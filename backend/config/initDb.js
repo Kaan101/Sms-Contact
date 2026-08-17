@@ -17,7 +17,19 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. Kullanıcı Talepleri Tablosu
+    // 2. OTP Doğrulama Tablosu
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS otp_verifications (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(50) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        is_used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 3. Kullanıcı Talepleri Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -32,7 +44,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 3. Niyet Netleştirme Tablosu
+    // 4. Niyet Netleştirme Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS disambiguation_dictionary (
         id SERIAL PRIMARY KEY,
@@ -43,7 +55,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 4. Örnek Buz Pateni Niyetini Ekle (Varsa atlar)
+    // Örnek Niyet
     await pool.query(`
       INSERT INTO disambiguation_dictionary (trigger_keyword, clarification_message, options)
       VALUES (
@@ -54,7 +66,7 @@ const initDatabase = async () => {
       ON CONFLICT (trigger_keyword) DO NOTHING;
     `);
 
-    console.log('✅ PostgreSQL tabloları (service_providers, requests, disambiguation) başarıyla doğrulandı ve hazırlandı.');
+    console.log('✅ Veritabanı tabloları ve OTP sistemi hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }
