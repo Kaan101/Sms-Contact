@@ -1,11 +1,9 @@
+require('dotenv').config(); // En tepede olmalı
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const { connectDB } = require('./config/db');
 const initDatabase = require('./config/initDb');
 const apiRoutes = require('./routes/apiRoutes');
-
-dotenv.config();
 
 // Veritabanı başlat
 (async () => {
@@ -25,7 +23,7 @@ app.use('/api', apiRoutes);
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'success',
-    message: 'SMS-Contact API sorunsuz çalışıyor!'
+    message: 'SMS-Contact API (PostgreSQL) sorunsuz çalışıyor!'
   });
 });
 

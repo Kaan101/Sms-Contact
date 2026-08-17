@@ -1,8 +1,11 @@
 const { Pool } = require('pg');
+require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost') ? false : {
+    rejectUnauthorized: false
+  }
 });
 
 const connectDB = async () => {
@@ -15,7 +18,7 @@ const connectDB = async () => {
     console.log('PostgreSQL (Railway) Bağlantısı Başarılı!');
     client.release();
   } catch (error) {
-    console.error(`PostgreSQL Bağlantı Hatası: ${error.message}`);
+    console.error('PostgreSQL Bağlantı Hatası Detayı:', error.message);
   }
 };
 
