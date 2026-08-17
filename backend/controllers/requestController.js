@@ -100,3 +100,37 @@ exports.getPendingRequests = async (req, res) => {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
+
+// Operatörün talebi belirli bir servis verene manuel ataması
+exports.assignProviderManually = async (req, res) => {
+  try {
+    const { requestId, providerId } = req.body;
+
+    if (!requestId || !providerId) {
+      return res.status(400).json({ status: 'error', message: 'Talep ID ve Servis Veren ID zorunludur.' });
+    }
+
+    const updateQuery = `
+      UPDATE requests
+      SET matched_provider_id = $1,
+          status = 'MATCHED'
+      WHERE id = $2
+      RETURNING *;
+    `;
+
+    const { rows } = await pool.query(updateQuery, [providerId, requestId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Talep başarıyla servis verene atandı.',
+      request: rows[0]
+    });
+  } catch (error) {
+    console.error('Manuel atama hatası:', error.message);
+    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+  }
+};
