@@ -603,16 +603,22 @@ const handleAssignProvider = async (requestId) => {
                       </p>
                     </div>
 
+          
                     <div className="flex items-center space-x-2">
                       <select
-                        onChange={(e) => setSelectedProviderMap({ ...selectedProviderMap, [req.id]: e.target.value })}
+                        value={selectedProviderMap[req.id] || ""}
+                        onChange={(e) =>
+                          setSelectedProviderMap((prev) => ({
+                            ...prev,
+                            [req.id]: e.target.value,
+                          }))
+                        }
                         className="text-xs p-2.5 border border-neutral-200 rounded-lg bg-neutral-50 outline-none focus:border-neutral-950 font-medium"
-                        defaultValue=""
                       >
                         <option value="" disabled>Sağlayıcı Seç</option>
                         {providers.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} (Öncelik: {p.priority_score})
+                            {p.name} (ID: {p.id})
                           </option>
                         ))}
                       </select>

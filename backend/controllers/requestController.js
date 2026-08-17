@@ -108,13 +108,27 @@ exports.assignProviderManually = async (req, res) => {
     if (!requestId || !providerId) {
       return res.status(400).json({ 
         status: 'error', 
-        message: 'Talep ID (requestId) ve Servis Veren ID (providerId) zorunludur.' 
+        message: 'requestId ve providerId zorunludur.' 
       });
     }
 
     const rId = parseInt(requestId, 10);
     const pId = parseInt(providerId, 10);
 
+    // 1. Servis sağlayıcının varlığını doğrula
+    const { rows: providerRows } = await pool.query(
+      'SELECT id, name FROM service_providers WHERE id = $1',
+      [pId]
+    );
+
+    if (providerRows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: `ID'si ${pId} olan servis sağlayıcı bulunamadı. Lütfen sayfayı yenileyin.`
+      });
+    }
+
+    // 2. Talebi güncelle
     const updateQuery = `
       UPDATE requests
       SET matched_provider_id = $1,
@@ -123,16 +137,16 @@ exports.assignProviderManually = async (req, res) => {
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(updateQuery, [pId, rId]);
+    const { rows: updatedRows } = await pool.query(updateQuery, [pId, rId]);
 
-    if (rows.length === 0) {
+    if (updatedRows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'Talep kaydı bulunamadı.' });
     }
 
     res.status(200).json({
       status: 'success',
-      message: 'Talep başarıyla servis verene atandı.',
-      request: rows[0]
+      message: `Talep başarıyla '${providerRows[0].name}' sağlayıcısına atandı.`,
+      request: updatedRows[0]
     });
   } catch (error) {
     console.error('Manuel atama hatası:', error);
