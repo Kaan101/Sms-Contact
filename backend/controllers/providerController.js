@@ -1,44 +1,132 @@
 const { pool } = require('../config/db');
 
-// Yeni Servis Veren Kaydı
+// 1. CREATE: Yeni Servis Veren Ekle
 exports.registerProvider = async (req, res) => {
   try {
     const { name, phone, email, serviceKeywords, communicationChannels, priorityScore } = req.body;
 
-    if (!name || !phone || !serviceKeywords || !Array.isArray(serviceKeywords)) {
-      return res.status(400).json({ status: 'error', message: 'İsim, telefon ve anahtar kelime listesi zorunludur.' });
+    if (!name || !phone || !serviceKeywords || !communicationChannels) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'İsim, telefon, anahtar kelimeler ve iletişim kanalları zorunludur.'
+      });
     }
 
-    // Anahtar kelimeleri küçük harfe çevirip normalize edelim
-    const normalizedKeywords = serviceKeywords.map(k => k.toLowerCase().trim());
-    const channels = communicationChannels && communicationChannels.length > 0 ? communicationChannels : ['PHONE'];
-
     const insertQuery = `
-      INSERT INTO providers (name, phone, email, service_keywords, communication_channels, priority_score)
+      INSERT INTO service_providers 
+      (name, phone, email, service_keywords, communication_channels, priority_score)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *;
     `;
 
-    const values = [name, phone, email || null, normalizedKeywords, channels, priorityScore || 100];
+    const values = [
+      name.trim(),
+      phone.trim(),
+      email ? email.trim() : null,
+      serviceKeywords,
+      communicationChannels,
+      priorityScore || 100
+    ];
+
     const { rows } = await pool.query(insertQuery, values);
 
     res.status(201).json({
       status: 'success',
-      message: 'Servis veren başarıyla kaydedildi.',
+      message: 'Servis veren başarıyla eklendi.',
       provider: rows[0]
     });
   } catch (error) {
-    console.error('Servis veren kayıt hatası:', error.message);
+    console.error('Servis veren ekleme hatası:', error.message);
     res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
   }
 };
 
-// Tüm Servis Verenleri Listele (Admin/Test için)
+// 2. READ: Tüm Servis Verenleri Listele
 exports.getProviders = async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM providers ORDER BY priority_score DESC');
-    res.status(200).json({ status: 'success', providers: rows });
+    const selectQuery = `
+      SELECT * FROM service_providers 
+      ORDER BY is_active DESC, priority_score DESC, created_at DESC;
+    `;
+    const { rows } = await pool.query(selectQuery);
+
+    res.status(200).json({
+      status: 'success',
+      providers: rows
+    });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('Servis verenleri getirme hatası:', error.message);
+    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+  }
+};
+
+// 3. UPDATE: Servis Veren Güncelle
+exports.updateProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, email, serviceKeywords, communicationChannels, priorityScore, isActive } = req.body;
+
+    const updateQuery = `
+      UPDATE service_providers
+      SET 
+        name = COALESCE($1, name),
+        phone = COALESCE($2, phone),
+        email = COALESCE($3, email),
+        service_keywords = COALESCE($4, service_keywords),
+        communication_channels = COALESCE($5, communication_channels),
+        priority_score = COALESCE($6, priority_score),
+        is_active = COALESCE($7, is_active)
+      WHERE id = $8
+      RETURNING *;
+    `;
+
+    const values = [
+      name ? name.trim() : null,
+      phone ? phone.trim() : null,
+      email !== undefined ? email : null,
+      serviceKeywords || null,
+      communicationChannels || null,
+      priorityScore !== undefined ? priorityScore : null,
+      isActive !== undefined ? isActive : null,
+      id
+    ];
+
+    const { rows } = await pool.query(updateQuery, values);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Servis veren bulunamadı.' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Servis veren başarıyla güncellendi.',
+      provider: rows[0]
+    });
+  } catch (error) {
+    console.error('Servis veren güncelleme hatası:', error.message);
+    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+  }
+};
+
+// 4. DELETE: Servis Vereni Sil
+exports.deleteProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Taleplerdeki ilişkileri bozmamak için önce kontrol edebilir veya doğrudan silebiliriz
+    const deleteQuery = `DELETE FROM service_providers WHERE id = $1 RETURNING *;`;
+    const { rows } = await pool.query(deleteQuery, [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Servis veren bulunamadı.' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Servis veren başarıyla silindi.'
+    });
+  } catch (error) {
+    console.error('Servis veren silme hatası:', error.message);
+    res.status(500).json({ status: 'error', message: 'Sunucu hatası veya ilişkili kayıt var.' });
   }
 };
