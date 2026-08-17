@@ -12,6 +12,15 @@ exports.registerProvider = async (req, res) => {
       });
     }
 
+    // Dizi olduğundan emin olalım
+    const keywordsArray = Array.isArray(serviceKeywords) 
+      ? serviceKeywords 
+      : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+    const channelsArray = Array.isArray(communicationChannels)
+      ? communicationChannels
+      : ['PHONE'];
+
     const insertQuery = `
       INSERT INTO service_providers 
       (name, phone, email, service_keywords, communication_channels, priority_score)
@@ -22,10 +31,10 @@ exports.registerProvider = async (req, res) => {
     const values = [
       name.trim(),
       phone.trim(),
-      email ? email.trim() : null,
-      serviceKeywords,
-      communicationChannels,
-      priorityScore || 100
+      email && email.trim() !== '' ? email.trim() : null,
+      keywordsArray,
+      channelsArray,
+      parseInt(priorityScore, 10) || 100
     ];
 
     const { rows } = await pool.query(insertQuery, values);
@@ -36,8 +45,11 @@ exports.registerProvider = async (req, res) => {
       provider: rows[0]
     });
   } catch (error) {
-    console.error('Servis veren ekleme hatası:', error.message);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+    console.error('Servis veren ekleme hatası:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: `Sunucu hatası: ${error.message}` 
+    });
   }
 };
 
@@ -55,8 +67,8 @@ exports.getProviders = async (req, res) => {
       providers: rows
     });
   } catch (error) {
-    console.error('Servis verenleri getirme hatası:', error.message);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+    console.error('Servis verenleri getirme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
 
@@ -65,6 +77,18 @@ exports.updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, phone, email, serviceKeywords, communicationChannels, priorityScore, isActive } = req.body;
+
+    const keywordsArray = serviceKeywords ? (
+      Array.isArray(serviceKeywords) 
+        ? serviceKeywords 
+        : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    ) : null;
+
+    const channelsArray = communicationChannels ? (
+      Array.isArray(communicationChannels) 
+        ? communicationChannels 
+        : ['PHONE']
+    ) : null;
 
     const updateQuery = `
       UPDATE service_providers
@@ -83,10 +107,10 @@ exports.updateProvider = async (req, res) => {
     const values = [
       name ? name.trim() : null,
       phone ? phone.trim() : null,
-      email !== undefined ? email : null,
-      serviceKeywords || null,
-      communicationChannels || null,
-      priorityScore !== undefined ? priorityScore : null,
+      email !== undefined ? (email && email.trim() !== '' ? email.trim() : null) : null,
+      keywordsArray,
+      channelsArray,
+      priorityScore !== undefined ? parseInt(priorityScore, 10) : null,
       isActive !== undefined ? isActive : null,
       id
     ];
@@ -103,17 +127,19 @@ exports.updateProvider = async (req, res) => {
       provider: rows[0]
     });
   } catch (error) {
-    console.error('Servis veren güncelleme hatası:', error.message);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+    console.error('Servis veren güncelleme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
 
-// 4. DELETE: Servis Vereni Sil
+// 4. DELETE: Servis Veren Sil
 exports.deleteProvider = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Taleplerdeki ilişkileri bozmamak için önce kontrol edebilir veya doğrudan silebiliriz
+    // Önce bu servis verene bağlı taleplerin foreign key'ini boşa çıkaralım
+    await pool.query('UPDATE requests SET matched_provider_id = NULL WHERE matched_provider_id = $1;', [id]);
+
     const deleteQuery = `DELETE FROM service_providers WHERE id = $1 RETURNING *;`;
     const { rows } = await pool.query(deleteQuery, [id]);
 
@@ -126,7 +152,7 @@ exports.deleteProvider = async (req, res) => {
       message: 'Servis veren başarıyla silindi.'
     });
   } catch (error) {
-    console.error('Servis veren silme hatası:', error.message);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası veya ilişkili kayıt var.' });
+    console.error('Servis veren silme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
