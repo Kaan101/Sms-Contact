@@ -137,15 +137,22 @@ export default function App() {
     }
   };
 
-  const handleAssignProvider = async (requestId) => {
+const handleAssignProvider = async (requestId) => {
     const providerId = selectedProviderMap[requestId];
-    if (!providerId) return;
+    if (!providerId) {
+      alert('Lütfen önce bir servis sağlayıcı seçin.');
+      return;
+    }
 
     try {
-      await axios.post(`${API_BASE}/requests/assign`, { requestId, providerId });
+      await axios.post(`${API_BASE}/requests/assign`, {
+        requestId: Number(requestId),
+        providerId: Number(providerId)
+      });
       fetchAdminData();
     } catch (err) {
-      alert('Atama işlemi başarısız oldu.');
+      console.error(err);
+      alert('Atama işlemi başarısız: ' + (err.response?.data?.message || err.message));
     }
   };
 

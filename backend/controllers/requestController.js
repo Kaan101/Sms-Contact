@@ -1,114 +1,119 @@
 const { pool } = require('../config/db');
 
-// Talep Oluştur ve Eşleştir
+// 1. Yeni Talep Oluşturma ve Kural Tabanlı Eşleştirme
 exports.createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
 
     if (!rawText || !contactValue) {
-      return res.status(400).json({ status: 'error', message: 'Talep metni ve iletişim bilgisi zorunludur.' });
+      return res.status(400).json({ status: 'error', message: 'Metin ve iletişim bilgisi zorunludur.' });
     }
 
-    // 1. Arama için anahtar kelimeleri çıkar
-    const fullText = disambiguationChoice ? `${rawText} ${disambiguationChoice}` : rawText;
-    const searchTokens = fullText.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+    const textToAnalyze = (disambiguationChoice || rawText).toLowerCase();
+    const tokens = textToAnalyze
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
 
-    // 2. Akıllı Eşleştirme Sorgusu (Öncelik Puanına göre sıralı)
-    // Servis verenin anahtar kelimeleri aranan kelimelerle kesişiyor mu?
-    const matchQuery = `
-      SELECT * FROM providers
-      WHERE is_active = TRUE
-        AND service_keywords && $1::text[]
-      ORDER BY priority_score DESC
-      LIMIT 1;
-    `;
+    // Servis verenleri puan sırasına göre al
+    const { rows: providers } = await pool.query(`
+      SELECT * FROM service_providers 
+      WHERE is_active = TRUE 
+      ORDER BY priority_score DESC;
+    `);
 
-    const { rows: matchedProviders } = await pool.query(matchQuery, [searchTokens]);
-
-    let requestStatus = 'PENDING';
     let matchedProvider = null;
-
-    if (matchedProviders.length > 0) {
-      // Eşleşme bulundu
-      matchedProvider = matchedProviders[0];
-      requestStatus = 'MATCHED';
-    } else {
-      // Eşleşme bulunamadı -> Wizard of Oz (Manuel Müdahale Havuzu)
-      requestStatus = 'MANUAL_INTERVENTION';
+    for (const provider of providers) {
+      const keywords = (provider.service_keywords || []).map(k => k.toLowerCase());
+      const hasMatch = keywords.some(k => tokens.includes(k) || textToAnalyze.includes(k));
+      if (hasMatch) {
+        matchedProvider = provider;
+        break;
+      }
     }
 
-    // 3. Kanal Seçimi ve Aciliyet Optimizasyonu
-    let finalChannel = preferredChannel || 'PHONE';
-    if (fullText.includes('pizza') || fullText.includes('çilingir') || fullText.includes('acil')) {
-      finalChannel = 'PHONE'; // Acil ihtiyaçlar her zaman telefona öncelik verir
-    }
+    const status = matchedProvider ? 'MATCHED' : 'MANUAL_INTERVENTION';
+    const matchedId = matchedProvider ? matchedProvider.id : null;
 
-    // 4. Talebi Veritabanına Kaydet
-    const insertRequestQuery = `
-      INSERT INTO requests (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, status, matched_provider_id)
+    const insertQuery = `
+      INSERT INTO requests 
+      (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, status, matched_provider_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *;
     `;
 
-    const { rows: requestRows } = await pool.query(insertRequestQuery, [
+    const { rows: savedRows } = await pool.query(insertQuery, [
       rawText,
       disambiguationChoice || null,
-      searchTokens,
+      tokens,
       contactValue,
-      finalChannel,
-      requestStatus,
-      matchedProvider ? matchedProvider.id : null
+      preferredChannel || 'PHONE',
+      status,
+      matchedId
     ]);
 
-    const createdRequest = requestRows[0];
+    const createdReq = savedRows[0];
 
-    // 5. Yanıtı Döndür
-    if (requestStatus === 'MATCHED') {
+    if (matchedProvider) {
+      const channels = matchedProvider.communication_channels || ['PHONE'];
+      const channelUsed = channels.includes(preferredChannel) ? preferredChannel : channels[0];
       return res.status(201).json({
         status: 'success',
-        message: 'Talebiniz başarıyla oluşturuldu ve en uygun servis verenle eşleştirildi!',
-        request: createdRequest,
+        message: `Talebiniz '${matchedProvider.name}' ile eşleştirildi. En kısa sürede ${channelUsed} üzerinden iletişime geçilecek.`,
         matchedProvider: {
           name: matchedProvider.name,
-          priorityScore: matchedProvider.priority_score,
-          channelUsed: finalChannel
-        }
+          phone: matchedProvider.phone,
+          channelUsed: channelUsed
+        },
+        request: createdReq
       });
     } else {
       return res.status(201).json({
         status: 'success',
-        message: 'Talebiniz alındı. En uygun servis veren sizinle kısa süre içinde iletişime geçecektir (Manuel Destek Devrede).',
-        request: createdRequest,
-        isManualIntervention: true
+        message: 'Talebiniz alındı. Uygun servis sağlayıcı onaylandığında sizinle iletişime geçilecektir.',
+        matchedProvider: null,
+        request: createdReq
       });
     }
-
   } catch (error) {
-    console.error('Talep oluşturma hatası:', error.message);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+    console.error('Talep oluşturma hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
 
-// Bekleyen ve Manuel Müdahale Gerektiren Talepleri Listele (Admin Paneli için)
+// 2. Bekleyen / Müdahale Gerektiren Talepleri Getir
 exports.getPendingRequests = async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT * FROM requests WHERE status IN ('PENDING', 'MANUAL_INTERVENTION') ORDER BY created_at DESC`
-    );
-    res.status(200).json({ status: 'success', requests: rows });
+    const { rows } = await pool.query(`
+      SELECT * FROM requests 
+      WHERE status = 'MANUAL_INTERVENTION' OR status = 'PENDING'
+      ORDER BY created_at DESC;
+    `);
+
+    res.status(200).json({
+      status: 'success',
+      requests: rows
+    });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('Bekleyen talepleri getirme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
 
-// Operatörün talebi belirli bir servis verene manuel ataması
+// 3. Operatörün Talebi Belirli Bir Servis Verene Manuel Ataması (DÜZELTİLDİ)
 exports.assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
 
     if (!requestId || !providerId) {
-      return res.status(400).json({ status: 'error', message: 'Talep ID ve Servis Veren ID zorunludur.' });
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'Talep ID (requestId) ve Servis Veren ID (providerId) zorunludur.' 
+      });
     }
+
+    const rId = parseInt(requestId, 10);
+    const pId = parseInt(providerId, 10);
 
     const updateQuery = `
       UPDATE requests
@@ -118,10 +123,10 @@ exports.assignProviderManually = async (req, res) => {
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(updateQuery, [providerId, requestId]);
+    const { rows } = await pool.query(updateQuery, [pId, rId]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
+      return res.status(404).json({ status: 'error', message: 'Talep kaydı bulunamadı.' });
     }
 
     res.status(200).json({
@@ -130,7 +135,7 @@ exports.assignProviderManually = async (req, res) => {
       request: rows[0]
     });
   } catch (error) {
-    console.error('Manuel atama hatası:', error.message);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+    console.error('Manuel atama hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
