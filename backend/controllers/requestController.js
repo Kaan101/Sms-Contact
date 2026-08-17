@@ -1,39 +1,58 @@
 const { pool } = require('../config/db');
 
-// 1. Yeni Talep Oluşturma ve Kural Tabanlı Eşleştirme
+// 1. Yeni Talep Oluşturma ve Eşleştirme Motoru
 exports.createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
 
     if (!rawText || !contactValue) {
-      return res.status(400).json({ status: 'error', message: 'Metin ve iletişim bilgisi zorunludur.' });
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'Talep metni ve iletişim bilgisi zorunludur.' 
+      });
     }
 
+    // Metni ayrıştır ve temizle
     const textToAnalyze = (disambiguationChoice || rawText).toLowerCase();
     const tokens = textToAnalyze
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length > 2);
+      .filter(w => w.length > 1);
 
-    // Servis verenleri puan sırasına göre al
-    const { rows: providers } = await pool.query(`
-      SELECT * FROM service_providers 
+    // Yalnızca veritabanında GERÇEKTEN var olan aktif sağlayıcıları çek
+    const { rows: activeProviders } = await pool.query(`
+      SELECT id, name, phone, service_keywords, communication_channels, priority_score 
+      FROM service_providers 
       WHERE is_active = TRUE 
-      ORDER BY priority_score DESC;
+      ORDER BY priority_score DESC, id ASC;
     `);
 
     let matchedProvider = null;
-    for (const provider of providers) {
-      const keywords = (provider.service_keywords || []).map(k => k.toLowerCase());
-      const hasMatch = keywords.some(k => tokens.includes(k) || textToAnalyze.includes(k));
-      if (hasMatch) {
-        matchedProvider = provider;
-        break;
+
+    if (activeProviders.length > 0) {
+      for (const provider of activeProviders) {
+        const keywords = (provider.service_keywords || []).map(k => k.toLowerCase().trim());
+        
+        // Hem tam metin araması hem de kelime bazlı eşleşme kontrolü
+        const hasMatch = keywords.some(k => 
+          tokens.includes(k) || 
+          textToAnalyze.includes(k) ||
+          k.split(/\s+/).every(part => textToAnalyze.includes(part))
+        );
+
+        if (hasMatch) {
+          matchedProvider = provider;
+          break;
+        }
       }
     }
 
-    const status = matchedProvider ? 'MATCHED' : 'MANUAL_INTERVENTION';
-    const matchedId = matchedProvider ? matchedProvider.id : null;
+    // matchedProvider yoksa veya ID'si geçersizse NULL atanır
+    const validMatchedId = (matchedProvider && Number.isInteger(Number(matchedProvider.id))) 
+      ? Number(matchedProvider.id) 
+      : null;
+    
+    const requestStatus = validMatchedId ? 'MATCHED' : 'MANUAL_INTERVENTION';
 
     const insertQuery = `
       INSERT INTO requests 
@@ -42,25 +61,28 @@ exports.createRequest = async (req, res) => {
       RETURNING *;
     `;
 
-    const { rows: savedRows } = await pool.query(insertQuery, [
-      rawText,
-      disambiguationChoice || null,
+    const values = [
+      rawText.trim(),
+      disambiguationChoice ? disambiguationChoice.trim() : null,
       tokens,
-      contactValue,
+      contactValue.trim(),
       preferredChannel || 'PHONE',
-      status,
-      matchedId
-    ]);
+      requestStatus,
+      validMatchedId
+    ];
 
+    const { rows: savedRows } = await pool.query(insertQuery, values);
     const createdReq = savedRows[0];
 
-    if (matchedProvider) {
+    if (validMatchedId && matchedProvider) {
       const channels = matchedProvider.communication_channels || ['PHONE'];
       const channelUsed = channels.includes(preferredChannel) ? preferredChannel : channels[0];
+
       return res.status(201).json({
         status: 'success',
-        message: `Talebiniz '${matchedProvider.name}' ile eşleştirildi. En kısa sürede ${channelUsed} üzerinden iletişime geçilecek.`,
+        message: `Talebiniz '${matchedProvider.name}' ile eşleştirildi. En kısa sürede ${channelUsed} üzerinden iletişime geçilecektir.`,
         matchedProvider: {
+          id: matchedProvider.id,
           name: matchedProvider.name,
           phone: matchedProvider.phone,
           channelUsed: channelUsed
@@ -77,11 +99,14 @@ exports.createRequest = async (req, res) => {
     }
   } catch (error) {
     console.error('Talep oluşturma hatası:', error);
-    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+    res.status(500).json({ 
+      status: 'error', 
+      message: `Sunucu hatası: ${error.message}` 
+    });
   }
 };
 
-// 2. Bekleyen / Müdahale Gerektiren Talepleri Getir
+// 2. Bekleyen / Müdahale Gerektiren Talepleri Listele
 exports.getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -100,7 +125,7 @@ exports.getPendingRequests = async (req, res) => {
   }
 };
 
-// 3. Operatörün Talebi Belirli Bir Servis Verene Manuel Ataması (DÜZELTİLDİ)
+// 3. Operatör Manuel Ataması (WoZ)
 exports.assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
@@ -108,14 +133,14 @@ exports.assignProviderManually = async (req, res) => {
     if (!requestId || !providerId) {
       return res.status(400).json({ 
         status: 'error', 
-        message: 'requestId ve providerId zorunludur.' 
+        message: 'requestId ve providerId parametreleri zorunludur.' 
       });
     }
 
     const rId = parseInt(requestId, 10);
     const pId = parseInt(providerId, 10);
 
-    // 1. Servis sağlayıcının varlığını doğrula
+    // Servis sağlayıcının varlığını doğrula
     const { rows: providerRows } = await pool.query(
       'SELECT id, name FROM service_providers WHERE id = $1',
       [pId]
@@ -124,11 +149,10 @@ exports.assignProviderManually = async (req, res) => {
     if (providerRows.length === 0) {
       return res.status(404).json({
         status: 'error',
-        message: `ID'si ${pId} olan servis sağlayıcı bulunamadı. Lütfen sayfayı yenileyin.`
+        message: `ID'si ${pId} olan servis sağlayıcı bulunamadı. Lütfen sağlayıcı listesini yenileyin.`
       });
     }
 
-    // 2. Talebi güncelle
     const updateQuery = `
       UPDATE requests
       SET matched_provider_id = $1,
@@ -140,12 +164,12 @@ exports.assignProviderManually = async (req, res) => {
     const { rows: updatedRows } = await pool.query(updateQuery, [pId, rId]);
 
     if (updatedRows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Talep kaydı bulunamadı.' });
+      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
     }
 
     res.status(200).json({
       status: 'success',
-      message: `Talep başarıyla '${providerRows[0].name}' sağlayıcısına atandı.`,
+      message: `Talep '${providerRows[0].name}' sağlayıcısına atandı.`,
       request: updatedRows[0]
     });
   } catch (error) {
