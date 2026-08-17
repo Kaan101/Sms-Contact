@@ -1,24 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  MessageSquareText, 
+  ArrowRight, 
+  CornerDownLeft, 
   Phone, 
-  MessageCircle, 
-  HelpCircle, 
+  MessageSquare, 
+  SlidersHorizontal, 
+  Users, 
+  ShieldAlert, 
   CheckCircle2, 
-  Clock, 
-  ArrowRight,
-  RotateCcw,
-  ShieldCheck,
-  UserCheck,
-  PlusCircle,
-  Inbox,
-  Users,
-  Trash2,
-  Edit,
-  X,
-  Tag,
-  Mail
+  RotateCcw, 
+  Plus, 
+  Trash2, 
+  Edit3, 
+  X, 
+  Sparkles,
+  Command,
+  HelpCircle,
+  Building2,
+  Clock,
+  Layers
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -32,18 +33,18 @@ export default function App() {
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   const [contactValue, setContactValue] = useState('');
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
-  const [step, setStep] = useState('INPUT');
+  const [step, setStep] = useState('INPUT'); // 'INPUT' | 'DISAMBIGUATE' | 'CONTACT' | 'RESULT'
   const [loading, setLoading] = useState(false);
   const [resultData, setResultData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Operatör / Admin State'leri
+  // Admin / CRUD State'leri
   const [pendingRequests, setPendingRequests] = useState([]);
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
   const [adminLoading, setAdminLoading] = useState(false);
 
-  // Servis Veren CRUD Form State'i
+  // Modal State'leri
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [formData, setFormData] = useState({
@@ -60,7 +61,7 @@ export default function App() {
       const res = await axios.get(`${API_BASE}/providers`);
       setProviders(res.data.providers || []);
     } catch (err) {
-      console.error('Servis verenleri çekme hatası:', err);
+      console.error(err);
     }
   };
 
@@ -74,7 +75,7 @@ export default function App() {
       setPendingRequests(reqRes.data.requests || []);
       setProviders(provRes.data.providers || []);
     } catch (err) {
-      console.error('Admin veri hatası:', err);
+      console.error(err);
     } finally {
       setAdminLoading(false);
     }
@@ -85,9 +86,8 @@ export default function App() {
     if (activeTab === 'PROVIDERS') fetchProviders();
   }, [activeTab]);
 
-  // Kullanıcı Talep Gönderimi
   const handleInitialSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!queryText.trim()) return;
 
     setLoading(true);
@@ -131,13 +131,12 @@ export default function App() {
       setResultData(response.data);
       setStep('RESULT');
     } catch (err) {
-      setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
+      setErrorMessage(err.response?.data?.message || 'Bir hata meydana geldi.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Manuel Eşleştirme Yap (WoZ)
   const handleAssignProvider = async (requestId) => {
     const providerId = selectedProviderMap[requestId];
     if (!providerId) return;
@@ -150,7 +149,6 @@ export default function App() {
     }
   };
 
-  // CRUD: Formu Aç (Ekle / Düzenle)
   const openModal = (provider = null) => {
     if (provider) {
       setEditingProviderId(provider.id);
@@ -176,7 +174,6 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  // CRUD: Kaydet (Create or Update)
   const handleSaveProvider = async (e) => {
     e.preventDefault();
     const keywordsArray = formData.serviceKeywords
@@ -202,18 +199,17 @@ export default function App() {
       setIsModalOpen(false);
       fetchProviders();
     } catch (err) {
-      alert('Kaydedilirken bir hata oluştu: ' + (err.response?.data?.message || err.message));
+      alert('Kayıt başarısız: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  // CRUD: Sil
   const handleDeleteProvider = async (id) => {
-    if (!window.confirm('Bu servis vereni silmek istediğinize emin misiniz?')) return;
+    if (!window.confirm('Bu servis sağlayıcıyı silmek istediğinize emin misiniz?')) return;
     try {
       await axios.delete(`${API_BASE}/providers/${id}`);
       fetchProviders();
     } catch (err) {
-      alert('Silme işlemi başarısız oldu.');
+      alert('Silme işlemi başarısız.');
     }
   };
 
@@ -229,165 +225,259 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans">
-      {/* Üst Menü / Navbar */}
-      <header className="bg-white border-b border-slate-200 py-3 px-6 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-100">
-              <MessageSquareText size={20} />
+    <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
+      
+      {/* 🧭 NAVIGATION: Swiss Precision Navbar */}
+      <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          
+          {/* Logo / Brand Mark */}
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={handleReset}>
+            <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">
+              SC
             </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-800">Sms-Contact</h1>
-              <p className="text-xs text-slate-500 font-medium">Doğal Dil ile Hizmet Eşleştirme</p>
+            <div className="flex items-baseline space-x-2">
+              <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 1.0</span>
             </div>
           </div>
 
-          {/* Sekmeler */}
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+          {/* Swiss Segmented Tabs */}
+          <div className="flex items-center bg-neutral-100/80 p-1 rounded-lg border border-neutral-200/60 text-xs font-medium">
             <button
               onClick={() => setActiveTab('USER')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                activeTab === 'USER' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3.5 py-1.5 rounded-md transition-all duration-200 ${
+                activeTab === 'USER' 
+                  ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
+                  : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
-              Talep Gönder
-            </button>
-            <button
-              onClick={() => setActiveTab('ADMIN')}
-              className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${
-                activeTab === 'ADMIN' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck size={14} />
-              <span>Operatör (WoZ)</span>
+              Talep Motoru
             </button>
             <button
               onClick={() => setActiveTab('PROVIDERS')}
-              className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${
-                activeTab === 'PROVIDERS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3.5 py-1.5 rounded-md transition-all duration-200 flex items-center space-x-1.5 ${
+                activeTab === 'PROVIDERS' 
+                  ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
+                  : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
-              <Users size={14} />
-              <span>Servis Verenler</span>
+              <Users size={13} className="text-neutral-400" />
+              <span>Sağlayıcılar</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ADMIN')}
+              className={`px-3.5 py-1.5 rounded-md transition-all duration-200 flex items-center space-x-1.5 ${
+                activeTab === 'ADMIN' 
+                  ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              <SlidersHorizontal size={13} className="text-neutral-400" />
+              <span>WoZ Havuzu</span>
+              {pendingRequests.length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              )}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Ana Gövde */}
-      <main className="max-w-4xl w-full mx-auto px-4 py-8">
+      {/* 🏛️ MAIN CONTENT AREA */}
+      <main className="max-w-6xl w-full mx-auto px-6 py-12 flex-1 flex flex-col justify-center">
+        
         {errorMessage && (
-          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm flex items-center justify-between">
+          <div className="max-w-xl mx-auto w-full mb-6 p-4 bg-rose-50/70 border border-rose-200/80 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between backdrop-blur-sm">
             <span>{errorMessage}</span>
-            <button onClick={() => setErrorMessage('')} className="text-rose-500 hover:text-rose-700 font-bold ml-4">✕</button>
+            <button onClick={() => setErrorMessage('')} className="text-rose-400 hover:text-rose-700 ml-4">
+              <X size={14} />
+            </button>
           </div>
         )}
 
-        {/* ----------------- 1. KULLANICI TALEP GÖNDERME EKRANI ----------------- */}
+        {/* ---------------- 1. KULLANICI ARAYÜZÜ (MINIMALIST & PSYCHOLOGICALLY FOCUSED) ---------------- */}
         {activeTab === 'USER' && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto w-full">
+            
+            {/* STEP 1: INPUT */}
             {step === 'INPUT' && (
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                <div className="mb-6 text-center">
-                  <h2 className="text-2xl font-bold text-slate-800 mb-2">Ne tür bir hizmet arıyorsunuz?</h2>
-                  <p className="text-sm text-slate-600">İhtiyacınızı günlük konuşma dilinizle yazın.</p>
+              <div className="space-y-8 animate-fadeIn">
+                <div className="text-center space-y-3">
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-neutral-200 bg-white text-neutral-600 text-xs font-medium shadow-swiss-sm">
+                    <Sparkles size={13} className="text-neutral-900" />
+                    <span>Serbest Metin Eşleştirme Motoru</span>
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-950">
+                    Hangi hizmete ihtiyacınız var?
+                  </h1>
+                  <p className="text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
+                    Kategori seçmeden, form doldurmadan. İstediğiniz hizmeti günlük dilde yazın, uygun sağlayıcıyla eşleştirelim.
+                  </p>
                 </div>
 
                 <form onSubmit={handleInitialSubmit} className="space-y-4">
-                  <textarea
-                    rows={4}
-                    value={queryText}
-                    onChange={(e) => setQueryText(e.target.value)}
-                    placeholder="Örn: Kadıköy'de acil buz pateni sahası kiralamak istiyorum veya Tarabya'da sıcak pizza siparişi verelim..."
-                    className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 text-base resize-none"
-                    required
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={loading || !queryText.trim()}
-                    className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold rounded-xl transition shadow-sm flex items-center justify-center space-x-2"
-                  >
-                    {loading ? <span>Analiz Ediliyor...</span> : <><span>Devam Et</span><ArrowRight size={18} /></>}
-                  </button>
+                  <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-swiss hover:border-neutral-300 transition-all p-3 focus-within:ring-2 focus-within:ring-neutral-950 focus-within:border-transparent">
+                    <textarea
+                      rows={3}
+                      value={queryText}
+                      onChange={(e) => setQueryText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleInitialSubmit();
+                        }
+                      }}
+                      placeholder="Örn: Moda'da acil bisiklet lastik tamiri arıyorum veya Kadıköy'de buz pateni sahası kiralayalım..."
+                      className="w-full p-3 text-base text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none"
+                      required
+                    />
+                    <div className="flex items-center justify-between pt-2 border-t border-neutral-100 px-2 text-xs text-neutral-400">
+                      <span className="hidden sm:inline-flex items-center space-x-1 font-mono text-[11px]">
+                        <CornerDownLeft size={11} />
+                        <span>Göndermek için Enter'a basın</span>
+                      </span>
+                      <button
+                        type="submit"
+                        disabled={loading || !queryText.trim()}
+                        className="ml-auto px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-lg text-xs font-semibold tracking-wide transition-all shadow-sm flex items-center space-x-1.5"
+                      >
+                        {loading ? (
+                          <span>Çözümleniyor...</span>
+                        ) : (
+                          <>
+                            <span>Devam Et</span>
+                            <ArrowRight size={13} />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </form>
+
+                {/* Micro Metrics */}
+                <div className="grid grid-cols-3 gap-4 pt-4 max-w-lg mx-auto text-center border-t border-neutral-200/50">
+                  <div>
+                    <p className="text-lg font-bold tracking-tight text-neutral-900">0s</p>
+                    <p className="text-[11px] text-neutral-400 uppercase tracking-wider font-mono">Form Süresi</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold tracking-tight text-neutral-900">%100</p>
+                    <p className="text-[11px] text-neutral-400 uppercase tracking-wider font-mono">Doğal Dil</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold tracking-tight text-neutral-900">Doğrudan</p>
+                    <p className="text-[11px] text-neutral-400 uppercase tracking-wider font-mono">Kanal Bağlantısı</p>
+                  </div>
+                </div>
               </div>
             )}
 
+            {/* STEP 2: DISAMBIGUATION (NİYET NETLEŞTİRME) */}
             {step === 'DISAMBIGUATE' && disambiguationData && (
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                <div className="flex items-center space-x-3 text-amber-600 mb-4 bg-amber-50 p-3 rounded-xl border border-amber-100">
-                  <HelpCircle size={24} className="flex-shrink-0" />
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-swiss p-8 space-y-6 animate-fadeIn">
+                <div className="flex items-start space-x-3.5 pb-4 border-b border-neutral-100">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <HelpCircle size={18} />
+                  </div>
                   <div>
-                    <h3 className="font-semibold text-sm">Hizmet Netleştirme</h3>
-                    <p className="text-xs text-amber-700 mt-0.5">{disambiguationData.message}</p>
+                    <h3 className="font-semibold text-base text-neutral-950">Hizmet Amacını Netleştirelim</h3>
+                    <p className="text-xs text-neutral-500 mt-0.5">{disambiguationData.message}</p>
                   </div>
                 </div>
 
-                <div className="space-y-3 my-6">
+                <div className="space-y-2.5">
                   {disambiguationData.options.map((option) => (
                     <button
                       key={option.id}
                       onClick={() => { setSelectedDisambiguation(option.text); setStep('CONTACT'); }}
-                      className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 transition flex items-center justify-between group"
+                      className="w-full text-left p-4 rounded-xl border border-neutral-200/80 hover:border-neutral-950 hover:bg-neutral-50/50 transition-all duration-150 flex items-center justify-between group"
                     >
-                      <span className="text-slate-800 font-medium group-hover:text-indigo-900">{option.text}</span>
-                      <ArrowRight size={18} className="text-slate-400 group-hover:text-indigo-600" />
+                      <span className="text-sm font-medium text-neutral-900 group-hover:text-neutral-950">{option.text}</span>
+                      <ArrowRight size={15} className="text-neutral-300 group-hover:text-neutral-950 group-hover:translate-x-0.5 transition-all" />
                     </button>
                   ))}
                   <button
                     onClick={() => { setSelectedDisambiguation(null); setStep('CONTACT'); }}
-                    className="w-full text-left p-3 rounded-xl border border-dashed border-slate-300 hover:bg-slate-50 text-slate-500 text-xs transition text-center"
+                    className="w-full text-center p-3 rounded-xl border border-dashed border-neutral-200 hover:bg-neutral-50 text-neutral-400 hover:text-neutral-600 text-xs transition"
                   >
-                    Yazdığım gibi devam et ("{queryText}")
+                    Orijinal ifademle devam et: <span className="font-medium italic">"{queryText}"</span>
                   </button>
                 </div>
               </div>
             )}
 
+            {/* STEP 3: CONTACT & CHANNEL SELECTION */}
             {step === 'CONTACT' && (
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold text-slate-800 mb-1">İletişim Tercihiniz</h2>
-                  <p className="text-xs text-slate-500">Servis sağlayıcının sizinle nasıl iletişime geçmesini istersiniz?</p>
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-swiss p-8 space-y-6 animate-fadeIn">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold tracking-tight text-neutral-950">İletişim & Kanal Tercihi</h2>
+                    <span className="text-[11px] font-mono text-neutral-400">Adım 2 / 2</span>
+                  </div>
+                  <p className="text-xs text-neutral-500 mt-1">Servis sağlayıcının size nasıl ulaşmasını istersiniz?</p>
+                  
+                  {selectedDisambiguation && (
+                    <div className="mt-3 inline-flex items-center space-x-1.5 bg-neutral-100 text-neutral-800 text-xs px-3 py-1 rounded-md font-mono">
+                      <span className="text-neutral-400 font-sans">Hedef:</span>
+                      <span className="font-semibold">{selectedDisambiguation}</span>
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleFinalSubmit} className="space-y-5">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Telefon Numaranız</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2 font-mono">
+                      Telefon Numaranız
+                    </label>
                     <input
                       type="tel"
                       value={contactValue}
                       onChange={(e) => setContactValue(e.target.value)}
                       placeholder="+90 5XX XXX XX XX"
-                      className="w-full p-3.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800"
+                      className="w-full p-3.5 rounded-xl border border-neutral-200 focus:border-neutral-950 focus:ring-1 focus:ring-neutral-950 outline-none text-neutral-900 text-sm font-mono tracking-tight"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Kanal Tercihi</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2 font-mono">
+                      Tercih Edilen İletişim Kanalı
+                    </label>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => setPreferredChannel('PHONE')}
-                        className={`p-3 rounded-xl border flex items-center justify-center space-x-2 text-sm font-medium transition ${
-                          preferredChannel === 'PHONE' ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 font-semibold' : 'border-slate-200 text-slate-600'
+                        className={`p-3.5 rounded-xl border text-left transition-all ${
+                          preferredChannel === 'PHONE'
+                            ? 'border-neutral-950 bg-neutral-950 text-white shadow-sm'
+                            : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
                         }`}
                       >
-                        <Phone size={18} />
-                        <span>Telefon Araması</span>
+                        <div className="flex items-center space-x-2">
+                          <Phone size={16} />
+                          <span className="text-xs font-semibold">Telefon Araması</span>
+                        </div>
+                        <p className={`text-[11px] mt-1 ${preferredChannel === 'PHONE' ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                          Hızlı ve doğrudan sesli görüşme
+                        </p>
                       </button>
+
                       <button
                         type="button"
                         onClick={() => setPreferredChannel('SMS')}
-                        className={`p-3 rounded-xl border flex items-center justify-center space-x-2 text-sm font-medium transition ${
-                          preferredChannel === 'SMS' ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 font-semibold' : 'border-slate-200 text-slate-600'
+                        className={`p-3.5 rounded-xl border text-left transition-all ${
+                          preferredChannel === 'SMS'
+                            ? 'border-neutral-950 bg-neutral-950 text-white shadow-sm'
+                            : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
                         }`}
                       >
-                        <MessageCircle size={18} />
-                        <span>SMS / WhatsApp</span>
+                        <div className="flex items-center space-x-2">
+                          <MessageSquare size={16} />
+                          <span className="text-xs font-semibold">SMS / WhatsApp</span>
+                        </div>
+                        <p className={`text-[11px] mt-1 ${preferredChannel === 'SMS' ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                          Yazılı bilgilendirme ve detay
+                        </p>
                       </button>
                     </div>
                   </div>
@@ -396,114 +486,123 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setStep('INPUT')}
-                      className="w-1/3 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold rounded-xl text-sm"
+                      className="w-1/3 py-3 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 font-semibold rounded-xl text-xs transition"
                     >
                       Geri
                     </button>
                     <button
                       type="submit"
                       disabled={loading || !contactValue.trim()}
-                      className="w-2/3 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold rounded-xl text-sm"
+                      className="w-2/3 py-3 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white font-semibold rounded-xl text-xs transition shadow-sm"
                     >
-                      {loading ? 'Gönderiliyor...' : 'Talebi Tamamla'}
+                      {loading ? 'İşleniyor...' : 'Talebi Onayla'}
                     </button>
                   </div>
                 </form>
               </div>
             )}
 
+            {/* STEP 4: RESULT */}
             {step === 'RESULT' && resultData && (
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-swiss p-8 text-center space-y-6 animate-fadeIn">
                 {resultData.matchedProvider ? (
                   <div className="space-y-4">
-                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
-                      <CheckCircle2 size={36} />
+                    <div className="w-14 h-14 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
+                      <CheckCircle2 size={28} />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">Eşleşme Sağlandı!</h2>
-                    <p className="text-sm text-slate-600 max-w-md mx-auto">{resultData.message}</p>
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left text-sm mt-4 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Servis Sağlayıcı:</span>
-                        <span className="font-semibold text-slate-800">{resultData.matchedProvider.name}</span>
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight text-neutral-950">Eşleşme Sağlandı</h2>
+                      <p className="text-xs text-neutral-500 max-w-sm mx-auto">{resultData.message}</p>
+                    </div>
+
+                    <div className="bg-neutral-50 border border-neutral-200/80 rounded-xl p-4 text-left text-xs space-y-2.5 font-mono">
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400 font-sans">Servis Sağlayıcı:</span>
+                        <span className="font-semibold text-neutral-950">{resultData.matchedProvider.name}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">İletişim Kanalı:</span>
-                        <span className="font-semibold text-slate-800">{resultData.matchedProvider.channelUsed}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400 font-sans">Kanal:</span>
+                        <span className="px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded font-semibold text-[10px]">
+                          {resultData.matchedProvider.channelUsed}
+                        </span>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
-                      <Clock size={36} />
+                    <div className="w-14 h-14 bg-neutral-100 border border-neutral-200 text-neutral-700 rounded-2xl mx-auto flex items-center justify-center">
+                      <Clock size={28} />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">Talebiniz Alındı</h2>
-                    <p className="text-sm text-slate-600 max-w-md mx-auto">{resultData.message}</p>
-                    <div className="inline-block bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full border border-blue-200">
-                      Operatör Havuzuna Aktarıldı (Wizard of Oz)
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight text-neutral-950">Talebiniz Kaydedildi</h2>
+                      <p className="text-xs text-neutral-500 max-w-sm mx-auto">{resultData.message}</p>
                     </div>
+                    <span className="inline-block bg-neutral-100 text-neutral-700 text-[11px] font-mono px-3 py-1 rounded-full border border-neutral-200">
+                      Operatör Koordinasyon Modu Aktif
+                    </span>
                   </div>
                 )}
 
                 <button
                   onClick={handleReset}
-                  className="mt-6 inline-flex items-center space-x-2 py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition"
+                  className="inline-flex items-center space-x-2 py-2.5 px-5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold transition"
                 >
-                  <RotateCcw size={16} />
-                  <span>Yeni Talep</span>
+                  <RotateCcw size={14} />
+                  <span>Yeni Talep Başlat</span>
                 </button>
               </div>
             )}
+
           </div>
         )}
 
-        {/* ----------------- 2. OPERATÖR / WOZ MODU ----------------- */}
+        {/* ---------------- 2. OPERATÖR WOZ MODU (SWISS DATA DASHBOARD) ---------------- */}
         {activeTab === 'ADMIN' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Operatör Müdahale Havuzu</h2>
-                <p className="text-xs text-slate-500">Otomatik eşleşmeyen talepleri servis verenlere yönlendirin.</p>
+                <h2 className="text-xl font-bold tracking-tight text-neutral-950">Operatör Müdahale Havuzu</h2>
+                <p className="text-xs text-neutral-500">Otomatik kural motorunun yetersiz kaldığı talepleri manuel koordine edin.</p>
               </div>
               <button
                 onClick={fetchAdminData}
-                className="text-xs font-semibold px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
+                className="text-xs font-semibold px-3 py-1.5 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 text-neutral-700 shadow-swiss-sm transition"
               >
                 Yenile
               </button>
             </div>
 
             {adminLoading ? (
-              <div className="text-center py-12 text-sm text-slate-500">Kayıtlar yükleniyor...</div>
+              <div className="text-center py-16 text-xs text-neutral-400 font-mono">Veriler sorgulanıyor...</div>
             ) : pendingRequests.length === 0 ? (
-              <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center">
-                <Inbox size={40} className="mx-auto text-slate-300 mb-3" />
-                <p className="text-slate-600 font-medium">Bekleyen talep yok.</p>
+              <div className="bg-white rounded-2xl border border-neutral-200 p-12 text-center shadow-swiss-sm">
+                <p className="text-sm font-semibold text-neutral-900">Bekleyen Talep Yok</p>
+                <p className="text-xs text-neutral-400 mt-1 font-mono">Tüm gelen istekler başarıyla yönlendirildi.</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {pendingRequests.map((req) => (
-                  <div key={req.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
+                  <div key={req.id} className="bg-white p-5 rounded-xl border border-neutral-200 shadow-swiss-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                           {req.status}
                         </span>
-                        <span className="text-xs text-slate-400">Talep #{req.id}</span>
+                        <span className="text-xs font-mono text-neutral-400">#REQ-{req.id}</span>
                       </div>
-                      <p className="text-sm font-semibold text-slate-800">"{req.raw_text}"</p>
-                      <p className="text-xs text-slate-500">
-                        İletişim: <span className="font-medium text-slate-700">{req.contact_value}</span> ({req.preferred_channel})
+                      <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}"</p>
+                      <p className="text-xs text-neutral-500 font-mono">
+                        İletişim: <span className="font-semibold text-neutral-800">{req.contact_value}</span> • [{req.preferred_channel}]
                       </p>
                     </div>
 
                     <div className="flex items-center space-x-2">
                       <select
                         onChange={(e) => setSelectedProviderMap({ ...selectedProviderMap, [req.id]: e.target.value })}
-                        className="text-xs p-2 border border-slate-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="text-xs p-2.5 border border-neutral-200 rounded-lg bg-neutral-50 outline-none focus:border-neutral-950 font-medium"
                         defaultValue=""
                       >
-                        <option value="" disabled>Servis Veren Seç</option>
+                        <option value="" disabled>Sağlayıcı Seç</option>
                         {providers.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} (Öncelik: {p.priority_score})
@@ -514,10 +613,9 @@ export default function App() {
                       <button
                         onClick={() => handleAssignProvider(req.id)}
                         disabled={!selectedProviderMap[req.id]}
-                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white rounded-lg text-xs font-semibold flex items-center space-x-1"
+                        className="px-3.5 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-lg text-xs font-semibold transition"
                       >
-                        <UserCheck size={14} />
-                        <span>Ata</span>
+                        Ata
                       </button>
                     </div>
                   </div>
@@ -527,90 +625,72 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- 3. SERVİS VERENLER (CRUD) MODU ----------------- */}
+        {/* ---------------- 3. SAĞLAYICI YÖNETİMİ (SWISS GRID CRUD) ---------------- */}
         {activeTab === 'PROVIDERS' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Servis Veren Yönetimi</h2>
-                <p className="text-xs text-slate-500">Sistemdeki servis sağlayıcıları ekleyin, anahtar kelimelerini ve öncelik puanlarını düzenleyin.</p>
+                <h2 className="text-xl font-bold tracking-tight text-neutral-950">Servis Sağlayıcı Dizini</h2>
+                <p className="text-xs text-neutral-500">Sistemdeki aktif servis sağlayıcıların iletişim, skor ve anahtar kelimelerini yönetin.</p>
               </div>
               <button
                 onClick={() => openModal()}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm"
+                className="px-3.5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-swiss-sm transition"
               >
-                <PlusCircle size={16} />
-                <span>Yeni Servis Veren Ekle</span>
+                <Plus size={14} />
+                <span>Yeni Sağlayıcı</span>
               </button>
             </div>
 
-            {/* Tablo Görünümü */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {providers.map((prov) => (
-                <div key={prov.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
+                <div key={prov.id} className="bg-white p-5 rounded-xl border border-neutral-200 shadow-swiss-sm flex flex-col justify-between space-y-4 hover:border-neutral-300 transition">
+                  <div className="space-y-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-bold text-slate-800 text-base">{prov.name}</h3>
-                        <p className="text-xs text-slate-500 flex items-center space-x-1 mt-0.5">
-                          <Phone size={12} />
-                          <span>{prov.phone}</span>
-                          {prov.email && (
-                            <>
-                              <span>•</span>
-                              <Mail size={12} />
-                              <span>{prov.email}</span>
-                            </>
-                          )}
+                        <h3 className="font-bold text-neutral-950 text-sm tracking-tight">{prov.name}</h3>
+                        <p className="text-xs text-neutral-400 font-mono mt-0.5">
+                          {prov.phone} {prov.email && `• ${prov.email}`}
                         </p>
                       </div>
-                      <span className="text-xs font-semibold px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
+                      <span className="text-[11px] font-mono font-semibold px-2 py-0.5 bg-neutral-100 text-neutral-800 rounded border border-neutral-200">
                         Skor: {prov.priority_score}
                       </span>
                     </div>
 
                     {/* Anahtar Kelimeler */}
-                    <div>
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center space-x-1">
-                        <Tag size={12} />
-                        <span>Anahtar Kelimeler:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(prov.service_keywords || []).map((kw, i) => (
-                          <span key={i} className="text-xs px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-medium">
-                            {kw}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* İletişim Kanalları */}
-                    <div className="flex items-center space-x-2 pt-1 text-xs text-slate-500">
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase">Kanallar:</span>
-                      {(prov.communication_channels || []).map((ch, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-semibold rounded text-[11px]">
-                          {ch}
+                    <div className="flex flex-wrap gap-1">
+                      {(prov.service_keywords || []).map((kw, i) => (
+                        <span key={i} className="text-[11px] font-mono px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded">
+                          {kw}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  {/* Butonlar */}
-                  <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
-                    <button
-                      onClick={() => openModal(prov)}
-                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center space-x-1"
-                    >
-                      <Edit size={14} />
-                      <span>Düzenle</span>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteProvider(prov.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold flex items-center space-x-1"
-                    >
-                      <Trash2 size={14} />
-                      <span>Sil</span>
-                    </button>
+                  {/* Alt İşlemler */}
+                  <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-xs">
+                    <div className="flex items-center space-x-1">
+                      {(prov.communication_channels || []).map((ch, i) => (
+                        <span key={i} className="text-[10px] font-mono uppercase font-bold text-neutral-400">
+                          {ch}{i < prov.communication_channels.length - 1 ? ' / ' : ''}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => openModal(prov)}
+                        className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"
+                      >
+                        <Edit3 size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProvider(prov.id)}
+                        className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -618,58 +698,58 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- MODAL: SERVİS VEREN EKLE / DÜZENLE ----------------- */}
+        {/* ---------------- MODAL: SAĞLAYICI FORM (CLEAN DIALOG) ---------------- */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <h3 className="font-bold text-slate-800 text-lg">
-                  {editingProviderId ? 'Servis Vereni Düzenle' : 'Yeni Servis Veren Ekle'}
+          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-swiss-lg border border-neutral-200 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                <h3 className="font-bold text-neutral-950 text-base">
+                  {editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Servis Sağlayıcı'}
                 </h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                  <X size={20} />
+                <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700">
+                  <X size={16} />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveProvider} className="space-y-4 pt-4">
+              <form onSubmit={handleSaveProvider} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">İşletme / Servis Veren Adı *</label>
+                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma / Sağlayıcı Adı *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Örn: Moda Bisiklet Servisi"
-                    className="w-full p-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Moda Bisiklet Atölyesi"
+                    className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 focus:border-neutral-950 outline-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Telefon *</label>
+                    <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label>
                     <input
                       type="tel"
                       required
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="+90 5XX XXX XX XX"
-                      className="w-full p-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="w-full p-2.5 text-xs font-mono rounded-lg border border-neutral-200 focus:border-neutral-950 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">E-posta</label>
+                    <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="info@isletme.com"
-                      className="w-full p-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      placeholder="info@firma.com"
+                      className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 focus:border-neutral-950 outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">
                     Anahtar Kelimeler (Virgülle ayırın) *
                   </label>
                   <input
@@ -677,24 +757,24 @@ export default function App() {
                     required
                     value={formData.serviceKeywords}
                     onChange={(e) => setFormData({ ...formData, serviceKeywords: e.target.value })}
-                    placeholder="bisiklet, lastik tamiri, vites ayarı, moda"
-                    className="w-full p-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="bisiklet, lastik, tamir, moda"
+                    className="w-full p-2.5 text-xs font-mono rounded-lg border border-neutral-200 focus:border-neutral-950 outline-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Öncelik Skoru (1-200)</label>
+                    <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru (1-200)</label>
                     <input
                       type="number"
                       value={formData.priorityScore}
                       onChange={(e) => setFormData({ ...formData, priorityScore: e.target.value })}
-                      className="w-full p-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="w-full p-2.5 text-xs font-mono rounded-lg border border-neutral-200 focus:border-neutral-950 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">İletişim Kanalları</label>
-                    <div className="flex items-center space-x-3 pt-2 text-xs font-medium text-slate-700">
+                    <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">İletişim Kanalları</label>
+                    <div className="flex items-center space-x-3 pt-2 text-xs font-mono">
                       <label className="flex items-center space-x-1 cursor-pointer">
                         <input
                           type="checkbox"
@@ -725,17 +805,17 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end space-x-2 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-neutral-100">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-semibold"
+                    className="px-3.5 py-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-600 rounded-lg text-xs font-semibold"
                   >
-                    İptal
+                    Vazgeç
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold"
+                    className="px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold"
                   >
                     Kaydet
                   </button>
@@ -744,11 +824,19 @@ export default function App() {
             </div>
           </div>
         )}
+
       </main>
 
-      {/* Alt Bilgi */}
-      <footer className="py-4 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
-        Sms-Contact Platformu © 2026 • MVP Architecture
+      {/* 🇨🇭 FOOTER: Minimalist Swiss Meta Info */}
+      <footer className="border-t border-neutral-200/80 bg-white py-6">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-neutral-400 font-mono">
+          <div>
+            <span>Sms-Contact</span> • <span>İsviçre Tasarım & Doğal Dil Eşleştirme Mimarisi</span>
+          </div>
+          <div>
+            <span>İTÜ Bilişim Enstitüsü © 2026</span>
+          </div>
+        </div>
       </footer>
     </div>
   );
