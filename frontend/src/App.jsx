@@ -32,14 +32,14 @@ import {
   Wrench,
   Shield,
   Save,
-  CheckCheck
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export default function App() {
   // --- 1. ROL VE AUTH STATE ---
-  // Rol: 'CUSTOMER' (Talep Eden) | 'PROVIDER' (Sağlayıcı) | 'ADMIN' (Yönetici)
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
   const [session, setSession] = useState(() => {
@@ -71,6 +71,7 @@ export default function App() {
   // --- 3. SAĞLAYICI (PROVIDER) STATE ---
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
+  const [isProfileOpen, setIsProfileOpen] = useState(false); // Başlangıçta kapalı akordeon
   const [providerFormData, setProviderFormData] = useState({
     name: '',
     phone: '',
@@ -89,7 +90,7 @@ export default function App() {
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
   const [adminLoading, setAdminLoading] = useState(false);
 
-  // Admin Sağlayıcı Ekle Modal
+  // Admin Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({
@@ -101,7 +102,7 @@ export default function App() {
     priorityScore: 100
   });
 
-  // --- VERİ ÇEKME METODLARI ---
+  // --- VERİ ÇEKME FONKSİYONLARI ---
   const fetchCustomerData = async () => {
     if (!session?.phone) return;
     try {
@@ -115,7 +116,6 @@ export default function App() {
   const fetchProviderData = async () => {
     if (!session?.phone) return;
     try {
-      // 1. Sağlayıcı profilini getir
       const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
       const prov = pRes.data.provider;
       setProviderProfile(prov);
@@ -128,12 +128,12 @@ export default function App() {
         priorityScore: prov.priority_score || 100
       });
 
-      // 2. Sağlayıcıya gelen talepleri getir
       const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}`);
       setProviderRequests(rRes.data.requests || []);
     } catch (err) {
       if (err.response?.status === 404) {
         setProviderProfile(null);
+        setIsProfileOpen(true); // Profil hiç yoksa doldurması için açık gelsin
       }
     }
   };
@@ -158,15 +158,24 @@ export default function App() {
     }
   };
 
+  // 🔄 ASENKRON CANLI DİNLEME (Polling)
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') fetchCustomerData();
       if (session.role === 'PROVIDER') fetchProviderData();
       if (session.role === 'ADMIN') fetchAdminData();
+
+      // Sağlayıcı ve Müşteri ekranı için her 3 saniyede bir sessiz veri tazeleme
+      const interval = setInterval(() => {
+        if (session.role === 'PROVIDER') fetchProviderData();
+        if (session.role === 'CUSTOMER') fetchCustomerData();
+      }, 3000);
+
+      return () => clearInterval(interval);
     }
   }, [session]);
 
-  // --- AUTH METODLARI ---
+  // Auth Metodları
   const handleSendOtp = async (e) => {
     e.preventDefault();
     if (!inputPhone.trim()) return;
@@ -191,7 +200,7 @@ export default function App() {
     setAuthLoading(true);
     setErrorMessage('');
     try {
-      const res = await axios.post(`${API_BASE}/auth/verify-otp`, {
+      await axios.post(`${API_BASE}/auth/verify-otp`, {
         phone: inputPhone.trim(),
         otpCode: inputOtp.trim()
       });
@@ -221,7 +230,7 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // --- MÜŞTERİ METODLARI ---
+  // Müşteri Talep Metodları
   const handleCustomerInitialSubmit = async (e) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
@@ -268,20 +277,22 @@ export default function App() {
     }
   };
 
+  // Sonraki Sağlayıcıya Geç (Düzeltildi)
   const handleCustomerNextProvider = async (requestId) => {
     try {
-      const res = await axios.post(`${API_BASE}/requests/${requestId}/next-provider`);
-      alert(res.data.message);
+      const res = await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
       fetchCustomerData();
     } catch (err) {
       alert('İşlem başarısız: ' + (err.response?.data?.message || err.message));
     }
   };
 
+  // Alternatif Sağlayıcı Seç (Düzeltildi)
   const handleCustomerSelectCandidate = async (requestId, providerId) => {
     try {
-      const res = await axios.post(`${API_BASE}/requests/${requestId}/select-candidate`, { providerId });
-      alert(res.data.message);
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, {
+        providerId: Number(providerId)
+      });
       setShowCandidatesMap(prev => ({ ...prev, [requestId]: false }));
       fetchCustomerData();
     } catch (err) {
@@ -291,7 +302,7 @@ export default function App() {
 
   const handleStatusChange = async (requestId, newStatus) => {
     try {
-      await axios.post(`${API_BASE}/requests/${requestId}/status`, { newStatus });
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus });
       if (session.role === 'CUSTOMER') fetchCustomerData();
       if (session.role === 'PROVIDER') fetchProviderData();
       if (session.role === 'ADMIN') fetchAdminData();
@@ -303,16 +314,16 @@ export default function App() {
   const handleDeleteRequest = async (requestId) => {
     if (!window.confirm('Bu talebi kalıcı olarak silmek istediğinize emin misiniz?')) return;
     try {
-      await axios.delete(`${API_BASE}/requests/${requestId}`);
+      await axios.delete(`${API_BASE}/requests/${Number(requestId)}`);
       if (session.role === 'CUSTOMER') fetchCustomerData();
       if (session.role === 'PROVIDER') fetchProviderData();
       if (session.role === 'ADMIN') fetchAdminData();
-    } catch (err) {
+    } catch {
       alert('Silme başarısız.');
     }
   };
 
-  // --- SAĞLAYICI PROFİLİ KAYDETME ---
+  // Sağlayıcı Profil Kaydet
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -335,14 +346,14 @@ export default function App() {
       } else {
         await axios.post(`${API_BASE}/providers`, payload);
       }
-      alert('Sağlayıcı profili başarıyla kaydedildi!');
+      setIsProfileOpen(false); // Kaydedildikten sonra akordeonu otomatik kapat
       fetchProviderData();
     } catch (err) {
       alert('Kaydedilemedi: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  // --- ADMİN WOZ METODLARI ---
+  // Admin İşlemleri
   const handleAdminAssign = async (requestId) => {
     const pId = selectedProviderMap[requestId];
     if (!pId) return alert('Lütfen sağlayıcı seçin.');
@@ -352,7 +363,7 @@ export default function App() {
         providerId: parseInt(pId, 10)
       });
       fetchAdminData();
-    } catch (err) {
+    } catch {
       alert('Atama başarısız.');
     }
   };
@@ -377,7 +388,7 @@ export default function App() {
       }
       setIsModalOpen(false);
       fetchAdminData();
-    } catch (err) {
+    } catch {
       alert('Kayıt başarısız.');
     }
   };
@@ -404,7 +415,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Multi-Tenant 3.0</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Multi-Role 3.1</span>
             </div>
           </div>
 
@@ -440,7 +451,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ---------------- 🚪 1. GİRİŞ EKRANI (3 ROL SEÇİMİ) ---------------- */}
+        {/* ---------------- 🚪 1. GİRİŞ EKRANI ---------------- */}
         {!session ? (
           <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-lg mx-auto w-full space-y-6">
             <div className="text-center space-y-2">
@@ -451,7 +462,6 @@ export default function App() {
               <p className="text-xs text-neutral-500">Lütfen sisteme hangi rolde bağlanmak istediğinizi seçin.</p>
             </div>
 
-            {/* Rol Seçim Butonları */}
             <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 text-xs font-semibold">
               <button
                 type="button"
@@ -481,11 +491,10 @@ export default function App() {
                 }`}
               >
                 <Shield size={16} />
-                <span>Yönetici (Admin)</span>
+                <span>Yönetici</span>
               </button>
             </div>
 
-            {/* OTP Formu */}
             {authStep === 'PHONE' ? (
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
@@ -559,7 +568,7 @@ export default function App() {
                 <div className="space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
-                    <span>Aktif Talepleriniz</span>
+                    <span>Aktif Talepleriniz ({myCustomerRequests.filter(r => r.status === 'MATCHED' || r.status === 'ACCEPTED' || r.status === 'MANUAL_INTERVENTION').length})</span>
                   </h3>
 
                   <div className="space-y-4">
@@ -606,8 +615,8 @@ export default function App() {
 
                         {/* İlk 3 Aday Paneli */}
                         {showCandidatesMap[req.id] && req.topCandidates && req.topCandidates.length > 0 && (
-                          <div className="p-4 bg-white rounded-xl border border-neutral-200 space-y-3">
-                            <p className="text-xs font-bold text-neutral-700 font-mono">En Uygun 3 Sağlayıcı:</p>
+                          <div className="p-4 bg-white rounded-xl border border-neutral-200 space-y-3 shadow-inner">
+                            <p className="text-xs font-bold text-neutral-700 font-mono">En Uygun Eşleşen 3 Sağlayıcı:</p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                               {req.topCandidates.map((cand, idx) => (
                                 <div key={cand.id} className="p-3 rounded-lg border text-xs flex flex-col justify-between space-y-2 bg-neutral-50">
@@ -618,9 +627,9 @@ export default function App() {
                                   {cand.id !== req.matched_provider_id && (
                                     <button
                                       onClick={() => handleCustomerSelectCandidate(req.id, cand.id)}
-                                      className="w-full py-1 bg-white border hover:bg-neutral-100 rounded text-[11px] font-semibold"
+                                      className="w-full py-1 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[11px] font-semibold transition"
                                     >
-                                      Seç
+                                      Buna Yönlendir
                                     </button>
                                   )}
                                 </div>
@@ -635,19 +644,19 @@ export default function App() {
                             {req.status === 'MATCHED' && (
                               <button
                                 onClick={() => handleCustomerNextProvider(req.id)}
-                                className="px-3 py-1.5 border hover:bg-neutral-100 rounded-lg font-semibold flex items-center space-x-1.5"
+                                className="px-3 py-1.5 border hover:bg-neutral-100 rounded-lg font-semibold flex items-center space-x-1.5 transition"
                               >
                                 <SkipForward size={13} />
-                                <span>Sonraki Sağlayıcı</span>
+                                <span>Sonraki Sağlayıcıya Geç</span>
                               </button>
                             )}
                             {req.topCandidates && req.topCandidates.length > 1 && (
                               <button
                                 onClick={() => setShowCandidatesMap(prev => ({ ...prev, [req.id]: !prev[req.id] }))}
-                                className="px-3 py-1.5 border hover:bg-neutral-100 rounded-lg font-semibold flex items-center space-x-1.5"
+                                className="px-3 py-1.5 border hover:bg-neutral-100 rounded-lg font-semibold flex items-center space-x-1.5 transition"
                               >
                                 <Layers size={13} />
-                                <span>{showCandidatesMap[req.id] ? 'Gizle' : 'Alternatifler (3)'}</span>
+                                <span>{showCandidatesMap[req.id] ? 'Adayları Gizle' : 'Alternatifleri Gör (3 Aday)'}</span>
                               </button>
                             )}
                           </div>
@@ -655,21 +664,21 @@ export default function App() {
                           <div className="flex items-center space-x-2 ml-auto">
                             <button
                               onClick={() => handleStatusChange(req.id, 'COMPLETED')}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center space-x-1"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center space-x-1 transition shadow-sm"
                             >
                               <ShieldCheck size={14} />
                               <span>Hizmeti Tamamla</span>
                             </button>
                             <button
                               onClick={() => handleStatusChange(req.id, 'CANCELLED')}
-                              className="px-2.5 py-1.5 border hover:bg-neutral-100 text-neutral-600 rounded-lg"
+                              className="px-2.5 py-1.5 border hover:bg-neutral-100 text-neutral-600 rounded-lg transition"
                               title="İptal Et"
                             >
                               <Ban size={13} />
                             </button>
                             <button
                               onClick={() => handleDeleteRequest(req.id)}
-                              className="p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg"
+                              className="p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg transition"
                               title="Sil"
                             >
                               <Trash2 size={15} />
@@ -697,7 +706,7 @@ export default function App() {
                         value={queryText}
                         onChange={(e) => setQueryText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerInitialSubmit(); } }}
-                        placeholder="Örn: Moda'da acil bisiklet tamiri arıyorum..."
+                        placeholder="Örn: Kadıköy'de erikli damacana su siparişi veya Moda'da bisiklet tamiri..."
                         className="w-full p-3 text-sm text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none"
                         required
                       />
@@ -793,120 +802,132 @@ export default function App() {
 
           /* ---------------- 🛠️ 3. SERVİS SAĞLAYICI (PROVIDER EKRANI) ---------------- */
           session.role === 'PROVIDER' ? (
-            <div className="max-w-4xl mx-auto w-full space-y-8">
+            <div className="max-w-4xl mx-auto w-full space-y-6">
               
-              {/* Profil Durumu & Güncelleme */}
-              <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-6 space-y-6">
-                <div className="flex items-start justify-between border-b pb-4">
-                  <div>
-                    <h2 className="text-xl font-bold tracking-tight text-neutral-950">
-                      {providerProfile ? providerProfile.name : 'Sağlayıcı Profilinizi Tamamlayın'}
-                    </h2>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Telefon numaranız: <strong className="font-mono text-neutral-800">{session.phone}</strong>
-                    </p>
+              {/* 📂 AÇILIR KAPANIR (ACCORDION) PROFİL PANELİ - BAŞLANGIÇTA KAPALI */}
+              <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm overflow-hidden transition">
+                <div 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-neutral-50/60 select-none"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center text-neutral-800">
+                      <Wrench size={18} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-neutral-950">
+                        {providerProfile ? providerProfile.name : 'Sağlayıcı Profilinizi Oluşturun'}
+                      </h2>
+                      <p className="text-xs text-neutral-500 font-mono">
+                        {session.phone} {providerProfile ? `• Skor: ${providerProfile.priority_score}` : '• Profil Tanımlanmamış'}
+                      </p>
+                    </div>
                   </div>
-                  {providerProfile && (
-                    <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-mono font-bold">
-                      Aktif Sağlayıcı (Skor: {providerProfile.priority_score})
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-semibold text-neutral-500">
+                      {isProfileOpen ? 'Profili Gizle' : 'Profili Düzenle'}
                     </span>
-                  )}
+                    {isProfileOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
                 </div>
 
-                <form onSubmit={handleSaveProviderProfile} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {isProfileOpen && (
+                  <form onSubmit={handleSaveProviderProfile} className="p-6 pt-2 border-t border-neutral-100 space-y-4 animate-fadeIn">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme / Servis Adı *</label>
+                        <input
+                          type="text"
+                          required
+                          value={providerFormData.name}
+                          onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })}
+                          placeholder="Örn: Erikli Su Kadıköy Bayi"
+                          className="w-full p-2.5 text-xs rounded-lg border outline-none focus:border-neutral-950"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta Adresi</label>
+                        <input
+                          type="email"
+                          value={providerFormData.email}
+                          onChange={(e) => setProviderFormData({ ...providerFormData, email: e.target.value })}
+                          placeholder="info@isletme.com"
+                          className="w-full p-2.5 text-xs rounded-lg border outline-none focus:border-neutral-950"
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme / Servis Adı *</label>
+                      <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">
+                        Hizmet Anahtar Kelimeleriniz (Virgülle Ayırın) *
+                      </label>
                       <input
                         type="text"
                         required
-                        value={providerFormData.name}
-                        onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })}
-                        placeholder="Örn: Moda Bisiklet Atölyesi"
-                        className="w-full p-2.5 text-xs rounded-lg border outline-none focus:border-neutral-950"
+                        value={providerFormData.serviceKeywords}
+                        onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })}
+                        placeholder="su, damacana, erikli, kadıköy, moda"
+                        className="w-full p-2.5 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta Adresi</label>
-                      <input
-                        type="email"
-                        value={providerFormData.email}
-                        onChange={(e) => setProviderFormData({ ...providerFormData, email: e.target.value })}
-                        placeholder="info@isletme.com"
-                        className="w-full p-2.5 text-xs rounded-lg border outline-none focus:border-neutral-950"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">
-                      Hizmet Anahtar Kelimeleriniz (Virgülle Ayırın) *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={providerFormData.serviceKeywords}
-                      onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })}
-                      placeholder="bisiklet, lastik, tamir, zincir, fren, moda, kadıköy"
-                      className="w-full p-2.5 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
-                    />
-                    <p className="text-[11px] text-neutral-400 mt-1">Kullanıcıların talepleri bu kelimelerle eşleştiğinde iş size yönlendirilir.</p>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center space-x-3 text-xs font-mono">
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={providerFormData.communicationChannels.includes('PHONE')}
-                          onChange={(e) => {
-                            const newCh = e.target.checked
-                              ? [...providerFormData.communicationChannels, 'PHONE']
-                              : providerFormData.communicationChannels.filter(c => c !== 'PHONE');
-                            setProviderFormData({ ...providerFormData, communicationChannels: newCh });
-                          }}
-                        />
-                        <span>PHONE</span>
-                      </label>
-                      <label className="flex items-center space-x-1 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={providerFormData.communicationChannels.includes('SMS')}
-                          onChange={(e) => {
-                            const newCh = e.target.checked
-                              ? [...providerFormData.communicationChannels, 'SMS']
-                              : providerFormData.communicationChannels.filter(c => c !== 'SMS');
-                            setProviderFormData({ ...providerFormData, communicationChannels: newCh });
-                          }}
-                        />
-                        <span>SMS</span>
-                      </label>
+                      <p className="text-[11px] text-neutral-400 mt-1">Kullanıcıların bu kelimeleri içeren talepleri doğrudan size yönlendirilir.</p>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm"
-                    >
-                      <Save size={13} />
-                      <span>Bilgileri Kaydet</span>
-                    </button>
-                  </div>
-                </form>
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center space-x-3 text-xs font-mono">
+                        <label className="flex items-center space-x-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={providerFormData.communicationChannels.includes('PHONE')}
+                            onChange={(e) => {
+                              const newCh = e.target.checked
+                                ? [...providerFormData.communicationChannels, 'PHONE']
+                                : providerFormData.communicationChannels.filter(c => c !== 'PHONE');
+                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
+                            }}
+                          />
+                          <span>PHONE</span>
+                        </label>
+                        <label className="flex items-center space-x-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={providerFormData.communicationChannels.includes('SMS')}
+                            onChange={(e) => {
+                              const newCh = e.target.checked
+                                ? [...providerFormData.communicationChannels, 'SMS']
+                                : providerFormData.communicationChannels.filter(c => c !== 'SMS');
+                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
+                            }}
+                          />
+                          <span>SMS</span>
+                        </label>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm"
+                      >
+                        <Save size={13} />
+                        <span>Profili Kaydet & Kapat</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
 
-              {/* Sağlayıcıya Gelen İş Talepleri */}
+              {/* 📡 SAĞLAYICIYA GELEN CANLI TALEPLER (ASENKRON OTOMATİK DÜŞER) */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold tracking-tight text-neutral-950 flex items-center space-x-2">
-                    <Building2 size={18} />
+                    <Radio size={16} className="text-emerald-500 animate-pulse" />
                     <span>Gelen İş Talepleri ({providerRequests.length})</span>
                   </h3>
-                  <button onClick={fetchProviderData} className="text-xs font-semibold px-3 py-1 border rounded-lg hover:bg-neutral-50">Yenile</button>
+                  <span className="text-[11px] font-mono text-neutral-400">Canlı Dinleniyor (3sn)</span>
                 </div>
 
                 {providerRequests.length === 0 ? (
                   <div className="bg-white rounded-2xl border p-12 text-center text-xs text-neutral-400">
-                    Henüz anahtar kelimelerinizle eşleşen yeni bir talep bulunmuyor.
+                    Henüz anahtar kelimelerinizle eşleşen yeni bir talep bulunmuyor. Yeni talep geldiğinde sayfa otomatik güncellenecektir.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -965,11 +986,10 @@ export default function App() {
             </div>
           ) :
 
-          /* ---------------- ⚙️ 4. ADMİN & WOZ YÖNETİM PANELİ ---------------- */
+          /* ---------------- ⚙️ 4. ADMİN (ADMIN EKRANI) ---------------- */
           (
             <div className="space-y-6">
               
-              {/* Admin Segmented Menü */}
               <div className="flex items-center justify-between border-b pb-4">
                 <div>
                   <h2 className="text-xl font-bold tracking-tight text-neutral-950">Sistem Yönetim Paneli</h2>
@@ -977,28 +997,16 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
-                  <button
-                    onClick={() => setAdminTab('WOZ')}
-                    className={`px-3 py-1.5 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}
-                  >
+                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     WoZ Havuzu ({pendingRequests.length})
                   </button>
-                  <button
-                    onClick={() => setAdminTab('PROVIDERS')}
-                    className={`px-3 py-1.5 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}
-                  >
+                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     Sağlayıcılar ({providers.length})
                   </button>
-                  <button
-                    onClick={() => setAdminTab('ALL_MATCHED')}
-                    className={`px-3 py-1.5 rounded-md ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}
-                  >
+                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1.5 rounded-md ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     Tüm Eşleşmeler ({matchedRequests.length})
                   </button>
-                  <button
-                    onClick={() => setAdminTab('SMS_LOGS')}
-                    className={`px-3 py-1.5 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}
-                  >
+                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1.5 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     SMS Logları ({smsLogs.length})
                   </button>
                 </div>
@@ -1134,7 +1142,7 @@ export default function App() {
           )
         )}
 
-        {/* ADMIN MODAL: SAĞLAYICI EKLE/DÜZENLE */}
+        {/* ADMIN MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 border space-y-4">
@@ -1154,7 +1162,7 @@ export default function App() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">Anahtar Kelimeler *</label>
-                  <input type="text" required value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="bisiklet, tamir" className="w-full p-2.5 text-xs font-mono rounded-lg border outline-none" />
+                  <input type="text" required value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="su, damacana" className="w-full p-2.5 text-xs font-mono rounded-lg border outline-none" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label>
@@ -1174,7 +1182,7 @@ export default function App() {
       {/* 🇨🇭 FOOTER */}
       <footer className="border-t border-neutral-200/80 bg-white py-6">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-neutral-400 font-mono">
-          <div><span>Sms-Contact</span> • <span>Multi-Tenant & Rol Tabanlı Servis Platformu</span></div>
+          <div><span>Sms-Contact</span> • <span>Multi-Tenant & Asenkron Servis Pazaryeri</span></div>
           <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
         </div>
       </footer>
