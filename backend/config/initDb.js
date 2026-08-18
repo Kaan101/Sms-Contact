@@ -2,7 +2,7 @@ const { pool } = require('./db');
 
 const initDatabase = async () => {
   try {
-    // 1. service_providers tablosunu oluştur
+    // 1. service_providers tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS service_providers (
         id SERIAL PRIMARY KEY,
@@ -17,19 +17,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. OTP tablosu
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS otp_verifications (
-        id SERIAL PRIMARY KEY,
-        phone VARCHAR(50) NOT NULL,
-        otp_code VARCHAR(10) NOT NULL,
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        is_used BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 3. requests tablosu
+    // 2. requests tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -44,23 +32,33 @@ const initDatabase = async () => {
       );
     `);
 
-    // 4. Foreign Key kısıtını güvenli şekilde onar/ekle
+    // 3. OTP tablosu
     await pool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint WHERE conname = 'requests_matched_provider_id_fkey'
-        ) THEN
-          ALTER TABLE requests 
-          ADD CONSTRAINT requests_matched_provider_id_fkey 
-          FOREIGN KEY (matched_provider_id) 
-          REFERENCES service_providers(id) 
-          ON DELETE SET NULL;
-        END IF;
-      END $$;
+      CREATE TABLE IF NOT EXISTS otp_verifications (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(50) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        is_used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
-    // 5. Sequence sayacını en büyük ID değerine eşitle (EN KRİTİK ADIM)
+    // 4. KRİTİK ADIM: Eski/Bozuk Foreign Key Kısıtını Kaldır ve Doğru Tabloya Yeniden Bağla
+    await pool.query(`
+      ALTER TABLE requests 
+      DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
+    `);
+
+    await pool.query(`
+      ALTER TABLE requests 
+      ADD CONSTRAINT requests_matched_provider_id_fkey 
+      FOREIGN KEY (matched_provider_id) 
+      REFERENCES service_providers(id) 
+      ON DELETE SET NULL;
+    `);
+
+    // 5. Sequence Sayacını Gerçek En Büyük ID'ye Senkronize Et
     await pool.query(`
       SELECT setval(
         pg_get_serial_sequence('service_providers', 'id'),
@@ -88,9 +86,9 @@ const initDatabase = async () => {
       );
     `);
 
-    console.log('✅ PostgreSQL tabloları, Foreign Key ve ID Sequence sayacı başarıyla senkronize edildi.');
+    console.log('✅ PostgreSQL Foreign Key referansları ve Sequence sayaçları sıfırlanıp onarıldı.');
   } catch (error) {
-    console.error('⚠️ DB Onarım uyarısı:', error.message);
+    console.error('❌ Tablo/Constraint onarım hatası:', error.message);
   }
 };
 
