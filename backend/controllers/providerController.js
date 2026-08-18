@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 
+// 1. Yeni Servis Veren Ekleme
 const registerProvider = async (req, res) => {
   try {
     const { name, phone, email, serviceKeywords, communicationChannels, priorityScore } = req.body;
@@ -48,6 +49,7 @@ const registerProvider = async (req, res) => {
   }
 };
 
+// 2. Tüm Servis Verenleri Getirme
 const getProviders = async (req, res) => {
   try {
     const selectQuery = `
@@ -66,6 +68,31 @@ const getProviders = async (req, res) => {
   }
 };
 
+// 3. Telefon Numarasına Göre Sağlayıcı Bilgisi Getir (Sağlayıcı Girişi İçin)
+const getProviderByPhone = async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon parametresi zorunludur.' });
+
+    const { rows } = await pool.query('SELECT * FROM service_providers WHERE phone = $1 LIMIT 1', [phone.trim()]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        status: 'not_found',
+        message: 'Bu telefon numarasıyla kayıtlı servis sağlayıcı bulunamadı.'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      provider: rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// 4. Servis Veren Güncelleme
 const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
@@ -116,7 +143,7 @@ const updateProvider = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      message: 'Servis veren başarıyla güncellendi.',
+      message: 'Profil başarıyla güncellendi.',
       provider: rows[0]
     });
   } catch (error) {
@@ -125,32 +152,28 @@ const updateProvider = async (req, res) => {
   }
 };
 
+// 5. Servis Veren Silme
 const deleteProvider = async (req, res) => {
   try {
     const { id } = req.params;
 
     await pool.query('UPDATE requests SET matched_provider_id = NULL WHERE matched_provider_id = $1;', [id]);
-
-    const deleteQuery = `DELETE FROM service_providers WHERE id = $1 RETURNING *;`;
-    const { rows } = await pool.query(deleteQuery, [id]);
+    const { rows } = await pool.query('DELETE FROM service_providers WHERE id = $1 RETURNING *;', [id]);
 
     if (rows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'Servis veren bulunamadı.' });
     }
 
-    res.status(200).json({
-      status: 'success',
-      message: 'Servis veren başarıyla silindi.'
-    });
+    res.status(200).json({ status: 'success', message: 'Servis veren silindi.' });
   } catch (error) {
-    console.error('Servis veren silme hatası:', error);
-    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+    res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
 module.exports = {
   registerProvider,
   getProviders,
+  getProviderByPhone,
   updateProvider,
   deleteProvider
 };

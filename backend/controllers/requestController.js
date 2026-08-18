@@ -9,15 +9,15 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
 
     if (eventType === 'MATCHED') {
       userMsg = `[Sms-Contact] Talebiniz #${requestId} '${providerData.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`;
-      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Tercih: ${channel}. Lütfen kabul edin.`;
+      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Tercih: ${channel}. Lütfen kabul edin veya pas geçin.`;
     } else if (eventType === 'ACCEPTED') {
-      userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. ${channel === 'PHONE' ? 'Arama başlatılıyor...' : 'SMS üzerinden detaylar paylaşılacak.'} İletişim: ${providerData.phone}`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile ${channel} üzerinden iletişime geçebilirsiniz.`;
+      userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. ${channel === 'PHONE' ? 'Arama başlatılıyor...' : 'SMS üzerinden yazacak.'} İletişim: ${providerData.phone}`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile iletişime geçebilirsiniz.`;
     } else if (eventType === 'COMPLETED') {
-      userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz başarıyla tamamlandı olarak işaretlendi. Bizi tercih ettiğiniz için teşekkürler!`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı iş müşteri tarafından 'Tamamlandı' olarak onaylandı.`;
+      userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz başarıyla tamamlandı olarak işaretlendi.`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı iş 'Tamamlandı' olarak onaylandı.`;
     } else if (eventType === 'CANCELLED') {
-      userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz iptal edildi.`;
+      userMsg = `[Sms-Contact] #${requestId} numaralı talep iptal edildi.`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talep iptal edildi.`;
     }
 
@@ -97,7 +97,7 @@ const createRequest = async (req, res) => {
 
       return res.status(201).json({
         status: 'success',
-        message: `Talebiniz '${primaryProvider.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`,
+        message: `Talebiniz '${primaryProvider.name}' ile eşleştirildi.`,
         matchedProvider: primaryProvider,
         candidates: topCandidates,
         request: createdReq
@@ -117,7 +117,7 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 2. Kullanıcının Taleplerini ve Adayları Getir
+// 2. Kullanıcının Kendi Talepleri
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -164,7 +164,30 @@ const getUserRequests = async (req, res) => {
   }
 };
 
-// 3. Sonraki Sağlayıcıya Geç
+// 3. Sağlayıcıya Atanmış Gelen Talepleri Getir (YENİ)
+const getProviderAssignedRequests = async (req, res) => {
+  try {
+    const { providerId } = req.query;
+    if (!providerId) return res.status(400).json({ status: 'error', message: 'providerId zorunludur.' });
+
+    const { rows } = await pool.query(`
+      SELECT 
+        r.*,
+        p.name AS provider_name,
+        p.phone AS provider_phone
+      FROM requests r
+      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
+      WHERE r.matched_provider_id = $1
+      ORDER BY r.updated_at DESC, r.created_at DESC;
+    `, [parseInt(providerId, 10)]);
+
+    res.status(200).json({ status: 'success', requests: rows });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// 4. Sonraki Sağlayıcıya Geç / Pas Geç
 const passToNextProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -190,7 +213,12 @@ const passToNextProvider = async (req, res) => {
     });
 
     if (matched.length <= 1) {
-      return res.status(400).json({ status: 'error', message: 'Bu talep için alternatif başka uygun sağlayıcı bulunamadı.' });
+      // Başka sağlayıcı yoksa operatör havuzuna çek
+      await pool.query("UPDATE requests SET status = 'MANUAL_INTERVENTION', matched_provider_id = NULL WHERE id = $1", [rId]);
+      return res.status(200).json({
+        status: 'success',
+        message: 'Alternatif başka sağlayıcı bulunmadığı için talep Operatör Havuzuna aktarıldı.'
+      });
     }
 
     const currentIndex = matched.findIndex(p => p.id === targetReq.matched_provider_id);
@@ -208,7 +236,7 @@ const passToNextProvider = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      message: `Talep sonraki sağlayıcı olan '${nextProvider.name}' ile yeniden eşleştirildi.`,
+      message: `Talep sonraki sağlayıcı '${nextProvider.name}' ile eşleştirildi.`,
       request: updatedRows[0],
       newProvider: nextProvider
     });
@@ -217,7 +245,7 @@ const passToNextProvider = async (req, res) => {
   }
 };
 
-// 4. Doğrudan Aday Sağlayıcı Seç
+// 5. Doğrudan Aday Sağlayıcı Seç
 const selectCandidateProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -247,7 +275,7 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
-// 5. Talep Durumu Güncelle (ACCEPTED, COMPLETED, CANCELLED)
+// 6. Talep Durumu Güncelle (ACCEPTED, COMPLETED, CANCELLED)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -286,7 +314,7 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// 6. Bekleyen Talepleri Getir (WoZ)
+// 7. Bekleyen / Eşleşen / Log / WoZ Sorguları
 const getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -300,7 +328,6 @@ const getPendingRequests = async (req, res) => {
   }
 };
 
-// 7. Eşleşen & Süreçteki Talepleri Getir
 const getMatchedRequests = async (req, res) => {
   try {
     const query = `
@@ -321,7 +348,6 @@ const getMatchedRequests = async (req, res) => {
   }
 };
 
-// 8. Manuel Atama (WoZ)
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
@@ -350,7 +376,6 @@ const assignProviderManually = async (req, res) => {
   }
 };
 
-// 9. Giden SMS Loglarını Getir
 const getOutboundNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -365,36 +390,28 @@ const getOutboundNotifications = async (req, res) => {
   }
 };
 
-// 10. Talebi Kalıcı Olarak Sil
 const deleteRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
     const rId = parseInt(requestId, 10);
 
-    if (isNaN(rId)) {
-      return res.status(400).json({ status: 'error', message: 'Geçersiz talep ID.' });
-    }
+    if (isNaN(rId)) return res.status(400).json({ status: 'error', message: 'Geçersiz talep ID.' });
 
     await pool.query('DELETE FROM outbound_notifications WHERE request_id = $1', [rId]);
     const { rows } = await pool.query('DELETE FROM requests WHERE id = $1 RETURNING *;', [rId]);
 
-    if (rows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Silinecek talep bulunamadı.' });
-    }
+    if (rows.length === 0) return res.status(404).json({ status: 'error', message: 'Silinecek talep bulunamadı.' });
 
-    res.status(200).json({
-      status: 'success',
-      message: 'Talep kalıcı olarak silindi.'
-    });
+    res.status(200).json({ status: 'success', message: 'Talep kalıcı olarak silindi.' });
   } catch (error) {
-    console.error('Talep silme hatası:', error);
-    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+    res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
 module.exports = {
   createRequest,
   getUserRequests,
+  getProviderAssignedRequests,
   passToNextProvider,
   selectCandidateProvider,
   updateRequestStatus,

@@ -5,13 +5,15 @@ const { sendOtp, verifyOtp } = require('../controllers/authController');
 const { checkDisambiguation } = require('../controllers/disambiguateController');
 const { 
   registerProvider, 
-  getProviders, 
+  getProviders,
+  getProviderByPhone,
   updateProvider, 
   deleteProvider 
 } = require('../controllers/providerController');
 const { 
   createRequest, 
   getUserRequests,
+  getProviderAssignedRequests,
   passToNextProvider,
   selectCandidateProvider,
   updateRequestStatus,
@@ -19,7 +21,7 @@ const {
   getMatchedRequests,
   assignProviderManually,
   getOutboundNotifications,
-  deleteRequest // <-- EKLENDİ
+  deleteRequest
 } = require('../controllers/requestController');
 
 // Auth / OTP
@@ -32,16 +34,18 @@ router.post('/disambiguate', checkDisambiguation);
 // Servis Sağlayıcılar
 router.post('/providers', registerProvider);
 router.get('/providers', getProviders);
+router.get('/providers/by-phone', getProviderByPhone);
 router.put('/providers/:id', updateProvider);
 router.delete('/providers/:id', deleteProvider);
 
-// Talepler & Çoklu Aday Yönetimi
+// Talepler & Süreç
 router.post('/requests', createRequest);
 router.get('/requests/my-requests', getUserRequests);
+router.get('/requests/provider-requests', getProviderAssignedRequests);
 router.post('/requests/:requestId/next-provider', passToNextProvider);
 router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
 router.post('/requests/:requestId/status', updateRequestStatus);
-router.delete('/requests/:requestId', deleteRequest); // <-- TALEP SİLME ROTASI
+router.delete('/requests/:requestId', deleteRequest);
 
 // WoZ ve Loglar
 router.get('/requests/pending', getPendingRequests);
