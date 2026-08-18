@@ -14,7 +14,9 @@ const {
   getPendingRequests,
   getMatchedRequests,
   getUserRequests,
-  assignProviderManually 
+  updateRequestStatus,
+  assignProviderManually,
+  getOutboundNotifications
 } = require('../controllers/requestController');
 
 // 1. Auth / OTP
@@ -30,11 +32,15 @@ router.get('/providers', getProviders);
 router.put('/providers/:id', updateProvider);
 router.delete('/providers/:id', deleteProvider);
 
-// 4. Talepler
+// 4. Talepler & Yaşam Döngüsü
 router.post('/requests', createRequest);
 router.get('/requests/pending', getPendingRequests);
 router.get('/requests/matched', getMatchedRequests);
 router.get('/requests/my-requests', getUserRequests);
+router.patch('/requests/:requestId/status', updateRequestStatus);
 router.post('/requests/assign', assignProviderManually);
+
+// 5. Giden SMS / Bildirim Logları
+router.get('/notifications', getOutboundNotifications);
 
 module.exports = router;

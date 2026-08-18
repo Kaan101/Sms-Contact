@@ -28,23 +28,12 @@ const initDatabase = async () => {
         preferred_channel VARCHAR(50) NOT NULL DEFAULT 'PHONE',
         status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
         matched_provider_id INTEGER,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 3. OTP tablosu
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS otp_verifications (
-        id SERIAL PRIMARY KEY,
-        phone VARCHAR(50) NOT NULL,
-        otp_code VARCHAR(10) NOT NULL,
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        is_used BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 4. KRİTİK ADIM: Eski/Bozuk Foreign Key Kısıtını Kaldır ve Doğru Tabloya Yeniden Bağla
+    // 3. Foreign key güvenli onarım
     await pool.query(`
       ALTER TABLE requests 
       DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
@@ -58,24 +47,41 @@ const initDatabase = async () => {
       ON DELETE SET NULL;
     `);
 
-    // 5. Sequence Sayacını Gerçek En Büyük ID'ye Senkronize Et
+    // 4. Giden SMS / Bildirim Log Tablosu (YENİ)
     await pool.query(`
-      SELECT setval(
-        pg_get_serial_sequence('service_providers', 'id'),
-        COALESCE((SELECT MAX(id) FROM service_providers), 1),
-        true
+      CREATE TABLE IF NOT EXISTS outbound_notifications (
+        id SERIAL PRIMARY KEY,
+        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+        recipient_type VARCHAR(20) NOT NULL, -- 'USER' | 'PROVIDER'
+        recipient_phone VARCHAR(50) NOT NULL,
+        channel VARCHAR(20) NOT NULL DEFAULT 'SMS',
+        message_body TEXT NOT NULL,
+        sent_status VARCHAR(20) DEFAULT 'DELIVERED',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
+    // 5. OTP Tablosu
     await pool.query(`
-      SELECT setval(
-        pg_get_serial_sequence('requests', 'id'),
-        COALESCE((SELECT MAX(id) FROM requests), 1),
-        true
+      CREATE TABLE IF NOT EXISTS otp_verifications (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(50) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        is_used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 6. Niyet Netleştirme Tablosu
+    // 6. Sequence Eşitlemeleri
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
+    `);
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE((SELECT MAX(id) FROM requests), 1), true);
+    `);
+
+    // 7. Niyet Sözlüğü
     await pool.query(`
       CREATE TABLE IF NOT EXISTS disambiguation_dictionary (
         id SERIAL PRIMARY KEY,
@@ -86,9 +92,9 @@ const initDatabase = async () => {
       );
     `);
 
-    console.log('✅ PostgreSQL Foreign Key referansları ve Sequence sayaçları sıfırlanıp onarıldı.');
+    console.log('✅ Veritabanı ve Bildirim (Outbound Notifications) motoru hazırlandı.');
   } catch (error) {
-    console.error('❌ Tablo/Constraint onarım hatası:', error.message);
+    console.error('❌ Tablo başlatma hatası:', error.message);
   }
 };
 
