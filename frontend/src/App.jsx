@@ -276,11 +276,13 @@ export default function App() {
   };
 
   // Durum Değiştirme (Kabul Et, Tamamla, İptal)
-  const handleStatusChange = async (requestId, newStatus) => {
+ const handleStatusChange = async (requestId, newStatus) => {
     try {
-      await axios.patch(`${API_BASE}/requests/${requestId}/status`, { newStatus });
-      fetchMyRequests();
-      if (activeTab === 'MATCHED') fetchMatchedRequests();
+      await axios.post(`${API_BASE}/requests/${requestId}/status`, { newStatus });
+      await fetchMyRequests();
+      if (activeTab === 'MATCHED') {
+        await fetchMatchedRequests();
+      }
     } catch (err) {
       alert('Durum güncellenemedi: ' + (err.response?.data?.message || err.message));
     }

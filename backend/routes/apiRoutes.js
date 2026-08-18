@@ -39,7 +39,9 @@ router.post('/requests', createRequest);
 router.get('/requests/my-requests', getUserRequests);
 router.post('/requests/:requestId/next-provider', passToNextProvider);
 router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
-router.patch('/requests/:requestId/status', updateRequestStatus);
+
+// Durum Güncelleme (POST olarak güncellendi)
+router.post('/requests/:requestId/status', updateRequestStatus);
 
 // WoZ ve Loglar
 router.get('/requests/pending', getPendingRequests);
