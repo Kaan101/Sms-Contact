@@ -1,36 +1,43 @@
 const { pool } = require('../config/db');
 
-// Yardımcı: Çift Taraflı SMS Simülasyonu Üretip Kaydeder
-const triggerSimulatedNotifications = async (requestId, reqData, providerData) => {
+// Yardımcı: SMS Bildirim Simülasyonu
+const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
   try {
     const channel = reqData.preferred_channel || 'PHONE';
-    
-    // 1. Müşteriye Giden SMS
-    const userMsg = `[Sms-Contact] Talebiniz onaylandı! '${providerData.name}' işletmesi en kısa sürede ${channel === 'PHONE' ? 'sesli arama ile' : 'SMS/WhatsApp üzerinden'} size ulaşacaktır. İletişim: ${providerData.phone}`;
-    
-    // 2. Servis Sağlayıcıya Giden SMS
-    const providerMsg = `[Sms-Contact] Yeni Talep (#${requestId})! Müşteri: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}" ${reqData.disambiguation_choice ? `(${reqData.disambiguation_choice})` : ''}. Tercih Edilen Kanal: ${channel}.`;
+    let userMsg = '';
+    let providerMsg = '';
 
-    await pool.query(`
-      INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
-      VALUES 
-        ($1, 'USER', $2, 'SMS', $3),
-        ($1, 'PROVIDER', $4, 'SMS', $5);
-    `, [requestId, reqData.contact_value, userMsg, providerData.phone, providerMsg]);
+    if (eventType === 'MATCHED') {
+      userMsg = `[Sms-Contact] Talebiniz #${requestId} '${providerData.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`;
+      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Tercih: ${channel}. Lütfen kabul edin.`;
+    } else if (eventType === 'ACCEPTED') {
+      userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. ${channel === 'PHONE' ? 'Arama başlatılıyor...' : 'SMS üzerinden detaylar paylaşılacak.'} İletişim: ${providerData.phone}`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile ${channel} üzerinden iletişime geçebilirsiniz.`;
+    } else if (eventType === 'COMPLETED') {
+      userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz başarıyla tamamlandı olarak işaretlendi. Bizi tercih ettiğiniz için teşekkürler!`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı iş müşteri tarafından 'Tamamlandı' olarak onaylandı.`;
+    }
 
-    console.log(`📡 [SMS LOG SIMULATED] Request #${requestId} için kullanıcı ve sağlayıcı SMS'leri kaydedildi.`);
+    if (userMsg && providerMsg) {
+      await pool.query(`
+        INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
+        VALUES 
+          ($1, 'USER', $2, 'SMS', $3),
+          ($1, 'PROVIDER', $4, 'SMS', $5);
+      `, [requestId, reqData.contact_value, userMsg, providerData.phone, providerMsg]);
+    }
   } catch (err) {
     console.error('SMS loglama hatası:', err.message);
   }
 };
 
-// 1. Yeni Talep Oluşturma
+// 1. Yeni Talep Oluşturma (En uygun ilk 3 adayı tespit eder)
 const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
 
     if (!rawText || !contactValue) {
-      return res.status(400).json({ status: 'error', message: 'Talep metni ve iletişim bilgisi zorunludur.' });
+      return res.status(400).json({ status: 'error', message: 'Metin ve iletişim bilgisi zorunludur.' });
     }
 
     const textToAnalyze = (disambiguationChoice || rawText).toLowerCase();
@@ -40,35 +47,30 @@ const createRequest = async (req, res) => {
       .filter(w => w.length > 1);
 
     const { rows: activeProviders } = await pool.query(`
-      SELECT id, name, phone, service_keywords, communication_channels, priority_score 
+      SELECT id, name, phone, email, service_keywords, communication_channels, priority_score 
       FROM service_providers 
       WHERE is_active = TRUE 
       ORDER BY priority_score DESC, id ASC;
     `);
 
-    let matchedProvider = null;
-
-    if (activeProviders.length > 0) {
-      for (const provider of activeProviders) {
-        const keywords = (provider.service_keywords || []).map(k => k.toLowerCase().trim());
-        const hasMatch = keywords.some(k => 
-          tokens.includes(k) || 
-          textToAnalyze.includes(k) ||
-          k.split(/\s+/).every(part => textToAnalyze.includes(part))
-        );
-
-        if (hasMatch) {
-          matchedProvider = provider;
-          break;
-        }
+    // Eşleşen tüm sağlayıcıları tespit et
+    const matchedCandidates = [];
+    for (const provider of activeProviders) {
+      const keywords = (provider.service_keywords || []).map(k => k.toLowerCase().trim());
+      const hasMatch = keywords.some(k => 
+        tokens.includes(k) || 
+        textToAnalyze.includes(k) ||
+        k.split(/\s+/).every(part => textToAnalyze.includes(part))
+      );
+      if (hasMatch) {
+        matchedCandidates.push(provider);
       }
     }
 
-    const validMatchedId = (matchedProvider && Number.isInteger(Number(matchedProvider.id))) 
-      ? Number(matchedProvider.id) 
-      : null;
-    
-    const requestStatus = validMatchedId ? 'MATCHED' : 'MANUAL_INTERVENTION';
+    // İlk 3 adayı al
+    const topCandidates = matchedCandidates.slice(0, 3);
+    const primaryProvider = topCandidates.length > 0 ? topCandidates[0] : null;
+    const requestStatus = primaryProvider ? 'MATCHED' : 'MANUAL_INTERVENTION';
 
     const insertQuery = `
       INSERT INTO requests 
@@ -77,42 +79,34 @@ const createRequest = async (req, res) => {
       RETURNING *;
     `;
 
-    const values = [
+    const { rows: savedRows } = await pool.query(insertQuery, [
       rawText.trim(),
       disambiguationChoice ? disambiguationChoice.trim() : null,
       tokens,
       contactValue.trim(),
       preferredChannel || 'PHONE',
       requestStatus,
-      validMatchedId
-    ];
+      primaryProvider ? primaryProvider.id : null
+    ]);
 
-    const { rows: savedRows } = await pool.query(insertQuery, values);
     const createdReq = savedRows[0];
 
-    if (validMatchedId && matchedProvider) {
-      // Çift taraflı SMS tetikle
-      await triggerSimulatedNotifications(createdReq.id, createdReq, matchedProvider);
-
-      const channels = matchedProvider.communication_channels || ['PHONE'];
-      const channelUsed = channels.includes(preferredChannel) ? preferredChannel : channels[0];
+    if (primaryProvider) {
+      await triggerSimulatedNotifications(createdReq.id, createdReq, primaryProvider, 'MATCHED');
 
       return res.status(201).json({
         status: 'success',
-        message: `Talebiniz '${matchedProvider.name}' ile eşleştirildi. Bilgilendirme SMS'leri taraflara iletildi.`,
-        matchedProvider: {
-          id: matchedProvider.id,
-          name: matchedProvider.name,
-          phone: matchedProvider.phone,
-          channelUsed: channelUsed
-        },
+        message: `Talebiniz '${primaryProvider.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`,
+        matchedProvider: primaryProvider,
+        candidates: topCandidates,
         request: createdReq
       });
     } else {
       return res.status(201).json({
         status: 'success',
-        message: 'Talebiniz alındı. Uygun servis sağlayıcı onaylandığında SMS ile bilgilendirileceksiniz.',
+        message: 'Talebiniz alındı. Uygun sağlayıcı onaylandığında SMS ile bildirilecektir.',
         matchedProvider: null,
+        candidates: [],
         request: createdReq
       });
     }
@@ -122,78 +116,142 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 2. Bekleyen Talepler (WoZ)
-const getPendingRequests = async (req, res) => {
-  try {
-    const { rows } = await pool.query(`
-      SELECT * FROM requests 
-      WHERE status = 'MANUAL_INTERVENTION' OR status = 'PENDING'
-      ORDER BY created_at DESC;
-    `);
-    res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
-// 3. Eşleşen & Süreçteki Talepler (Lifecycle Takibi)
-const getMatchedRequests = async (req, res) => {
-  try {
-    const query = `
-      SELECT 
-        r.id,
-        r.raw_text,
-        r.disambiguation_choice,
-        r.contact_value,
-        r.preferred_channel,
-        r.status,
-        r.created_at,
-        r.updated_at,
-        p.id AS provider_id,
-        p.name AS provider_name,
-        p.phone AS provider_phone
-      FROM requests r
-      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
-      WHERE r.status IN ('MATCHED', 'ACCEPTED', 'COMPLETED', 'CANCELLED')
-      ORDER BY r.updated_at DESC, r.created_at DESC;
-    `;
-    const { rows } = await pool.query(query);
-    res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
-// 4. Kullanıcının Kendi Talepleri
+// 2. Kullanıcının Kendi Talepleri & Aday Sağlayıcıları Getir
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon zorunludur.' });
 
-    const query = `
+    // Talepleri ve atanmış sağlayıcı bilgilerini çek
+    const { rows: userRequests } = await pool.query(`
       SELECT 
-        r.id,
-        r.raw_text,
-        r.disambiguation_choice,
-        r.contact_value,
-        r.preferred_channel,
-        r.status,
-        r.created_at,
+        r.*,
         p.name AS provider_name,
-        p.phone AS provider_phone
+        p.phone AS provider_phone,
+        p.email AS provider_email,
+        p.priority_score AS provider_score
       FROM requests r
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
       WHERE r.contact_value = $1
       ORDER BY r.created_at DESC;
-    `;
-    const { rows } = await pool.query(query, [phone.trim()]);
-    res.status(200).json({ status: 'success', requests: rows });
+    `, [phone.trim()]);
+
+    // Tüm aktif sağlayıcıları da çekelim (alternatif listesi için)
+    const { rows: allProviders } = await pool.query(`
+      SELECT id, name, phone, service_keywords, priority_score 
+      FROM service_providers 
+      WHERE is_active = TRUE 
+      ORDER BY priority_score DESC;
+    `);
+
+    // Her talep için en uygun ilk 3 adayı dinamik hesapla
+    const enrichedRequests = userRequests.map(reqItem => {
+      const textToAnalyze = (reqItem.disambiguation_choice || reqItem.raw_text).toLowerCase();
+      const tokens = textToAnalyze.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ').split(/\s+/).filter(w => w.length > 1);
+
+      const matched = allProviders.filter(prov => {
+        const kws = (prov.service_keywords || []).map(k => k.toLowerCase().trim());
+        return kws.some(k => tokens.includes(k) || textToAnalyze.includes(k));
+      });
+
+      return {
+        ...reqItem,
+        topCandidates: matched.slice(0, 3)
+      };
+    });
+
+    res.status(200).json({ status: 'success', requests: enrichedRequests });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
-// 5. Talep Yaşam Döngüsü Durum Güncelleme (ACCEPTED, COMPLETED, CANCELLED)
+// 3. Sonraki Sağlayıcıya Geç (Pass to Next Provider)
+const passToNextProvider = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const rId = parseInt(requestId, 10);
+
+    const { rows: reqRows } = await pool.query('SELECT * FROM requests WHERE id = $1', [rId]);
+    if (reqRows.length === 0) return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
+    const targetReq = reqRows[0];
+
+    const textToAnalyze = (targetReq.disambiguation_choice || targetReq.raw_text).toLowerCase();
+    const tokens = textToAnalyze.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ').split(/\s+/).filter(w => w.length > 1);
+
+    const { rows: allProviders } = await pool.query(`
+      SELECT id, name, phone, service_keywords, priority_score 
+      FROM service_providers 
+      WHERE is_active = TRUE 
+      ORDER BY priority_score DESC;
+    `);
+
+    const matched = allProviders.filter(prov => {
+      const kws = (prov.service_keywords || []).map(k => k.toLowerCase().trim());
+      return kws.some(k => tokens.includes(k) || textToAnalyze.includes(k));
+    });
+
+    if (matched.length <= 1) {
+      return res.status(400).json({ status: 'error', message: 'Bu talep için alternatif başka uygun sağlayıcı bulunamadı.' });
+    }
+
+    // Mevcut sağlayıcının sırasını bul ve bir sonrakini seç
+    const currentIndex = matched.findIndex(p => p.id === targetReq.matched_provider_id);
+    const nextIndex = (currentIndex + 1) % matched.length;
+    const nextProvider = matched[nextIndex];
+
+    const { rows: updatedRows } = await pool.query(`
+      UPDATE requests 
+      SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 
+      RETURNING *;
+    `, [nextProvider.id, rId]);
+
+    // Yeni sağlayıcıya ve kullanıcıya SMS logu tetikle
+    await triggerSimulatedNotifications(rId, updatedRows[0], nextProvider, 'MATCHED');
+
+    res.status(200).json({
+      status: 'success',
+      message: `Talep sonraki sağlayıcı olan '${nextProvider.name}' ile yeniden eşleştirildi.`,
+      request: updatedRows[0],
+      newProvider: nextProvider
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// 4. Doğrudan Alternatif Sağlayıcı Seç
+const selectCandidateProvider = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { providerId } = req.body;
+    const rId = parseInt(requestId, 10);
+    const pId = parseInt(providerId, 10);
+
+    const { rows: providerRows } = await pool.query('SELECT * FROM service_providers WHERE id = $1', [pId]);
+    if (providerRows.length === 0) return res.status(404).json({ status: 'error', message: 'Sağlayıcı bulunamadı.' });
+
+    const { rows: updatedRows } = await pool.query(`
+      UPDATE requests 
+      SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 
+      RETURNING *;
+    `, [pId, rId]);
+
+    await triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
+
+    res.status(200).json({
+      status: 'success',
+      message: `Talep başarıyla '${providerRows[0].name}' sağlayıcısına yönlendirildi.`,
+      request: updatedRows[0]
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// 5. Talep Yaşam Döngüsü Durumu Güncelle (Kabul Et, Tamamla, İptal Et)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -215,6 +273,14 @@ const updateRequestStatus = async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
     }
 
+    // Sağlayıcı bilgisi varsa bildirim üret
+    if (rows[0].matched_provider_id) {
+      const { rows: pRows } = await pool.query('SELECT * FROM service_providers WHERE id = $1', [rows[0].matched_provider_id]);
+      if (pRows.length > 0) {
+        await triggerSimulatedNotifications(rows[0].id, rows[0], pRows[0], newStatus);
+      }
+    }
+
     res.status(200).json({
       status: 'success',
       message: `Talep durumu '${newStatus}' olarak güncellendi.`,
@@ -225,36 +291,61 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// 6. Manuel Atama (WoZ)
+// 6. Bekleyen / Eşleşen / WoZ / Log Sorguları
+const getPendingRequests = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT * FROM requests 
+      WHERE status = 'MANUAL_INTERVENTION' OR status = 'PENDING'
+      ORDER BY created_at DESC;
+    `);
+    res.status(200).json({ status: 'success', requests: rows });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+const getMatchedRequests = async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        r.*,
+        p.id AS provider_id,
+        p.name AS provider_name,
+        p.phone AS provider_phone
+      FROM requests r
+      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
+      WHERE r.status IN ('MATCHED', 'ACCEPTED', 'COMPLETED', 'CANCELLED')
+      ORDER BY r.updated_at DESC, r.created_at DESC;
+    `;
+    const { rows } = await pool.query(query);
+    res.status(200).json({ status: 'success', requests: rows });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
     const rId = parseInt(requestId, 10);
     const pId = parseInt(providerId, 10);
 
-    const { rows: providerRows } = await pool.query(
-      'SELECT id, name, phone FROM service_providers WHERE id = $1',
-      [pId]
-    );
+    const { rows: providerRows } = await pool.query('SELECT id, name, phone FROM service_providers WHERE id = $1', [pId]);
+    if (providerRows.length === 0) return res.status(404).json({ status: 'error', message: 'Sağlayıcı bulunamadı.' });
 
-    if (providerRows.length === 0) {
-      return res.status(404).json({ status: 'error', message: `ID ${pId} olan sağlayıcı bulunamadı.` });
-    }
-
-    const updateQuery = `
+    const { rows: updatedRows } = await pool.query(`
       UPDATE requests
       SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
       RETURNING *;
-    `;
-    const { rows: updatedRows } = await pool.query(updateQuery, [pId, rId]);
+    `, [pId, rId]);
 
-    // SMS Simülasyonu Tetikle
-    await triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0]);
+    await triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
 
     res.status(200).json({
       status: 'success',
-      message: `Talep '${providerRows[0].name}' sağlayıcısına atandı ve SMS logları oluşturuldu.`,
+      message: `Talep '${providerRows[0].name}' sağlayıcısına atandı.`,
       request: updatedRows[0]
     });
   } catch (error) {
@@ -262,23 +353,15 @@ const assignProviderManually = async (req, res) => {
   }
 };
 
-// 7. Giden SMS / Bildirim Loglarını Getir (YENİ)
 const getOutboundNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT 
-        n.*,
-        r.raw_text
-      FROM outbound_notifications n
-      LEFT JOIN requests r ON n.request_id = r.id
-      ORDER BY n.created_at DESC
-      LIMIT 100;
+      SELECT n.*, r.raw_text 
+      FROM outbound_notifications n 
+      LEFT JOIN requests r ON n.request_id = r.id 
+      ORDER BY n.created_at DESC LIMIT 100;
     `);
-
-    res.status(200).json({
-      status: 'success',
-      notifications: rows
-    });
+    res.status(200).json({ status: 'success', notifications: rows });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
@@ -286,10 +369,12 @@ const getOutboundNotifications = async (req, res) => {
 
 module.exports = {
   createRequest,
+  getUserRequests,
+  passToNextProvider,
+  selectCandidateProvider,
+  updateRequestStatus,
   getPendingRequests,
   getMatchedRequests,
-  getUserRequests,
-  updateRequestStatus,
   assignProviderManually,
   getOutboundNotifications
 };
