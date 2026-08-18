@@ -1,7 +1,7 @@
 const { pool } = require('../config/db');
 
-// 1. OTP Üret & Gönder (Simüle)
-exports.sendOtp = async (req, res) => {
+// 1. OTP Üret ve Gönder (Simülasyon)
+const sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
 
@@ -10,9 +10,7 @@ exports.sendOtp = async (req, res) => {
     }
 
     const cleanPhone = phone.trim();
-    // 6 haneli rastgele OTP kodu
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    // 3 dakika geçerlilik süresi
     const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
 
     const insertQuery = `
@@ -23,16 +21,13 @@ exports.sendOtp = async (req, res) => {
 
     await pool.query(insertQuery, [cleanPhone, otpCode, expiresAt]);
 
-    console.log(`\n================================`);
-    console.log(`🔑 [OTP SIMULATION] Telefon: ${cleanPhone} -> KOD: ${otpCode}`);
-    console.log(`================================\n`);
+    console.log(`\n🔑 [OTP SIMULATION] Telefon: ${cleanPhone} -> KOD: ${otpCode}\n`);
 
-    // İleride gerçek SMS sağlayıcısı (Netgsm, Twilio vb.) buraya bağlanacak
     res.status(200).json({
       status: 'success',
       message: 'Doğrulama kodu telefonunuza gönderildi.',
       phone: cleanPhone,
-      simulatedOtp: otpCode // Canlıda kolay test edebilmeniz için dönüyoruz
+      simulatedOtp: otpCode
     });
   } catch (error) {
     console.error('OTP gönderme hatası:', error);
@@ -40,8 +35,8 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
-// 2. OTP Doğrula & Giriş Yap
-exports.verifyOtp = async (req, res) => {
+// 2. OTP Doğrula
+const verifyOtp = async (req, res) => {
   try {
     const { phone, otpCode } = req.body;
 
@@ -68,7 +63,6 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    // Kodu kullanıldı olarak işaretle
     await pool.query('UPDATE otp_verifications SET is_used = TRUE WHERE id = $1', [rows[0].id]);
 
     res.status(200).json({
@@ -83,4 +77,9 @@ exports.verifyOtp = async (req, res) => {
     console.error('OTP doğrulama hatası:', error);
     res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
+};
+
+module.exports = {
+  sendOtp,
+  verifyOtp
 };
