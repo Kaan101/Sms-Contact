@@ -17,13 +17,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. Sequence Senkronizasyonu (ID çakışmalarını önler)
-    await pool.query(`
-      SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE(MAX(id), 1)) 
-      FROM service_providers;
-    `);
-
-    // 3. OTP Tablosu
+    // 2. OTP Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS otp_verifications (
         id SERIAL PRIMARY KEY,
@@ -35,7 +29,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 4. Kullanıcı Talepleri Tablosu
+    // 3. Kullanıcı Talepleri Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -50,13 +44,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 5. Sequence Senkronizasyonu (Requests için)
-    await pool.query(`
-      SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE(MAX(id), 1)) 
-      FROM requests;
-    `);
-
-    // 6. Niyet Tablosu
+    // 4. Niyet Netleştirme Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS disambiguation_dictionary (
         id SERIAL PRIMARY KEY,
@@ -67,9 +55,20 @@ const initDatabase = async () => {
       );
     `);
 
-    console.log('✅ PostgreSQL sequence ve tabloları senkronize edildi.');
+    // Örnek Niyet
+    await pool.query(`
+      INSERT INTO disambiguation_dictionary (trigger_keyword, clarification_message, options)
+      VALUES (
+        'buz pateni',
+        '"buz pateni" için aradığınız hizmeti netleştirmek ister misiniz?',
+        '[{"id": 1, "text": "Buz pateni sahası / pist rezervasyonu"}, {"id": 2, "text": "Buz pateni ayakkabısı / ekipman satışı"}]'::jsonb
+      )
+      ON CONFLICT (trigger_keyword) DO NOTHING;
+    `);
+
+    console.log('✅ PostgreSQL tabloları ve OTP sistemi hazır.');
   } catch (error) {
-    console.error('❌ Tablo başlatma hatası:', error.message);
+    console.error('⚠️ Tablo hazırlık uyarısı:', error.message);
   }
 };
 
