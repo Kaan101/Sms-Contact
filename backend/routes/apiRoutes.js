@@ -19,16 +19,16 @@ const {
 router.post('/auth/send-otp', sendOtp);
 router.post('/auth/verify-otp', verifyOtp);
 
-// 2. Disambiguate
+// 2. Disambiguation
 router.post('/disambiguate', checkDisambiguation);
 
-// 3. Provider CRUD
+// 3. Servis Sağlayıcılar CRUD
 router.post('/providers', registerProvider);
 router.get('/providers', getProviders);
 router.put('/providers/:id', updateProvider);
 router.delete('/providers/:id', deleteProvider);
 
-// 4. Requests & WoZ
+// 4. Talepler ve WoZ Operatör Havuzu
 router.post('/requests', createRequest);
 router.get('/requests/pending', getPendingRequests);
 router.post('/requests/assign', assignProviderManually);

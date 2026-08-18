@@ -1,7 +1,6 @@
 const { pool } = require('../config/db');
 
-// 1. CREATE: Yeni Servis Veren Ekle
-exports.registerProvider = async (req, res) => {
+const registerProvider = async (req, res) => {
   try {
     const { name, phone, email, serviceKeywords, communicationChannels, priorityScore } = req.body;
 
@@ -12,7 +11,6 @@ exports.registerProvider = async (req, res) => {
       });
     }
 
-    // Dizi olduğundan emin olalım
     const keywordsArray = Array.isArray(serviceKeywords) 
       ? serviceKeywords 
       : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -46,15 +44,11 @@ exports.registerProvider = async (req, res) => {
     });
   } catch (error) {
     console.error('Servis veren ekleme hatası:', error);
-    res.status(500).json({ 
-      status: 'error', 
-      message: `Sunucu hatası: ${error.message}` 
-    });
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
 
-// 2. READ: Tüm Servis Verenleri Listele
-exports.getProviders = async (req, res) => {
+const getProviders = async (req, res) => {
   try {
     const selectQuery = `
       SELECT * FROM service_providers 
@@ -72,8 +66,7 @@ exports.getProviders = async (req, res) => {
   }
 };
 
-// 3. UPDATE: Servis Veren Güncelle
-exports.updateProvider = async (req, res) => {
+const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, phone, email, serviceKeywords, communicationChannels, priorityScore, isActive } = req.body;
@@ -132,12 +125,10 @@ exports.updateProvider = async (req, res) => {
   }
 };
 
-// 4. DELETE: Servis Veren Sil
-exports.deleteProvider = async (req, res) => {
+const deleteProvider = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Önce bu servis verene bağlı taleplerin foreign key'ini boşa çıkaralım
     await pool.query('UPDATE requests SET matched_provider_id = NULL WHERE matched_provider_id = $1;', [id]);
 
     const deleteQuery = `DELETE FROM service_providers WHERE id = $1 RETURNING *;`;
@@ -155,4 +146,11 @@ exports.deleteProvider = async (req, res) => {
     console.error('Servis veren silme hatası:', error);
     res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
+};
+
+module.exports = {
+  registerProvider,
+  getProviders,
+  updateProvider,
+  deleteProvider
 };

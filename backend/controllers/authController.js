@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-exports.sendOtp = async (req, res) => {
+const sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
 
@@ -34,7 +34,7 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
-exports.verifyOtp = async (req, res) => {
+const verifyOtp = async (req, res) => {
   try {
     const { phone, otpCode } = req.body;
 
@@ -75,4 +75,9 @@ exports.verifyOtp = async (req, res) => {
     console.error('OTP doğrulama hatası:', error);
     res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
+};
+
+module.exports = {
+  sendOtp,
+  verifyOtp
 };

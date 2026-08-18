@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-exports.checkDisambiguation = async (req, res) => {
+const checkDisambiguation = async (req, res) => {
   try {
     const { queryText } = req.body;
 
@@ -37,4 +37,8 @@ exports.checkDisambiguation = async (req, res) => {
     console.error('Niyet kontrol hatası:', error);
     res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
+};
+
+module.exports = {
+  checkDisambiguation
 };
