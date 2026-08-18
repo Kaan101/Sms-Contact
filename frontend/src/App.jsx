@@ -17,13 +17,18 @@ import {
   HelpCircle,
   Clock,
   LogOut,
-  KeyRound
+  KeyRound,
+  ChevronDown,
+  ChevronUp,
+  CheckCheck,
+  History,
+  Building2
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export default function App() {
-  // --- 1. KULLANICI & OTP AUTH STATE ---
+  // --- AUTH STATE ---
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('sc_user');
@@ -33,14 +38,14 @@ export default function App() {
     }
   });
   
-  const [authStep, setAuthStep] = useState('PHONE'); // 'PHONE' | 'OTP'
+  const [authStep, setAuthStep] = useState('PHONE');
   const [inputPhone, setInputPhone] = useState('');
   const [inputOtp, setInputOtp] = useState('');
   const [simulatedCode, setSimulatedCode] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // --- 2. TALEP AKIŞI STATE ---
-  const [activeTab, setActiveTab] = useState('USER'); // 'USER' | 'ADMIN' | 'PROVIDERS'
+  // --- TAB & FLOW STATE ---
+  const [activeTab, setActiveTab] = useState('USER'); // 'USER' | 'MATCHED' | 'ADMIN' | 'PROVIDERS'
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
@@ -50,13 +55,19 @@ export default function App() {
   const [resultData, setResultData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // --- 3. OPERATÖR WOZ & SAĞLAYICI STATE ---
+  // --- KULLANICI TALEPLERİ (AKORDEON) ---
+  const [myRequests, setMyRequests] = useState([]);
+  const [isMyRequestsOpen, setIsMyRequestsOpen] = useState(true);
+  const [myRequestsLoading, setMyRequestsLoading] = useState(false);
+
+  // --- GENEL EŞLEŞMELER & WOZ STATE ---
+  const [matchedRequests, setMatchedRequests] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
   const [adminLoading, setAdminLoading] = useState(false);
 
-  // --- 4. SAĞLAYICI CRUD MODAL STATE ---
+  // --- SAĞLAYICI CRUD MODAL ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [formData, setFormData] = useState({
@@ -69,12 +80,37 @@ export default function App() {
   });
 
   // Veri Çekme Fonksiyonları
+  const fetchMyRequests = async () => {
+    if (!user?.phone) return;
+    setMyRequestsLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(user.phone)}`);
+      setMyRequests(res.data.requests || []);
+    } catch (err) {
+      console.error('Kullanıcı talepleri hatası:', err);
+    } finally {
+      setMyRequestsLoading(false);
+    }
+  };
+
+  const fetchMatchedRequests = async () => {
+    setAdminLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/requests/matched`);
+      setMatchedRequests(res.data.requests || []);
+    } catch (err) {
+      console.error('Eşleşen talepler hatası:', err);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
   const fetchProviders = async () => {
     try {
       const res = await axios.get(`${API_BASE}/providers`);
       setProviders(res.data.providers || []);
     } catch (err) {
-      console.error('Sağlayıcıları getirme hatası:', err);
+      console.error('Sağlayıcılar hatası:', err);
     }
   };
 
@@ -88,18 +124,20 @@ export default function App() {
       setPendingRequests(reqRes.data.requests || []);
       setProviders(provRes.data.providers || []);
     } catch (err) {
-      console.error('Admin verileri getirme hatası:', err);
+      console.error('Admin veri hatası:', err);
     } finally {
       setAdminLoading(false);
     }
   };
 
   useEffect(() => {
+    if (activeTab === 'USER' && user) fetchMyRequests();
+    if (activeTab === 'MATCHED') fetchMatchedRequests();
     if (activeTab === 'ADMIN') fetchAdminData();
     if (activeTab === 'PROVIDERS') fetchProviders();
-  }, [activeTab]);
+  }, [activeTab, user]);
 
-  // --- AUTH METODLARI ---
+  // Auth Metodları
   const handleSendOtp = async (e) => {
     e.preventDefault();
     if (!inputPhone.trim()) return;
@@ -145,7 +183,7 @@ export default function App() {
     handleReset();
   };
 
-  // --- TALEP MOTORU METODLARI ---
+  // Talep Gönderim Metodları
   const handleInitialSubmit = async (e) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
@@ -190,6 +228,7 @@ export default function App() {
 
       setResultData(response.data);
       setStep('RESULT');
+      fetchMyRequests(); // Talebi hemen listeye yansıt
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
     } finally {
@@ -197,7 +236,6 @@ export default function App() {
     }
   };
 
-  // --- WOZ MANUEL ATAMA METODU (Tip Güvenli) ---
   const handleAssignProvider = async (requestId) => {
     const selectedVal = selectedProviderMap[requestId];
     if (!selectedVal) {
@@ -205,13 +243,10 @@ export default function App() {
       return;
     }
 
-    const rId = parseInt(requestId, 10);
-    const pId = parseInt(selectedVal, 10);
-
     try {
       await axios.post(`${API_BASE}/requests/assign`, {
-        requestId: rId,
-        providerId: pId
+        requestId: parseInt(requestId, 10),
+        providerId: parseInt(selectedVal, 10)
       });
       await fetchAdminData();
     } catch (err) {
@@ -219,7 +254,6 @@ export default function App() {
     }
   };
 
-  // --- SAĞLAYICI CRUD METODLARI ---
   const openModal = (provider = null) => {
     if (provider) {
       setEditingProviderId(provider.id);
@@ -314,7 +348,7 @@ export default function App() {
             <div className="flex items-center bg-neutral-100/80 p-1 rounded-lg border border-neutral-200/60 text-xs font-medium">
               <button
                 onClick={() => setActiveTab('USER')}
-                className={`px-3.5 py-1.5 rounded-md transition-all ${
+                className={`px-3 py-1.5 rounded-md transition-all ${
                   activeTab === 'USER' 
                     ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
                     : 'text-neutral-500 hover:text-neutral-900'
@@ -323,8 +357,19 @@ export default function App() {
                 Talep Motoru
               </button>
               <button
+                onClick={() => setActiveTab('MATCHED')}
+                className={`px-3 py-1.5 rounded-md transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'MATCHED' 
+                    ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+              >
+                <CheckCheck size={13} className="text-neutral-400" />
+                <span>Eşleşmeler</span>
+              </button>
+              <button
                 onClick={() => setActiveTab('PROVIDERS')}
-                className={`px-3.5 py-1.5 rounded-md transition-all flex items-center space-x-1.5 ${
+                className={`px-3 py-1.5 rounded-md transition-all flex items-center space-x-1.5 ${
                   activeTab === 'PROVIDERS' 
                     ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
                     : 'text-neutral-500 hover:text-neutral-900'
@@ -335,7 +380,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setActiveTab('ADMIN')}
-                className={`px-3.5 py-1.5 rounded-md transition-all flex items-center space-x-1.5 ${
+                className={`px-3 py-1.5 rounded-md transition-all flex items-center space-x-1.5 ${
                   activeTab === 'ADMIN' 
                     ? 'bg-white text-neutral-950 shadow-sm font-semibold' 
                     : 'text-neutral-500 hover:text-neutral-900'
@@ -368,10 +413,10 @@ export default function App() {
       </header>
 
       {/* 🏛️ MAIN CONTENT */}
-      <main className="max-w-6xl w-full mx-auto px-6 py-12 flex-1 flex flex-col justify-center">
+      <main className="max-w-6xl w-full mx-auto px-6 py-10 flex-1 flex flex-col justify-start">
         
         {errorMessage && (
-          <div className="max-w-xl mx-auto w-full mb-6 p-4 bg-rose-50/70 border border-rose-200/80 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between backdrop-blur-sm">
+          <div className="max-w-2xl mx-auto w-full mb-6 p-4 bg-rose-50/70 border border-rose-200/80 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between backdrop-blur-sm">
             <span>{errorMessage}</span>
             <button onClick={() => setErrorMessage('')} className="text-rose-400 hover:text-rose-700 ml-4">
               <X size={14} />
@@ -379,9 +424,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- 1. KULLANICI ARAYÜZÜ ----------------- */}
+        {/* ----------------- 1. KULLANICI TALEP & GEÇMİŞ EKRANI ----------------- */}
         {activeTab === 'USER' && (
-          <div className="max-w-2xl mx-auto w-full">
+          <div className="max-w-2xl mx-auto w-full space-y-8">
             {!user ? (
               /* OTP GİRİŞ PANELİ */
               <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto space-y-6">
@@ -462,19 +507,20 @@ export default function App() {
                 )}
               </div>
             ) : (
-              /* GİRİŞ YAPILMIŞ TALEP AKIŞI */
+              /* GİRİŞ YAPILMIŞ KULLANICI ALANI */
               <>
+                {/* 1.1 TALEP GİRİŞ ADIMI */}
                 {step === 'INPUT' && (
-                  <div className="space-y-8">
-                    <div className="text-center space-y-3">
+                  <div className="space-y-6">
+                    <div className="text-center space-y-2">
                       <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-neutral-200 bg-white text-neutral-600 text-xs font-medium shadow-sm">
                         <Sparkles size={13} className="text-neutral-900" />
                         <span>Doğrulanmış Kullanıcı: <strong className="font-mono text-neutral-900">{user.phone}</strong></span>
                       </div>
-                      <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-950">
+                      <h1 className="text-3xl font-extrabold tracking-tight text-neutral-950">
                         Hangi hizmete ihtiyacınız var?
                       </h1>
-                      <p className="text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
+                      <p className="text-xs text-neutral-500 max-w-md mx-auto leading-relaxed">
                         İhtiyacınızı günlük dilde yazın. Doğrulanmış profiliniz üzerinden en uygun sağlayıcıyla eşleştirelim.
                       </p>
                     </div>
@@ -492,13 +538,13 @@ export default function App() {
                             }
                           }}
                           placeholder="Örn: Moda'da acil bisiklet lastik tamiri arıyorum veya Kadıköy'de buz pateni sahası kiralayalım..."
-                          className="w-full p-3 text-base text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none"
+                          className="w-full p-3 text-sm text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none"
                           required
                         />
                         <div className="flex items-center justify-between pt-2 border-t border-neutral-100 px-2 text-xs text-neutral-400">
                           <span className="hidden sm:inline-flex items-center space-x-1 font-mono text-[11px]">
                             <CornerDownLeft size={11} />
-                            <span>Göndermek için Enter'a basın</span>
+                            <span>Enter ile devam edin</span>
                           </span>
                           <button
                             type="submit"
@@ -513,6 +559,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 1.2 DİSAMBİGUATE */}
                 {step === 'DISAMBIGUATE' && disambiguationData && (
                   <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-8 space-y-6">
                     <div className="flex items-start space-x-3.5 pb-4 border-b border-neutral-100">
@@ -546,6 +593,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 1.3 KANAL ONAY */}
                 {step === 'CONFIRM' && (
                   <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-8 space-y-6">
                     <div>
@@ -624,6 +672,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 1.4 SONUÇ */}
                 {step === 'RESULT' && resultData && (
                   <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-8 text-center space-y-6">
                     {resultData.matchedProvider ? (
@@ -673,13 +722,139 @@ export default function App() {
                     </button>
                   </div>
                 )}
+
+                {/* 1.5 KULLANICININ KENDİ GEÇMİŞ TALEPLERİ & EŞLEŞMELERİ (AKORDEON LİSTE) */}
+                <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => setIsMyRequestsOpen(!isMyRequestsOpen)}
+                    className="w-full p-4 flex items-center justify-between hover:bg-neutral-50/60 transition text-left"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <History size={16} className="text-neutral-500" />
+                      <span className="font-semibold text-xs tracking-tight text-neutral-900">
+                        Taleplerim & Eşleşme Durumlarım ({myRequests.length})
+                      </span>
+                    </div>
+                    {isMyRequestsOpen ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
+                  </button>
+
+                  {isMyRequestsOpen && (
+                    <div className="p-4 pt-0 border-t border-neutral-100 space-y-3">
+                      {myRequestsLoading ? (
+                        <p className="text-xs text-neutral-400 py-4 text-center font-mono">Talepleriniz yükleniyor...</p>
+                      ) : myRequests.length === 0 ? (
+                        <p className="text-xs text-neutral-400 py-4 text-center">Henüz bir talep göndermediniz.</p>
+                      ) : (
+                        myRequests.map((req) => (
+                          <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200/70 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs font-medium text-neutral-900 leading-snug">"{req.raw_text}"</p>
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded shrink-0 ${
+                                req.status === 'MATCHED'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+                              }`}>
+                                {req.status === 'MATCHED' ? 'EŞLEŞTİ' : 'HAVUZDA'}
+                              </span>
+                            </div>
+
+                            {req.provider_name ? (
+                              <div className="pt-2 border-t border-neutral-200/60 flex items-center justify-between text-[11px]">
+                                <div className="flex items-center space-x-1.5 text-neutral-700">
+                                  <Building2 size={13} className="text-emerald-600" />
+                                  <span className="font-semibold">{req.provider_name}</span>
+                                  <span className="text-neutral-400">({req.provider_phone})</span>
+                                </div>
+                                <span className="font-mono text-[10px] text-neutral-400 uppercase">
+                                  Kanal: {req.preferred_channel}
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-neutral-400 italic pt-1">
+                                Operatör uygun sağlayıcı ile koordinasyonu sağlıyor...
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </>
             )}
-
           </div>
         )}
 
-        {/* ----------------- 2. OPERATÖR WOZ MODU ----------------- */}
+        {/* ----------------- 2. GENEL EŞLEŞEN TALEPLER SEKMESİ ----------------- */}
+        {activeTab === 'MATCHED' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-neutral-950">Eşleşen Tüm Talepler</h2>
+                <p className="text-xs text-neutral-500">Sistemde kural tabanlı veya operatör eliyle eşleştirilmiş tüm istekler.</p>
+              </div>
+              <button
+                onClick={fetchMatchedRequests}
+                className="text-xs font-semibold px-3 py-1.5 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 text-neutral-700 transition"
+              >
+                Yenile
+              </button>
+            </div>
+
+            {adminLoading ? (
+              <div className="text-center py-16 text-xs text-neutral-400 font-mono">Eşleşmeler sorgulanıyor...</div>
+            ) : matchedRequests.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-neutral-200 p-12 text-center">
+                <p className="text-sm font-semibold text-neutral-900">Henüz Eşleşen Talep Yok</p>
+                <p className="text-xs text-neutral-400 mt-1 font-mono">Otomatik veya manuel eşleşme sağlandıkça burada listelenecektir.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {matchedRequests.map((req) => (
+                  <div key={req.id} className="bg-white p-5 rounded-xl border border-neutral-200 shadow-sm flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          MATCHED #REQ-{req.id}
+                        </span>
+                        <span className="text-[11px] font-mono text-neutral-400">
+                          {new Date(req.created_at).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}"</p>
+                      {req.disambiguation_choice && (
+                        <p className="text-xs text-indigo-600 font-medium">Hedef: {req.disambiguation_choice}</p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-neutral-100 space-y-1.5 text-xs font-mono">
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400 font-sans">Kullanıcı Telefon:</span>
+                        <span className="font-semibold text-neutral-800">{req.contact_value}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400 font-sans">Atanan Sağlayıcı:</span>
+                        <span className="font-semibold text-emerald-700">{req.provider_name || 'Bilinmiyor'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400 font-sans">Sağlayıcı İletişim:</span>
+                        <span className="text-neutral-700">{req.provider_phone}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400 font-sans">Kanal Tercihi:</span>
+                        <span className="px-1.5 py-0.5 bg-neutral-100 text-neutral-700 rounded font-semibold text-[10px]">
+                          {req.preferred_channel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ----------------- 3. OPERATÖR WOZ MODU ----------------- */}
         {activeTab === 'ADMIN' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
@@ -728,7 +903,7 @@ export default function App() {
                         <option value="" disabled>Sağlayıcı Seç</option>
                         {providers.map((p) => (
                           <option key={p.id} value={String(p.id)}>
-                            {p.name} (ID: {p.id} - Öncelik: {p.priority_score})
+                            {p.name} (ID: {p.id} - Skor: {p.priority_score})
                           </option>
                         ))}
                       </select>
@@ -748,7 +923,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- 3. SAĞLAYICI YÖNETİMİ (CRUD) ----------------- */}
+        {/* ----------------- 4. SAĞLAYICI YÖNETİMİ (CRUD) ----------------- */}
         {activeTab === 'PROVIDERS' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
@@ -819,7 +994,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- MODAL: SAĞLAYICI EKLE / DÜZENLE ----------------- */}
+        {/* MODAL: SAĞLAYICI FORM */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-neutral-200 space-y-4">

@@ -11,7 +11,9 @@ const {
 } = require('../controllers/providerController');
 const { 
   createRequest, 
-  getPendingRequests, 
+  getPendingRequests,
+  getMatchedRequests,
+  getUserRequests,
   assignProviderManually 
 } = require('../controllers/requestController');
 
@@ -28,9 +30,11 @@ router.get('/providers', getProviders);
 router.put('/providers/:id', updateProvider);
 router.delete('/providers/:id', deleteProvider);
 
-// 4. Talepler ve WoZ Operatör Havuzu
+// 4. Talepler
 router.post('/requests', createRequest);
 router.get('/requests/pending', getPendingRequests);
+router.get('/requests/matched', getMatchedRequests);
+router.get('/requests/my-requests', getUserRequests);
 router.post('/requests/assign', assignProviderManually);
 
 module.exports = router;

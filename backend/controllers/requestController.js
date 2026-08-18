@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 
+// 1. Yeni Talep Oluştur
 const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
@@ -97,6 +98,7 @@ const createRequest = async (req, res) => {
   }
 };
 
+// 2. Bekleyen Talepler (WoZ)
 const getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -115,6 +117,77 @@ const getPendingRequests = async (req, res) => {
   }
 };
 
+// 3. Genel Eşleşen Talepler (MATCHED)
+const getMatchedRequests = async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        r.id,
+        r.raw_text,
+        r.disambiguation_choice,
+        r.contact_value,
+        r.preferred_channel,
+        r.status,
+        r.created_at,
+        p.name AS provider_name,
+        p.phone AS provider_phone,
+        p.email AS provider_email
+      FROM requests r
+      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
+      WHERE r.status = 'MATCHED'
+      ORDER BY r.created_at DESC;
+    `;
+    const { rows } = await pool.query(query);
+
+    res.status(200).json({
+      status: 'success',
+      requests: rows
+    });
+  } catch (error) {
+    console.error('Eşleşen talepleri getirme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+  }
+};
+
+// 4. Kullanıcının Kendi Talepleri (Telefon numarasına göre)
+const getUserRequests = async (req, res) => {
+  try {
+    const { phone } = req.query;
+
+    if (!phone) {
+      return res.status(400).json({ status: 'error', message: 'Telefon parametresi zorunludur.' });
+    }
+
+    const query = `
+      SELECT 
+        r.id,
+        r.raw_text,
+        r.disambiguation_choice,
+        r.contact_value,
+        r.preferred_channel,
+        r.status,
+        r.created_at,
+        p.name AS provider_name,
+        p.phone AS provider_phone
+      FROM requests r
+      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
+      WHERE r.contact_value = $1
+      ORDER BY r.created_at DESC;
+    `;
+
+    const { rows } = await pool.query(query, [phone.trim()]);
+
+    res.status(200).json({
+      status: 'success',
+      requests: rows
+    });
+  } catch (error) {
+    console.error('Kullanıcı taleplerini getirme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+  }
+};
+
+// 5. Manuel Atama (WoZ)
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
@@ -169,5 +242,7 @@ const assignProviderManually = async (req, res) => {
 module.exports = {
   createRequest,
   getPendingRequests,
+  getMatchedRequests,
+  getUserRequests,
   assignProviderManually
 };
