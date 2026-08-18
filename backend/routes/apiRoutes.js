@@ -1,28 +1,36 @@
 const express = require('express');
 const router = express.Router();
 
-// Controller'ları içe aktar
-const authController = require('../controllers/authController');
-const disambiguateController = require('../controllers/disambiguateController');
-const providerController = require('../controllers/providerController');
-const requestController = require('../controllers/requestController');
+const { sendOtp, verifyOtp } = require('../controllers/authController');
+const { checkDisambiguation } = require('../controllers/disambiguateController');
+const { 
+  registerProvider, 
+  getProviders, 
+  updateProvider, 
+  deleteProvider 
+} = require('../controllers/providerController');
+const { 
+  createRequest, 
+  getPendingRequests, 
+  assignProviderManually 
+} = require('../controllers/requestController');
 
 // 1. Auth / OTP
-router.post('/auth/send-otp', authController.sendOtp);
-router.post('/auth/verify-otp', authController.verifyOtp);
+router.post('/auth/send-otp', sendOtp);
+router.post('/auth/verify-otp', verifyOtp);
 
-// 2. Niyet Netleştirme
-router.post('/disambiguate', disambiguateController.checkDisambiguation);
+// 2. Disambiguate
+router.post('/disambiguate', checkDisambiguation);
 
-// 3. Servis Verenler CRUD
-router.post('/providers', providerController.registerProvider);
-router.get('/providers', providerController.getProviders);
-router.put('/providers/:id', providerController.updateProvider);
-router.delete('/providers/:id', providerController.deleteProvider);
+// 3. Provider CRUD
+router.post('/providers', registerProvider);
+router.get('/providers', getProviders);
+router.put('/providers/:id', updateProvider);
+router.delete('/providers/:id', deleteProvider);
 
-// 4. Talepler ve WoZ Operatör Havuzu
-router.post('/requests', requestController.createRequest);
-router.get('/requests/pending', requestController.getPendingRequests);
-router.post('/requests/assign', requestController.assignProviderManually);
+// 4. Requests & WoZ
+router.post('/requests', createRequest);
+router.get('/requests/pending', getPendingRequests);
+router.post('/requests/assign', assignProviderManually);
 
 module.exports = router;

@@ -1,7 +1,6 @@
 const { pool } = require('../config/db');
 
-// 1. OTP Üret ve Gönder (Simülasyon)
-const sendOtp = async (req, res) => {
+exports.sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
 
@@ -25,7 +24,7 @@ const sendOtp = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      message: 'Doğrulama kodu telefonunuza gönderildi.',
+      message: 'Doğrulama kodu gönderildi.',
       phone: cleanPhone,
       simulatedOtp: otpCode
     });
@@ -35,8 +34,7 @@ const sendOtp = async (req, res) => {
   }
 };
 
-// 2. OTP Doğrula
-const verifyOtp = async (req, res) => {
+exports.verifyOtp = async (req, res) => {
   try {
     const { phone, otpCode } = req.body;
 
@@ -77,9 +75,4 @@ const verifyOtp = async (req, res) => {
     console.error('OTP doğrulama hatası:', error);
     res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
-};
-
-module.exports = {
-  sendOtp,
-  verifyOtp
 };
