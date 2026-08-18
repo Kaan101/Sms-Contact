@@ -276,15 +276,29 @@ export default function App() {
   };
 
   // Durum Değiştirme (Kabul Et, Tamamla, İptal)
- const handleStatusChange = async (requestId, newStatus) => {
+  const handleStatusChange = async (requestId, newStatus) => {
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/status`, { newStatus });
-      await fetchMyRequests();
-      if (activeTab === 'MATCHED') {
-        await fetchMatchedRequests();
-      }
+      fetchMyRequests();
+      if (activeTab === 'MATCHED') fetchMatchedRequests();
     } catch (err) {
       alert('Durum güncellenemedi: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  // Talep Silme (Kalıcı Olarak DB'den)
+  const handleDeleteRequest = async (requestId) => {
+    if (!window.confirm('Bu talebi kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE}/requests/${requestId}`);
+      await fetchMyRequests();
+      if (activeTab === 'MATCHED') fetchMatchedRequests();
+      if (activeTab === 'ADMIN') fetchAdminData();
+    } catch (err) {
+      alert('Silme işlemi başarısız: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -708,7 +722,7 @@ export default function App() {
                                 </button>
                               )}
 
-                              {/* Simüle: Sağlayıcı Onayı (Test amaçlı sağlayıcı kabul butonu) */}
+                              {/* Simüle: Sağlayıcı Onayı */}
                               {req.status === 'MATCHED' && (
                                 <button
                                   onClick={() => handleStatusChange(req.id, 'ACCEPTED')}
@@ -721,21 +735,35 @@ export default function App() {
                               )}
                             </div>
 
-                            {/* Talebi Tamamla / İptal Et (Talep Yapan Taraf) */}
+                            {/* Talebi Tamamla / İptal Et / Sil */}
                             <div className="flex items-center space-x-2 ml-auto">
+                              {req.status !== 'COMPLETED' && (
+                                <button
+                                  onClick={() => handleStatusChange(req.id, 'COMPLETED')}
+                                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center space-x-1 transition shadow-sm"
+                                >
+                                  <ShieldCheck size={14} />
+                                  <span>Hizmeti Tamamla</span>
+                                </button>
+                              )}
+                              
+                              {req.status !== 'CANCELLED' && req.status !== 'COMPLETED' && (
+                                <button
+                                  onClick={() => handleStatusChange(req.id, 'CANCELLED')}
+                                  className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-lg font-semibold flex items-center space-x-1 transition"
+                                  title="Talebi İptal Et"
+                                >
+                                  <Ban size={13} />
+                                  <span>İptal Et</span>
+                                </button>
+                              )}
+
                               <button
-                                onClick={() => handleStatusChange(req.id, 'COMPLETED')}
-                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center space-x-1 transition shadow-sm"
-                              >
-                                <ShieldCheck size={14} />
-                                <span>Hizmeti Tamamla</span>
-                              </button>
-                              <button
-                                onClick={() => handleStatusChange(req.id, 'CANCELLED')}
+                                onClick={() => handleDeleteRequest(req.id)}
                                 className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                                title="Talebi İptal Et"
+                                title="Talebi Kalıcı Olarak Sil"
                               >
-                                <Ban size={15} />
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </div>
@@ -900,11 +928,20 @@ export default function App() {
                               Sağlayıcı: {req.provider_name || 'Bilinmiyor'} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
                             </p>
                           </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            req.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}>
-                            {req.status === 'COMPLETED' ? 'TAMAMLANDI' : 'İPTAL'}
-                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                              req.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}>
+                              {req.status === 'COMPLETED' ? 'TAMAMLANDI' : 'İPTAL'}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteRequest(req.id)}
+                              className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-100/60 rounded-md transition"
+                              title="Talebi Sil"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

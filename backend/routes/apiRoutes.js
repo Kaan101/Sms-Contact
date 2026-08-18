@@ -18,7 +18,8 @@ const {
   getPendingRequests,
   getMatchedRequests,
   assignProviderManually,
-  getOutboundNotifications
+  getOutboundNotifications,
+  deleteRequest // <-- EKLENDİ
 } = require('../controllers/requestController');
 
 // Auth / OTP
@@ -39,9 +40,8 @@ router.post('/requests', createRequest);
 router.get('/requests/my-requests', getUserRequests);
 router.post('/requests/:requestId/next-provider', passToNextProvider);
 router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
-
-// Durum Güncelleme (POST olarak güncellendi)
 router.post('/requests/:requestId/status', updateRequestStatus);
+router.delete('/requests/:requestId', deleteRequest); // <-- TALEP SİLME ROTASI
 
 // WoZ ve Loglar
 router.get('/requests/pending', getPendingRequests);
