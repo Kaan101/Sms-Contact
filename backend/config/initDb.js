@@ -2,7 +2,7 @@ const { pool } = require('./db');
 
 const initDatabase = async () => {
   try {
-    // 1. Servis Verenler Tablosu
+    // 1. service_providers tablosunu oluştur
     await pool.query(`
       CREATE TABLE IF NOT EXISTS service_providers (
         id SERIAL PRIMARY KEY,
@@ -17,7 +17,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. OTP Tablosu
+    // 2. OTP tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS otp_verifications (
         id SERIAL PRIMARY KEY,
@@ -29,7 +29,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 3. Kullanıcı Talepleri Tablosu
+    // 3. requests tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -39,12 +39,45 @@ const initDatabase = async () => {
         contact_value VARCHAR(100) NOT NULL,
         preferred_channel VARCHAR(50) NOT NULL DEFAULT 'PHONE',
         status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-        matched_provider_id INTEGER REFERENCES service_providers(id) ON DELETE SET NULL,
+        matched_provider_id INTEGER,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 4. Niyet Netleştirme Tablosu
+    // 4. Foreign Key kısıtını güvenli şekilde onar/ekle
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'requests_matched_provider_id_fkey'
+        ) THEN
+          ALTER TABLE requests 
+          ADD CONSTRAINT requests_matched_provider_id_fkey 
+          FOREIGN KEY (matched_provider_id) 
+          REFERENCES service_providers(id) 
+          ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+
+    // 5. Sequence sayacını en büyük ID değerine eşitle (EN KRİTİK ADIM)
+    await pool.query(`
+      SELECT setval(
+        pg_get_serial_sequence('service_providers', 'id'),
+        COALESCE((SELECT MAX(id) FROM service_providers), 1),
+        true
+      );
+    `);
+
+    await pool.query(`
+      SELECT setval(
+        pg_get_serial_sequence('requests', 'id'),
+        COALESCE((SELECT MAX(id) FROM requests), 1),
+        true
+      );
+    `);
+
+    // 6. Niyet Netleştirme Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS disambiguation_dictionary (
         id SERIAL PRIMARY KEY,
@@ -55,20 +88,9 @@ const initDatabase = async () => {
       );
     `);
 
-    // Örnek Niyet
-    await pool.query(`
-      INSERT INTO disambiguation_dictionary (trigger_keyword, clarification_message, options)
-      VALUES (
-        'buz pateni',
-        '"buz pateni" için aradığınız hizmeti netleştirmek ister misiniz?',
-        '[{"id": 1, "text": "Buz pateni sahası / pist rezervasyonu"}, {"id": 2, "text": "Buz pateni ayakkabısı / ekipman satışı"}]'::jsonb
-      )
-      ON CONFLICT (trigger_keyword) DO NOTHING;
-    `);
-
-    console.log('✅ PostgreSQL tabloları ve OTP sistemi hazır.');
+    console.log('✅ PostgreSQL tabloları, Foreign Key ve ID Sequence sayacı başarıyla senkronize edildi.');
   } catch (error) {
-    console.error('⚠️ Tablo hazırlık uyarısı:', error.message);
+    console.error('⚠️ DB Onarım uyarısı:', error.message);
   }
 };
 
