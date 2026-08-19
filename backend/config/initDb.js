@@ -33,6 +33,11 @@ const initDatabase = async () => {
       );
     `);
 
+    // Kolon eklemeleri (Önceden oluşturulmuş tablolar için güvenli güncelleme)
+    await pool.query(`
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+
     // 3. Foreign key güvenli onarım
     await pool.query(`
       ALTER TABLE requests 
@@ -47,12 +52,12 @@ const initDatabase = async () => {
       ON DELETE SET NULL;
     `);
 
-    // 4. Giden SMS / Bildirim Log Tablosu (YENİ)
+    // 4. Giden SMS / Bildirim Log Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS outbound_notifications (
         id SERIAL PRIMARY KEY,
         request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
-        recipient_type VARCHAR(20) NOT NULL, -- 'USER' | 'PROVIDER'
+        recipient_type VARCHAR(20) NOT NULL,
         recipient_phone VARCHAR(50) NOT NULL,
         channel VARCHAR(20) NOT NULL DEFAULT 'SMS',
         message_body TEXT NOT NULL,
@@ -92,7 +97,7 @@ const initDatabase = async () => {
       );
     `);
 
-    console.log('✅ Veritabanı ve Bildirim (Outbound Notifications) motoru hazırlandı.');
+    console.log('✅ Veritabanı ve tüm tablolar eksiksiz hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }

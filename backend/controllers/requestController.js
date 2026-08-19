@@ -125,7 +125,7 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 2. Kullanıcının Kendi Talepleri ve Adayları (Format Uyuşmazlığına Karşı Esnek Arama)
+// 2. Kullanıcının Kendi Talepleri ve Adayları (Tüm ID'leri ve Sıralamayı Güvenli Getirir)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -146,7 +146,7 @@ const getUserRequests = async (req, res) => {
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
       WHERE r.contact_value = $1 
          OR regexp_replace(r.contact_value, '\\D', '', 'g') LIKE '%' || $2 || '%'
-      ORDER BY r.updated_at DESC, r.created_at DESC;
+      ORDER BY r.id DESC;
     `, [rawPhone, lastDigits]);
 
     const { rows: allProviders } = await pool.query(`
@@ -173,6 +173,7 @@ const getUserRequests = async (req, res) => {
 
     res.status(200).json({ status: 'success', requests: enrichedRequests });
   } catch (error) {
+    console.error('getUserRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -194,11 +195,12 @@ const getProviderAssignedRequests = async (req, res) => {
       FROM requests r
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
       WHERE r.matched_provider_id = $1
-      ORDER BY r.updated_at DESC, r.created_at DESC;
+      ORDER BY r.id DESC;
     `, [pId]);
 
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
+    console.error('getProviderAssignedRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -337,6 +339,7 @@ const updateRequestStatus = async (req, res) => {
       request: rows[0]
     });
   } catch (error) {
+    console.error('updateRequestStatus hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -347,10 +350,11 @@ const getPendingRequests = async (req, res) => {
     const { rows } = await pool.query(`
       SELECT * FROM requests 
       WHERE status = 'MANUAL_INTERVENTION' OR status = 'PENDING'
-      ORDER BY created_at DESC;
+      ORDER BY id DESC;
     `);
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
+    console.error('getPendingRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -367,11 +371,12 @@ const getMatchedRequests = async (req, res) => {
       FROM requests r
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
       WHERE r.status IN ('MATCHED', 'ACCEPTED', 'COMPLETED', 'CANCELLED')
-      ORDER BY r.updated_at DESC, r.created_at DESC;
+      ORDER BY r.id DESC;
     `;
     const { rows } = await pool.query(query);
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
+    console.error('getMatchedRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -387,9 +392,9 @@ const assignProviderManually = async (req, res) => {
     if (providerRows.length === 0) return res.status(404).json({ status: 'error', message: 'Sağlayıcı bulunamadı.' });
 
     const { rows: updatedRows } = await pool.query(`
-      UPDATE requests
+      UPDATE requests 
       SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
+      WHERE id = $2 
       RETURNING *;
     `, [pId, rId]);
 
@@ -401,6 +406,7 @@ const assignProviderManually = async (req, res) => {
       request: updatedRows[0]
     });
   } catch (error) {
+    console.error('assignProviderManually hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -412,10 +418,11 @@ const getOutboundNotifications = async (req, res) => {
       SELECT n.*, r.raw_text 
       FROM outbound_notifications n 
       LEFT JOIN requests r ON n.request_id = r.id 
-      ORDER BY n.created_at DESC LIMIT 100;
+      ORDER BY n.id DESC LIMIT 100;
     `);
     res.status(200).json({ status: 'success', notifications: rows });
   } catch (error) {
+    console.error('getOutboundNotifications hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -435,6 +442,7 @@ const deleteRequest = async (req, res) => {
 
     res.status(200).json({ status: 'success', message: 'Talep kalıcı olarak silindi.' });
   } catch (error) {
+    console.error('deleteRequest hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };

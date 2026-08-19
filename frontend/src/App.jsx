@@ -316,7 +316,7 @@ export default function App() {
       if (session.role === 'PROVIDER') await fetchProviderData();
       if (session.role === 'ADMIN') await fetchAdminData();
     } catch {
-      alert('Silme işlemi başarısız.');
+      alert('Silme başarısız.');
     }
   };
 
@@ -400,7 +400,7 @@ export default function App() {
     }
   };
 
-  // 🎯 AKTİF VE GEÇMİŞ TALEPLER FİLTRELERİ (AÇIKÇA TANIMLANDI)
+  // 🎯 AKTİF VE GEÇMİŞ TALEPLER FİLTRELERİ
   const activeRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
@@ -571,7 +571,7 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-3xl mx-auto w-full space-y-8">
               
-              {/* 🌟 AKTİF TALEPLER KARTLARI (activeRequests) */}
+              {/* 🌟 AKTİF TALEPLER KARTLARI */}
               {activeRequests.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
@@ -786,7 +786,7 @@ export default function App() {
                 <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
                     <History size={14} />
-                    <span>Geçmiş Talepler ({pastRequests.length})</span>
+                    <span>Geçmiş Talepler</span>
                   </h3>
                   <div className="space-y-2">
                     {pastRequests.map((req) => (
