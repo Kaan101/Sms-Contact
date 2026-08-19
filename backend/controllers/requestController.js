@@ -1,12 +1,10 @@
 const { pool } = require('../config/db');
 
-// Yardımcı: Telefon numarasını sadece rakamlara indirger ve normalize eder
 const normalizePhone = (p) => {
   if (!p) return '';
   return p.replace(/\D/g, '');
 };
 
-// Yardımcı: Çift Taraflı SMS Bildirim Simülasyonu
 const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
   try {
     const channel = reqData.preferred_channel || 'PHONE';
@@ -40,7 +38,6 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   }
 };
 
-// 1. Yeni Talep Oluşturma
 const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
@@ -125,7 +122,6 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 2. Kullanıcının Kendi Talepleri ve Adayları (Tüm ID'leri ve Sıralamayı Güvenli Getirir)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -178,14 +174,31 @@ const getUserRequests = async (req, res) => {
   }
 };
 
-// 3. Sağlayıcıya Gelen Talepler (Asenkron Polling)
 const getProviderAssignedRequests = async (req, res) => {
   try {
-    const { providerId } = req.query;
-    if (!providerId) return res.status(400).json({ status: 'error', message: 'providerId zorunludur.' });
+    const { providerId, phone } = req.query;
 
-    const pId = parseInt(providerId, 10);
-    if (isNaN(pId)) return res.status(400).json({ status: 'error', message: 'Geçersiz providerId.' });
+    if (!providerId && !phone) {
+      return res.status(400).json({ status: 'error', message: 'providerId veya phone zorunludur.' });
+    }
+
+    let pId = parseInt(providerId, 10);
+    const rawPhone = phone ? phone.trim() : '';
+    const cleanDigits = normalizePhone(rawPhone);
+    const lastDigits = cleanDigits.length >= 7 ? cleanDigits.slice(-7) : cleanDigits;
+
+    if (isNaN(pId) || pId <= 0) {
+      const { rows: foundProv } = await pool.query(`
+        SELECT id FROM service_providers 
+        WHERE phone = $1 
+           OR regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $2 || '%'
+        LIMIT 1;
+      `, [rawPhone, lastDigits]);
+
+      if (foundProv.length > 0) {
+        pId = foundProv[0].id;
+      }
+    }
 
     const { rows } = await pool.query(`
       SELECT 
@@ -193,10 +206,12 @@ const getProviderAssignedRequests = async (req, res) => {
         p.name AS provider_name,
         p.phone AS provider_phone
       FROM requests r
-      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
-      WHERE r.matched_provider_id = $1
+      INNER JOIN service_providers p ON r.matched_provider_id = p.id
+      WHERE r.matched_provider_id = $1 
+         OR p.phone = $2
+         OR ($3 <> '' AND regexp_replace(p.phone, '\\D', '', 'g') LIKE '%' || $3 || '%')
       ORDER BY r.id DESC;
-    `, [pId]);
+    `, [pId || -1, rawPhone, lastDigits]);
 
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
@@ -205,7 +220,6 @@ const getProviderAssignedRequests = async (req, res) => {
   }
 };
 
-// 4. Sonraki Sağlayıcıya Geç (Pass Next)
 const passToNextProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -263,7 +277,6 @@ const passToNextProvider = async (req, res) => {
   }
 };
 
-// 5. Doğrudan Aday Sağlayıcı Seç (Direct Candidate Select)
 const selectCandidateProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -304,7 +317,6 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
-// 6. Talep Durumu Güncelle (ACCEPTED, COMPLETED, CANCELLED)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -344,7 +356,6 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// 7. Bekleyen Talepleri Getir (WoZ)
 const getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -359,7 +370,6 @@ const getPendingRequests = async (req, res) => {
   }
 };
 
-// 8. Eşleşen & Süreçteki Tüm Talepler
 const getMatchedRequests = async (req, res) => {
   try {
     const query = `
@@ -381,7 +391,6 @@ const getMatchedRequests = async (req, res) => {
   }
 };
 
-// 9. Manuel Atama (WoZ)
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
@@ -411,7 +420,6 @@ const assignProviderManually = async (req, res) => {
   }
 };
 
-// 10. Giden SMS Loglarını Getir
 const getOutboundNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -427,7 +435,6 @@ const getOutboundNotifications = async (req, res) => {
   }
 };
 
-// 11. Talebi Kalıcı Olarak Sil
 const deleteRequest = async (req, res) => {
   try {
     const { requestId } = req.params;

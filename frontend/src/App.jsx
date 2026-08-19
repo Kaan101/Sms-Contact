@@ -128,12 +128,17 @@ export default function App() {
         priorityScore: prov.priority_score || 100
       });
 
-      const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}`);
+      const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
       setProviderRequests(rRes.data.requests || []);
     } catch (err) {
       if (err.response?.status === 404) {
         setProviderProfile(null);
-        setIsProfileOpen(true);
+        try {
+          const fallbackRes = await axios.get(`${API_BASE}/requests/provider-requests?phone=${encodeURIComponent(session.phone)}`);
+          setProviderRequests(fallbackRes.data.requests || []);
+        } catch {
+          setProviderRequests([]);
+        }
       }
     }
   };
@@ -158,7 +163,6 @@ export default function App() {
     }
   };
 
-  // 🔄 ASENKRON CANLI DİNLEME (3 saniyede bir polling)
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') fetchCustomerData();
@@ -168,13 +172,12 @@ export default function App() {
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData();
         if (session.role === 'CUSTOMER') fetchCustomerData();
-      }, 3000);
+      }, 2000);
 
       return () => clearInterval(interval);
     }
   }, [session]);
 
-  // --- AUTH METODLARI ---
   const handleSendOtp = async (e) => {
     e.preventDefault();
     if (!inputPhone.trim()) return;
@@ -225,11 +228,11 @@ export default function App() {
     localStorage.removeItem('sc_session');
     setSession(null);
     setProviderProfile(null);
+    setIsProfileOpen(false);
     setMyCustomerRequests([]);
     setStep('INPUT');
   };
 
-  // --- MÜŞTERİ TALEP METODLARI ---
   const handleCustomerInitialSubmit = async (e) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
@@ -280,6 +283,7 @@ export default function App() {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
       await fetchCustomerData();
+      if (session.role === 'PROVIDER') await fetchProviderData();
     } catch (err) {
       alert('İşlem başarısız: ' + (err.response?.data?.message || err.message));
     }
@@ -292,6 +296,7 @@ export default function App() {
       });
       setShowCandidatesMap(prev => ({ ...prev, [requestId]: false }));
       await fetchCustomerData();
+      if (session.role === 'PROVIDER') await fetchProviderData();
     } catch (err) {
       alert('Seçim başarısız: ' + (err.response?.data?.message || err.message));
     }
@@ -320,7 +325,6 @@ export default function App() {
     }
   };
 
-  // --- SAĞLAYICI PROFİLİ KAYDETME ---
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -350,7 +354,6 @@ export default function App() {
     }
   };
 
-  // --- ADMİN İŞLEMLERİ ---
   const handleAdminAssign = async (requestId) => {
     const pId = selectedProviderMap[requestId];
     if (!pId) return alert('Lütfen sağlayıcı seçin.');
@@ -400,7 +403,6 @@ export default function App() {
     }
   };
 
-  // 🎯 AKTİF VE GEÇMİŞ TALEPLER FİLTRELERİ
   const activeRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
@@ -423,7 +425,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.2</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.3</span>
             </div>
           </div>
 
@@ -511,6 +513,7 @@ export default function App() {
                   </label>
                   <input
                     type="tel"
+                    inputMode="tel"
                     required
                     value={inputPhone}
                     onChange={(e) => setInputPhone(e.target.value)}
@@ -531,19 +534,23 @@ export default function App() {
                 {simulatedCode && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-mono flex items-center justify-between">
                     <span>Simüle SMS Kodu:</span>
-                    <span className="font-bold text-base tracking-widest text-neutral-950">{simulatedCode}</span>
+                    <span className="font-bold text-lg tracking-widest text-neutral-950">{simulatedCode}</span>
                   </div>
                 )}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">6 Haneli Kod</label>
+                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
+                    4 Haneli Doğrulama Kodu
+                  </label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     required
-                    maxLength={6}
+                    maxLength={4}
                     value={inputOtp}
-                    onChange={(e) => setInputOtp(e.target.value)}
-                    placeholder="123456"
-                    className="w-full p-3.5 text-center text-lg tracking-widest font-mono rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none"
+                    onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="1234"
+                    className="w-full p-3.5 text-center text-2xl tracking-[0.4em] font-mono font-bold rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none"
                   />
                 </div>
                 <div className="flex items-center space-x-2">
@@ -571,7 +578,7 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-3xl mx-auto w-full space-y-8">
               
-              {/* 🌟 AKTİF TALEPLER KARTLARI */}
+              {/* AKTİF TALEPLER */}
               {activeRequests.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
@@ -699,7 +706,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Yeni Talep Oluşturma */}
+              {/* Yeni Talep Girişi */}
               {step === 'INPUT' && (
                 <div className="space-y-4 pt-2">
                   <div className="text-center space-y-1.5">
@@ -786,7 +793,7 @@ export default function App() {
                 <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
                     <History size={14} />
-                    <span>Geçmiş Talepler</span>
+                    <span>Geçmiş Talepler ({pastRequests.length})</span>
                   </h3>
                   <div className="space-y-2">
                     {pastRequests.map((req) => (
@@ -929,12 +936,12 @@ export default function App() {
                     <Radio size={16} className="text-emerald-500 animate-pulse" />
                     <span>Gelen İş Talepleri ({providerRequests.length})</span>
                   </h3>
-                  <span className="text-[11px] font-mono text-neutral-400">Canlı Dinleniyor (3sn)</span>
+                  <span className="text-[11px] font-mono text-neutral-400">Canlı Dinleniyor (2sn)</span>
                 </div>
 
                 {providerRequests.length === 0 ? (
                   <div className="bg-white rounded-2xl border p-12 text-center text-xs text-neutral-400">
-                    Henüz anahtar kelimelerinizle eşleşen yeni bir talep bulunmuyor. Yeni talep geldiğinde sayfa otomatik güncellenecektir.
+                    Henüz anahtar kelimelerinizle eşleşen yeni bir talep bulunmuyor. Yeni talep yönlendirildiğinde ekran otomatik olarak güncellenecektir.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

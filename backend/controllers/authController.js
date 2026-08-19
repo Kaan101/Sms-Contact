@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 
+// 1. 4 Haneli OTP Üret ve Gönder
 const sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -9,8 +10,9 @@ const sendOtp = async (req, res) => {
     }
 
     const cleanPhone = phone.trim();
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
+    // 4 Haneli Kod (1000 - 9999)
+    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     const insertQuery = `
       INSERT INTO otp_verifications (phone, otp_code, expires_at)
@@ -20,11 +22,11 @@ const sendOtp = async (req, res) => {
 
     await pool.query(insertQuery, [cleanPhone, otpCode, expiresAt]);
 
-    console.log(`\n🔑 [OTP SIMULATION] Telefon: ${cleanPhone} -> KOD: ${otpCode}\n`);
+    console.log(`\n🔑 [4-DIGIT OTP SIMULATION] Telefon: ${cleanPhone} -> KOD: ${otpCode}\n`);
 
     res.status(200).json({
       status: 'success',
-      message: 'Doğrulama kodu gönderildi.',
+      message: '4 haneli doğrulama kodu gönderildi.',
       phone: cleanPhone,
       simulatedOtp: otpCode
     });
@@ -34,6 +36,7 @@ const sendOtp = async (req, res) => {
   }
 };
 
+// 2. 4 Haneli OTP Doğrula
 const verifyOtp = async (req, res) => {
   try {
     const { phone, otpCode } = req.body;
@@ -47,7 +50,10 @@ const verifyOtp = async (req, res) => {
 
     const query = `
       SELECT * FROM otp_verifications
-      WHERE phone = $1 AND otp_code = $2 AND is_used = FALSE AND expires_at > NOW()
+      WHERE (phone = $1 OR regexp_replace(phone, '\\D', '', 'g') LIKE '%' || right(regexp_replace($1, '\\D', '', 'g'), 7))
+        AND otp_code = $2 
+        AND is_used = FALSE 
+        AND expires_at > NOW()
       ORDER BY created_at DESC
       LIMIT 1;
     `;
@@ -57,7 +63,7 @@ const verifyOtp = async (req, res) => {
     if (rows.length === 0) {
       return res.status(400).json({
         status: 'error',
-        message: 'Geçersiz veya süresi dolmuş doğrulama kodu.'
+        message: 'Geçersiz veya süresi dolmuş 4 haneli doğrulama kodu.'
       });
     }
 
