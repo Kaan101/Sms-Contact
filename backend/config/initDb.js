@@ -17,7 +17,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. requests tablosu
+    // 2. requests tablosu (Zenginleştirilmiş alanlarla)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -25,6 +25,9 @@ const initDatabase = async () => {
         disambiguation_choice TEXT,
         keywords TEXT[],
         contact_value VARCHAR(100) NOT NULL,
+        location VARCHAR(255) DEFAULT 'Kadıköy, İstanbul',
+        urgency VARCHAR(50) DEFAULT 'NORMAL', -- 'ACİL', 'NORMAL', 'DÜŞÜK'
+        deadline_date DATE DEFAULT CURRENT_DATE,
         preferred_channel VARCHAR(50) NOT NULL DEFAULT 'PHONE',
         status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
         matched_provider_id INTEGER,
@@ -33,11 +36,14 @@ const initDatabase = async () => {
       );
     `);
 
-    // Eski kısıtları temizle (Hata almamak için)
+    // Kolonların eksik olma ihtimaline karşı ALTER TABLE güvencesi
     await pool.query(`
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT 'Kadıköy, İstanbul';
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS urgency VARCHAR(50) DEFAULT 'NORMAL';
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS deadline_date DATE DEFAULT CURRENT_DATE;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS check_status;
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
     // 3. Foreign key güvenli onarım
@@ -54,7 +60,7 @@ const initDatabase = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS outbound_notifications (
         id SERIAL PRIMARY KEY,
-        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+        request_id INTEGER,
         recipient_type VARCHAR(20) NOT NULL,
         recipient_phone VARCHAR(50) NOT NULL,
         channel VARCHAR(20) NOT NULL DEFAULT 'SMS',
@@ -94,7 +100,7 @@ const initDatabase = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
-        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+        request_id INTEGER NOT NULL,
         reviewer_type VARCHAR(20) NOT NULL,
         rating INTEGER,
         comment TEXT,
@@ -111,7 +117,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı ve durum kısıtları başarıyla güncellendi.');
+    console.log('✅ Veritabanı ve konum/aciliyet/tarih alanları hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }

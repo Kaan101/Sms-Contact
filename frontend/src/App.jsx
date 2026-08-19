@@ -29,7 +29,11 @@ import {
   FolderKanban, 
   Calendar, 
   Star,
-  Sparkles
+  Sparkles,
+  MapPin,
+  AlertTriangle,
+  Sliders,
+  CheckCircle2
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -57,7 +61,14 @@ export default function App() {
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
+  
+  // 🌟 Onay Ekranı Form Detayları (Default Değerler)
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
+  const [locationValue, setLocationValue] = useState('Kadıköy, İstanbul');
+  const [urgencyValue, setUrgencyValue] = useState('NORMAL');
+  const [deadlineValue, setDeadlineValue] = useState(new Date().toISOString().split('T')[0]);
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true); // Default Kapalı
+
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
@@ -280,6 +291,7 @@ export default function App() {
     }
   };
 
+  // 🌟 Tüm Form Seçenekleriyle Birlikte Gönderim
   const handleCustomerFinalSubmit = async (e) => {
     e?.preventDefault();
     if (!session?.phone) return;
@@ -290,11 +302,15 @@ export default function App() {
         rawText: queryText,
         disambiguationChoice: selectedDisambiguation,
         contactValue: session.phone,
-        preferredChannel: preferredChannel
+        preferredChannel: preferredChannel,
+        location: locationValue,
+        urgency: urgencyValue,
+        deadlineDate: deadlineValue
       });
       setQueryText('');
       setSelectedDisambiguation(null);
       setStep('INPUT');
+      setIsDetailsCollapsed(true);
       await fetchCustomerData();
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
@@ -349,7 +365,6 @@ export default function App() {
     }
   };
 
-  // 🌟 POPUP ÇIKMADAN SESSİZCE KAYDEDEN REVIEW FONKSİYONU
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => {
     try {
       const rating = isSkip ? null : (reviewRatingMap[requestId] || 5);
@@ -362,7 +377,6 @@ export default function App() {
         comment
       });
 
-      // State'i anında güncelle (popup alert yok)
       setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true }));
 
       if (session.role === 'CUSTOMER') await fetchCustomerData();
@@ -488,33 +502,30 @@ export default function App() {
     }
   };
 
-  // 🎯 1. AKTİF TALEPLER: Devam eden süreçler (MATCHED, ACCEPTED, PROVIDER_COMPLETED)
+  // Müşteri Listeleri
   const activeCustomerRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
   });
 
-  // 🎯 2. DEĞERLENDİRME BEKLEYENLER: Müşteri "Tamamla" dedi ama henüz yorumunu kaydetmedi/atlamadı
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     const isReviewed = r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`];
     return s === 'COMPLETED' && !isReviewed;
   });
 
-  // 🎯 3. GEÇMİŞ TALEPLER (COLLAPSED): Yorumu yapılmış olan COMPLETED talepler veya CANCELLED talepler
   const pastCustomerRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     const isReviewed = r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`];
     return s === 'CANCELLED' || (s === 'COMPLETED' && isReviewed);
   });
 
-  // 🎯 SAĞLAYICI AKTİF İŞ TALEPLERİ
+  // Sağlayıcı Listeleri
   const activeProviderRequests = providerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED';
   });
 
-  // 🎯 SAĞLAYICI GEÇMİŞ İŞ TALEPLERİ
   const pastProviderRequests = providerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'COMPLETED' || s === 'CANCELLED';
@@ -532,7 +543,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.7</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.8</span>
             </div>
           </div>
 
@@ -685,7 +696,7 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-2xl mx-auto w-full space-y-6">
               
-              {/* 🌟 A. AKTİF TALEPLER KUTUSU */}
+              {/* A. AKTİF TALEPLER KUTUSU */}
               {activeCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
@@ -709,7 +720,7 @@ export default function App() {
                           <div>
                             {req.status === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">Onay Bekliyor</span>}
                             {req.status === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Kabul Edildi</span>}
-                            {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">Sağlayıcı Teslim Etti (Onay Bekliyor)</span>}
+                            {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">Sağlayıcı Teslim Etti</span>}
                             {req.status === 'MANUAL_INTERVENTION' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-800 border border-amber-200">Havuzda</span>}
                           </div>
                         </div>
@@ -723,6 +734,12 @@ export default function App() {
                                 <span className="font-mono text-neutral-500">({req.provider_phone})</span>
                               </div>
                               <span className="text-[10px] font-mono text-neutral-400">Kanal: {req.preferred_channel}</span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
+                              <span>📍 {req.location || 'Kadıköy'}</span>
+                              <span>⚡ {req.urgency || 'NORMAL'}</span>
+                              <span>📅 {req.deadline_date ? new Date(req.deadline_date).toLocaleDateString('tr-TR') : 'Bugün'}</span>
                             </div>
 
                             {req.status === 'ACCEPTED' && (
@@ -821,7 +838,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 B. DEĞERLENDİRME ALANI (Müşteri "Tamamla" dediğinde buraya gelir, GEÇMİŞİN ÜSTÜNDE AÇIK DURUR) */}
+              {/* 🌟 B. DEĞERLENDİRME ALANI (GEÇMİŞİN ÜSTÜNDE) */}
               {pendingReviewCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border-2 border-emerald-400/80 shadow-md p-5 space-y-4">
                   <div className="flex items-center space-x-2 text-emerald-800">
@@ -896,7 +913,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* C. YENİ TALEP FORMU */}
+              {/* C. YENİ TALEP GİRİŞ FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
                   <div className="text-center space-y-1">
@@ -922,7 +939,7 @@ export default function App() {
                           disabled={loading || !queryText.trim()}
                           className="ml-auto px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-lg text-xs font-semibold flex items-center space-x-1"
                         >
-                          {loading ? 'Çözümleniyor...' : <><span>Eşleştir</span><ArrowRight size={12} /></>}
+                          {loading ? 'Çözümleniyor...' : <><span>Devam Et</span><ArrowRight size={12} /></>}
                         </button>
                       </div>
                     </div>
@@ -948,37 +965,145 @@ export default function App() {
                 </div>
               )}
 
+              {/* 🌟 🌟 🌟 D. GELİŞMİŞ ONAY VE COLLAPSIBLE DETAY SEÇİM FORMU 🌟 🌟 🌟 */}
               {step === 'CONFIRM' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
-                  <h2 className="text-base font-bold">İletişim Kanalı Tercihiniz</h2>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPreferredChannel('PHONE')}
-                      className={`p-3 rounded-xl border text-left text-xs ${preferredChannel === 'PHONE' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white'}`}
-                    >
-                      <Phone size={15} />
-                      <span className="font-semibold block mt-1">Telefon Araması</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreferredChannel('SMS')}
-                      className={`p-3 rounded-xl border text-left text-xs ${preferredChannel === 'SMS' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white'}`}
-                    >
-                      <MessageSquare size={15} />
-                      <span className="font-semibold block mt-1">SMS / WhatsApp</span>
-                    </button>
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
+                  <div className="border-b pb-3">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">Talep Özeti & Onay</span>
+                    <h2 className="text-base font-bold text-neutral-950 mt-0.5">"{queryText}"</h2>
+                    {selectedDisambiguation && (
+                      <p className="text-xs text-neutral-500 mt-0.5 font-medium">Hedef: <span className="text-neutral-900">{selectedDisambiguation}</span></p>
+                    )}
                   </div>
-                  <div className="flex space-x-2">
-                    <button onClick={() => setStep('INPUT')} className="w-1/3 py-2 border rounded-lg text-xs font-semibold">Geri</button>
-                    <button onClick={handleCustomerFinalSubmit} disabled={loading} className="w-2/3 py-2 bg-neutral-950 text-white rounded-lg text-xs font-semibold">
-                      {loading ? 'Başlatılıyor...' : 'Talebi Başlat'}
+
+                  {/* 🔽 Collapsible Detay Formu */}
+                  <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
+                    <div
+                      onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
+                      className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"
+                    >
+                      <div className="flex items-center space-x-2 text-neutral-800 font-bold">
+                        <Sliders size={15} className="text-neutral-600" />
+                        <span>📋 Ek Tercihler & Detaylar (Konum, Aciliyet, Tarih, Kanal)</span>
+                      </div>
+                      <div className="flex items-center space-x-1 text-neutral-400 font-mono text-[11px]">
+                        <span>{isDetailsCollapsed ? 'Düzenle' : 'Kapat'}</span>
+                        {isDetailsCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+                      </div>
+                    </div>
+
+                    {!isDetailsCollapsed && (
+                      <div className="p-4 pt-2 border-t border-neutral-200/70 bg-white space-y-3.5">
+                        
+                        {/* 1. Konum Bilgisi */}
+                        <div>
+                          <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
+                            <MapPin size={12} className="text-neutral-700" />
+                            <span>Hizmet Konumu</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={locationValue}
+                            onChange={(e) => setLocationValue(e.target.value)}
+                            placeholder="Örn: Kadıköy, Caferağa Mah."
+                            className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium"
+                          />
+                        </div>
+
+                        {/* 2. Aciliyet & En Geç Tarih */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
+                              <AlertTriangle size={12} className="text-neutral-700" />
+                              <span>İletişim Aciliyeti</span>
+                            </label>
+                            <select
+                              value={urgencyValue}
+                              onChange={(e) => setUrgencyValue(e.target.value)}
+                              className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium"
+                            >
+                              <option value="ACİL">🔥 Acil (Hemen İletişim)</option>
+                              <option value="NORMAL">⚡ Normal (1-2 Saat İçinde)</option>
+                              <option value="DÜŞÜK">🕒 Düşük (Gün İçinde Uygun Zaman)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
+                              <Calendar size={12} className="text-neutral-700" />
+                              <span>En Geç Tarih</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={deadlineValue}
+                              onChange={(e) => setDeadlineValue(e.target.value)}
+                              className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 3. İletişim Kanal Tercihi */}
+                        <div>
+                          <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
+                            İletişim Kanalı Tercihiniz
+                          </label>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => setPreferredChannel('PHONE')}
+                              className={`p-2.5 rounded-lg border text-left text-xs flex items-center space-x-2 transition ${preferredChannel === 'PHONE' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                            >
+                              <Phone size={14} />
+                              <span className="font-semibold">Telefon Araması</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreferredChannel('SMS')}
+                              className={`p-2.5 rounded-lg border text-left text-xs flex items-center space-x-2 transition ${preferredChannel === 'SMS' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                            >
+                              <MessageSquare size={14} />
+                              <span className="font-semibold">SMS / WhatsApp</span>
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 🌟 Canlı Nihai Onay Özeti Kartı */}
+                  <div className="p-3 bg-neutral-100/70 rounded-xl border border-neutral-200 text-xs space-y-1.5">
+                    <p className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider font-mono">Gönderilecek Bilgiler:</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-neutral-600">
+                      <div>📍 <span className="font-bold text-neutral-900">{locationValue}</span></div>
+                      <div>⚡ <span className="font-bold text-neutral-900">{urgencyValue}</span></div>
+                      <div>📅 <span className="font-bold text-neutral-900">{deadlineValue}</span></div>
+                      <div>📞 <span className="font-bold text-neutral-900">{preferredChannel === 'PHONE' ? 'Telefon' : 'SMS'}</span></div>
+                    </div>
+                  </div>
+
+                  {/* Onay Butonları */}
+                  <div className="flex space-x-2 pt-2">
+                    <button 
+                      type="button"
+                      onClick={() => setStep('INPUT')} 
+                      className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-100 rounded-xl text-xs font-semibold text-neutral-700 transition"
+                    >
+                      Geri Dön
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleCustomerFinalSubmit} 
+                      disabled={loading} 
+                      className="w-2/3 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center justify-center space-x-1.5"
+                    >
+                      {loading ? <span>Eşleştiriliyor...</span> : <><span>Talebi Onayla & Başlat</span><CheckCircle2 size={14} /></>}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* 🌟 D. MÜŞTERİ GEÇMİŞ TALEPLER - COLLAPSED & BAŞLANGIÇTA KAPALI */}
+              {/* E. MÜŞTERİ GEÇMİŞ TALEPLER - COLLAPSED */}
               {pastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
                   <div 
@@ -1013,7 +1138,6 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Kayıtlı Değerlendirme Bilgisi */}
                           {req.status === 'COMPLETED' && (req.customer_rating || reviewRatingMap[req.id]) && (
                             <div className="p-2 bg-white rounded border border-emerald-200/80 text-emerald-900 text-[11px] flex items-center justify-between">
                               <span>Değerlendirmeniz: <strong className="text-amber-500">{req.customer_rating || reviewRatingMap[req.id]} ★</strong> {req.customer_comment ? `("${req.customer_comment}")` : ''}</span>
@@ -1178,9 +1302,17 @@ export default function App() {
                           </div>
                         </div>
 
-                        <p className="text-xs font-mono text-neutral-500 bg-white p-2 rounded border border-neutral-200/60">
-                          Müşteri Tel: <strong className="text-neutral-800">{req.contact_value}</strong> • Kanal: [{req.preferred_channel}]
-                        </p>
+                        <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1">
+                          <p className="font-mono text-neutral-600">
+                            Müşteri Tel: <strong className="text-neutral-800">{req.contact_value}</strong>
+                          </p>
+                          <div className="flex flex-wrap gap-2 text-[10px] font-mono text-neutral-500">
+                            <span>📍 Konum: <strong>{req.location || 'Kadıköy'}</strong></span>
+                            <span>⚡ Aciliyet: <strong>{req.urgency || 'NORMAL'}</strong></span>
+                            <span>📅 Tarih: <strong>{req.deadline_date ? new Date(req.deadline_date).toLocaleDateString('tr-TR') : 'Bugün'}</strong></span>
+                            <span>📞 Kanal: <strong>[{req.preferred_channel}]</strong></span>
+                          </div>
+                        </div>
 
                         <div className="flex items-center justify-end space-x-2 pt-1">
                           {req.status === 'MATCHED' && (
@@ -1274,7 +1406,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 SAĞLAYICI GEÇMİŞ TALEPLER - COLLAPSED */}
+              {/* SAĞLAYICI GEÇMİŞ TALEPLER */}
               {pastProviderRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
                   <div 

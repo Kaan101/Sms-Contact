@@ -9,12 +9,14 @@ const getNormalizedLast10 = (p) => {
 const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
   try {
     const channel = reqData.preferred_channel || 'PHONE';
+    const loc = reqData.location || 'Kadıköy, İstanbul';
+    const urg = reqData.urgency || 'NORMAL';
     let userMsg = '';
     let providerMsg = '';
 
     if (eventType === 'MATCHED') {
       userMsg = `[Sms-Contact] Talebiniz #${requestId} '${providerData.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`;
-      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Tercih: ${channel}. Lütfen kabul edin veya pas geçin.`;
+      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Konum: ${loc}, Aciliyet: ${urg}, Kanal: ${channel}. Lütfen kabul edin veya pas geçin.`;
     } else if (eventType === 'ACCEPTED') {
       userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. İletişim: ${providerData.phone}`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile iletişime geçebilirsiniz.`;
@@ -30,14 +32,13 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
     }
 
     if (userMsg && providerMsg && providerData.phone) {
-      // Asenkron ve havuzu yormayacak şekilde çalıştır
       pool.query(`
         INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
         VALUES 
           ($1, 'USER', $2, 'SMS', $3),
           ($1, 'PROVIDER', $4, 'SMS', $5);
       `, [requestId, reqData.contact_value, userMsg, providerData.phone, providerMsg]).catch(err => {
-        console.error('SMS loglama arkaplan hatası:', err.message);
+        console.error('SMS loglama hatası:', err.message);
       });
     }
   } catch (err) {
@@ -45,10 +46,18 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   }
 };
 
-// 1. Yeni Talep Oluşturma
+// 1. Yeni Talep Oluşturma (Konum, Aciliyet, Tarih ve Kanal ile)
 const createRequest = async (req, res) => {
   try {
-    const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
+    const { 
+      rawText, 
+      disambiguationChoice, 
+      contactValue, 
+      preferredChannel, 
+      location, 
+      urgency, 
+      deadlineDate 
+    } = req.body;
 
     if (!rawText || !contactValue) {
       return res.status(400).json({ status: 'error', message: 'Metin ve iletişim bilgisi zorunludur.' });
@@ -88,21 +97,25 @@ const createRequest = async (req, res) => {
 
     const insertQuery = `
       INSERT INTO requests 
-      (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, status, matched_provider_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, location, urgency, deadline_date, status, matched_provider_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *;
     `;
 
-    const { rows: savedRows } = await pool.query(insertQuery, [
+    const values = [
       rawText.trim(),
       disambiguationChoice ? disambiguationChoice.trim() : null,
       tokens,
       cleanContact,
       preferredChannel || 'PHONE',
+      location && location.trim() !== '' ? location.trim() : 'Kadıköy, İstanbul',
+      urgency || 'NORMAL',
+      deadlineDate || new Date().toISOString().split('T')[0],
       requestStatus,
       primaryProvider ? primaryProvider.id : null
-    ]);
+    ];
 
+    const { rows: savedRows } = await pool.query(insertQuery, values);
     const createdReq = savedRows[0];
 
     if (primaryProvider) {
