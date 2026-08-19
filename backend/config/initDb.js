@@ -17,7 +17,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. requests tablosu (Güvenli yapı)
+    // 2. requests tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -33,13 +33,14 @@ const initDatabase = async () => {
       );
     `);
 
+    // Eski kısıtları temizle (Hata almamak için)
     await pool.query(`
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS check_status;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
-    // 3. Foreign key onarımı
+    // 3. Foreign key güvenli onarım
     await pool.query(`
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
       ALTER TABLE requests 
@@ -53,7 +54,7 @@ const initDatabase = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS outbound_notifications (
         id SERIAL PRIMARY KEY,
-        request_id INTEGER,
+        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
         recipient_type VARCHAR(20) NOT NULL,
         recipient_phone VARCHAR(50) NOT NULL,
         channel VARCHAR(20) NOT NULL DEFAULT 'SMS',
@@ -93,7 +94,7 @@ const initDatabase = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
-        request_id INTEGER NOT NULL,
+        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
         reviewer_type VARCHAR(20) NOT NULL,
         rating INTEGER,
         comment TEXT,
@@ -110,7 +111,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı tabloları tamamen senkronize edildi.');
+    console.log('✅ Veritabanı ve durum kısıtları başarıyla güncellendi.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }
