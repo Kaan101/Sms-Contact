@@ -31,9 +31,10 @@ import {
   Star,
   Sparkles,
   MapPin,
-  AlertTriangle,
+  Flame,
   Sliders,
-  CheckCircle2
+  CheckCircle2,
+  Navigation
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -62,12 +63,14 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 Onay Ekranı Form Detayları (Default Değerler)
+  // 🌟 Form Seçenekleri (Mevcut Konum, Acil Checkbox, En Son Tarih & Saat)
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
-  const [locationValue, setLocationValue] = useState('Kadıköy, İstanbul');
-  const [urgencyValue, setUrgencyValue] = useState('NORMAL');
-  const [deadlineValue, setDeadlineValue] = useState(new Date().toISOString().split('T')[0]);
-  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true); // Default Kapalı
+  const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
+  const [isUrgent, setIsUrgent] = useState(false); // Checkbox: Default false
+  const [deadlineDate, setDeadlineDate] = useState(new Date().toISOString().split('T')[0]);
+  const [deadlineTime, setDeadlineTime] = useState('18:00');
+  const [isLocating, setIsLocating] = useState(false);
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
 
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
@@ -113,7 +116,7 @@ export default function App() {
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
 
-  // Admin Modal
+  // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({
@@ -124,6 +127,36 @@ export default function App() {
     communicationChannels: ['PHONE', 'SMS'],
     priorityScore: 100
   });
+
+  // 📍 Mevcut Konumu Tarayıcıdan Al
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          // OpenStreetMap Nominatim Ters Konumlandırma
+          const geoRes = await axios.get(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`
+          );
+          const addr = geoRes.data.address;
+          const district = addr.suburb || addr.district || addr.town || addr.city_district || 'Kadıköy';
+          const city = addr.city || addr.province || 'İstanbul';
+          setLocationValue(`${district}, ${city}`);
+        } catch {
+          setLocationValue(`${latitude.toFixed(3)}, ${longitude.toFixed(3)} (Konum Alındı)`);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        console.warn('Konum izni alınamadı:', err.message);
+        setIsLocating(false);
+      },
+      { timeout: 8000 }
+    );
+  };
 
   // Veri Çekme
   const fetchCustomerData = async () => {
@@ -193,10 +226,12 @@ export default function App() {
     }
   };
 
-  // 🔄 5 SANİYEDE BİR CANLI YENİLEME
   useEffect(() => {
     if (session) {
-      if (session.role === 'CUSTOMER') fetchCustomerData();
+      if (session.role === 'CUSTOMER') {
+        fetchCustomerData();
+        fetchCurrentLocation(); // Müşteri girişinde mevcut konumu otomatik al
+      }
       if (session.role === 'PROVIDER') fetchProviderData();
       if (session.role === 'ADMIN') fetchAdminData();
 
@@ -274,6 +309,9 @@ export default function App() {
     setLoading(true);
     setErrorMessage('');
 
+    // Onay ekranına geçişte konumu otomatik güncelle
+    fetchCurrentLocation();
+
     try {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
       if (response.data.status === 'ambiguous') {
@@ -291,11 +329,12 @@ export default function App() {
     }
   };
 
-  // 🌟 Tüm Form Seçenekleriyle Birlikte Gönderim
   const handleCustomerFinalSubmit = async (e) => {
     e?.preventDefault();
     if (!session?.phone) return;
     setLoading(true);
+
+    const deadlineDatetimeISO = `${deadlineDate}T${deadlineTime}:00`;
 
     try {
       await axios.post(`${API_BASE}/requests`, {
@@ -304,13 +343,14 @@ export default function App() {
         contactValue: session.phone,
         preferredChannel: preferredChannel,
         location: locationValue,
-        urgency: urgencyValue,
-        deadlineDate: deadlineValue
+        isUrgent: isUrgent,
+        deadlineDatetime: deadlineDatetimeISO
       });
       setQueryText('');
       setSelectedDisambiguation(null);
       setStep('INPUT');
       setIsDetailsCollapsed(true);
+      setIsUrgent(false);
       await fetchCustomerData();
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
@@ -543,7 +583,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.8</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.9</span>
             </div>
           </div>
 
@@ -696,7 +736,7 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-2xl mx-auto w-full space-y-6">
               
-              {/* A. AKTİF TALEPLER KUTUSU */}
+              {/* A. AKTİF TALEPLER */}
               {activeCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
@@ -737,9 +777,9 @@ export default function App() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
-                              <span>📍 {req.location || 'Kadıköy'}</span>
-                              <span>⚡ {req.urgency || 'NORMAL'}</span>
-                              <span>📅 {req.deadline_date ? new Date(req.deadline_date).toLocaleDateString('tr-TR') : 'Bugün'}</span>
+                              <span>📍 {req.location || 'Mevcut Konum'}</span>
+                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                              {req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                             </div>
 
                             {req.status === 'ACCEPTED' && (
@@ -760,7 +800,7 @@ export default function App() {
                           <div className="p-2.5 bg-amber-50 rounded text-xs text-amber-900">Operatör koordinasyonu devraldı.</div>
                         )}
 
-                        {/* İlk 3 Aday Seçimi */}
+                        {/* İlk 3 Aday */}
                         {showCandidatesMap[req.id] && req.topCandidates && req.topCandidates.length > 0 && (
                           <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
                             <p className="text-[11px] font-bold text-neutral-700 font-mono">En Uygun 3 Sağlayıcı:</p>
@@ -965,7 +1005,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 🌟 🌟 D. GELİŞMİŞ ONAY VE COLLAPSIBLE DETAY SEÇİM FORMU 🌟 🌟 🌟 */}
+              {/* 🌟 D. GELİŞMİŞ ONAY EKRANI (Mevcut Konum, Acil Checkbox, En Son Tarih & Saat) */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -984,7 +1024,7 @@ export default function App() {
                     >
                       <div className="flex items-center space-x-2 text-neutral-800 font-bold">
                         <Sliders size={15} className="text-neutral-600" />
-                        <span>📋 Ek Tercihler & Detaylar (Konum, Aciliyet, Tarih, Kanal)</span>
+                        <span>📋 Ek Tercihler (Konum, Aciliyet, En Son Tarih & Saat, Kanal)</span>
                       </div>
                       <div className="flex items-center space-x-1 text-neutral-400 font-mono text-[11px]">
                         <span>{isDetailsCollapsed ? 'Düzenle' : 'Kapat'}</span>
@@ -995,54 +1035,78 @@ export default function App() {
                     {!isDetailsCollapsed && (
                       <div className="p-4 pt-2 border-t border-neutral-200/70 bg-white space-y-3.5">
                         
-                        {/* 1. Konum Bilgisi */}
+                        {/* 1. Mevcut Konum Alanı */}
                         <div>
-                          <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
-                            <MapPin size={12} className="text-neutral-700" />
-                            <span>Hizmet Konumu</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
+                              <MapPin size={12} className="text-neutral-700" />
+                              <span>Konum Bilgisi</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={fetchCurrentLocation}
+                              disabled={isLocating}
+                              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold"
+                            >
+                              <Navigation size={10} className={isLocating ? 'animate-spin' : ''} />
+                              <span>{isLocating ? 'Alınıyor...' : '📍 Mevcut Konumumu Al'}</span>
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={locationValue}
                             onChange={(e) => setLocationValue(e.target.value)}
-                            placeholder="Örn: Kadıköy, Caferağa Mah."
+                            placeholder="Mevcut konumunuz otomatik algılanır..."
                             className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium"
                           />
                         </div>
 
-                        {/* 2. Aciliyet & En Geç Tarih */}
+                        {/* 2. Aciliyet (Checkbox) */}
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isUrgent}
+                              onChange={(e) => setIsUrgent(e.target.checked)}
+                              className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950"
+                            />
+                            <div className="flex items-center space-x-1 text-xs font-bold text-neutral-800">
+                              <Flame size={15} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} />
+                              <span>Acil Hizmet Talebi (En Kısa Sürede İletişim)</span>
+                            </div>
+                          </label>
+                        </div>
+
+                        {/* 3. En Son Tarih & Saat */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
-                              <AlertTriangle size={12} className="text-neutral-700" />
-                              <span>İletişim Aciliyeti</span>
+                              <Calendar size={12} className="text-neutral-700" />
+                              <span>En Son Tarih</span>
                             </label>
-                            <select
-                              value={urgencyValue}
-                              onChange={(e) => setUrgencyValue(e.target.value)}
-                              className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium"
-                            >
-                              <option value="ACİL">🔥 Acil (Hemen İletişim)</option>
-                              <option value="NORMAL">⚡ Normal (1-2 Saat İçinde)</option>
-                              <option value="DÜŞÜK">🕒 Düşük (Gün İçinde Uygun Zaman)</option>
-                            </select>
+                            <input
+                              type="date"
+                              value={deadlineDate}
+                              onChange={(e) => setDeadlineDate(e.target.value)}
+                              className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950"
+                            />
                           </div>
 
                           <div>
                             <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
-                              <Calendar size={12} className="text-neutral-700" />
-                              <span>En Geç Tarih</span>
+                              <Clock size={12} className="text-neutral-700" />
+                              <span>En Son Saat</span>
                             </label>
                             <input
-                              type="date"
-                              value={deadlineValue}
-                              onChange={(e) => setDeadlineValue(e.target.value)}
+                              type="time"
+                              value={deadlineTime}
+                              onChange={(e) => setDeadlineTime(e.target.value)}
                               className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950"
                             />
                           </div>
                         </div>
 
-                        {/* 3. İletişim Kanal Tercihi */}
+                        {/* 4. İletişim Kanal Tercihi */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihiniz
@@ -1071,14 +1135,14 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 🌟 Canlı Nihai Onay Özeti Kartı */}
-                  <div className="p-3 bg-neutral-100/70 rounded-xl border border-neutral-200 text-xs space-y-1.5">
-                    <p className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider font-mono">Gönderilecek Bilgiler:</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-neutral-600">
-                      <div>📍 <span className="font-bold text-neutral-900">{locationValue}</span></div>
-                      <div>⚡ <span className="font-bold text-neutral-900">{urgencyValue}</span></div>
-                      <div>📅 <span className="font-bold text-neutral-900">{deadlineValue}</span></div>
-                      <div>📞 <span className="font-bold text-neutral-900">{preferredChannel === 'PHONE' ? 'Telefon' : 'SMS'}</span></div>
+                  {/* 🌟 Canlı Nihai Onay Özeti Kartı (İşaretli Değilse Acil Yazısı Çıkmaz) */}
+                  <div className="p-3.5 bg-neutral-100/70 rounded-xl border border-neutral-200 text-xs space-y-1.5">
+                    <p className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider font-mono">Talep Detayları:</p>
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-neutral-700">
+                      <div>📍 <strong>{locationValue}</strong></div>
+                      {isUrgent && <div className="text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</div>}
+                      <div>⏰ En Son: <strong>{deadlineDate} {deadlineTime}</strong></div>
+                      <div>📞 Kanal: <strong>{preferredChannel === 'PHONE' ? 'Telefon' : 'SMS'}</strong></div>
                     </div>
                   </div>
 
@@ -1306,10 +1370,10 @@ export default function App() {
                           <p className="font-mono text-neutral-600">
                             Müşteri Tel: <strong className="text-neutral-800">{req.contact_value}</strong>
                           </p>
-                          <div className="flex flex-wrap gap-2 text-[10px] font-mono text-neutral-500">
-                            <span>📍 Konum: <strong>{req.location || 'Kadıköy'}</strong></span>
-                            <span>⚡ Aciliyet: <strong>{req.urgency || 'NORMAL'}</strong></span>
-                            <span>📅 Tarih: <strong>{req.deadline_date ? new Date(req.deadline_date).toLocaleDateString('tr-TR') : 'Bugün'}</strong></span>
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
+                            <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
+                            {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                            {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             <span>📞 Kanal: <strong>[{req.preferred_channel}]</strong></span>
                           </div>
                         </div>

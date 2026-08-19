@@ -9,14 +9,16 @@ const getNormalizedLast10 = (p) => {
 const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
   try {
     const channel = reqData.preferred_channel || 'PHONE';
-    const loc = reqData.location || 'Kadıköy, İstanbul';
-    const urg = reqData.urgency || 'NORMAL';
+    const loc = reqData.location || 'Mevcut Konum';
+    const isUrgent = reqData.is_urgent === true;
+    const deadline = reqData.deadline_datetime ? new Date(reqData.deadline_datetime).toLocaleString('tr-TR') : 'Belirtilmedi';
+    
     let userMsg = '';
     let providerMsg = '';
 
     if (eventType === 'MATCHED') {
       userMsg = `[Sms-Contact] Talebiniz #${requestId} '${providerData.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`;
-      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Konum: ${loc}, Aciliyet: ${urg}, Kanal: ${channel}. Lütfen kabul edin veya pas geçin.`;
+      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Konum: ${loc}${isUrgent ? ' [🔥 ACİL]' : ''}. En Son: ${deadline}. Kanal: ${channel}. Lütfen yanıtlayın.`;
     } else if (eventType === 'ACCEPTED') {
       userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. İletişim: ${providerData.phone}`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile iletişime geçebilirsiniz.`;
@@ -46,7 +48,7 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   }
 };
 
-// 1. Yeni Talep Oluşturma (Konum, Aciliyet, Tarih ve Kanal ile)
+// 1. Yeni Talep Oluşturma
 const createRequest = async (req, res) => {
   try {
     const { 
@@ -55,8 +57,8 @@ const createRequest = async (req, res) => {
       contactValue, 
       preferredChannel, 
       location, 
-      urgency, 
-      deadlineDate 
+      isUrgent, 
+      deadlineDatetime 
     } = req.body;
 
     if (!rawText || !contactValue) {
@@ -97,7 +99,7 @@ const createRequest = async (req, res) => {
 
     const insertQuery = `
       INSERT INTO requests 
-      (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, location, urgency, deadline_date, status, matched_provider_id)
+      (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, location, is_urgent, deadline_datetime, status, matched_provider_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *;
     `;
@@ -108,9 +110,9 @@ const createRequest = async (req, res) => {
       tokens,
       cleanContact,
       preferredChannel || 'PHONE',
-      location && location.trim() !== '' ? location.trim() : 'Kadıköy, İstanbul',
-      urgency || 'NORMAL',
-      deadlineDate || new Date().toISOString().split('T')[0],
+      location && location.trim() !== '' ? location.trim() : 'İstanbul, Türkiye',
+      isUrgent === true,
+      deadlineDatetime ? new Date(deadlineDatetime) : new Date(),
       requestStatus,
       primaryProvider ? primaryProvider.id : null
     ];

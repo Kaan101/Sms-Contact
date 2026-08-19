@@ -17,7 +17,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. requests tablosu (Zenginleştirilmiş alanlarla)
+    // 2. requests tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -25,9 +25,9 @@ const initDatabase = async () => {
         disambiguation_choice TEXT,
         keywords TEXT[],
         contact_value VARCHAR(100) NOT NULL,
-        location VARCHAR(255) DEFAULT 'Kadıköy, İstanbul',
-        urgency VARCHAR(50) DEFAULT 'NORMAL', -- 'ACİL', 'NORMAL', 'DÜŞÜK'
-        deadline_date DATE DEFAULT CURRENT_DATE,
+        location VARCHAR(255) DEFAULT 'İstanbul, Türkiye',
+        is_urgent BOOLEAN DEFAULT FALSE,
+        deadline_datetime TIMESTAMP WITH TIME ZONE,
         preferred_channel VARCHAR(50) NOT NULL DEFAULT 'PHONE',
         status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
         matched_provider_id INTEGER,
@@ -36,11 +36,11 @@ const initDatabase = async () => {
       );
     `);
 
-    // Kolonların eksik olma ihtimaline karşı ALTER TABLE güvencesi
+    // Kolon eklemeleri ve kısıt temizliği
     await pool.query(`
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT 'Kadıköy, İstanbul';
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS urgency VARCHAR(50) DEFAULT 'NORMAL';
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS deadline_date DATE DEFAULT CURRENT_DATE;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT 'İstanbul, Türkiye';
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS is_urgent BOOLEAN DEFAULT FALSE;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS deadline_datetime TIMESTAMP WITH TIME ZONE;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS check_status;
@@ -96,7 +96,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme & Yorum Tablosu
+    // 7. Değerlendirme Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
@@ -117,7 +117,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı ve konum/aciliyet/tarih alanları hazırlandı.');
+    console.log('✅ Veritabanı ve anlık konum/zaman tablosu hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }
