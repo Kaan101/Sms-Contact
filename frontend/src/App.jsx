@@ -62,11 +62,13 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [showCandidatesMap, setShowCandidatesMap] = useState({});
+  const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false); // Müşteri geçmiş akordeonu (Kapalı)
 
   // Sağlayıcı State
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false); // Sağlayıcı geçmiş akordeonu (Kapalı)
   const [providerFormData, setProviderFormData] = useState({
     name: '',
     phone: '',
@@ -180,7 +182,6 @@ export default function App() {
     }
   };
 
-  // 🔄 5 SANİYEDE BİR GÜNCELLEME (Polling)
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') fetchCustomerData();
@@ -249,6 +250,8 @@ export default function App() {
     setSession(null);
     setProviderProfile(null);
     setIsProfileOpen(false);
+    setIsCustomerHistoryOpen(false);
+    setIsProviderHistoryOpen(false);
     setMyCustomerRequests([]);
     setStep('INPUT');
   };
@@ -483,12 +486,26 @@ export default function App() {
     }
   };
 
-  const activeRequests = myCustomerRequests.filter(r => {
+  // Müşteri Aktif Talepleri
+  const activeCustomerRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
   });
 
-  const pastRequests = myCustomerRequests.filter(r => {
+  // Müşteri Geçmiş Talepleri
+  const pastCustomerRequests = myCustomerRequests.filter(r => {
+    const s = (r.status || '').toUpperCase();
+    return s === 'COMPLETED' || s === 'CANCELLED';
+  });
+
+  // Sağlayıcı Aktif Talepleri (MATCHED, ACCEPTED, PROVIDER_COMPLETED)
+  const activeProviderRequests = providerRequests.filter(r => {
+    const s = (r.status || '').toUpperCase();
+    return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED';
+  });
+
+  // Sağlayıcı Geçmiş Talepleri (COMPLETED, CANCELLED)
+  const pastProviderRequests = providerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'COMPLETED' || s === 'CANCELLED';
   });
@@ -505,7 +522,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.5</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.6</span>
             </div>
           </div>
 
@@ -659,15 +676,15 @@ export default function App() {
             <div className="max-w-2xl mx-auto w-full space-y-6">
               
               {/* AKTİF TALEPLER KUTUSU */}
-              {activeRequests.length > 0 && (
+              {activeCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
-                    <span>Aktif Talepleriniz ({activeRequests.length})</span>
+                    <span>Aktif Talepleriniz ({activeCustomerRequests.length})</span>
                   </h3>
 
                   <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
-                    {activeRequests.map((req) => (
+                    {activeCustomerRequests.map((req) => (
                       <div key={req.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -876,89 +893,100 @@ export default function App() {
                 </div>
               )}
 
-              {/* GEÇMİŞ TALEPLER & MÜŞTERİ YORUMU */}
-              {pastRequests.length > 0 && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
-                  <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
-                    <History size={13} />
-                    <span>Geçmiş Talepler & Değerlendirmeler ({pastRequests.length})</span>
-                  </h3>
-                  <div className="max-h-[350px] overflow-y-auto space-y-3 pr-1">
-                    {pastRequests.map((req) => (
-                      <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5 text-xs">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                            <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                              Sağlayıcı: {req.provider_name || 'Bilinmiyor'} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-1.5">
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                              {req.status}
-                            </span>
-                            <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600"><Trash2 size={12} /></button>
-                          </div>
-                        </div>
+              {/* 🌟 MÜŞTERİ GEÇMİŞ TALEPLER - COLLAPSED & KAPALI */}
+              {pastCustomerRequests.length > 0 && (
+                <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+                  <div 
+                    onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)}
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <History size={15} className="text-neutral-500" />
+                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">
+                        Geçmiş Talepler & Değerlendirmeler ({pastCustomerRequests.length})
+                      </h3>
+                    </div>
+                    {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
 
-                        {req.status === 'COMPLETED' && (
-                          req.customer_rating || reviewedRequestsMap[`${req.id}_CUSTOMER`] ? (
-                            <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
-                              <div className="flex items-center space-x-1">
-                                <span className="font-bold">Değerlendirmeniz:</span>
-                                <span className="text-amber-500 font-bold">{req.customer_rating || reviewRatingMap[req.id] || 5} ★</span>
-                                {req.customer_comment && <span className="text-neutral-500 italic">("{req.customer_comment}")</span>}
-                              </div>
-                              <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
+                  {isCustomerHistoryOpen && (
+                    <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[350px] overflow-y-auto">
+                      {pastCustomerRequests.map((req) => (
+                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5 text-xs mt-3">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
+                              <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                Sağlayıcı: {req.provider_name || 'Bilinmiyor'} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
+                              </p>
                             </div>
-                          ) : (
-                            <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-neutral-800 text-[11px]">Hizmeti Değerlendirin:</span>
+                            <div className="flex items-center space-x-1.5">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                {req.status}
+                              </span>
+                              <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600"><Trash2 size={12} /></button>
+                            </div>
+                          </div>
+
+                          {req.status === 'COMPLETED' && (
+                            req.customer_rating || reviewedRequestsMap[`${req.id}_CUSTOMER`] ? (
+                              <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
                                 <div className="flex items-center space-x-1">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                      key={star}
-                                      type="button"
-                                      onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
-                                      className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
-                                    >
-                                      <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
-                                    </button>
-                                  ))}
+                                  <span className="font-bold">Değerlendirmeniz:</span>
+                                  <span className="text-amber-500 font-bold">{req.customer_rating || reviewRatingMap[req.id] || 5} ★</span>
+                                  {req.customer_comment && <span className="text-neutral-500 italic">("{req.customer_comment}")</span>}
+                                </div>
+                                <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-neutral-800 text-[11px]">Hizmeti Değerlendirin:</span>
+                                  <div className="flex items-center space-x-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button
+                                        key={star}
+                                        type="button"
+                                        onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
+                                        className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
+                                      >
+                                        <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={reviewCommentMap[req.id] || ''}
+                                  onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })}
+                                  placeholder="Hizmet nasıldı? Açıklama yazın (opsiyonel)..."
+                                  className="w-full p-2 text-xs rounded border outline-none bg-neutral-50"
+                                />
+
+                                <div className="flex items-center justify-end space-x-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReview(req.id, 'CUSTOMER', true)}
+                                    className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]"
+                                  >
+                                    Yorum Yapmadan Geç
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReview(req.id, 'CUSTOMER', false)}
+                                    className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold"
+                                  >
+                                    Puanı Gönder
+                                  </button>
                                 </div>
                               </div>
-
-                              <input
-                                type="text"
-                                value={reviewCommentMap[req.id] || ''}
-                                onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })}
-                                placeholder="Hizmet nasıldı? Açıklama yazın (opsiyonel)..."
-                                className="w-full p-2 text-xs rounded border outline-none bg-neutral-50"
-                              />
-
-                              <div className="flex items-center justify-end space-x-2 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSendReview(req.id, 'CUSTOMER', true)}
-                                  className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]"
-                                >
-                                  Yorum Yapmadan Geç
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSendReview(req.id, 'CUSTOMER', false)}
-                                  className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold"
-                                >
-                                  Puanı Gönder
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                            )
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1079,23 +1107,23 @@ export default function App() {
                 )}
               </div>
 
-              {/* SAĞLAYICI GELEN TALEPLER KUTUSU */}
+              {/* SAĞLAYICI AKTİF İŞ TALEPLERİ KUTUSU */}
               <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-950 flex items-center space-x-1.5">
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
-                    <span>Gelen İş Talepleri ({providerRequests.length})</span>
+                    <span>Aktif İş Talepleri ({activeProviderRequests.length})</span>
                   </h3>
                   <span className="text-[10px] font-mono text-neutral-400">Canlı (5sn)</span>
                 </div>
 
                 <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
-                  {providerRequests.length === 0 ? (
+                  {activeProviderRequests.length === 0 ? (
                     <div className="p-8 text-center text-xs text-neutral-400">
-                      Henüz yeni bir iş talebi bulunmuyor. Yeni talep geldiğinde anında burada listelenecektir.
+                      Henüz aktif bir iş talebi bulunmuyor.
                     </div>
                   ) : (
-                    providerRequests.map((req) => (
+                    activeProviderRequests.map((req) => (
                       <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -1103,12 +1131,10 @@ export default function App() {
                               req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                               req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                               req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                              req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                               'bg-neutral-100 text-neutral-800'
                             }`}>
                               {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : 
-                               req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : 
-                               req.status === 'COMPLETED' ? 'İŞ TAMAMLANDI' : req.status}
+                               req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
                             </span>
                             <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
                             <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
@@ -1148,8 +1174,8 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* 🌟 SAĞLAYICI TESLİM ETTİĞİ ANDA SAĞLAYICININ REVIEW ALANI */}
-                        {(req.status === 'PROVIDER_COMPLETED' || req.status === 'COMPLETED') && (
+                        {/* Sağlayıcı Review Alanı */}
+                        {req.status === 'PROVIDER_COMPLETED' && (
                           req.provider_rating || reviewedRequestsMap[`${req.id}_PROVIDER`] ? (
                             <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between mt-2">
                               <div className="flex items-center space-x-1">
@@ -1210,6 +1236,44 @@ export default function App() {
                   )}
                 </div>
               </div>
+
+              {/* 🌟 SAĞLAYICI GEÇMİŞ TALEPLER - COLLAPSED & KAPALI */}
+              {pastProviderRequests.length > 0 && (
+                <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+                  <div 
+                    onClick={() => setIsProviderHistoryOpen(!isProviderHistoryOpen)}
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <History size={15} className="text-neutral-500" />
+                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">
+                        Geçmiş İş Talepleri ({pastProviderRequests.length})
+                      </h3>
+                    </div>
+                    {isProviderHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+
+                  {isProviderHistoryOpen && (
+                    <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[350px] overflow-y-auto">
+                      {pastProviderRequests.map((req) => (
+                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs mt-3">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
+                              <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                Müşteri: {req.contact_value} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
+                              </p>
+                            </div>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">
+                              {req.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           ) :
