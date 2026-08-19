@@ -6,22 +6,15 @@ import {
   Phone, 
   PhoneCall, 
   MessageSquare, 
-  SlidersHorizontal, 
-  Users, 
-  CheckCircle2, 
-  RotateCcw, 
   Plus, 
   Trash2, 
   Edit3, 
   X, 
-  Sparkles, 
-  HelpCircle, 
   Clock, 
   LogOut, 
   KeyRound, 
   History, 
   Building2, 
-  SendHorizontal, 
   Check, 
   Ban, 
   ShieldCheck, 
@@ -42,7 +35,6 @@ import {
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export default function App() {
-  // --- 1. ROL VE AUTH STATE ---
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
   const [session, setSession] = useState(() => {
@@ -61,7 +53,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // --- 2. MÜŞTERİ (CUSTOMER) STATE ---
+  // Müşteri State
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
@@ -71,7 +63,7 @@ export default function App() {
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [showCandidatesMap, setShowCandidatesMap] = useState({});
 
-  // --- 3. SAĞLAYICI (PROVIDER) STATE ---
+  // Sağlayıcı State
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -84,7 +76,7 @@ export default function App() {
     priorityScore: 100
   });
 
-  // --- 4. ADMİN (ADMIN) STATE ---
+  // Admin State
   const [adminTab, setAdminTab] = useState('PROJECT');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
@@ -92,7 +84,7 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
 
-  // --- 5. PROJE YOL HARİTASI (FEATURES) STATE ---
+  // Yol Haritası State
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({
@@ -103,12 +95,12 @@ export default function App() {
     priority: 'ORTA'
   });
 
-  // --- 6. REVIEW STATE ---
+  // Review State
   const [reviewRatingMap, setReviewRatingMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
 
-  // Admin Modal
+  // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({
@@ -120,7 +112,7 @@ export default function App() {
     priorityScore: 100
   });
 
-  // --- VERİ ÇEKME FONKSİYONLARI ---
+  // Veri Çekme
   const fetchCustomerData = async () => {
     if (!session?.phone) return;
     try {
@@ -198,13 +190,12 @@ export default function App() {
         if (session.role === 'PROVIDER') fetchProviderData();
         if (session.role === 'CUSTOMER') fetchCustomerData();
         if (session.role === 'ADMIN' && adminTab === 'SMS_LOGS') fetchAdminData();
-      }, 2000);
+      }, 3000);
 
       return () => clearInterval(interval);
     }
   }, [session, adminTab]);
 
-  // --- AUTH METODLARI ---
   const handleSendOtp = async (e) => {
     e.preventDefault();
     if (!inputPhone.trim()) return;
@@ -261,7 +252,6 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // --- MÜŞTERİ TALEP METODLARI ---
   const handleCustomerInitialSubmit = async (e) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
@@ -354,7 +344,7 @@ export default function App() {
     }
   };
 
-  // --- REVIEW / DEĞERLENDİRME METODU ---
+  // İnceleme / Yorum Gönder
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => {
     try {
       const rating = isSkip ? null : (reviewRatingMap[requestId] || 5);
@@ -367,7 +357,7 @@ export default function App() {
         comment
       });
 
-      setReviewedRequestsMap(prev => ({ ...prev, [requestId]: true }));
+      setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true }));
       alert(isSkip ? 'Değerlendirme atlandı.' : 'Değerlendirmeniz kaydedildi ve SMS günlüğüne işlendi.');
 
       if (session.role === 'CUSTOMER') await fetchCustomerData();
@@ -406,7 +396,6 @@ export default function App() {
     }
   };
 
-  // --- PROJE YOL HARİTASI METODLARI ---
   const handleCreateFeature = async (e) => {
     e.preventDefault();
     if (!newFeature.title.trim()) return;
@@ -494,13 +483,13 @@ export default function App() {
     }
   };
 
-  // Müşteri için aktif talepler (Müşteri tamamlayana kadar buradadır)
+  // Müşteri Aktif Talepleri (Müşteri 'Tamamla' demedikçe buradadır)
   const activeRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
   });
 
-  // Müşteri için geçmiş talepler (Yalnızca müşteri tamamla veya iptal derse buraya geçer)
+  // Müşteri Tamamlanan Talepleri (Sadece müşteri tamamla veya iptal dediğinde geçer)
   const pastRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'COMPLETED' || s === 'CANCELLED';
@@ -518,7 +507,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.9</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.0</span>
             </div>
           </div>
 
@@ -671,7 +660,7 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-2xl mx-auto w-full space-y-6">
               
-              {/* AKTİF TALEPLER KUTUSU (Müşteri Tamamlayana Kadar Kesinlikle Buradadır) */}
+              {/* AKTİF TALEPLER KUTUSU (Müşteri 'Tamamla' demedikçe KESİNLİKLE buradadır) */}
               {activeRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
@@ -695,7 +684,7 @@ export default function App() {
                           <div>
                             {req.status === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">Onay Bekliyor</span>}
                             {req.status === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Kabul Edildi</span>}
-                            {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Teslim Edildi (Onayınız Bekleniyor)</span>}
+                            {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Sağlayıcı Teslim Etti (Onayınız Bekleniyor)</span>}
                             {req.status === 'MANUAL_INTERVENTION' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-800 border border-amber-200">Havuzda</span>}
                           </div>
                         </div>
@@ -720,8 +709,8 @@ export default function App() {
 
                             {req.status === 'PROVIDER_COMPLETED' && (
                               <div className="p-2.5 bg-purple-50 border border-purple-200 rounded text-[11px] text-purple-950 space-y-1">
-                                <p className="font-bold">Sağlayıcı işi teslim ettiğini bildirdi.</p>
-                                <p className="text-neutral-600">Hizmeti onaylayarak tamamlayabilir veya memnun kalmadıysanız sonraki sağlayıcıya yönlendirebilirsiniz.</p>
+                                <p className="font-bold">Sağlayıcı hizmeti tamamladığını bildirdi.</p>
+                                <p className="text-neutral-600">Hizmeti onaylayabilir veya memnun kalmadıysanız sonraki sağlayıcıya yönlendirebilirsiniz.</p>
                               </div>
                             )}
                           </div>
@@ -754,7 +743,7 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Aksiyon Butonları */}
+                        {/* Aksiyon Butonları (Müşteri için) */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
                             {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && (
@@ -778,6 +767,7 @@ export default function App() {
                           </div>
 
                           <div className="flex items-center space-x-1.5 ml-auto">
+                            {/* 🌟 Sadece müşteri buraya bastığında talep COMPLETED olur */}
                             <button
                               onClick={() => handleStatusChange(req.id, 'COMPLETED')}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"
@@ -889,7 +879,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* GEÇMİŞ TALEPLER & MÜŞTERİ YORUM ALANI */}
+              {/* 🌟 YALNIZCA MÜŞTERİ TAMAMLAYINCA GEÇMİŞE DÜŞEN TALEPLER & REVIEW */}
               {pastRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
@@ -915,7 +905,7 @@ export default function App() {
                         </div>
 
                         {req.status === 'COMPLETED' && (
-                          req.customer_rating || reviewedRequestsMap[req.id] ? (
+                          req.customer_rating || reviewedRequestsMap[`${req.id}_CUSTOMER`] ? (
                             <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
                               <div className="flex items-center space-x-1">
                                 <span className="font-bold">Değerlendirmeniz:</span>
@@ -1099,7 +1089,7 @@ export default function App() {
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
                     <span>Gelen İş Talepleri ({providerRequests.length})</span>
                   </h3>
-                  <span className="text-[10px] font-mono text-neutral-400">Canlı (2sn)</span>
+                  <span className="text-[10px] font-mono text-neutral-400">Canlı (3sn)</span>
                 </div>
 
                 <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
@@ -1150,6 +1140,7 @@ export default function App() {
                               </button>
                             </>
                           )}
+                          {/* 🌟 Sağlayıcı bitirdiğinde PROVIDER_COMPLETED olur */}
                           {req.status === 'ACCEPTED' && (
                             <button
                               onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')}
@@ -1161,9 +1152,9 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* 🌟 Sağlayıcı Teslim Ettiğinde veya Tamamlandığında Sağlayıcının Review Kutusu */}
+                        {/* 🌟 SAĞLAYICI TESLİM ETTİĞİ ANDA SAĞLAYICI İÇİN DEĞERLENDİRME KUTUSU HEMEN BURADA AÇILIR */}
                         {(req.status === 'PROVIDER_COMPLETED' || req.status === 'COMPLETED') && (
-                          req.provider_rating || reviewedRequestsMap[req.id] ? (
+                          req.provider_rating || reviewedRequestsMap[`${req.id}_PROVIDER`] ? (
                             <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between mt-2">
                               <div className="flex items-center space-x-1">
                                 <span className="font-bold">Müşteri Değerlendirmeniz:</span>

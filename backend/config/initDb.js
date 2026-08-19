@@ -37,7 +37,7 @@ const initDatabase = async () => {
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
-    // 3. Foreign key onarımı
+    // 3. Foreign key güvenli onarım
     await pool.query(`
       ALTER TABLE requests 
       DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
@@ -91,7 +91,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme & Yorum Tablosu (Güvenli Unique Constraint ile)
+    // 7. Değerlendirme & Yorum Tablosu (Sıfırdan Sorunsuz Yapı)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
@@ -103,15 +103,10 @@ const initDatabase = async () => {
       );
     `);
 
+    // Unique index ile çakışmayı önleme
     await pool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint WHERE conname = 'unique_request_reviewer'
-        ) THEN
-          ALTER TABLE reviews ADD CONSTRAINT unique_request_reviewer UNIQUE(request_id, reviewer_type);
-        END IF;
-      END $$;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_req_reviewer 
+      ON reviews (request_id, reviewer_type);
     `);
 
     // Sequence Eşitlemeleri
@@ -128,7 +123,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı ve durum geçişleri hazırlandı.');
+    console.log('✅ Veritabanı ve tüm durumlar hatasız şekilde senkronize edildi.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }
