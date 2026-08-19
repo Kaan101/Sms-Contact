@@ -4,7 +4,7 @@ import {
   ArrowRight, Phone, PhoneCall, MessageSquare, Plus, Trash2, Edit3, X, Clock, LogOut, 
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
-  Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, CheckCircle, AlertCircle
+  Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -63,7 +63,7 @@ export default function App() {
   });
 
   // Admin State
-  const [adminTab, setAdminTab] = useState('TESTS'); // Varsayılan olarak Testler sekmesi açık
+  const [adminTab, setAdminTab] = useState('ALL_MATCHED');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -81,7 +81,7 @@ export default function App() {
     priority: 'ORTA'
   });
 
-  // 🌟 Test Senaryoları State
+  // Test Senaryoları State
   const [tests, setTests] = useState([]);
   const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({
@@ -229,7 +229,7 @@ export default function App() {
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData();
         if (session.role === 'CUSTOMER') fetchCustomerData();
-        if (session.role === 'ADMIN' && adminTab === 'SMS_LOGS') fetchAdminData();
+        if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
       }, 5000);
 
       return () => clearInterval(interval);
@@ -415,7 +415,7 @@ export default function App() {
     }
   };
 
-  // Test Senaryoları CRUD Fonksiyonları
+  // Test Senaryoları CRUD
   const handleCreateTest = async (e) => {
     e.preventDefault();
     if (!newTest.title.trim()) return;
@@ -454,7 +454,7 @@ export default function App() {
     }
   };
 
-  // Proje Özellikleri CRUD Fonksiyonları
+  // Proje Özellikleri CRUD
   const handleCreateFeature = async (e) => {
     e.preventDefault();
     if (!newFeature.title.trim()) return;
@@ -613,7 +613,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.0 QA</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.1 QA</span>
             </div>
           </div>
 
@@ -801,7 +801,7 @@ export default function App() {
                               <div className="flex items-center space-x-1.5">
                                 <Building2 size={14} className="text-neutral-700" />
                                 <span className="font-bold text-neutral-950">{req.provider_name}</span>
-                                <span className="font-mono text-neutral-500">({req.provider_phone})</span>
+                                <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
                               </div>
                               <span className="text-[10px] font-mono text-neutral-400">Kanal: {req.preferred_channel}</span>
                             </div>
@@ -815,7 +815,7 @@ export default function App() {
                             {req.status === 'ACCEPTED' && (
                               <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5">
                                 <PhoneCall size={13} className="text-emerald-700 animate-bounce" />
-                                <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor.</span>
+                                <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></span>
                               </div>
                             )}
 
@@ -830,21 +830,22 @@ export default function App() {
                           <div className="p-2.5 bg-amber-50 rounded text-xs text-amber-900">Operatör koordinasyonu devraldı.</div>
                         )}
 
-                        {/* İlk 3 Aday */}
+                        {/* İlk 3 Aday (Sağlayıcı Telefonu Eklendi) */}
                         {showCandidatesMap[req.id] && req.topCandidates && req.topCandidates.length > 0 && (
                           <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
                             <p className="text-[11px] font-bold text-neutral-700 font-mono">En Uygun 3 Sağlayıcı:</p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                               {req.topCandidates.map((cand, idx) => (
-                                <div key={cand.id} className="p-2 rounded border text-xs flex flex-col justify-between bg-neutral-50">
-                                  <div>
-                                    <p className="font-bold text-[11px]">#{idx + 1} {cand.name}</p>
+                                <div key={cand.id} className="p-2.5 rounded-lg border text-xs flex flex-col justify-between bg-neutral-50">
+                                  <div className="space-y-1">
+                                    <p className="font-bold text-[11px] text-neutral-900">#{idx + 1} {cand.name}</p>
+                                    <p className="text-[10px] font-mono text-neutral-600 font-semibold">📞 {cand.phone}</p>
                                     <p className="text-[9px] font-mono text-neutral-400">Skor: {cand.priority_score}</p>
                                   </div>
                                   {cand.id !== req.matched_provider_id && (
                                     <button
                                       onClick={() => handleCustomerSelectCandidate(req.id, cand.id)}
-                                      className="w-full mt-1 py-0.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-semibold"
+                                      className="w-full mt-2 py-1 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-semibold transition"
                                     >
                                       Buna Geç
                                     </button>
@@ -908,7 +909,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 B. DEĞERLENDİRME ALANI (GEÇMİŞİN ÜSTÜNDE) */}
+              {/* B. DEĞERLENDİRME ALANI */}
               {pendingReviewCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border-2 border-emerald-400/80 shadow-md p-5 space-y-4">
                   <div className="flex items-center space-x-2 text-emerald-800">
@@ -926,7 +927,8 @@ export default function App() {
                             <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
                             <p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p>
                             <p className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                              Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong>
+                              Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> 
+                              {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}
                             </p>
                           </div>
                           <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">
@@ -998,7 +1000,7 @@ export default function App() {
                         value={queryText}
                         onChange={(e) => setQueryText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerInitialSubmit(); } }}
-                        placeholder="Örn: Kadıköy'de erikli damacana su siparişi veya Moda'da bisiklet tamiri..."
+                        placeholder="Örn: Kadıköy'de erikli damacana su siparişi veya Moda'da çilingir..."
                         className="w-full p-2 text-xs text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none"
                         required
                       />
@@ -1220,8 +1222,8 @@ export default function App() {
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                              <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                                Sağlayıcı: {req.provider_name || 'Bilinmiyor'} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
+                              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                                Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone ? `(📞 ${req.provider_phone})` : ''} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
                               </p>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -1548,6 +1550,9 @@ export default function App() {
                 <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
 
                 <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
+                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
+                    Eşleşmeler ({matchedRequests.length})
+                  </button>
                   <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     <FileCheck2 size={13} />
                     <span>Test Senaryoları ({tests.length})</span>
@@ -1562,16 +1567,57 @@ export default function App() {
                   <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     Sağlayıcılar ({providers.length})
                   </button>
-                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    Eşleşmeler ({matchedRequests.length})
-                  </button>
                   <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     SMS Log ({smsLogs.length})
                   </button>
                 </div>
               </div>
 
-              {/* 🌟 4.0 TEST SENARYOLARI (QA SUITE) SEKİSİ */}
+              {/* 🌟 4.0 TÜM EŞLEŞMELER (SAĞLAYICI TELEFONU EKLİ) */}
+              {adminTab === 'ALL_MATCHED' && (
+                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {matchedRequests.map((req) => (
+                      <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
+                        <div className="flex justify-between items-center font-mono">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            req.status === 'MATCHED' ? 'bg-blue-100 text-blue-800' :
+                            req.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
+                            req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                            req.status === 'COMPLETED' ? 'bg-emerald-200 text-emerald-950' : 'bg-neutral-200'
+                          }`}>
+                            {req.status}
+                          </span>
+                          <span className="text-neutral-400">#REQ-{req.id}</span>
+                        </div>
+
+                        <p className="font-semibold text-neutral-950">"{req.raw_text}"</p>
+                        
+                        <div className="p-2 bg-white rounded border border-neutral-200/80 space-y-1 font-mono text-[11px]">
+                          <p className="text-neutral-600">
+                            👤 Müşteri: <strong className="text-neutral-900">{req.contact_value}</strong>
+                          </p>
+                          <p className="text-neutral-600">
+                            🛠️ Sağlayıcı: <strong className="text-neutral-900">{req.provider_name || 'Atanmadı'}</strong>
+                          </p>
+                          {req.provider_phone && (
+                            <p className="text-blue-700 font-semibold">
+                              📞 Sağlayıcı Tel: <strong>{req.provider_phone}</strong>
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2 text-[10px] text-neutral-400 pt-1 border-t border-neutral-100">
+                            <span>📍 {req.location || 'Kadıköy'}</span>
+                            {req.is_urgent && <span className="text-rose-600 font-bold">🔥 ACİL</span>}
+                            <span>📅 {new Date(req.created_at).toLocaleDateString('tr-TR')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 4.1 TEST SENARYOLARI (QA SUITE) SEKİSİ */}
               {adminTab === 'TESTS' && (
                 <div className="space-y-4">
                   {/* Yeni Test Senaryosu Ekle */}
@@ -1591,7 +1637,7 @@ export default function App() {
                           required
                           value={newTest.title}
                           onChange={(e) => setNewTest({ ...newTest, title: e.target.value })}
-                          placeholder="Test Başlığı (Örn: TC-11: OTP Çoklu Deneme)..."
+                          placeholder="Test Başlığı..."
                           className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
                         />
                       </div>
@@ -1634,7 +1680,7 @@ export default function App() {
                     </div>
                   </form>
 
-                  {/* Test Senaryoları Listesi (Akordeon & Tablo Kartları) */}
+                  {/* Test Senaryoları Listesi */}
                   <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
                     {tests.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">
@@ -1747,7 +1793,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.1 PROJE / YOL HARİTASI */}
+              {/* 4.2 PROJE / YOL HARİTASI */}
               {adminTab === 'PROJECT' && (
                 <div className="space-y-4">
                   <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
@@ -1919,10 +1965,10 @@ export default function App() {
               )}
 
               {/* DİĞER ADMİN PENCERELERİ */}
-              {adminTab !== 'TESTS' && adminTab !== 'PROJECT' && (
+              {adminTab !== 'TESTS' && adminTab !== 'PROJECT' && adminTab !== 'ALL_MATCHED' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto pr-1">
                   
-                  {/* 4.2 WoZ Havuzu */}
+                  {/* 4.3 WoZ Havuzu */}
                   {adminTab === 'WOZ' && (
                     <div className="space-y-3">
                       {pendingRequests.length === 0 ? (
@@ -1944,7 +1990,7 @@ export default function App() {
                               >
                                 <option value="" disabled>Sağlayıcı Seç</option>
                                 {providers.map((p) => (
-                                  <option key={p.id} value={String(p.id)}>{p.name} (Skor: {p.priority_score})</option>
+                                  <option key={p.id} value={String(p.id)}>{p.name} (📞 {p.phone}) - Skor: {p.priority_score}</option>
                                 ))}
                               </select>
                               <button
@@ -1961,7 +2007,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 4.3 Sağlayıcılar CRUD */}
+                  {/* 4.4 Sağlayıcılar CRUD */}
                   {adminTab === 'PROVIDERS' && (
                     <div className="space-y-3">
                       <div className="flex justify-end">
@@ -1979,13 +2025,13 @@ export default function App() {
                           <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex flex-col justify-between space-y-2 text-xs">
                             <div>
                               <div className="flex items-start justify-between">
-                                <h3 className="font-bold">{prov.name}</h3>
-                                <span className="text-[10px] font-mono bg-neutral-200 px-1.5 py-0.5 rounded">Skor: {prov.priority_score}</span>
+                                <h3 className="font-bold text-neutral-900">{prov.name}</h3>
+                                <span className="text-[10px] font-mono bg-neutral-200 px-1.5 py-0.5 rounded font-bold">Skor: {prov.priority_score}</span>
                               </div>
-                              <p className="text-[11px] text-neutral-400 font-mono">{prov.phone}</p>
+                              <p className="text-[11px] text-blue-700 font-mono font-semibold mt-0.5">📞 {prov.phone}</p>
                               <div className="flex flex-wrap gap-1 mt-1.5">
                                 {(prov.service_keywords || []).map((kw, i) => (
-                                  <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 bg-white border rounded">{kw}</span>
+                                  <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 bg-white border rounded text-neutral-600">{kw}</span>
                                 ))}
                               </div>
                             </div>
@@ -2003,7 +2049,7 @@ export default function App() {
                                   });
                                   setIsModalOpen(true);
                                 }}
-                                className="p-1 hover:bg-neutral-200 rounded"
+                                className="p-1 hover:bg-neutral-200 rounded text-neutral-600"
                               >
                                 <Edit3 size={12} />
                               </button>
@@ -2014,22 +2060,6 @@ export default function App() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* 4.4 Tüm Eşleşmeler */}
-                  {adminTab === 'ALL_MATCHED' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {matchedRequests.map((req) => (
-                        <div key={req.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1.5 text-xs">
-                          <div className="flex justify-between font-mono">
-                            <span className="font-bold">{req.status}</span>
-                            <span className="text-neutral-400">#REQ-{req.id}</span>
-                          </div>
-                          <p className="font-semibold">"{req.raw_text}"</p>
-                          <p className="text-neutral-500 font-mono text-[11px]">Müşteri: {req.contact_value} • Sağlayıcı: {req.provider_name}</p>
-                        </div>
-                      ))}
                     </div>
                   )}
 
