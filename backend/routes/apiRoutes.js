@@ -29,22 +29,26 @@ const {
   updateFeature,
   deleteFeature
 } = require('../controllers/featureController');
+const {
+  submitReview,
+  getReviewsByRequest
+} = require('../controllers/reviewController');
 
-// Auth / OTP
+// 1. Auth / OTP
 router.post('/auth/send-otp', sendOtp);
 router.post('/auth/verify-otp', verifyOtp);
 
-// Disambiguation
+// 2. Disambiguation
 router.post('/disambiguate', checkDisambiguation);
 
-// Servis Sağlayıcılar
+// 3. Servis Sağlayıcılar
 router.post('/providers', registerProvider);
 router.get('/providers', getProviders);
 router.get('/providers/by-phone', getProviderByPhone);
 router.put('/providers/:id', updateProvider);
 router.delete('/providers/:id', deleteProvider);
 
-// Talepler & Süreç
+// 4. Talepler
 router.post('/requests', createRequest);
 router.get('/requests/my-requests', getUserRequests);
 router.get('/requests/provider-requests', getProviderAssignedRequests);
@@ -53,16 +57,20 @@ router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
 router.post('/requests/:requestId/status', updateRequestStatus);
 router.delete('/requests/:requestId', deleteRequest);
 
-// WoZ ve Loglar
+// 5. WoZ & Bildirimler
 router.get('/requests/pending', getPendingRequests);
 router.get('/requests/matched', getMatchedRequests);
 router.post('/requests/assign', assignProviderManually);
 router.get('/notifications', getOutboundNotifications);
 
-// Proje Özellikleri / Yol Haritası CRUD
+// 6. Proje Özellikleri / Yol Haritası
 router.get('/features', getFeatures);
 router.post('/features', createFeature);
 router.put('/features/:id', updateFeature);
 router.delete('/features/:id', deleteFeature);
+
+// 7. Değerlendirme & Yorum (Reviews)
+router.post('/reviews', submitReview);
+router.get('/reviews/:requestId', getReviewsByRequest);
 
 module.exports = router;

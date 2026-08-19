@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-// 1. İnceleme / Değerlendirme Kaydet (ve SMS Logu Oluştur)
+// 1. Değerlendirme Kaydet ve SMS Logu Oluştur
 const submitReview = async (req, res) => {
   try {
     const { requestId, reviewerType, rating, comment } = req.body;
@@ -13,7 +13,7 @@ const submitReview = async (req, res) => {
     const numRating = (rating !== null && rating !== undefined && rating !== '') ? parseInt(rating, 10) : null;
     const cleanComment = (comment && String(comment).trim() !== '') ? String(comment).trim() : null;
 
-    // Talep ve sağlayıcı bilgilerini çek
+    // Talep ve sağlayıcı bilgilerini getir
     const { rows: reqRows } = await pool.query(`
       SELECT r.*, p.name AS provider_name, p.phone AS provider_phone 
       FROM requests r
@@ -23,7 +23,7 @@ const submitReview = async (req, res) => {
 
     const currentReq = reqRows.length > 0 ? reqRows[0] : null;
 
-    // Varsa önceki değerlendirmeyi sil
+    // Varsa eski değerlendirmeyi sil
     await pool.query('DELETE FROM reviews WHERE request_id = $1 AND reviewer_type = $2;', [rId, reviewerType]);
 
     // Yeni değerlendirmeyi kaydet
