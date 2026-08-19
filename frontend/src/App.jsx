@@ -507,7 +507,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.1</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.2</span>
             </div>
           </div>
 
@@ -743,7 +743,7 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Aksiyon Butonları */}
+                        {/* Aksiyon Butonları (Müşteri için) */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
                             {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && (
@@ -767,7 +767,7 @@ export default function App() {
                           </div>
 
                           <div className="flex items-center space-x-1.5 ml-auto">
-                            {/* 🌟 Müşteri Onaylama ve Tamamlama Butonu */}
+                            {/* SADECE MÜŞTERİ BUTONA BASINCA COMPLETED OLUR */}
                             <button
                               onClick={() => handleStatusChange(req.id, 'COMPLETED')}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"
@@ -879,7 +879,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 MÜŞTERİ TAMAMLAYINCA GEÇMİŞE DÜŞEN TALEPLER & REVIEW */}
+              {/* 🌟 YALNIZCA MÜŞTERİ TAMAMLAYINCA BURAYA GEÇER VE REVIEW AÇILIR */}
               {pastRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
@@ -1140,7 +1140,6 @@ export default function App() {
                               </button>
                             </>
                           )}
-                          {/* 🌟 Sağlayıcı Teslim Et Butonu */}
                           {req.status === 'ACCEPTED' && (
                             <button
                               onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')}

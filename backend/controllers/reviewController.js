@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-// 1. İnceleme / Değerlendirme Kaydet (ve SMS Logu Oluştur)
+// İnceleme / Değerlendirme Kaydet (ve SMS Logu Oluştur)
 const submitReview = async (req, res) => {
   try {
     const { requestId, reviewerType, rating, comment } = req.body;
@@ -10,8 +10,8 @@ const submitReview = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Geçersiz talep numarası veya değerlendiren tipi.' });
     }
 
-    const numRating = rating !== null && rating !== undefined && rating !== '' ? parseInt(rating, 10) : null;
-    const cleanComment = comment && String(comment).trim() !== '' ? String(comment).trim() : null;
+    const numRating = (rating !== null && rating !== undefined && rating !== '') ? parseInt(rating, 10) : null;
+    const cleanComment = (comment && String(comment).trim() !== '') ? String(comment).trim() : null;
 
     const { rows: reqRows } = await pool.query(`
       SELECT r.*, p.name AS provider_name, p.phone AS provider_phone 
@@ -25,7 +25,7 @@ const submitReview = async (req, res) => {
     }
     const currentReq = reqRows[0];
 
-    // Varsa önceki değerlendirmeyi temizleyip yenisini ekle
+    // Önceki incelemeyi temizleyip yenisini ekle
     await pool.query('DELETE FROM reviews WHERE request_id = $1 AND reviewer_type = $2', [rId, reviewerType]);
 
     const insertQuery = `
@@ -35,10 +35,10 @@ const submitReview = async (req, res) => {
     `;
     const { rows: savedReview } = await pool.query(insertQuery, [rId, reviewerType, numRating, cleanComment]);
 
-    // SMS Bildirimi Logla
+    // SMS Bildirimi Tetikle
     if (reviewerType === 'CUSTOMER') {
       const reviewSummary = numRating ? `Puan: ${numRating}/5 Yıldız${cleanComment ? ` - Yorum: "${cleanComment}"` : ''}` : 'Puan vermeden onayladı.';
-      const providerMsg = `[Sms-Contact] Müşteriniz #${rId} numaralı hizmeti tamamladı ve değerlendirdi! (${reviewSummary})`;
+      const providerMsg = `[Sms-Contact] Müşteriniz #${rId} numaralı hizmeti onayladı ve değerlendirdi! (${reviewSummary})`;
 
       if (currentReq.provider_phone) {
         await pool.query(`
@@ -67,7 +67,6 @@ const submitReview = async (req, res) => {
   }
 };
 
-// 2. Bir Talebe Ait Değerlendirmeleri Getir
 const getReviewsByRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
