@@ -34,6 +34,12 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   }
 };
 
+// Yardımcı: Numarayı sadece rakamlara indirgeyip normalize eder
+const normalizePhone = (p) => {
+  if (!p) return '';
+  return p.replace(/\D/g, ''); // Sadece rakamları bırakır
+};
+
 // 1. Yeni Talep Oluşturma
 const createRequest = async (req, res) => {
   try {
@@ -42,6 +48,8 @@ const createRequest = async (req, res) => {
     if (!rawText || !contactValue) {
       return res.status(400).json({ status: 'error', message: 'Metin ve iletişim bilgisi zorunludur.' });
     }
+
+    const cleanContact = contactValue.trim();
 
     const textToAnalyze = (disambiguationChoice || rawText).toLowerCase();
     const tokens = textToAnalyze
@@ -84,7 +92,7 @@ const createRequest = async (req, res) => {
       rawText.trim(),
       disambiguationChoice ? disambiguationChoice.trim() : null,
       tokens,
-      contactValue.trim(),
+      cleanContact,
       preferredChannel || 'PHONE',
       requestStatus,
       primaryProvider ? primaryProvider.id : null
@@ -117,12 +125,17 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 2. Kullanıcının Kendi Talepleri ve Adayları
+// 2. Kullanıcının Kendi Talepleri (Esnek Telefon Eşleme)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon zorunludur.' });
 
+    const rawPhone = phone.trim();
+    const cleanDigits = normalizePhone(rawPhone);
+    const lastDigits = cleanDigits.length >= 7 ? cleanDigits.slice(-7) : cleanDigits;
+
+    // Hem tam metin hem de son 7 hane üzerinden arar (Format farkı sorununu tamamen yok eder)
     const { rows: userRequests } = await pool.query(`
       SELECT 
         r.*,
@@ -132,9 +145,10 @@ const getUserRequests = async (req, res) => {
         p.priority_score AS provider_score
       FROM requests r
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
-      WHERE r.contact_value = $1
+      WHERE r.contact_value = $1 
+         OR regexp_replace(r.contact_value, '\\D', '', 'g') LIKE '%' || $2 || '%'
       ORDER BY r.updated_at DESC, r.created_at DESC;
-    `, [phone.trim()]);
+    `, [rawPhone, lastDigits]);
 
     const { rows: allProviders } = await pool.query(`
       SELECT id, name, phone, service_keywords, priority_score 

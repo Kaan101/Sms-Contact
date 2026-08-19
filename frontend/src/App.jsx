@@ -71,7 +71,7 @@ export default function App() {
   // --- 3. SAĞLAYICI (PROVIDER) STATE ---
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
-  const [isProfileOpen, setIsProfileOpen] = useState(false); // Başlangıçta kapalı akordeon
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({
     name: '',
     phone: '',
@@ -82,7 +82,7 @@ export default function App() {
   });
 
   // --- 4. ADMİN (ADMIN) STATE ---
-  const [adminTab, setAdminTab] = useState('WOZ'); // 'WOZ' | 'PROVIDERS' | 'ALL_MATCHED' | 'SMS_LOGS'
+  const [adminTab, setAdminTab] = useState('WOZ');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -109,7 +109,7 @@ export default function App() {
       const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
       setMyCustomerRequests(res.data.requests || []);
     } catch (err) {
-      console.error(err);
+      console.error('Müşteri talepleri çekilemedi:', err);
     }
   };
 
@@ -133,7 +133,7 @@ export default function App() {
     } catch (err) {
       if (err.response?.status === 404) {
         setProviderProfile(null);
-        setIsProfileOpen(true); // Profil hiç yoksa doldurması için açık gelsin
+        setIsProfileOpen(true);
       }
     }
   };
@@ -152,20 +152,19 @@ export default function App() {
       setMatchedRequests(matchRes.data.requests || []);
       setSmsLogs(logRes.data.notifications || []);
     } catch (err) {
-      console.error(err);
+      console.error('Admin verileri çekilemedi:', err);
     } finally {
       setAdminLoading(false);
     }
   };
 
-  // 🔄 ASENKRON CANLI DİNLEME (Polling)
+  // 🔄 ASENKRON CANLI DİNLEME (3 saniyede bir polling)
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') fetchCustomerData();
       if (session.role === 'PROVIDER') fetchProviderData();
       if (session.role === 'ADMIN') fetchAdminData();
 
-      // Sağlayıcı ve Müşteri ekranı için her 3 saniyede bir sessiz veri tazeleme
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData();
         if (session.role === 'CUSTOMER') fetchCustomerData();
@@ -175,7 +174,7 @@ export default function App() {
     }
   }, [session]);
 
-  // Auth Metodları
+  // --- AUTH METODLARI ---
   const handleSendOtp = async (e) => {
     e.preventDefault();
     if (!inputPhone.trim()) return;
@@ -230,7 +229,7 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // Müşteri Talep Metodları
+  // --- MÜŞTERİ TALEP METODLARI ---
   const handleCustomerInitialSubmit = async (e) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
@@ -269,7 +268,7 @@ export default function App() {
       setQueryText('');
       setSelectedDisambiguation(null);
       setStep('INPUT');
-      fetchCustomerData();
+      await fetchCustomerData();
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
     } finally {
@@ -277,24 +276,22 @@ export default function App() {
     }
   };
 
-  // Sonraki Sağlayıcıya Geç (Düzeltildi)
   const handleCustomerNextProvider = async (requestId) => {
     try {
-      const res = await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
-      fetchCustomerData();
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
+      await fetchCustomerData();
     } catch (err) {
       alert('İşlem başarısız: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  // Alternatif Sağlayıcı Seç (Düzeltildi)
   const handleCustomerSelectCandidate = async (requestId, providerId) => {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, {
         providerId: Number(providerId)
       });
       setShowCandidatesMap(prev => ({ ...prev, [requestId]: false }));
-      fetchCustomerData();
+      await fetchCustomerData();
     } catch (err) {
       alert('Seçim başarısız: ' + (err.response?.data?.message || err.message));
     }
@@ -303,9 +300,9 @@ export default function App() {
   const handleStatusChange = async (requestId, newStatus) => {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus });
-      if (session.role === 'CUSTOMER') fetchCustomerData();
-      if (session.role === 'PROVIDER') fetchProviderData();
-      if (session.role === 'ADMIN') fetchAdminData();
+      if (session.role === 'CUSTOMER') await fetchCustomerData();
+      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'ADMIN') await fetchAdminData();
     } catch (err) {
       alert('Durum güncellenemedi: ' + (err.response?.data?.message || err.message));
     }
@@ -315,15 +312,15 @@ export default function App() {
     if (!window.confirm('Bu talebi kalıcı olarak silmek istediğinize emin misiniz?')) return;
     try {
       await axios.delete(`${API_BASE}/requests/${Number(requestId)}`);
-      if (session.role === 'CUSTOMER') fetchCustomerData();
-      if (session.role === 'PROVIDER') fetchProviderData();
-      if (session.role === 'ADMIN') fetchAdminData();
+      if (session.role === 'CUSTOMER') await fetchCustomerData();
+      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'ADMIN') await fetchAdminData();
     } catch {
-      alert('Silme başarısız.');
+      alert('Silme işlemi başarısız.');
     }
   };
 
-  // Sağlayıcı Profil Kaydet
+  // --- SAĞLAYICI PROFİLİ KAYDETME ---
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -346,14 +343,14 @@ export default function App() {
       } else {
         await axios.post(`${API_BASE}/providers`, payload);
       }
-      setIsProfileOpen(false); // Kaydedildikten sonra akordeonu otomatik kapat
-      fetchProviderData();
+      setIsProfileOpen(false);
+      await fetchProviderData();
     } catch (err) {
       alert('Kaydedilemedi: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  // Admin İşlemleri
+  // --- ADMİN İŞLEMLERİ ---
   const handleAdminAssign = async (requestId) => {
     const pId = selectedProviderMap[requestId];
     if (!pId) return alert('Lütfen sağlayıcı seçin.');
@@ -362,7 +359,7 @@ export default function App() {
         requestId: parseInt(requestId, 10),
         providerId: parseInt(pId, 10)
       });
-      fetchAdminData();
+      await fetchAdminData();
     } catch {
       alert('Atama başarısız.');
     }
@@ -387,7 +384,7 @@ export default function App() {
         await axios.post(`${API_BASE}/providers`, payload);
       }
       setIsModalOpen(false);
-      fetchAdminData();
+      await fetchAdminData();
     } catch {
       alert('Kayıt başarısız.');
     }
@@ -397,11 +394,22 @@ export default function App() {
     if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return;
     try {
       await axios.delete(`${API_BASE}/providers/${id}`);
-      fetchAdminData();
+      await fetchAdminData();
     } catch {
       alert('Silinemedi.');
     }
   };
+
+  // 🎯 AKTİF VE GEÇMİŞ TALEPLER FİLTRELERİ (AÇIKÇA TANIMLANDI)
+  const activeRequests = myCustomerRequests.filter(r => {
+    const s = (r.status || '').toUpperCase();
+    return s === 'MATCHED' || s === 'ACCEPTED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
+  });
+
+  const pastRequests = myCustomerRequests.filter(r => {
+    const s = (r.status || '').toUpperCase();
+    return s === 'COMPLETED' || s === 'CANCELLED';
+  });
 
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
@@ -415,7 +423,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Multi-Role 3.1</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.2</span>
             </div>
           </div>
 
@@ -563,17 +571,17 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-3xl mx-auto w-full space-y-8">
               
-              {/* Aktif Talepler Kartları */}
-              {myCustomerRequests.filter(r => r.status === 'MATCHED' || r.status === 'ACCEPTED' || r.status === 'MANUAL_INTERVENTION').length > 0 && (
+              {/* 🌟 AKTİF TALEPLER KARTLARI (activeRequests) */}
+              {activeRequests.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
-                    <span>Aktif Talepleriniz ({myCustomerRequests.filter(r => r.status === 'MATCHED' || r.status === 'ACCEPTED' || r.status === 'MANUAL_INTERVENTION').length})</span>
+                    <span>Aktif Talepleriniz ({activeRequests.length})</span>
                   </h3>
 
                   <div className="space-y-4">
-                    {myCustomerRequests.filter(r => r.status === 'MATCHED' || r.status === 'ACCEPTED' || r.status === 'MANUAL_INTERVENTION').map((req) => (
-                      <div key={req.id} className="bg-white rounded-2xl border-2 border-neutral-900/10 p-5 shadow-swiss space-y-4">
+                    {activeRequests.map((req) => (
+                      <div key={req.id} className="bg-white rounded-2xl border-2 border-neutral-900/10 p-5 shadow-sm space-y-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
@@ -774,14 +782,14 @@ export default function App() {
               )}
 
               {/* Geçmiş Talepler */}
-              {myCustomerRequests.filter(r => r.status === 'COMPLETED' || r.status === 'CANCELLED').length > 0 && (
+              {pastRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
                     <History size={14} />
-                    <span>Geçmiş Talepler</span>
+                    <span>Geçmiş Talepler ({pastRequests.length})</span>
                   </h3>
                   <div className="space-y-2">
-                    {myCustomerRequests.filter(r => r.status === 'COMPLETED' || r.status === 'CANCELLED').map((req) => (
+                    {pastRequests.map((req) => (
                       <div key={req.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs">
                         <div>
                           <p className="font-semibold text-neutral-800">"{req.raw_text}"</p>
@@ -804,7 +812,7 @@ export default function App() {
           session.role === 'PROVIDER' ? (
             <div className="max-w-4xl mx-auto w-full space-y-6">
               
-              {/* 📂 AÇILIR KAPANIR (ACCORDION) PROFİL PANELİ - BAŞLANGIÇTA KAPALI */}
+              {/* Profil Akordeonu */}
               <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm overflow-hidden transition">
                 <div 
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -833,10 +841,10 @@ export default function App() {
                 </div>
 
                 {isProfileOpen && (
-                  <form onSubmit={handleSaveProviderProfile} className="p-6 pt-2 border-t border-neutral-100 space-y-4 animate-fadeIn">
+                  <form onSubmit={handleSaveProviderProfile} className="p-6 pt-2 border-t border-neutral-100 space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme / Servis Adı *</label>
+                        <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme Adı *</label>
                         <input
                           type="text"
                           required
@@ -847,7 +855,7 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta Adresi</label>
+                        <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
                         <input
                           type="email"
                           value={providerFormData.email}
@@ -860,7 +868,7 @@ export default function App() {
 
                     <div>
                       <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1">
-                        Hizmet Anahtar Kelimeleriniz (Virgülle Ayırın) *
+                        Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *
                       </label>
                       <input
                         type="text"
@@ -870,7 +878,6 @@ export default function App() {
                         placeholder="su, damacana, erikli, kadıköy, moda"
                         className="w-full p-2.5 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
                       />
-                      <p className="text-[11px] text-neutral-400 mt-1">Kullanıcıların bu kelimeleri içeren talepleri doğrudan size yönlendirilir.</p>
                     </div>
 
                     <div className="flex items-center justify-between pt-2">
@@ -908,14 +915,14 @@ export default function App() {
                         className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm"
                       >
                         <Save size={13} />
-                        <span>Profili Kaydet & Kapat</span>
+                        <span>Profili Kaydet</span>
                       </button>
                     </div>
                   </form>
                 )}
               </div>
 
-              {/* 📡 SAĞLAYICIYA GELEN CANLI TALEPLER (ASENKRON OTOMATİK DÜŞER) */}
+              {/* Gelen Canlı Talepler */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold tracking-tight text-neutral-950 flex items-center space-x-2">
@@ -948,7 +955,6 @@ export default function App() {
                           <p className="text-xs font-mono text-neutral-500">Müşteri Tel: <strong className="text-neutral-800">{req.contact_value}</strong> [{req.preferred_channel}]</p>
                         </div>
 
-                        {/* Aksiyon: Kabul Et veya Pas Geç */}
                         <div className="pt-3 border-t flex items-center justify-end space-x-2">
                           {req.status === 'MATCHED' && (
                             <>
@@ -986,10 +992,9 @@ export default function App() {
             </div>
           ) :
 
-          /* ---------------- ⚙️ 4. ADMİN (ADMIN EKRANI) ---------------- */
+          /* ---------------- ⚙️ 4. ADMİN EKRANI ---------------- */
           (
             <div className="space-y-6">
-              
               <div className="flex items-center justify-between border-b pb-4">
                 <div>
                   <h2 className="text-xl font-bold tracking-tight text-neutral-950">Sistem Yönetim Paneli</h2>
@@ -1182,7 +1187,7 @@ export default function App() {
       {/* 🇨🇭 FOOTER */}
       <footer className="border-t border-neutral-200/80 bg-white py-6">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-neutral-400 font-mono">
-          <div><span>Sms-Contact</span> • <span>Multi-Tenant & Asenkron Servis Pazaryeri</span></div>
+          <div><span>Sms-Contact</span> • <span>Multi-Tenant & Asenkron Servis Platformu</span></div>
           <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
         </div>
       </footer>
