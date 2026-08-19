@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-// İnceleme / Değerlendirme Kaydet (ve SMS Logu Oluştur)
+// 1. İnceleme / Değerlendirme Kaydet (ve SMS Logu Oluştur)
 const submitReview = async (req, res) => {
   try {
     const { requestId, reviewerType, rating, comment } = req.body;
@@ -11,9 +11,8 @@ const submitReview = async (req, res) => {
     }
 
     const numRating = rating !== null && rating !== undefined && rating !== '' ? parseInt(rating, 10) : null;
-    const cleanComment = comment && comment.trim() !== '' ? comment.trim() : null;
+    const cleanComment = comment && String(comment).trim() !== '' ? String(comment).trim() : null;
 
-    // Talep ve sağlayıcı bilgilerini çek
     const { rows: reqRows } = await pool.query(`
       SELECT r.*, p.name AS provider_name, p.phone AS provider_phone 
       FROM requests r
@@ -26,10 +25,8 @@ const submitReview = async (req, res) => {
     }
     const currentReq = reqRows[0];
 
-    // Önce varsa eski kaydı silip temiz ekle (Çakışma riskini %0'a indirir)
-    await pool.query(`
-      DELETE FROM reviews WHERE request_id = $1 AND reviewer_type = $2;
-    `, [rId, reviewerType]);
+    // Varsa önceki değerlendirmeyi temizleyip yenisini ekle
+    await pool.query('DELETE FROM reviews WHERE request_id = $1 AND reviewer_type = $2', [rId, reviewerType]);
 
     const insertQuery = `
       INSERT INTO reviews (request_id, reviewer_type, rating, comment)
@@ -38,10 +35,10 @@ const submitReview = async (req, res) => {
     `;
     const { rows: savedReview } = await pool.query(insertQuery, [rId, reviewerType, numRating, cleanComment]);
 
-    // SMS Bildirimi Tetikle
+    // SMS Bildirimi Logla
     if (reviewerType === 'CUSTOMER') {
-      const reviewSummary = numRating ? `Puan: ${numRating}/5 Yıldız${cleanComment ? ` - Yorum: "${cleanComment}"` : ''}` : 'Puan vermeden işlemi tamamladı.';
-      const providerMsg = `[Sms-Contact] Müşteriniz #${rId} numaralı hizmet için değerlendirme yaptı! (${reviewSummary})`;
+      const reviewSummary = numRating ? `Puan: ${numRating}/5 Yıldız${cleanComment ? ` - Yorum: "${cleanComment}"` : ''}` : 'Puan vermeden onayladı.';
+      const providerMsg = `[Sms-Contact] Müşteriniz #${rId} numaralı hizmeti tamamladı ve değerlendirdi! (${reviewSummary})`;
 
       if (currentReq.provider_phone) {
         await pool.query(`
@@ -50,8 +47,8 @@ const submitReview = async (req, res) => {
         `, [rId, currentReq.provider_phone, providerMsg]);
       }
     } else if (reviewerType === 'PROVIDER') {
-      const reviewSummary = numRating ? `Puan: ${numRating}/5 Yıldız${cleanComment ? ` - Yorum: "${cleanComment}"` : ''}` : 'Puan vermeden işlemi tamamladı.';
-      const userMsg = `[Sms-Contact] '${currentReq.provider_name}' hizmet sonrası sizi değerlendirdi! (${reviewSummary})`;
+      const reviewSummary = numRating ? `Puan: ${numRating}/5 Yıldız${cleanComment ? ` - Yorum: "${cleanComment}"` : ''}` : 'Puan vermeden teslim etti.';
+      const userMsg = `[Sms-Contact] '${currentReq.provider_name}' hizmet tesliminde sizi değerlendirdi! (${reviewSummary})`;
 
       await pool.query(`
         INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
@@ -70,6 +67,7 @@ const submitReview = async (req, res) => {
   }
 };
 
+// 2. Bir Talebe Ait Değerlendirmeleri Getir
 const getReviewsByRequest = async (req, res) => {
   try {
     const { requestId } = req.params;

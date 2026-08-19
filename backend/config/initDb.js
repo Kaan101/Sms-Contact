@@ -33,17 +33,15 @@ const initDatabase = async () => {
       );
     `);
 
+    // Eski kısıtları ve engelleri temizle
     await pool.query(`
+      ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
     // 3. Foreign key güvenli onarım
     await pool.query(`
-      ALTER TABLE requests 
-      DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
-    `);
-
-    await pool.query(`
+      ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
       ALTER TABLE requests 
       ADD CONSTRAINT requests_matched_provider_id_fkey 
       FOREIGN KEY (matched_provider_id) 
@@ -91,7 +89,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme & Yorum Tablosu (Sıfırdan Sorunsuz Yapı)
+    // 7. Değerlendirme & Yorum Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
@@ -101,29 +99,18 @@ const initDatabase = async () => {
         comment TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-    `);
-
-    // Unique index ile çakışmayı önleme
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_req_reviewer 
-      ON reviews (request_id, reviewer_type);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_req_reviewer ON reviews (request_id, reviewer_type);
     `);
 
     // Sequence Eşitlemeleri
     await pool.query(`
       SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
-    `);
-    await pool.query(`
       SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE((SELECT MAX(id) FROM requests), 1), true);
-    `);
-    await pool.query(`
       SELECT setval(pg_get_serial_sequence('project_features', 'id'), COALESCE((SELECT MAX(id) FROM project_features), 1), true);
-    `);
-    await pool.query(`
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı ve tüm durumlar hatasız şekilde senkronize edildi.');
+    console.log('✅ Veritabanı ve durum kısıtları başarıyla güncellendi.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }
