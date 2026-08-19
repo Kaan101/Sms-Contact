@@ -30,19 +30,22 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
     }
 
     if (userMsg && providerMsg && providerData.phone) {
-      await pool.query(`
+      // Asenkron ve havuzu yormayacak şekilde çalıştır
+      pool.query(`
         INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
         VALUES 
           ($1, 'USER', $2, 'SMS', $3),
           ($1, 'PROVIDER', $4, 'SMS', $5);
-      `, [requestId, reqData.contact_value, userMsg, providerData.phone, providerMsg]);
+      `, [requestId, reqData.contact_value, userMsg, providerData.phone, providerMsg]).catch(err => {
+        console.error('SMS loglama arkaplan hatası:', err.message);
+      });
     }
   } catch (err) {
     console.error('SMS loglama hatası:', err.message);
   }
 };
 
-// 1. Yeni Talep Oluşturma (Hatasız ve Korumalı)
+// 1. Yeni Talep Oluşturma
 const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
@@ -59,7 +62,6 @@ const createRequest = async (req, res) => {
       .split(/\s+/)
       .filter(w => w.length > 1);
 
-    // Aktif sağlayıcıları çek
     const { rows: activeProviders } = await pool.query(`
       SELECT id, name, phone, email, service_keywords, communication_channels, priority_score 
       FROM service_providers 
@@ -104,7 +106,7 @@ const createRequest = async (req, res) => {
     const createdReq = savedRows[0];
 
     if (primaryProvider) {
-      await triggerSimulatedNotifications(createdReq.id, createdReq, primaryProvider, 'MATCHED');
+      triggerSimulatedNotifications(createdReq.id, createdReq, primaryProvider, 'MATCHED');
 
       return res.status(201).json({
         status: 'success',
@@ -123,7 +125,7 @@ const createRequest = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Talep oluşturma hatası detay:', error);
+    console.error('Talep oluşturma hatası:', error);
     res.status(500).json({ status: 'error', message: `Talep oluşturulamadı: ${error.message}` });
   }
 };
@@ -274,7 +276,7 @@ const passToNextProvider = async (req, res) => {
       RETURNING *;
     `, [nextProvider.id, rId]);
 
-    await triggerSimulatedNotifications(rId, updatedRows[0], nextProvider, 'MATCHED');
+    triggerSimulatedNotifications(rId, updatedRows[0], nextProvider, 'MATCHED');
 
     res.status(200).json({
       status: 'success',
@@ -315,7 +317,7 @@ const selectCandidateProvider = async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
     }
 
-    await triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
+    triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
 
     res.status(200).json({
       status: 'success',
@@ -352,7 +354,7 @@ const updateRequestStatus = async (req, res) => {
     if (rows[0].matched_provider_id) {
       const { rows: pRows } = await pool.query('SELECT id, name, phone FROM service_providers WHERE id = $1', [rows[0].matched_provider_id]);
       if (pRows.length > 0) {
-        await triggerSimulatedNotifications(rows[0].id, rows[0], pRows[0], newStatus);
+        triggerSimulatedNotifications(rows[0].id, rows[0], pRows[0], newStatus);
       }
     }
 
@@ -418,7 +420,7 @@ const assignProviderManually = async (req, res) => {
       RETURNING *;
     `, [pId, rId]);
 
-    await triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
+    triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
 
     res.status(200).json({
       status: 'success',
