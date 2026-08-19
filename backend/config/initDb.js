@@ -33,7 +33,6 @@ const initDatabase = async () => {
       );
     `);
 
-    // Eski kısıtları temizle (Hata almamak için)
     await pool.query(`
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS check_status;
@@ -54,7 +53,7 @@ const initDatabase = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS outbound_notifications (
         id SERIAL PRIMARY KEY,
-        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+        request_id INTEGER,
         recipient_type VARCHAR(20) NOT NULL,
         recipient_phone VARCHAR(50) NOT NULL,
         channel VARCHAR(20) NOT NULL DEFAULT 'SMS',
@@ -90,17 +89,16 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme & Yorum Tablosu
+    // 7. Değerlendirme & Yorum Tablosu (Sıfırdan Sorunsuz Yapı)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
-        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+        request_id INTEGER NOT NULL,
         reviewer_type VARCHAR(20) NOT NULL,
         rating INTEGER,
         comment TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_req_reviewer ON reviews (request_id, reviewer_type);
     `);
 
     // Sequence Eşitlemeleri
@@ -111,7 +109,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı ve durum kısıtları başarıyla güncellendi.');
+    console.log('✅ Veritabanı ve Review tablosu hatasız hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }
