@@ -33,9 +33,10 @@ const initDatabase = async () => {
       );
     `);
 
-    // Kısıtları kaldır ve updated_at garantile
+    // Eski kısıtları temizle (Hata almamak için)
     await pool.query(`
       ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
+      ALTER TABLE requests DROP CONSTRAINT IF EXISTS check_status;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 

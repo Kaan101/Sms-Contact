@@ -483,7 +483,7 @@ export default function App() {
     }
   };
 
-  // 🎯 Müşteri Aktif Talepleri (Müşteri Tamamla demedikçe buradadır)
+  // 🎯 Müşteri Aktif Talepleri (Müşteri Tamamla demedikçe KESİNLİKLE buradadır)
   const activeRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
@@ -507,7 +507,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.2</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.3</span>
             </div>
           </div>
 
@@ -660,7 +660,7 @@ export default function App() {
           session.role === 'CUSTOMER' ? (
             <div className="max-w-2xl mx-auto w-full space-y-6">
               
-              {/* AKTİF TALEPLER KUTUSU */}
+              {/* AKTİF TALEPLER KUTUSU (Müşteri Tamamla Demedikçe Asla Geçmişe Düşmez) */}
               {activeRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
@@ -709,7 +709,7 @@ export default function App() {
 
                             {req.status === 'PROVIDER_COMPLETED' && (
                               <div className="p-2.5 bg-purple-50 border border-purple-200 rounded text-[11px] text-purple-950 space-y-1">
-                                <p className="font-bold">Sağlayıcı işi tamamladığını bildirdi.</p>
+                                <p className="font-bold">Sağlayıcı işi teslim ettiğini bildirdi.</p>
                                 <p className="text-neutral-600">Hizmeti onaylayabilir veya memnun kalmadıysanız sonraki sağlayıcıya yönlendirebilirsiniz.</p>
                               </div>
                             )}
@@ -767,7 +767,7 @@ export default function App() {
                           </div>
 
                           <div className="flex items-center space-x-1.5 ml-auto">
-                            {/* SADECE MÜŞTERİ BUTONA BASINCA COMPLETED OLUR */}
+                            {/* 🌟 MÜŞTERİ ONAYLAYINCA COMPLETED OLUR */}
                             <button
                               onClick={() => handleStatusChange(req.id, 'COMPLETED')}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"
@@ -879,7 +879,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YALNIZCA MÜŞTERİ TAMAMLAYINCA BURAYA GEÇER VE REVIEW AÇILIR */}
+              {/* 🌟 YALNIZCA MÜŞTERİ TAMAMLAYINCA GEÇMİŞE GEÇEN TALEPLER & MÜŞTERİ YORUMU */}
               {pastRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
@@ -1140,6 +1140,7 @@ export default function App() {
                               </button>
                             </>
                           )}
+                          {/* 🌟 Sağlayıcı Teslim Et Butonu */}
                           {req.status === 'ACCEPTED' && (
                             <button
                               onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')}
@@ -1151,7 +1152,7 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* 🌟 SAĞLAYICI TESLİM ETTİĞİNDE SAĞLAYICININ REVIEW ALANI BURADA AÇILIR */}
+                        {/* 🌟 SAĞLAYICI TESLİM ETTİĞİ ANDA SAĞLAYICININ REVIEW ALANI BURADA AÇILIR */}
                         {(req.status === 'PROVIDER_COMPLETED' || req.status === 'COMPLETED') && (
                           req.provider_rating || reviewedRequestsMap[`${req.id}_PROVIDER`] ? (
                             <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between mt-2">

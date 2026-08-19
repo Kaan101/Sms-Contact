@@ -25,9 +25,10 @@ const submitReview = async (req, res) => {
     }
     const currentReq = reqRows[0];
 
-    // Önceki incelemeyi temizleyip yenisini ekle
+    // Önceki kaydı temizle
     await pool.query('DELETE FROM reviews WHERE request_id = $1 AND reviewer_type = $2', [rId, reviewerType]);
 
+    // Yeni değerlendirmeyi kaydet
     const insertQuery = `
       INSERT INTO reviews (request_id, reviewer_type, rating, comment)
       VALUES ($1, $2, $3, $4)
