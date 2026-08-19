@@ -134,7 +134,6 @@ export default function App() {
     } catch (err) {
       if (err.response?.status === 404) {
         setProviderProfile(null);
-        // Profil bulunamazsa bile akordeon kapalı kalsın (kullanıcı isterse açar)
         try {
           const fallbackRes = await axios.get(`${API_BASE}/requests/provider-requests?phone=${encodeURIComponent(session.phone)}`);
           setProviderRequests(fallbackRes.data.requests || []);
@@ -1185,7 +1184,7 @@ export default function App() {
                   <input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
                 </div>
                 <div className="flex justify-end space-x-2 pt-2 border-t">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-3 py-1.5 border rounded-lg text-xs font-semibold">Vazgeç</button>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold">Vazgeç</button>
                   <button type="submit" className="px-3.5 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold">Kaydet</button>
                 </div>
               </form>

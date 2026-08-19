@@ -1,10 +1,13 @@
 const { pool } = require('../config/db');
 
-const normalizePhone = (p) => {
+// Yardımcı: Telefonu son 10 haneye indirger (örn: 5323002301)
+const getNormalizedLast10 = (p) => {
   if (!p) return '';
-  return p.replace(/\D/g, '');
+  const digits = p.replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : digits;
 };
 
+// Yardımcı: Çift Taraflı SMS Bildirim Simülasyonu
 const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
   try {
     const channel = reqData.preferred_channel || 'PHONE';
@@ -38,6 +41,7 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   }
 };
 
+// 1. Yeni Talep Oluşturma
 const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
@@ -122,14 +126,14 @@ const createRequest = async (req, res) => {
   }
 };
 
+// 2. Kullanıcının Kendi Talepleri
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon zorunludur.' });
 
     const rawPhone = phone.trim();
-    const cleanDigits = normalizePhone(rawPhone);
-    const lastDigits = cleanDigits.length >= 7 ? cleanDigits.slice(-7) : cleanDigits;
+    const last10 = getNormalizedLast10(rawPhone);
 
     const { rows: userRequests } = await pool.query(`
       SELECT 
@@ -141,9 +145,9 @@ const getUserRequests = async (req, res) => {
       FROM requests r
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
       WHERE r.contact_value = $1 
-         OR regexp_replace(r.contact_value, '\\D', '', 'g') LIKE '%' || $2 || '%'
+         OR RIGHT(REGEXP_REPLACE(r.contact_value, '\\D', '', 'g'), 10) = $2
       ORDER BY r.id DESC;
-    `, [rawPhone, lastDigits]);
+    `, [rawPhone, last10]);
 
     const { rows: allProviders } = await pool.query(`
       SELECT id, name, phone, service_keywords, priority_score 
@@ -174,6 +178,7 @@ const getUserRequests = async (req, res) => {
   }
 };
 
+// 3. Sağlayıcıya Gelen Talepler (Son 10 Hane Eşleşmesiyle Kusursuz Sorgu)
 const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId, phone } = req.query;
@@ -184,23 +189,24 @@ const getProviderAssignedRequests = async (req, res) => {
 
     let pId = parseInt(providerId, 10);
     const rawPhone = phone ? phone.trim() : '';
-    const cleanDigits = normalizePhone(rawPhone);
-    const lastDigits = cleanDigits.length >= 7 ? cleanDigits.slice(-7) : cleanDigits;
+    const last10 = getNormalizedLast10(rawPhone);
 
+    // Eğer ID yoksa veya geçersizse telefon numarasından (son 10 hane ile) ID bulalım
     if (isNaN(pId) || pId <= 0) {
       const { rows: foundProv } = await pool.query(`
         SELECT id FROM service_providers 
         WHERE phone = $1 
-           OR regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $2 || '%'
+           OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2
         LIMIT 1;
-      `, [rawPhone, lastDigits]);
+      `, [rawPhone, last10]);
 
       if (foundProv.length > 0) {
         pId = foundProv[0].id;
       }
     }
 
-    const { rows } = await pool.query(`
+    // Talepleri hem sağlayıcı ID hem de sağlayıcı telefonunun son 10 hanesiyle bul
+    const query = `
       SELECT 
         r.*,
         p.name AS provider_name,
@@ -209,10 +215,11 @@ const getProviderAssignedRequests = async (req, res) => {
       INNER JOIN service_providers p ON r.matched_provider_id = p.id
       WHERE r.matched_provider_id = $1 
          OR p.phone = $2
-         OR ($3 <> '' AND regexp_replace(p.phone, '\\D', '', 'g') LIKE '%' || $3 || '%')
+         OR ($3 <> '' AND RIGHT(REGEXP_REPLACE(p.phone, '\\D', '', 'g'), 10) = $3)
       ORDER BY r.id DESC;
-    `, [pId || -1, rawPhone, lastDigits]);
+    `;
 
+    const { rows } = await pool.query(query, [pId || -1, rawPhone, last10]);
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
     console.error('getProviderAssignedRequests hatası:', error);
@@ -220,6 +227,7 @@ const getProviderAssignedRequests = async (req, res) => {
   }
 };
 
+// 4. Sonraki Sağlayıcıya Geç (Pass Next)
 const passToNextProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -277,6 +285,7 @@ const passToNextProvider = async (req, res) => {
   }
 };
 
+// 5. Doğrudan Aday Sağlayıcı Seç (Direct Candidate Select)
 const selectCandidateProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -317,6 +326,7 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
+// 6. Talep Durumu Güncelle (ACCEPTED, COMPLETED, CANCELLED)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -356,6 +366,7 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
+// 7. Bekleyen Talepleri Getir (WoZ)
 const getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -370,6 +381,7 @@ const getPendingRequests = async (req, res) => {
   }
 };
 
+// 8. Eşleşen & Süreçteki Tüm Talepler
 const getMatchedRequests = async (req, res) => {
   try {
     const query = `
@@ -391,6 +403,7 @@ const getMatchedRequests = async (req, res) => {
   }
 };
 
+// 9. Manuel Atama (WoZ)
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
@@ -420,6 +433,7 @@ const assignProviderManually = async (req, res) => {
   }
 };
 
+// 10. Giden SMS Loglarını Getir
 const getOutboundNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -435,6 +449,7 @@ const getOutboundNotifications = async (req, res) => {
   }
 };
 
+// 11. Talebi Kalıcı Olarak Sil
 const deleteRequest = async (req, res) => {
   try {
     const { requestId } = req.params;

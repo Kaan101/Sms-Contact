@@ -1,5 +1,12 @@
 const { pool } = require('../config/db');
 
+// Yardımcı: Telefonu son 10 haneye indirger (örn: 5323002301)
+const getNormalizedLast10 = (p) => {
+  if (!p) return '';
+  const digits = p.replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+};
+
 // 1. Yeni Servis Veren Ekleme
 const registerProvider = async (req, res) => {
   try {
@@ -54,7 +61,7 @@ const getProviders = async (req, res) => {
   try {
     const selectQuery = `
       SELECT * FROM service_providers 
-      ORDER BY is_active DESC, priority_score DESC, created_at DESC;
+      ORDER BY is_active DESC, priority_score DESC, id ASC;
     `;
     const { rows } = await pool.query(selectQuery);
 
@@ -68,13 +75,23 @@ const getProviders = async (req, res) => {
   }
 };
 
-// 3. Telefon Numarasına Göre Sağlayıcı Bilgisi Getir (Sağlayıcı Girişi İçin)
+// 3. Telefon Numarasına Göre Sağlayıcı Bilgisi Getir (Son 10 Hane Eşleşmesiyle)
 const getProviderByPhone = async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon parametresi zorunludur.' });
 
-    const { rows } = await pool.query('SELECT * FROM service_providers WHERE phone = $1 LIMIT 1', [phone.trim()]);
+    const rawPhone = phone.trim();
+    const last10 = getNormalizedLast10(rawPhone);
+
+    const query = `
+      SELECT * FROM service_providers 
+      WHERE phone = $1 
+         OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2
+      LIMIT 1;
+    `;
+
+    const { rows } = await pool.query(query, [rawPhone, last10]);
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -88,6 +105,7 @@ const getProviderByPhone = async (req, res) => {
       provider: rows[0]
     });
   } catch (error) {
+    console.error('getProviderByPhone hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
