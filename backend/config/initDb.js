@@ -117,6 +117,38 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
+    // 8. Test Senaryoları Tablosu
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS test_cases (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        tester_name VARCHAR(100),
+        test_date DATE DEFAULT CURRENT_DATE,
+        status VARCHAR(50) DEFAULT 'BEKLİYOR', -- 'BEKLİYOR', 'BAŞARILI', 'BAŞARISIZ'
+        result_notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // İlk kurulumda temel testleri ekle (Eğer tablo boşsa)
+    const { rowCount } = await pool.query('SELECT id FROM test_cases LIMIT 1;');
+    if (rowCount === 0) {
+      await pool.query(`
+        INSERT INTO test_cases (title, description, status) VALUES 
+        ('Müşteri Talep Girişi', 'Müşteri doğal dil ile talep girebiliyor mu?', 'BEKLİYOR'),
+        ('Konum Servisi', 'Mevcut konum tarayıcıdan otomatik alınıyor mu?', 'BEKLİYOR'),
+        ('Acil Servis Etiketi', 'Acil checkbox işaretlendiğinde etiket düşüyor mu?', 'BEKLİYOR'),
+        ('Otomatik Eşleşme', 'Talep uygun sağlayıcıya otomatik düşüyor mu?', 'BEKLİYOR'),
+        ('Sağlayıcı Kabul', 'Sağlayıcı talebi kabul edip SMS gönderiyor mu?', 'BEKLİYOR'),
+        ('Hizmet Teslimi', 'Sağlayıcı teslim ettiğinde bildirim gidiyor mu?', 'BEKLİYOR'),
+        ('Müşteri Onay/Review', 'Müşteri onayı ve 5 yıldız yorum kaydediliyor mu?', 'BEKLİYOR'),
+        ('SMS Log Kontrolü', 'Tüm süreç SMS loglarına tarihli düşüyor mu?', 'BEKLİYOR'),
+        ('Sağlayıcı Review', 'Sağlayıcı müşteri yorumu yapabiliyor mu?', 'BEKLİYOR'),
+        ('Geçmişe Aktarım', 'Tamamlanan iş geçmişe düşüyor mu?', 'BEKLİYOR');
+      `);
+    };
+
     console.log('✅ Veritabanı ve anlık konum/zaman tablosu hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
