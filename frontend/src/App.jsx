@@ -36,7 +36,8 @@ import {
   ChevronUp, 
   FolderKanban, 
   Calendar, 
-  Star 
+  Star,
+  CheckCircle
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -440,7 +441,7 @@ export default function App() {
     try {
       await axios.delete(`${API_BASE}/features/${id}`);
       await fetchFeatures();
-    } catch (err) {
+    } catch {
       alert('Silme başarısız.');
     }
   };
@@ -494,11 +495,13 @@ export default function App() {
     }
   };
 
+  // Müşteri için aktif: MATCHED, ACCEPTED, PROVIDER_COMPLETED, MANUAL_INTERVENTION
   const activeRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
-    return s === 'MATCHED' || s === 'ACCEPTED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
+    return s === 'MATCHED' || s === 'ACCEPTED' || s === 'PROVIDER_COMPLETED' || s === 'MANUAL_INTERVENTION' || s === 'PENDING';
   });
 
+  // Müşteri için tamamlanmış: COMPLETED, CANCELLED
   const pastRequests = myCustomerRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     return s === 'COMPLETED' || s === 'CANCELLED';
@@ -516,7 +519,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.7</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.8</span>
             </div>
           </div>
 
@@ -693,12 +696,14 @@ export default function App() {
                           <div>
                             {req.status === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">Onay Bekliyor</span>}
                             {req.status === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Kabul Edildi</span>}
+                            {/* 🌟 Sağlayıcı bitirdiğinde müşteriye yansıyan özel rozet */}
+                            {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">Teslim Edildi / Onay Bekliyor</span>}
                             {req.status === 'MANUAL_INTERVENTION' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-800 border border-amber-200">Havuzda</span>}
                           </div>
                         </div>
 
                         {req.provider_name ? (
-                          <div className="p-3 bg-white rounded-lg border border-neutral-200/70 space-y-1.5 text-xs">
+                          <div className="p-3 bg-white rounded-lg border border-neutral-200/70 space-y-2 text-xs">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-1.5">
                                 <Building2 size={14} className="text-neutral-700" />
@@ -712,6 +717,14 @@ export default function App() {
                               <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5">
                                 <PhoneCall size={13} className="text-emerald-700 animate-bounce" />
                                 <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor.</span>
+                              </div>
+                            )}
+
+                            {/* 🌟 Sağlayıcı teslim ettiğinde müşteriye gösterilen onay çağrısı */}
+                            {req.status === 'PROVIDER_COMPLETED' && (
+                              <div className="p-2.5 bg-purple-50 border border-purple-200 rounded text-[11px] text-purple-950 space-y-1">
+                                <p className="font-bold">Sağlayıcı hizmeti tamamladığını bildirdi.</p>
+                                <p className="text-neutral-600">Hizmeti onaylayabilir veya memnun kalmadıysanız sonraki sağlayıcıya yönlendirebilirsiniz.</p>
                               </div>
                             )}
                           </div>
@@ -747,13 +760,14 @@ export default function App() {
                         {/* Aksiyon Butonları */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
-                            {req.status === 'MATCHED' && (
+                            {/* Memnun kalınmazsa veya onay öncesi her aşamada sonraki sağlayıcıya geçilebilir */}
+                            {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && (
                               <button
                                 onClick={() => handleCustomerNextProvider(req.id)}
-                                className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1"
+                                className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"
                               >
                                 <SkipForward size={11} />
-                                <span>Sonraki</span>
+                                <span>Sonraki Sağlayıcıya Geç</span>
                               </button>
                             )}
                             {req.topCandidates && req.topCandidates.length > 1 && (
@@ -768,12 +782,13 @@ export default function App() {
                           </div>
 
                           <div className="flex items-center space-x-1.5 ml-auto">
+                            {/* 🌟 Müşteri Tamamlama Onayı Butonu */}
                             <button
                               onClick={() => handleStatusChange(req.id, 'COMPLETED')}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1"
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"
                             >
                               <ShieldCheck size={12} />
-                              <span>Tamamla</span>
+                              <span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span>
                             </button>
                             <button
                               onClick={() => handleStatusChange(req.id, 'CANCELLED')}
@@ -879,7 +894,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 TAMAMLANAN TALEPLER VE 5 YILDIZLI REVIEW / YORUM ALANI */}
+              {/* 🌟 TAMAMLANAN TALEPLER VE REVIEW / YORUM ALANI (Yalnızca Müşteri Tamamlayınca Açılır) */}
               {pastRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
@@ -904,7 +919,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 Müşteri 5 Yıldız ve Yorum Kutusu */}
                         {req.status === 'COMPLETED' && (
                           req.customer_rating || reviewedRequestsMap[req.id] ? (
                             <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
@@ -1106,9 +1120,11 @@ export default function App() {
                             <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
                               req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                               req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
                               'bg-neutral-100 text-neutral-800'
                             }`}>
-                              {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : req.status}
+                              {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : 
+                               req.status === 'PROVIDER_COMPLETED' ? 'TESLİM EDİLDİ (ONAY BEKLİYOR)' : req.status}
                             </span>
                             <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
                             <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
@@ -1137,19 +1153,20 @@ export default function App() {
                               </button>
                             </>
                           )}
+                          {/* 🌟 Sağlayıcı Tamamla dediğinde doğrudan COMPLETED değil, PROVIDER_COMPLETED'e geçer */}
                           {req.status === 'ACCEPTED' && (
                             <button
-                              onClick={() => handleStatusChange(req.id, 'COMPLETED')}
+                              onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')}
                               className="px-3 py-1 bg-neutral-900 text-white rounded text-xs font-semibold flex items-center space-x-1"
                             >
                               <ShieldCheck size={12} />
-                              <span>İşi Tamamla</span>
+                              <span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span>
                             </button>
                           )}
                         </div>
 
-                        {/* 🌟 Sağlayıcının Müşteriye Puan/Yorum Vermesi */}
-                        {req.status === 'COMPLETED' && (
+                        {/* Sağlayıcının Müşteriye Puan/Yorum Vermesi */}
+                        {(req.status === 'COMPLETED' || req.status === 'PROVIDER_COMPLETED') && (
                           req.provider_rating || reviewedRequestsMap[req.id] ? (
                             <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
                               <div className="flex items-center space-x-1">
@@ -1526,7 +1543,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 4.4 SMS Logları (🌟 Telefon Yanında Sistem Tarih ve Saati) */}
+                  {/* 4.4 SMS Logları */}
                   {adminTab === 'SMS_LOGS' && (
                     <div className="space-y-2.5">
                       {smsLogs.map((log) => (
@@ -1535,7 +1552,6 @@ export default function App() {
                             <div className="flex items-center space-x-2">
                               <span className="font-bold px-1.5 py-0.5 rounded bg-white border">{log.recipient_type}</span>
                               <span className="font-semibold text-neutral-800">{log.recipient_phone}</span>
-                              {/* 🌟 TELEFON YANINDA SİSTEM TARİH VE SAATİ */}
                               <span className="px-2 py-0.5 bg-neutral-200/80 text-neutral-700 rounded font-mono font-bold flex items-center space-x-1">
                                 <Clock size={11} />
                                 <span>{new Date(log.created_at).toLocaleString('tr-TR')}</span>

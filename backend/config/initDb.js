@@ -91,17 +91,27 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme & Yorum Tablosu (YENİ)
+    // 7. Değerlendirme & Yorum Tablosu (Güvenli Unique Constraint ile)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
         request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
-        reviewer_type VARCHAR(20) NOT NULL, -- 'CUSTOMER' | 'PROVIDER'
-        rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+        reviewer_type VARCHAR(20) NOT NULL,
+        rating INTEGER,
         comment TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT unique_request_reviewer UNIQUE(request_id, reviewer_type)
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'unique_request_reviewer'
+        ) THEN
+          ALTER TABLE reviews ADD CONSTRAINT unique_request_reviewer UNIQUE(request_id, reviewer_type);
+        END IF;
+      END $$;
     `);
 
     // Sequence Eşitlemeleri
@@ -118,7 +128,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı, SMS Logları ve Review motoru hazırlandı.');
+    console.log('✅ Veritabanı ve durum geçişleri hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }

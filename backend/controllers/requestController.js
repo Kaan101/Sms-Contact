@@ -18,9 +18,12 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
     } else if (eventType === 'ACCEPTED') {
       userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. ${channel === 'PHONE' ? 'Arama başlatılıyor...' : 'SMS üzerinden yazacak.'} İletişim: ${providerData.phone}`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile iletişime geçebilirsiniz.`;
+    } else if (eventType === 'PROVIDER_COMPLETED') {
+      userMsg = `[Sms-Contact] '${providerData.name}' hizmeti tamamladığını bildirdi. Lütfen panelinizden onaylayarak 5 yıldız üzerinden puanlayın veya sonraki sağlayıcıya geçin.`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı işi tamamladınız. Müşteri onayı ve puanlaması bekleniyor.`;
     } else if (eventType === 'COMPLETED') {
-      userMsg = `[Sms-Contact] #${requestId} numaralı hizmet tamamlandı. Lütfen sağlayıcıyı 5 yıldız üzerinden puanlayın.`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı iş tamamlandı olarak işaretlendi. Lütfen müşteriyi değerlendirin.`;
+      userMsg = `[Sms-Contact] #${requestId} numaralı hizmet tamamlandı olarak onaylandı. Değerlendirmeniz için teşekkürler!`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı iş müşteri tarafından 'Onaylandı ve Tamamlandı'.`;
     } else if (eventType === 'CANCELLED') {
       userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz iptal edildi.`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talep iptal edildi.`;
@@ -323,12 +326,13 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
+// Durum Güncelleme (PROVIDER_COMPLETED ve COMPLETED Ayrımı)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { newStatus } = req.body;
 
-    const allowedStatuses = ['MATCHED', 'ACCEPTED', 'COMPLETED', 'CANCELLED'];
+    const allowedStatuses = ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED'];
     if (!allowedStatuses.includes(newStatus)) {
       return res.status(400).json({ status: 'error', message: 'Geçersiz talep durumu.' });
     }
@@ -386,7 +390,7 @@ const getMatchedRequests = async (req, res) => {
         p.phone AS provider_phone
       FROM requests r
       LEFT JOIN service_providers p ON r.matched_provider_id = p.id
-      WHERE r.status IN ('MATCHED', 'ACCEPTED', 'COMPLETED', 'CANCELLED')
+      WHERE r.status IN ('MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED')
       ORDER BY r.id DESC;
     `;
     const { rows } = await pool.query(query);

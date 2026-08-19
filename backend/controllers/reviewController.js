@@ -10,8 +10,8 @@ const submitReview = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Geçersiz talep veya inceleyen tipi.' });
     }
 
-    const numRating = rating ? parseInt(rating, 10) : null;
-    const cleanComment = comment ? comment.trim() : null;
+    const numRating = rating !== null && rating !== undefined ? parseInt(rating, 10) : null;
+    const cleanComment = comment && comment.trim() !== '' ? comment.trim() : null;
 
     // Talep ve sağlayıcı bilgilerini al
     const { rows: reqRows } = await pool.query(`
@@ -31,7 +31,10 @@ const submitReview = async (req, res) => {
       INSERT INTO reviews (request_id, reviewer_type, rating, comment)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (request_id, reviewer_type) 
-      DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, created_at = CURRENT_TIMESTAMP
+      DO UPDATE SET 
+        rating = EXCLUDED.rating, 
+        comment = EXCLUDED.comment, 
+        created_at = CURRENT_TIMESTAMP
       RETURNING *;
     `;
 
@@ -60,12 +63,12 @@ const submitReview = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      message: 'Değerlendirme kaydedildi ve SMS günlüğüne işlendi.',
+      message: 'Değerlendirme başarıyla kaydedildi.',
       review: savedReview[0]
     });
   } catch (error) {
     console.error('submitReview hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
+    res.status(500).json({ status: 'error', message: `Veritabanı hatası: ${error.message}` });
   }
 };
 
