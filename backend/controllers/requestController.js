@@ -1,6 +1,12 @@
 const { pool } = require('../config/db');
 
-// Yardımcı: SMS Bildirim Simülasyonu
+// Yardımcı: Telefon numarasını sadece rakamlara indirger ve normalize eder
+const normalizePhone = (p) => {
+  if (!p) return '';
+  return p.replace(/\D/g, '');
+};
+
+// Yardımcı: Çift Taraflı SMS Bildirim Simülasyonu
 const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
   try {
     const channel = reqData.preferred_channel || 'PHONE';
@@ -32,12 +38,6 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   } catch (err) {
     console.error('SMS loglama hatası:', err.message);
   }
-};
-
-// Yardımcı: Numarayı sadece rakamlara indirgeyip normalize eder
-const normalizePhone = (p) => {
-  if (!p) return '';
-  return p.replace(/\D/g, ''); // Sadece rakamları bırakır
 };
 
 // 1. Yeni Talep Oluşturma
@@ -125,7 +125,7 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 2. Kullanıcının Kendi Talepleri (Esnek Telefon Eşleme)
+// 2. Kullanıcının Kendi Talepleri ve Adayları (Format Uyuşmazlığına Karşı Esnek Arama)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -135,7 +135,6 @@ const getUserRequests = async (req, res) => {
     const cleanDigits = normalizePhone(rawPhone);
     const lastDigits = cleanDigits.length >= 7 ? cleanDigits.slice(-7) : cleanDigits;
 
-    // Hem tam metin hem de son 7 hane üzerinden arar (Format farkı sorununu tamamen yok eder)
     const { rows: userRequests } = await pool.query(`
       SELECT 
         r.*,
@@ -154,7 +153,7 @@ const getUserRequests = async (req, res) => {
       SELECT id, name, phone, service_keywords, priority_score 
       FROM service_providers 
       WHERE is_active = TRUE 
-      ORDER BY priority_score DESC;
+      ORDER BY priority_score DESC, id ASC;
     `);
 
     const enrichedRequests = userRequests.map(reqItem => {
@@ -178,7 +177,7 @@ const getUserRequests = async (req, res) => {
   }
 };
 
-// 3. Sağlayıcıya Gelen Canlı Talepler (Asenkron Polling İçin)
+// 3. Sağlayıcıya Gelen Talepler (Asenkron Polling)
 const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
@@ -204,7 +203,7 @@ const getProviderAssignedRequests = async (req, res) => {
   }
 };
 
-// 4. Sonraki Sağlayıcıya Geç (Pass Next - Hatasız)
+// 4. Sonraki Sağlayıcıya Geç (Pass Next)
 const passToNextProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -262,7 +261,7 @@ const passToNextProvider = async (req, res) => {
   }
 };
 
-// 5. Alternatif Sağlayıcı Seç (Direct Candidate Select - Hatasız)
+// 5. Doğrudan Aday Sağlayıcı Seç (Direct Candidate Select)
 const selectCandidateProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -303,7 +302,7 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
-// 6. Talep Durumu Güncelle (Kabul Et, Tamamla, İptal)
+// 6. Talep Durumu Güncelle (ACCEPTED, COMPLETED, CANCELLED)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -342,7 +341,7 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// 7. WoZ ve Diğer Listeler
+// 7. Bekleyen Talepleri Getir (WoZ)
 const getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -356,6 +355,7 @@ const getPendingRequests = async (req, res) => {
   }
 };
 
+// 8. Eşleşen & Süreçteki Tüm Talepler
 const getMatchedRequests = async (req, res) => {
   try {
     const query = `
@@ -376,6 +376,7 @@ const getMatchedRequests = async (req, res) => {
   }
 };
 
+// 9. Manuel Atama (WoZ)
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
@@ -404,6 +405,7 @@ const assignProviderManually = async (req, res) => {
   }
 };
 
+// 10. Giden SMS Loglarını Getir
 const getOutboundNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -418,6 +420,7 @@ const getOutboundNotifications = async (req, res) => {
   }
 };
 
+// 11. Talebi Kalıcı Olarak Sil
 const deleteRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
