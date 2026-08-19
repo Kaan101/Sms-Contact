@@ -37,6 +37,10 @@ import {
   Navigation
 } from 'lucide-react';
 
+// Mevcut state'lerin yanına:
+const [tests, setTests] = useState([]);
+const [newTest, setNewTest] = useState({ title: '', description: '', tester_name: '', status: 'BEKLİYOR' });
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export default function App() {
@@ -571,6 +575,25 @@ export default function App() {
     return s === 'COMPLETED' || s === 'CANCELLED';
   });
 
+  const fetchAdminData = async () => {
+  try {
+    const [reqRes, provRes, matchRes, logRes, featRes, testRes] = await Promise.all([
+      axios.get(`${API_BASE}/requests/pending`),
+      axios.get(`${API_BASE}/providers`),
+      axios.get(`${API_BASE}/requests/matched`),
+      axios.get(`${API_BASE}/notifications`),
+      axios.get(`${API_BASE}/features`),
+      axios.get(`${API_BASE}/tests`) // Burası eklendi
+    ]);
+    setPendingRequests(reqRes.data.requests);
+    setProviders(provRes.data.providers);
+    setMatchedRequests(matchRes.data.requests);
+    setSmsLogs(logRes.data.notifications);
+    setFeatures(featRes.data.features);
+    setTests(testRes.data.tests); // Burası eklendi
+  } catch (err) { console.error(err); }
+};
+
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -661,6 +684,7 @@ export default function App() {
                 <Shield size={16} />
                 <span>Admin</span>
               </button>
+              
             </div>
 
             {authStep === 'PHONE' ? (
@@ -1844,6 +1868,47 @@ export default function App() {
                       ))}
                     </div>
                   )}
+
+                  {adminTab === 'TESTS' && (
+                    <div className="space-y-4">
+                      {/* Test Ekleme Formu (Features ile aynı yapı) */}
+                      <div className="bg-white p-4 rounded-2xl border shadow-sm">
+                        <input className="w-full border p-2 mb-2 text-xs" placeholder="Test Adı" value={newTest.title} onChange={e => setNewTest({...newTest, title: e.target.value})} />
+                        <button onClick={async () => {
+                          await axios.post(`${API_BASE}/tests`, newTest);
+                          fetchAdminData();
+                        }} className="bg-black text-white px-4 py-2 rounded text-xs">Test Case Ekle</button>
+                      </div>
+
+                      {/* Test Listesi Tablosu */}
+                      <table className="w-full text-xs text-left bg-white rounded-lg border">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="p-3">Test Adı</th>
+                            <th className="p-3">Durum</th>
+                            <th className="p-3">Test Eden</th>
+                            <th className="p-3">İşlem</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tests.map(test => (
+                            <tr key={test.id} className="border-b">
+                              <td className="p-3 font-semibold">{test.title}</td>
+                              <td className="p-3">{test.status}</td>
+                              <td className="p-3">{test.tester_name}</td>
+                              <td className="p-3">
+                                <button onClick={async () => {
+                                  await axios.put(`${API_BASE}/tests/${test.id}`, { status: 'BAŞARILI' });
+                                  fetchAdminData();
+                                }} className="text-emerald-600 font-bold">Tamamla</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
 
                 </div>
               )}

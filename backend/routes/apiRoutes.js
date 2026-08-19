@@ -74,3 +74,10 @@ router.post('/reviews', submitReview);
 router.get('/reviews/:requestId', getReviewsByRequest);
 
 module.exports = router;
+
+const { getTests, createTest, updateTest, deleteTest } = require('../controllers/testController');
+router.get('/tests', getTests);
+router.post('/tests', createTest);
+router.put('/tests/:id', updateTest);
+router.delete('/tests/:id', deleteTest);
+
