@@ -77,21 +77,34 @@ const initDatabase = async () => {
       );
     `);
 
-    // 6. Proje Özellikleri / Fikirleri Tablosu (YENİ)
+    // 6. Proje Özellikleri Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS project_features (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         target_date DATE DEFAULT CURRENT_DATE,
-        status VARCHAR(50) NOT NULL DEFAULT 'BEKLİYOR', -- 'BEKLİYOR', 'DEVAM EDİYOR', 'TAMAMLANDI', 'İPTAL'
-        priority VARCHAR(50) NOT NULL DEFAULT 'ORTA', -- 'DÜŞÜK', 'ORTA', 'YÜKSEK', 'KRİTİK'
+        status VARCHAR(50) NOT NULL DEFAULT 'BEKLİYOR',
+        priority VARCHAR(50) NOT NULL DEFAULT 'ORTA',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 7. Sequence Eşitlemeleri
+    // 7. Değerlendirme & Yorum Tablosu (YENİ)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id SERIAL PRIMARY KEY,
+        request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
+        reviewer_type VARCHAR(20) NOT NULL, -- 'CUSTOMER' | 'PROVIDER'
+        rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+        comment TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_request_reviewer UNIQUE(request_id, reviewer_type)
+      );
+    `);
+
+    // Sequence Eşitlemeleri
     await pool.query(`
       SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
     `);
@@ -101,19 +114,11 @@ const initDatabase = async () => {
     await pool.query(`
       SELECT setval(pg_get_serial_sequence('project_features', 'id'), COALESCE((SELECT MAX(id) FROM project_features), 1), true);
     `);
-
-    // 8. Niyet Sözlüğü
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS disambiguation_dictionary (
-        id SERIAL PRIMARY KEY,
-        trigger_keyword VARCHAR(100) NOT NULL UNIQUE,
-        clarification_message TEXT NOT NULL,
-        options JSONB NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
+      SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
     `);
 
-    console.log('✅ Veritabanı ve Proje Yol Haritası tablosu hazırlandı.');
+    console.log('✅ Veritabanı, SMS Logları ve Review motoru hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }

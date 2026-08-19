@@ -4,7 +4,7 @@ import {
   ArrowRight, 
   CornerDownLeft, 
   Phone, 
-  PhoneCall,
+  PhoneCall, 
   MessageSquare, 
   SlidersHorizontal, 
   Users, 
@@ -33,10 +33,10 @@ import {
   Shield, 
   Save, 
   ChevronDown, 
-  ChevronUp,
-  FolderKanban,
-  Calendar,
-  AlertCircle
+  ChevronUp, 
+  FolderKanban, 
+  Calendar, 
+  Star 
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -85,13 +85,12 @@ export default function App() {
   });
 
   // --- 4. ADMİN (ADMIN) STATE ---
-  const [adminTab, setAdminTab] = useState('PROJECT'); // 'PROJECT' | 'WOZ' | 'PROVIDERS' | 'ALL_MATCHED' | 'SMS_LOGS'
+  const [adminTab, setAdminTab] = useState('PROJECT');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
-  const [adminLoading, setAdminLoading] = useState(false);
 
   // --- 5. PROJE YOL HARİTASI (FEATURES) STATE ---
   const [features, setFeatures] = useState([]);
@@ -104,7 +103,12 @@ export default function App() {
     priority: 'ORTA'
   });
 
-  // Admin Modal (Sağlayıcı Ekle)
+  // --- 6. REVIEW STATE ---
+  const [reviewRatingMap, setReviewRatingMap] = useState({});
+  const [reviewCommentMap, setReviewCommentMap] = useState({});
+  const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
+
+  // Admin Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({
@@ -167,7 +171,6 @@ export default function App() {
   };
 
   const fetchAdminData = async () => {
-    setAdminLoading(true);
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
         axios.get(`${API_BASE}/requests/pending`),
@@ -182,8 +185,6 @@ export default function App() {
       await fetchFeatures();
     } catch (err) {
       console.error('Admin verileri çekilemedi:', err);
-    } finally {
-      setAdminLoading(false);
     }
   };
 
@@ -196,11 +197,12 @@ export default function App() {
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData();
         if (session.role === 'CUSTOMER') fetchCustomerData();
+        if (session.role === 'ADMIN' && adminTab === 'SMS_LOGS') fetchAdminData();
       }, 2000);
 
       return () => clearInterval(interval);
     }
-  }, [session]);
+  }, [session, adminTab]);
 
   // --- AUTH METODLARI ---
   const handleSendOtp = async (e) => {
@@ -352,6 +354,29 @@ export default function App() {
     }
   };
 
+  // --- REVIEW / DEĞERLENDİRME METODU ---
+  const handleSendReview = async (requestId, reviewerType, isSkip = false) => {
+    try {
+      const rating = isSkip ? null : (reviewRatingMap[requestId] || 5);
+      const comment = isSkip ? null : (reviewCommentMap[requestId] || '');
+
+      await axios.post(`${API_BASE}/reviews`, {
+        requestId: Number(requestId),
+        reviewerType,
+        rating,
+        comment
+      });
+
+      setReviewedRequestsMap(prev => ({ ...prev, [requestId]: true }));
+      alert(isSkip ? 'Değerlendirme atlandı.' : 'Değerlendirmeniz kaydedildi ve SMS günlüğüne işlendi.');
+
+      if (session.role === 'CUSTOMER') await fetchCustomerData();
+      if (session.role === 'PROVIDER') await fetchProviderData();
+    } catch (err) {
+      alert('Değerlendirme kaydedilemedi: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -381,7 +406,7 @@ export default function App() {
     }
   };
 
-  // --- PROJE YOL HARİTASI (FEATURES) METODLARI ---
+  // --- PROJE YOL HARİTASI METODLARI ---
   const handleCreateFeature = async (e) => {
     e.preventDefault();
     if (!newFeature.title.trim()) return;
@@ -411,16 +436,15 @@ export default function App() {
   };
 
   const handleDeleteFeature = async (id) => {
-    if (!window.confirm('Bu özelliği/fikri silmek istediğinize emin misiniz?')) return;
+    if (!window.confirm('Bu özelliği silmek istediğinize emin misiniz?')) return;
     try {
       await axios.delete(`${API_BASE}/features/${id}`);
       await fetchFeatures();
     } catch (err) {
-      alert('Silme başarısız: ' + (err.response?.data?.message || err.message));
+      alert('Silme başarısız.');
     }
   };
 
-  // --- ADMİN DİĞER İŞLEMLER ---
   const handleAdminAssign = async (requestId) => {
     const pId = selectedProviderMap[requestId];
     if (!pId) return alert('Lütfen sağlayıcı seçin.');
@@ -480,26 +504,6 @@ export default function App() {
     return s === 'COMPLETED' || s === 'CANCELLED';
   });
 
-  const getPriorityBadge = (p) => {
-    switch (p) {
-      case 'KRİTİK': return 'bg-rose-100 text-rose-800 border-rose-200';
-      case 'YÜKSEK': return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'ORTA': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'DÜŞÜK': return 'bg-neutral-100 text-neutral-700 border-neutral-200';
-      default: return 'bg-neutral-100 text-neutral-800 border-neutral-200';
-    }
-  };
-
-  const getStatusBadge = (s) => {
-    switch (s) {
-      case 'TAMAMLANDI': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'DEVAM EDİYOR': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'BEKLİYOR': return 'bg-neutral-100 text-neutral-700 border-neutral-200';
-      case 'İPTAL': return 'bg-rose-50 text-rose-600 border-rose-200';
-      default: return 'bg-neutral-100 text-neutral-800 border-neutral-200';
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -512,7 +516,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.6</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 3.7</span>
             </div>
           </div>
 
@@ -715,6 +719,7 @@ export default function App() {
                           <div className="p-2.5 bg-amber-50 rounded text-xs text-amber-900">Operatör koordinasyonu devraldı.</div>
                         )}
 
+                        {/* İlk 3 Aday Seçimi */}
                         {showCandidatesMap[req.id] && req.topCandidates && req.topCandidates.length > 0 && (
                           <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
                             <p className="text-[11px] font-bold text-neutral-700 font-mono">En Uygun 3 Sağlayıcı:</p>
@@ -739,6 +744,7 @@ export default function App() {
                           </div>
                         )}
 
+                        {/* Aksiyon Butonları */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
                             {req.status === 'MATCHED' && (
@@ -873,24 +879,87 @@ export default function App() {
                 </div>
               )}
 
-              {/* GEÇMİŞ TALEPLER KUTUSU */}
+              {/* 🌟 TAMAMLANAN TALEPLER VE 5 YILDIZLI REVIEW / YORUM ALANI */}
               {pastRequests.length > 0 && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-2">
+                <div className="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-500 flex items-center space-x-1.5">
                     <History size={13} />
-                    <span>Geçmiş Talepler ({pastRequests.length})</span>
+                    <span>Geçmiş Talepler & Değerlendirmeler ({pastRequests.length})</span>
                   </h3>
-                  <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+                  <div className="max-h-[350px] overflow-y-auto space-y-3 pr-1">
                     {pastRequests.map((req) => (
-                      <div key={req.id} className="p-2.5 bg-neutral-50 rounded-lg border flex items-center justify-between text-xs">
-                        <div>
-                          <p className="font-semibold text-neutral-800">"{req.raw_text}"</p>
-                          <p className="text-[10px] text-neutral-400 font-mono">Sağlayıcı: {req.provider_name || 'Bilinmiyor'}</p>
+                      <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5 text-xs">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
+                            <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                              Sağlayıcı: {req.provider_name || 'Bilinmiyor'} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                              {req.status}
+                            </span>
+                            <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600"><Trash2 size={12} /></button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-1.5">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200 text-neutral-800">{req.status}</span>
-                          <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600"><Trash2 size={12} /></button>
-                        </div>
+
+                        {/* 🌟 Müşteri 5 Yıldız ve Yorum Kutusu */}
+                        {req.status === 'COMPLETED' && (
+                          req.customer_rating || reviewedRequestsMap[req.id] ? (
+                            <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
+                              <div className="flex items-center space-x-1">
+                                <span className="font-bold">Değerlendirmeniz:</span>
+                                <span className="text-amber-500 font-bold">{req.customer_rating || reviewRatingMap[req.id] || 5} ★</span>
+                                {req.customer_comment && <span className="text-neutral-500 italic">("{req.customer_comment}")</span>}
+                              </div>
+                              <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-neutral-800 text-[11px]">Hizmeti Değerlendirin:</span>
+                                <div className="flex items-center space-x-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
+                                      className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
+                                    >
+                                      <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <input
+                                type="text"
+                                value={reviewCommentMap[req.id] || ''}
+                                onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })}
+                                placeholder="Hizmet nasıldı? Açıklama yazın (opsiyonel)..."
+                                className="w-full p-2 text-xs rounded border outline-none bg-neutral-50"
+                              />
+
+                              <div className="flex items-center justify-end space-x-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendReview(req.id, 'CUSTOMER', true)}
+                                  className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]"
+                                >
+                                  Yorum Yapmadan Geç
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendReview(req.id, 'CUSTOMER', false)}
+                                  className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold"
+                                >
+                                  Puanı Gönder
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1078,6 +1147,64 @@ export default function App() {
                             </button>
                           )}
                         </div>
+
+                        {/* 🌟 Sağlayıcının Müşteriye Puan/Yorum Vermesi */}
+                        {req.status === 'COMPLETED' && (
+                          req.provider_rating || reviewedRequestsMap[req.id] ? (
+                            <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
+                              <div className="flex items-center space-x-1">
+                                <span className="font-bold">Müşteri Değerlendirmeniz:</span>
+                                <span className="text-amber-500 font-bold">{req.provider_rating || reviewRatingMap[req.id] || 5} ★</span>
+                                {req.provider_comment && <span className="text-neutral-500 italic">("{req.provider_comment}")</span>}
+                              </div>
+                              <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2 mt-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-neutral-800 text-[11px]">Müşteriyi Değerlendirin:</span>
+                                <div className="flex items-center space-x-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
+                                      className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
+                                    >
+                                      <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <input
+                                type="text"
+                                value={reviewCommentMap[req.id] || ''}
+                                onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })}
+                                placeholder="Müşteri deneyimi nasıldı? Açıklama yazın..."
+                                className="w-full p-2 text-xs rounded border outline-none bg-neutral-50"
+                              />
+
+                              <div className="flex items-center justify-end space-x-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendReview(req.id, 'PROVIDER', true)}
+                                  className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]"
+                                >
+                                  Yorum Yapmadan Geç
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendReview(req.id, 'PROVIDER', false)}
+                                  className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold"
+                                >
+                                  Puanı Gönder
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        )}
+
                       </div>
                     ))
                   )}
@@ -1113,10 +1240,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 4.0 PROJE / YOL HARİTASI MODÜLÜ (CRUD) */}
+              {/* 4.0 PROJE / YOL HARİTASI MODÜLÜ */}
               {adminTab === 'PROJECT' && (
                 <div className="space-y-4">
-                  {/* Yeni Özellik / Fikir Ekleme Formu */}
                   <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
@@ -1133,7 +1259,7 @@ export default function App() {
                           required
                           value={newFeature.title}
                           onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })}
-                          placeholder="Özellik Başlığı (Örn: Konum Bazlı Mesafe Filtresi)..."
+                          placeholder="Özellik Başlığı..."
                           className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
                         />
                       </div>
@@ -1173,33 +1299,31 @@ export default function App() {
                         rows={2}
                         value={newFeature.description}
                         onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })}
-                        placeholder="Özelliğin detaylı açıklaması ve hedeflenen çalışma mekanizması (opsiyonel)..."
+                        placeholder="Özelliğin detaylı açıklaması (opsiyonel)..."
                         className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none"
                       />
                     </div>
                   </form>
 
-                  {/* Özellik Listesi (Açılır Kapanır Accordion Satırlar) */}
                   <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
                     {features.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">
-                        Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor. Yukarıdaki formdan hemen ekleyin.
+                        Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.
                       </div>
                     ) : (
                       features.map((feat) => {
                         const isExpanded = expandedFeatureId === feat.id;
                         return (
                           <div key={feat.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                            {/* Satır Başlığı */}
                             <div
                               onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)}
                               className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"
                             >
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getPriorityBadge(feat.priority)}`}>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
                                   {feat.priority}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getStatusBadge(feat.status)}`}>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 bg-neutral-100 text-neutral-700">
                                   {feat.status}
                                 </span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
@@ -1214,7 +1338,6 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Açılır Düzenleme ve Detay Paneli */}
                             {isExpanded && (
                               <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
                                 <div>
@@ -1288,7 +1411,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* SABİT YÜKSEKLİKTE DİĞER ADMİN PENCERELERİ (max-h-[500px] & scrollable) */}
+              {/* DİĞER ADMİN PENCERELERİ */}
               {adminTab !== 'PROJECT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto pr-1">
                   
@@ -1403,14 +1526,22 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 4.4 SMS Logları */}
+                  {/* 4.4 SMS Logları (🌟 Telefon Yanında Sistem Tarih ve Saati) */}
                   {adminTab === 'SMS_LOGS' && (
                     <div className="space-y-2.5">
                       {smsLogs.map((log) => (
                         <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
-                          <div className="flex items-center space-x-2 text-[10px] font-mono">
-                            <span className="font-bold px-1.5 py-0.5 rounded bg-white border">{log.recipient_type}</span>
-                            <span>{log.recipient_phone}</span>
+                          <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold px-1.5 py-0.5 rounded bg-white border">{log.recipient_type}</span>
+                              <span className="font-semibold text-neutral-800">{log.recipient_phone}</span>
+                              {/* 🌟 TELEFON YANINDA SİSTEM TARİH VE SAATİ */}
+                              <span className="px-2 py-0.5 bg-neutral-200/80 text-neutral-700 rounded font-mono font-bold flex items-center space-x-1">
+                                <Clock size={11} />
+                                <span>{new Date(log.created_at).toLocaleString('tr-TR')}</span>
+                              </span>
+                            </div>
+                            <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-bold">{log.sent_status}</span>
                           </div>
                           <p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed">{log.message_body}</p>
                         </div>
