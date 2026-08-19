@@ -33,12 +33,11 @@ const initDatabase = async () => {
       );
     `);
 
-    // Kolon eklemeleri (Önceden oluşturulmuş tablolar için güvenli güncelleme)
     await pool.query(`
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
-    // 3. Foreign key güvenli onarım
+    // 3. Foreign key onarımı
     await pool.query(`
       ALTER TABLE requests 
       DROP CONSTRAINT IF EXISTS requests_matched_provider_id_fkey;
@@ -52,7 +51,7 @@ const initDatabase = async () => {
       ON DELETE SET NULL;
     `);
 
-    // 4. Giden SMS / Bildirim Log Tablosu
+    // 4. Giden SMS Bildirim Log Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS outbound_notifications (
         id SERIAL PRIMARY KEY,
@@ -78,15 +77,32 @@ const initDatabase = async () => {
       );
     `);
 
-    // 6. Sequence Eşitlemeleri
+    // 6. Proje Özellikleri / Fikirleri Tablosu (YENİ)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_features (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        target_date DATE DEFAULT CURRENT_DATE,
+        status VARCHAR(50) NOT NULL DEFAULT 'BEKLİYOR', -- 'BEKLİYOR', 'DEVAM EDİYOR', 'TAMAMLANDI', 'İPTAL'
+        priority VARCHAR(50) NOT NULL DEFAULT 'ORTA', -- 'DÜŞÜK', 'ORTA', 'YÜKSEK', 'KRİTİK'
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 7. Sequence Eşitlemeleri
     await pool.query(`
       SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
     `);
     await pool.query(`
       SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE((SELECT MAX(id) FROM requests), 1), true);
     `);
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('project_features', 'id'), COALESCE((SELECT MAX(id) FROM project_features), 1), true);
+    `);
 
-    // 7. Niyet Sözlüğü
+    // 8. Niyet Sözlüğü
     await pool.query(`
       CREATE TABLE IF NOT EXISTS disambiguation_dictionary (
         id SERIAL PRIMARY KEY,
@@ -97,7 +113,7 @@ const initDatabase = async () => {
       );
     `);
 
-    console.log('✅ Veritabanı ve tüm tablolar eksiksiz hazırlandı.');
+    console.log('✅ Veritabanı ve Proje Yol Haritası tablosu hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }

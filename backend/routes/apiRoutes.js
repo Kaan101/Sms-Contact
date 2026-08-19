@@ -23,6 +23,12 @@ const {
   getOutboundNotifications,
   deleteRequest
 } = require('../controllers/requestController');
+const {
+  getFeatures,
+  createFeature,
+  updateFeature,
+  deleteFeature
+} = require('../controllers/featureController');
 
 // Auth / OTP
 router.post('/auth/send-otp', sendOtp);
@@ -52,5 +58,11 @@ router.get('/requests/pending', getPendingRequests);
 router.get('/requests/matched', getMatchedRequests);
 router.post('/requests/assign', assignProviderManually);
 router.get('/notifications', getOutboundNotifications);
+
+// Proje Özellikleri / Yol Haritası CRUD
+router.get('/features', getFeatures);
+router.post('/features', createFeature);
+router.put('/features/:id', updateFeature);
+router.delete('/features/:id', deleteFeature);
 
 module.exports = router;
