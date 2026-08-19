@@ -36,7 +36,6 @@ const initDatabase = async () => {
       );
     `);
 
-    // Kolon eklemeleri ve kısıt temizliği
     await pool.query(`
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT 'İstanbul, Türkiye';
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS is_urgent BOOLEAN DEFAULT FALSE;
@@ -96,7 +95,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme Tablosu
+    // 7. Değerlendirme & Yorum Tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
@@ -109,21 +108,13 @@ const initDatabase = async () => {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_req_reviewer ON reviews (request_id, reviewer_type);
     `);
 
-    // Sequence Eşitlemeleri
-    await pool.query(`
-      SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
-      SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE((SELECT MAX(id) FROM requests), 1), true);
-      SELECT setval(pg_get_serial_sequence('project_features', 'id'), COALESCE((SELECT MAX(id) FROM project_features), 1), true);
-      SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
-    `);
-
-    // 8. Test Senaryoları Tablosu
+    // 8. Test Senaryoları Tablosu (Sistem QA Suite)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS test_cases (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
-        tester_name VARCHAR(100),
+        tester_name VARCHAR(100) DEFAULT 'Admin/Tester',
         test_date DATE DEFAULT CURRENT_DATE,
         status VARCHAR(50) DEFAULT 'BEKLİYOR', -- 'BEKLİYOR', 'BAŞARILI', 'BAŞARISIZ'
         result_notes TEXT,
@@ -131,25 +122,34 @@ const initDatabase = async () => {
       );
     `);
 
-    // İlk kurulumda temel testleri ekle (Eğer tablo boşsa)
-    const { rowCount } = await pool.query('SELECT id FROM test_cases LIMIT 1;');
-    if (rowCount === 0) {
+    // Otomatik 10 Kapsamlı Test Senaryosu Yükle (Eğer tablo boşsa)
+    const { rowCount: testCount } = await pool.query('SELECT id FROM test_cases LIMIT 1;');
+    if (testCount === 0) {
       await pool.query(`
-        INSERT INTO test_cases (title, description, status) VALUES 
-        ('Müşteri Talep Girişi', 'Müşteri doğal dil ile talep girebiliyor mu?', 'BEKLİYOR'),
-        ('Konum Servisi', 'Mevcut konum tarayıcıdan otomatik alınıyor mu?', 'BEKLİYOR'),
-        ('Acil Servis Etiketi', 'Acil checkbox işaretlendiğinde etiket düşüyor mu?', 'BEKLİYOR'),
-        ('Otomatik Eşleşme', 'Talep uygun sağlayıcıya otomatik düşüyor mu?', 'BEKLİYOR'),
-        ('Sağlayıcı Kabul', 'Sağlayıcı talebi kabul edip SMS gönderiyor mu?', 'BEKLİYOR'),
-        ('Hizmet Teslimi', 'Sağlayıcı teslim ettiğinde bildirim gidiyor mu?', 'BEKLİYOR'),
-        ('Müşteri Onay/Review', 'Müşteri onayı ve 5 yıldız yorum kaydediliyor mu?', 'BEKLİYOR'),
-        ('SMS Log Kontrolü', 'Tüm süreç SMS loglarına tarihli düşüyor mu?', 'BEKLİYOR'),
-        ('Sağlayıcı Review', 'Sağlayıcı müşteri yorumu yapabiliyor mu?', 'BEKLİYOR'),
-        ('Geçmişe Aktarım', 'Tamamlanan iş geçmişe düşüyor mu?', 'BEKLİYOR');
+        INSERT INTO test_cases (title, description, tester_name, status, result_notes) VALUES 
+        ('TC-01: Doğal Dil Talep Ayrıştırma', 'Kullanıcının yazdığı metin tokenlara ayrılarak uygun anahtar kelimelerle eşleşiyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: Otomatik MATCHED statüsü.'),
+        ('TC-02: Mevcut Konum Tespiti', 'Tarayıcı Geolocation API üzerinden anlık konum alınıp talep alanına yazılıyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: İlçe/Şehir formatında dolum.'),
+        ('TC-03: Acil Hizmet Checkbox Doğrulaması', 'Acil checkbox işaretlendiğinde SMS logunda [🔥 ACİL] etiketi yer alıyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: SMS gövdesinde aciliyet bilgisi.'),
+        ('TC-04: En Son Tarih & Saat Entegrasyonu', 'Seçilen tarih ve saat ISO formatında deadline_datetime kolonuna kaydediliyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: Tarih-saat eşzamanlı kayıt.'),
+        ('TC-05: Sağlayıcı Bildirim ve Kabul Akışı', 'Sağlayıcı talebi ACCEPTED yaptığında kullanıcıya bilgilendirme SMSi loglanıyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: PROVIDER ve USER SMS logları.'),
+        ('TC-06: Hizmet Teslim Gate Kontrolü', 'Sağlayıcı PROVIDER_COMPLETED yaptığında müşteri ekranında onay butonu beliriyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: Müşteri onay butonu tetiklenir.'),
+        ('TC-07: Müşteri Onay ve Review (5 Yıldız)', 'Müşteri hizmeti onaylayıp yıldız verdiğinde puan ve yorum veritabanına yazılıyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: reviews tablosu INSERT.'),
+        ('TC-08: Sağlayıcı Müşteri Puanlama', 'Sağlayıcı işi teslim ettikten sonra müşteri deneyimini 5 yıldızla puanlayabiliyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: Sağlayıcı review kaydı.'),
+        ('TC-09: Çift Taraflı SMS Günlüğü', 'Tüm durum geçişlerinde outbound_notifications tablosuna tarihli SMS düşüyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: 5 saniyede bir canlı akış.'),
+        ('TC-10: Geçmiş Talep Collapsed Düzeni', 'İncelemesi tamamlanan işler Geçmiş Talepler altına collapsed ve kapalı olarak iniyor mu?', 'İTÜ Test Ekibi', 'BEKLİYOR', 'Beklenen: Temiz aktif liste.');
       `);
-    };
+    }
 
-    console.log('✅ Veritabanı ve anlık konum/zaman tablosu hazırlandı.');
+    // Sequence Eşitlemeleri
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
+      SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE((SELECT MAX(id) FROM requests), 1), true);
+      SELECT setval(pg_get_serial_sequence('project_features', 'id'), COALESCE((SELECT MAX(id) FROM project_features), 1), true);
+      SELECT setval(pg_get_serial_sequence('reviews', 'id'), COALESCE((SELECT MAX(id) FROM reviews), 1), true);
+      SELECT setval(pg_get_serial_sequence('test_cases', 'id'), COALESCE((SELECT MAX(id) FROM test_cases), 1), true);
+    `);
+
+    console.log('✅ Veritabanı ve Test Senaryoları (QA Suite) hazırlandı.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
   }

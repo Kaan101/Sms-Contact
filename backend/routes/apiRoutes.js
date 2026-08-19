@@ -33,6 +33,12 @@ const {
   submitReview,
   getReviewsByRequest
 } = require('../controllers/reviewController');
+const {
+  getTests,
+  createTest,
+  updateTest,
+  deleteTest
+} = require('../controllers/testController');
 
 // 1. Auth / OTP
 router.post('/auth/send-otp', sendOtp);
@@ -63,21 +69,20 @@ router.get('/requests/matched', getMatchedRequests);
 router.post('/requests/assign', assignProviderManually);
 router.get('/notifications', getOutboundNotifications);
 
-// 6. Proje Özellikleri / Yol Haritası
+// 6. Proje Yol Haritası
 router.get('/features', getFeatures);
 router.post('/features', createFeature);
 router.put('/features/:id', updateFeature);
 router.delete('/features/:id', deleteFeature);
 
-// 7. Değerlendirme & Yorum (Reviews)
+// 7. Değerlendirme & Yorum
 router.post('/reviews', submitReview);
 router.get('/reviews/:requestId', getReviewsByRequest);
 
-module.exports = router;
-
-const { getTests, createTest, updateTest, deleteTest } = require('../controllers/testController');
+// 8. Sistem Test Senaryoları
 router.get('/tests', getTests);
 router.post('/tests', createTest);
 router.put('/tests/:id', updateTest);
 router.delete('/tests/:id', deleteTest);
 
+module.exports = router;

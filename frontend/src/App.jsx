@@ -1,45 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  ArrowRight, 
-  Phone, 
-  PhoneCall, 
-  MessageSquare, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  X, 
-  Clock, 
-  LogOut, 
-  KeyRound, 
-  History, 
-  Building2, 
-  Check, 
-  Ban, 
-  ShieldCheck, 
-  SkipForward, 
-  Layers, 
-  Radio, 
-  User, 
-  Wrench, 
-  Shield, 
-  Save, 
-  ChevronDown, 
-  ChevronUp, 
-  FolderKanban, 
-  Calendar, 
-  Star,
-  Sparkles,
-  MapPin,
-  Flame,
-  Sliders,
-  CheckCircle2,
-  Navigation
+  ArrowRight, Phone, PhoneCall, MessageSquare, Plus, Trash2, Edit3, X, Clock, LogOut, 
+  KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
+  User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
+  Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, CheckCircle, AlertCircle
 } from 'lucide-react';
-
-// Mevcut state'lerin yanına:
-const [tests, setTests] = useState([]);
-const [newTest, setNewTest] = useState({ title: '', description: '', tester_name: '', status: 'BEKLİYOR' });
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -67,10 +33,10 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 Form Seçenekleri (Mevcut Konum, Acil Checkbox, En Son Tarih & Saat)
+  // Onay Form Detayları
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
-  const [isUrgent, setIsUrgent] = useState(false); // Checkbox: Default false
+  const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState(new Date().toISOString().split('T')[0]);
   const [deadlineTime, setDeadlineTime] = useState('18:00');
   const [isLocating, setIsLocating] = useState(false);
@@ -97,7 +63,7 @@ export default function App() {
   });
 
   // Admin State
-  const [adminTab, setAdminTab] = useState('PROJECT');
+  const [adminTab, setAdminTab] = useState('TESTS'); // Varsayılan olarak Testler sekmesi açık
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -113,6 +79,17 @@ export default function App() {
     targetDate: new Date().toISOString().split('T')[0],
     status: 'BEKLİYOR',
     priority: 'ORTA'
+  });
+
+  // 🌟 Test Senaryoları State
+  const [tests, setTests] = useState([]);
+  const [expandedTestId, setExpandedTestId] = useState(null);
+  const [newTest, setNewTest] = useState({
+    title: '',
+    description: '',
+    testerName: 'İTÜ Test Ekibi',
+    testDate: new Date().toISOString().split('T')[0],
+    status: 'BEKLİYOR'
   });
 
   // Review State
@@ -132,7 +109,7 @@ export default function App() {
     priorityScore: 100
   });
 
-  // 📍 Mevcut Konumu Tarayıcıdan Al
+  // 📍 Mevcut Konumu Al
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) return;
     setIsLocating(true);
@@ -140,7 +117,6 @@ export default function App() {
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
-          // OpenStreetMap Nominatim Ters Konumlandırma
           const geoRes = await axios.get(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`
           );
@@ -155,14 +131,14 @@ export default function App() {
         }
       },
       (err) => {
-        console.warn('Konum izni alınamadı:', err.message);
+        console.warn('Konum alınamadı:', err.message);
         setIsLocating(false);
       },
       { timeout: 8000 }
     );
   };
 
-  // Veri Çekme
+  // Veri Çekme Fonksiyonları
   const fetchCustomerData = async () => {
     if (!session?.phone) return;
     try {
@@ -212,6 +188,15 @@ export default function App() {
     }
   };
 
+  const fetchTests = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/tests`);
+      setTests(res.data.tests || []);
+    } catch (err) {
+      console.error('Testler yüklenemedi:', err);
+    }
+  };
+
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
@@ -225,16 +210,18 @@ export default function App() {
       setMatchedRequests(matchRes.data.requests || []);
       setSmsLogs(logRes.data.notifications || []);
       await fetchFeatures();
+      await fetchTests();
     } catch (err) {
       console.error('Admin verileri çekilemedi:', err);
     }
   };
 
+  // 🔄 5 Saniyede Bir Canlı Yenileme
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') {
         fetchCustomerData();
-        fetchCurrentLocation(); // Müşteri girişinde mevcut konumu otomatik al
+        fetchCurrentLocation();
       }
       if (session.role === 'PROVIDER') fetchProviderData();
       if (session.role === 'ADMIN') fetchAdminData();
@@ -312,8 +299,6 @@ export default function App() {
     if (!queryText.trim()) return;
     setLoading(true);
     setErrorMessage('');
-
-    // Onay ekranına geçişte konumu otomatik güncelle
     fetchCurrentLocation();
 
     try {
@@ -430,6 +415,85 @@ export default function App() {
     }
   };
 
+  // Test Senaryoları CRUD Fonksiyonları
+  const handleCreateTest = async (e) => {
+    e.preventDefault();
+    if (!newTest.title.trim()) return;
+
+    try {
+      await axios.post(`${API_BASE}/tests`, newTest);
+      setNewTest({
+        title: '',
+        description: '',
+        testerName: 'İTÜ Test Ekibi',
+        testDate: new Date().toISOString().split('T')[0],
+        status: 'BEKLİYOR'
+      });
+      await fetchTests();
+    } catch (err) {
+      alert('Test eklenemedi: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleUpdateTest = async (id, updatedFields) => {
+    try {
+      await axios.put(`${API_BASE}/tests/${id}`, updatedFields);
+      await fetchTests();
+    } catch (err) {
+      alert('Güncelleme başarısız: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeleteTest = async (id) => {
+    if (!window.confirm('Bu test senaryosunu silmek istediğinize emin misiniz?')) return;
+    try {
+      await axios.delete(`${API_BASE}/tests/${id}`);
+      await fetchTests();
+    } catch {
+      alert('Silme başarısız.');
+    }
+  };
+
+  // Proje Özellikleri CRUD Fonksiyonları
+  const handleCreateFeature = async (e) => {
+    e.preventDefault();
+    if (!newFeature.title.trim()) return;
+
+    try {
+      await axios.post(`${API_BASE}/features`, newFeature);
+      setNewFeature({
+        title: '',
+        description: '',
+        targetDate: new Date().toISOString().split('T')[0],
+        status: 'BEKLİYOR',
+        priority: 'ORTA'
+      });
+      await fetchFeatures();
+    } catch (err) {
+      alert('Özellik eklenemedi: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleUpdateFeature = async (id, updatedFields) => {
+    try {
+      await axios.put(`${API_BASE}/features/${id}`, updatedFields);
+      await fetchFeatures();
+    } catch (err) {
+      alert('Güncelleme başarısız: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeleteFeature = async (id) => {
+    if (!window.confirm('Bu özelliği silmek istediğinize emin misiniz?')) return;
+    try {
+      await axios.delete(`${API_BASE}/features/${id}`);
+      await fetchFeatures();
+    } catch {
+      alert('Silme başarısız.');
+    }
+  };
+
+  // Provider Profil Kaydı
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -456,44 +520,6 @@ export default function App() {
       await fetchProviderData();
     } catch (err) {
       console.error('Kaydedilemedi:', err);
-    }
-  };
-
-  const handleCreateFeature = async (e) => {
-    e.preventDefault();
-    if (!newFeature.title.trim()) return;
-
-    try {
-      await axios.post(`${API_BASE}/features`, newFeature);
-      setNewFeature({
-        title: '',
-        description: '',
-        targetDate: new Date().toISOString().split('T')[0],
-        status: 'BEKLİYOR',
-        priority: 'ORTA'
-      });
-      await fetchFeatures();
-    } catch (err) {
-      console.error('Özellik eklenemedi:', err);
-    }
-  };
-
-  const handleUpdateFeature = async (id, updatedFields) => {
-    try {
-      await axios.put(`${API_BASE}/features/${id}`, updatedFields);
-      await fetchFeatures();
-    } catch (err) {
-      console.error('Güncelleme başarısız:', err);
-    }
-  };
-
-  const handleDeleteFeature = async (id) => {
-    if (!window.confirm('Bu özelliği silmek istediğinize emin misiniz?')) return;
-    try {
-      await axios.delete(`${API_BASE}/features/${id}`);
-      await fetchFeatures();
-    } catch {
-      console.error('Silme başarısız.');
     }
   };
 
@@ -575,25 +601,6 @@ export default function App() {
     return s === 'COMPLETED' || s === 'CANCELLED';
   });
 
-  const fetchAdminData = async () => {
-  try {
-    const [reqRes, provRes, matchRes, logRes, featRes, testRes] = await Promise.all([
-      axios.get(`${API_BASE}/requests/pending`),
-      axios.get(`${API_BASE}/providers`),
-      axios.get(`${API_BASE}/requests/matched`),
-      axios.get(`${API_BASE}/notifications`),
-      axios.get(`${API_BASE}/features`),
-      axios.get(`${API_BASE}/tests`) // Burası eklendi
-    ]);
-    setPendingRequests(reqRes.data.requests);
-    setProviders(provRes.data.providers);
-    setMatchedRequests(matchRes.data.requests);
-    setSmsLogs(logRes.data.notifications);
-    setFeatures(featRes.data.features);
-    setTests(testRes.data.tests); // Burası eklendi
-  } catch (err) { console.error(err); }
-};
-
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -606,7 +613,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 4.9</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.0 QA</span>
             </div>
           </div>
 
@@ -642,7 +649,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 🚪 GİRİŞ EKRANI */}
+        {/* ---------------- 🚪 1. GİRİŞ EKRANI ---------------- */}
         {!session ? (
           <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto w-full space-y-6">
             <div className="text-center space-y-2">
@@ -684,7 +691,6 @@ export default function App() {
                 <Shield size={16} />
                 <span>Admin</span>
               </button>
-              
             </div>
 
             {authStep === 'PHONE' ? (
@@ -1029,7 +1035,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 D. GELİŞMİŞ ONAY EKRANI (Mevcut Konum, Acil Checkbox, En Son Tarih & Saat) */}
+              {/* D. GELİŞMİŞ ONAY EKRANI */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1040,7 +1046,7 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 🔽 Collapsible Detay Formu */}
+                  {/* Collapsible Detay Formu */}
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
                     <div
                       onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
@@ -1059,7 +1065,7 @@ export default function App() {
                     {!isDetailsCollapsed && (
                       <div className="p-4 pt-2 border-t border-neutral-200/70 bg-white space-y-3.5">
                         
-                        {/* 1. Mevcut Konum Alanı */}
+                        {/* 1. Mevcut Konum */}
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
@@ -1085,7 +1091,7 @@ export default function App() {
                           />
                         </div>
 
-                        {/* 2. Aciliyet (Checkbox) */}
+                        {/* 2. Acil Checkbox */}
                         <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
                           <label className="flex items-center space-x-2.5 cursor-pointer select-none">
                             <input
@@ -1130,7 +1136,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 4. İletişim Kanal Tercihi */}
+                        {/* 4. İletişim Kanalı */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihiniz
@@ -1159,7 +1165,7 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 🌟 Canlı Nihai Onay Özeti Kartı (İşaretli Değilse Acil Yazısı Çıkmaz) */}
+                  {/* Canlı Nihai Onay Özeti */}
                   <div className="p-3.5 bg-neutral-100/70 rounded-xl border border-neutral-200 text-xs space-y-1.5">
                     <p className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider font-mono">Talep Detayları:</p>
                     <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-neutral-700">
@@ -1542,6 +1548,10 @@ export default function App() {
                 <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
 
                 <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
+                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
+                    <FileCheck2 size={13} />
+                    <span>Test Senaryoları ({tests.length})</span>
+                  </button>
                   <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     <FolderKanban size={13} />
                     <span>Yol Haritası ({features.length})</span>
@@ -1561,7 +1571,183 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 4.0 PROJE / YOL HARİTASI */}
+              {/* 🌟 4.0 TEST SENARYOLARI (QA SUITE) SEKİSİ */}
+              {adminTab === 'TESTS' && (
+                <div className="space-y-4">
+                  {/* Yeni Test Senaryosu Ekle */}
+                  <form onSubmit={handleCreateTest} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
+                        <Plus size={14} className="text-neutral-950" />
+                        <span>Yeni Test Senaryosu Ekle</span>
+                      </h3>
+                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-5">
+                        <input
+                          type="text"
+                          required
+                          value={newTest.title}
+                          onChange={(e) => setNewTest({ ...newTest, title: e.target.value })}
+                          placeholder="Test Başlığı (Örn: TC-11: OTP Çoklu Deneme)..."
+                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <input
+                          type="text"
+                          value={newTest.testerName}
+                          onChange={(e) => setNewTest({ ...newTest, testerName: e.target.value })}
+                          placeholder="Test Eden Kişi"
+                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <input
+                          type="date"
+                          value={newTest.testDate}
+                          onChange={(e) => setNewTest({ ...newTest, testDate: e.target.value })}
+                          className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <button
+                          type="submit"
+                          className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm"
+                        >
+                          <Plus size={13} />
+                          <span>Ekle</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <textarea
+                        rows={2}
+                        value={newTest.description}
+                        onChange={(e) => setNewTest({ ...newTest, description: e.target.value })}
+                        placeholder="Test adımları ve beklenen sonuç açıklaması..."
+                        className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
+                      />
+                    </div>
+                  </form>
+
+                  {/* Test Senaryoları Listesi (Akordeon & Tablo Kartları) */}
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
+                    {tests.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-neutral-400">
+                        Henüz kayıtlı bir test senaryosu bulunmuyor.
+                      </div>
+                    ) : (
+                      tests.map((testItem) => {
+                        const isExpanded = expandedTestId === testItem.id;
+                        return (
+                          <div key={testItem.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
+                            <div
+                              onClick={() => setExpandedTestId(isExpanded ? null : testItem.id)}
+                              className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"
+                            >
+                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${
+                                  testItem.status === 'BAŞARILI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                                  testItem.status === 'BAŞARISIZ' ? 'bg-rose-100 text-rose-800 border-rose-200' :
+                                  'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}>
+                                  {testItem.status}
+                                </span>
+                                <p className="font-semibold text-neutral-900 truncate">{testItem.title}</p>
+                              </div>
+
+                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
+                                <span className="font-mono text-[11px] hidden sm:inline">
+                                  👤 {testItem.tester_name || 'Tester'}
+                                </span>
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex">
+                                  <Calendar size={12} />
+                                  <span>{testItem.test_date ? new Date(testItem.test_date).toLocaleDateString('tr-TR') : '-'}</span>
+                                </span>
+                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
+                                <div>
+                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Test Adımları</label>
+                                  <p className="text-xs text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/70 font-mono leading-relaxed">
+                                    {testItem.description || 'Açıklama belirtilmemiş.'}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Sonucu & Notlar</label>
+                                  <textarea
+                                    rows={2}
+                                    defaultValue={testItem.result_notes || ''}
+                                    onBlur={(e) => handleUpdateTest(testItem.id, { resultNotes: e.target.value })}
+                                    placeholder="Test sonucu, hata logu veya gözlemlerinizi yazın..."
+                                    className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                  <div>
+                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Durumu</label>
+                                    <select
+                                      value={testItem.status}
+                                      onChange={(e) => handleUpdateTest(testItem.id, { status: e.target.value })}
+                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"
+                                    >
+                                      <option value="BEKLİYOR">⏳ Bekliyor</option>
+                                      <option value="BAŞARILI">✅ Başarılı (Passed)</option>
+                                      <option value="BAŞARISIZ">❌ Başarısız (Failed)</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label>
+                                    <input
+                                      type="text"
+                                      defaultValue={testItem.tester_name || ''}
+                                      onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })}
+                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label>
+                                    <input
+                                      type="date"
+                                      defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''}
+                                      onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })}
+                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
+                                  <span className="font-mono">Senaryo ID: #{testItem.id}</span>
+                                  <button
+                                    onClick={() => handleDeleteTest(testItem.id)}
+                                    className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>Senaryoyu Sil</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 4.1 PROJE / YOL HARİTASI */}
               {adminTab === 'PROJECT' && (
                 <div className="space-y-4">
                   <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
@@ -1733,10 +1919,10 @@ export default function App() {
               )}
 
               {/* DİĞER ADMİN PENCERELERİ */}
-              {adminTab !== 'PROJECT' && (
+              {adminTab !== 'TESTS' && adminTab !== 'PROJECT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto pr-1">
                   
-                  {/* 4.1 WoZ Havuzu */}
+                  {/* 4.2 WoZ Havuzu */}
                   {adminTab === 'WOZ' && (
                     <div className="space-y-3">
                       {pendingRequests.length === 0 ? (
@@ -1775,7 +1961,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 4.2 Sağlayıcılar CRUD */}
+                  {/* 4.3 Sağlayıcılar CRUD */}
                   {adminTab === 'PROVIDERS' && (
                     <div className="space-y-3">
                       <div className="flex justify-end">
@@ -1831,7 +2017,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 4.3 Tüm Eşleşmeler */}
+                  {/* 4.4 Tüm Eşleşmeler */}
                   {adminTab === 'ALL_MATCHED' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {matchedRequests.map((req) => (
@@ -1847,7 +2033,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 4.4 SMS Logları */}
+                  {/* 4.5 SMS Logları */}
                   {adminTab === 'SMS_LOGS' && (
                     <div className="space-y-2.5">
                       {smsLogs.map((log) => (
@@ -1868,47 +2054,6 @@ export default function App() {
                       ))}
                     </div>
                   )}
-
-                  {adminTab === 'TESTS' && (
-                    <div className="space-y-4">
-                      {/* Test Ekleme Formu (Features ile aynı yapı) */}
-                      <div className="bg-white p-4 rounded-2xl border shadow-sm">
-                        <input className="w-full border p-2 mb-2 text-xs" placeholder="Test Adı" value={newTest.title} onChange={e => setNewTest({...newTest, title: e.target.value})} />
-                        <button onClick={async () => {
-                          await axios.post(`${API_BASE}/tests`, newTest);
-                          fetchAdminData();
-                        }} className="bg-black text-white px-4 py-2 rounded text-xs">Test Case Ekle</button>
-                      </div>
-
-                      {/* Test Listesi Tablosu */}
-                      <table className="w-full text-xs text-left bg-white rounded-lg border">
-                        <thead className="bg-gray-50 border-b">
-                          <tr>
-                            <th className="p-3">Test Adı</th>
-                            <th className="p-3">Durum</th>
-                            <th className="p-3">Test Eden</th>
-                            <th className="p-3">İşlem</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {tests.map(test => (
-                            <tr key={test.id} className="border-b">
-                              <td className="p-3 font-semibold">{test.title}</td>
-                              <td className="p-3">{test.status}</td>
-                              <td className="p-3">{test.tester_name}</td>
-                              <td className="p-3">
-                                <button onClick={async () => {
-                                  await axios.put(`${API_BASE}/tests/${test.id}`, { status: 'BAŞARILI' });
-                                  fetchAdminData();
-                                }} className="text-emerald-600 font-bold">Tamamla</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
 
                 </div>
               )}
