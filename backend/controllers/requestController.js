@@ -16,20 +16,20 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
       userMsg = `[Sms-Contact] Talebiniz #${requestId} '${providerData.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`;
       providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Tercih: ${channel}. Lütfen kabul edin veya pas geçin.`;
     } else if (eventType === 'ACCEPTED') {
-      userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. ${channel === 'PHONE' ? 'Arama başlatılıyor...' : 'SMS üzerinden yazacak.'} İletişim: ${providerData.phone}`;
+      userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. İletişim: ${providerData.phone}`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile iletişime geçebilirsiniz.`;
     } else if (eventType === 'PROVIDER_COMPLETED') {
-      userMsg = `[Sms-Contact] '${providerData.name}' hizmeti tamamladığını bildirdi. Lütfen panelinizden onaylayarak 5 yıldız üzerinden puanlayın veya sonraki sağlayıcıya geçin.`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı işi tamamladınız. Müşteri onayı ve puanlaması bekleniyor.`;
+      userMsg = `[Sms-Contact] '${providerData.name}' hizmeti tamamladığını bildirdi. Lütfen onaylayın.`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı işi tamamladınız. Müşteri onayı bekleniyor.`;
     } else if (eventType === 'COMPLETED') {
-      userMsg = `[Sms-Contact] #${requestId} numaralı hizmet tamamlandı olarak onaylandı. Değerlendirmeniz için teşekkürler!`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı iş müşteri tarafından 'Onaylandı ve Tamamlandı'.`;
+      userMsg = `[Sms-Contact] #${requestId} numaralı hizmet tamamlandı olarak onaylandı. Teşekkürler!`;
+      providerMsg = `[Sms-Contact] #${requestId} numaralı iş müşteri tarafından onaylandı.`;
     } else if (eventType === 'CANCELLED') {
       userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz iptal edildi.`;
       providerMsg = `[Sms-Contact] #${requestId} numaralı talep iptal edildi.`;
     }
 
-    if (userMsg && providerMsg) {
+    if (userMsg && providerMsg && providerData.phone) {
       await pool.query(`
         INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
         VALUES 
@@ -42,6 +42,7 @@ const triggerSimulatedNotifications = async (requestId, reqData, providerData, e
   }
 };
 
+// 1. Yeni Talep Oluşturma (Hatasız ve Korumalı)
 const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel } = req.body;
@@ -51,13 +52,14 @@ const createRequest = async (req, res) => {
     }
 
     const cleanContact = contactValue.trim();
-
     const textToAnalyze = (disambiguationChoice || rawText).toLowerCase();
+    
     const tokens = textToAnalyze
       .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ')
       .split(/\s+/)
       .filter(w => w.length > 1);
 
+    // Aktif sağlayıcıları çek
     const { rows: activeProviders } = await pool.query(`
       SELECT id, name, phone, email, service_keywords, communication_channels, priority_score 
       FROM service_providers 
@@ -121,8 +123,8 @@ const createRequest = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Talep oluşturma hatası:', error);
-    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+    console.error('Talep oluşturma hatası detay:', error);
+    res.status(500).json({ status: 'error', message: `Talep oluşturulamadı: ${error.message}` });
   }
 };
 
@@ -326,7 +328,6 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
-// Durum Güncelleme (PROVIDER_COMPLETED ve COMPLETED Ayrımı)
 const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
