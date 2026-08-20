@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  ArrowRight, Phone, PhoneCall, MessageSquare, Plus, Trash2, Edit3, X, Clock, LogOut, 
+  ArrowRight, Phone, PhoneCall, MessageSquare, Mail, Plus, Trash2, Edit3, X, Clock, LogOut, 
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
@@ -50,8 +50,9 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // Talep Bilgileri State
+  // 🌟 Talep Bilgileri State (EMAIL ve İletişim E-postası Eklendi)
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
+  const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
@@ -75,7 +76,7 @@ export default function App() {
     phone: '',
     email: '',
     serviceKeywords: '',
-    communicationChannels: ['PHONE', 'SMS'],
+    communicationChannels: ['PHONE', 'SMS', 'EMAIL'],
     priorityScore: 100
   });
 
@@ -87,7 +88,7 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
 
-  // 🌟 WoZ Atama Modal ve Arama State'leri
+  // WoZ Atama Modal ve Arama State'leri
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
 
@@ -133,7 +134,7 @@ export default function App() {
     phone: '',
     email: '',
     serviceKeywords: '',
-    communicationChannels: ['PHONE', 'SMS'],
+    communicationChannels: ['PHONE', 'SMS', 'EMAIL'],
     priorityScore: 100
   });
 
@@ -188,7 +189,7 @@ export default function App() {
         phone: prov.phone,
         email: prov.email || '',
         serviceKeywords: (prov.service_keywords || []).join(', '),
-        communicationChannels: prov.communication_channels || ['PHONE'],
+        communicationChannels: prov.communication_channels || ['PHONE', 'SMS'],
         priorityScore: prov.priority_score || 100
       });
 
@@ -322,7 +323,7 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç (İmpersonation)
+  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
     const cleanPhone = encodeURIComponent(provPhone.trim());
@@ -357,15 +358,25 @@ export default function App() {
   const handleCustomerFinalSubmit = async (e) => {
     e?.preventDefault();
     if (!session?.phone) return;
-    setLoading(true);
 
+    if (preferredChannel === 'EMAIL' && !contactEmail.trim()) {
+      setErrorMessage('Lütfen geçerli bir e-posta adresi giriniz.');
+      return;
+    }
+
+    setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
+
+    // EMAIL kanalı seçildiyse contactValue olarak e-posta da dahil edilir
+    const finalContactValue = preferredChannel === 'EMAIL' 
+      ? `${contactEmail.trim()} (Tel: ${session.phone})`
+      : session.phone;
 
     try {
       await axios.post(`${API_BASE}/requests`, {
         rawText: queryText,
         disambiguationChoice: selectedDisambiguation,
-        contactValue: session.phone,
+        contactValue: finalContactValue,
         preferredChannel: preferredChannel,
         location: locationValue,
         isUrgent: isUrgent,
@@ -375,6 +386,7 @@ export default function App() {
       setSelectedDisambiguation(null);
       setDeadlineDate('');
       setDeadlineTime('');
+      setContactEmail('');
       setStep('INPUT');
       setIsDetailsCollapsed(true);
       setIsUrgent(false);
@@ -558,7 +570,7 @@ export default function App() {
     }
   };
 
-  // 🌟 Manuel WoZ Atama Fonksiyonu
+  // Manuel WoZ Atama
   const handleAdminAssign = async (requestId, providerId) => {
     const pId = providerId || selectedProviderMap[requestId];
     if (!pId) return;
@@ -674,7 +686,6 @@ export default function App() {
     return phoneMatch || bodyMatch;
   });
 
-  // 🌟 WoZ Popup Arama Filtresi
   const filteredWozProviders = providers.filter(p => {
     const q = wozProviderSearch.toLowerCase().trim();
     if (!q) return true;
@@ -696,7 +707,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.6</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.7</span>
             </div>
           </div>
 
@@ -1120,7 +1131,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
+              {/* 🌟 D. ONAY EKRANI & TALEP BİLGİLERİ (EMAIL KANALI & GİRİŞ ALANI EKLENDİ) */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1146,7 +1157,9 @@ export default function App() {
                           <span>📍 {locationValue}</span>
                           {isUrgent && <span className="text-rose-700 font-bold">🔥 ACİL</span>}
                           {deadlineDate && <span>⏰ {deadlineDate} {deadlineTime}</span>}
-                          <span>📞 {preferredChannel === 'PHONE' ? 'Telefon' : 'SMS'}</span>
+                          <span>
+                            {preferredChannel === 'PHONE' ? '📞 Telefon' : preferredChannel === 'SMS' ? '💬 SMS' : `📧 E-posta (${contactEmail || 'Belirtilmedi'})`}
+                          </span>
                         </div>
                       </div>
 
@@ -1240,30 +1253,59 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 4. İletişim Kanalı */}
+                        {/* 4. İletişim Kanalı Tercihi (PHONE, SMS, EMAIL) */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihiniz
                           </label>
-                          <div className="grid grid-cols-2 gap-2.5">
+                          <div className="grid grid-cols-3 gap-2">
                             <button
                               type="button"
                               onClick={() => setPreferredChannel('PHONE')}
-                              className={`p-2.5 rounded-lg border text-left text-xs flex items-center space-x-2 transition ${preferredChannel === 'PHONE' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannel === 'PHONE' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
-                              <Phone size={14} />
-                              <span className="font-semibold">Telefon Araması</span>
+                              <Phone size={13} />
+                              <span className="font-semibold text-[11px]">Telefon</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setPreferredChannel('SMS')}
-                              className={`p-2.5 rounded-lg border text-left text-xs flex items-center space-x-2 transition ${preferredChannel === 'SMS' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannel === 'SMS' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
-                              <MessageSquare size={14} />
-                              <span className="font-semibold">SMS / WhatsApp</span>
+                              <MessageSquare size={13} />
+                              <span className="font-semibold text-[11px]">SMS</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreferredChannel('EMAIL')}
+                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannel === 'EMAIL' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                            >
+                              <Mail size={13} />
+                              <span className="font-semibold text-[11px]">E-posta</span>
                             </button>
                           </div>
                         </div>
+
+                        {/* 🌟 5. EMAIL Seçildiyse Açılan Dinamik E-posta Kutusu */}
+                        {preferredChannel === 'EMAIL' && (
+                          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
+                            <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1">
+                              <Mail size={12} className="text-blue-700" />
+                              <span>İletişim E-posta Adresiniz *</span>
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              value={contactEmail}
+                              onChange={(e) => setContactEmail(e.target.value)}
+                              placeholder="adiniz@example.com"
+                              className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium"
+                            />
+                            <p className="text-[10px] text-blue-700 font-mono">
+                              Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.
+                            </p>
+                          </div>
+                        )}
 
                       </div>
                     )}
@@ -1441,6 +1483,19 @@ export default function App() {
                           />
                           <span>SMS</span>
                         </label>
+                        <label className="flex items-center space-x-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={providerFormData.communicationChannels.includes('EMAIL')}
+                            onChange={(e) => {
+                              const newCh = e.target.checked
+                                ? [...providerFormData.communicationChannels, 'EMAIL']
+                                : providerFormData.communicationChannels.filter(c => c !== 'EMAIL');
+                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
+                            }}
+                          />
+                          <span>EMAIL</span>
+                        </label>
                       </div>
 
                       <button
@@ -1491,7 +1546,7 @@ export default function App() {
 
                         <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1">
                           <p className="font-mono text-neutral-600">
-                            Müşteri Tel: <strong className="text-neutral-800">{req.contact_value}</strong>
+                            Müşteri İletişim: <strong className="text-neutral-800">{req.contact_value}</strong>
                           </p>
                           <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
                             <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
@@ -1515,7 +1570,7 @@ export default function App() {
                                 className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"
                               >
                                 <Check size={12} />
-                                <span>Kabul Et & SMS İlet</span>
+                                <span>Kabul Et & İletişime Geç</span>
                               </button>
                             </>
                           )}
@@ -1664,7 +1719,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 4.0 WoZ HAVUZU (ARAMA FİLTRELİ POPUP ENTEGRASYONU) */}
+              {/* 4.0 WoZ HAVUZU */}
               {adminTab === 'WOZ' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1 space-y-3">
                   {pendingRequests.length === 0 ? (
@@ -1726,7 +1781,7 @@ export default function App() {
                     </div>
 
                     <button
-                      onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS'], priorityScore: 100 }); setIsModalOpen(true); }}
+                      onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL'], priorityScore: 100 }); setIsModalOpen(true); }}
                       className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shrink-0 shadow-sm w-full sm:w-auto justify-center"
                     >
                       <Plus size={13} />
@@ -1760,6 +1815,7 @@ export default function App() {
                               </div>
                               
                               <p className="text-[11px] text-blue-700 font-mono font-semibold mt-0.5">📞 {prov.phone}</p>
+                              {prov.email && <p className="text-[10px] text-neutral-500 font-mono">📧 {prov.email}</p>}
                               
                               <div className="flex flex-wrap gap-1 mt-1.5">
                                 {(prov.service_keywords || []).map((kw, i) => (
@@ -1787,7 +1843,7 @@ export default function App() {
                                       phone: prov.phone,
                                       email: prov.email || '',
                                       serviceKeywords: (prov.service_keywords || []).join(', '),
-                                      communicationChannels: prov.communication_channels || ['PHONE'],
+                                      communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL'],
                                       priorityScore: prov.priority_score || 100
                                     });
                                     setIsModalOpen(true);
@@ -1874,7 +1930,7 @@ export default function App() {
                             
                             <div className="p-2 bg-white rounded border border-neutral-200/80 space-y-1 font-mono text-[11px]">
                               <p className="text-neutral-600">
-                                👤 Müşteri: <strong className="text-neutral-900">{req.contact_value}</strong>
+                                👤 Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
                               </p>
                               <p className="text-neutral-600">
                                 🛠️ Sağlayıcı: <strong className="text-neutral-900">{req.provider_name || 'Atanmadı'}</strong>
@@ -2439,6 +2495,10 @@ export default function App() {
                 <div>
                   <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label>
                   <input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
+                  <input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} placeholder="info@firma.com" className="w-full p-2 text-xs rounded-lg border outline-none" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Anahtar Kelimeler *</label>
