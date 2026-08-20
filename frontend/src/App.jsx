@@ -323,6 +323,7 @@ export default function App() {
     setStep('INPUT');
   };
 
+  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
     const cleanPhone = encodeURIComponent(provPhone.trim());
@@ -693,7 +694,7 @@ export default function App() {
     return nameMatch || phoneMatch || kwMatch;
   });
 
-  // 🌟 Yardımcı Fonksiyon: İletişim bilgisinden e-posta adresini ayıklar
+  // E-posta adresini ayıklar
   const extractEmail = (text) => {
     if (!text) return null;
     const match = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
@@ -712,7 +713,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.8</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.9</span>
             </div>
           </div>
 
@@ -1534,7 +1535,28 @@ export default function App() {
                     activeProviderRequests.map((req) => {
                       const clientEmail = extractEmail(req.contact_value);
                       const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
-                      const mailtoBody = encodeURIComponent(`Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nİyi çalışmalar.`);
+                      
+                      // 🌟 E-posta Gövdesi ve Alt İmza Bilgileri (Firma Adı, Adres, Telefon, E-posta)
+                      const providerName = providerProfile?.name || req.provider_name || 'Hizmet Sağlayıcı';
+                      const providerPhone = providerProfile?.phone || req.provider_phone || session.phone;
+                      const providerEmail = providerProfile?.email || req.provider_email || '';
+                      const providerLocation = req.location || 'İstanbul';
+
+                      const emailBodyText = 
+`Merhaba,
+
+"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.
+
+Detayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.
+
+Saygılarımızla,
+--------------------------------------------
+🏢 ${providerName}
+📍 Adres / Hizmet Bölgesi: ${providerLocation}
+📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}
+--------------------------------------------`;
+
+                      const mailtoBody = encodeURIComponent(emailBodyText);
                       const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
 
                       return (
@@ -1555,19 +1577,19 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* 🌟 Müşteri İletişim Bilgileri ve Tıklanabilir mailto: Bağlantısı */}
+                          {/* Müşteri İletişim Bilgileri ve Tıklanabilir mailto: Bağlantısı */}
                           <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1.5">
                             <div className="flex flex-wrap items-center justify-between gap-1">
                               <p className="font-mono text-neutral-700">
                                 Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
                               </p>
                               
-                              {/* 🌟 TIKLANABİLİR E-POSTA BAĞLANTISI (VARSAYILAN E-POSTA İSTEMCİSİNİ AÇAR) */}
+                              {/* 🌟 TIKLANABİLİR E-POSTA BAĞLANTISI (İmzalı ve Otomatik Doldurulmuş) */}
                               {mailtoLink && (
                                 <a
                                   href={mailtoLink}
                                   className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-[11px] font-semibold flex items-center space-x-1 transition shadow-xs"
-                                  title="Varsayılan E-posta Uygulamasında Aç"
+                                  title="İmzalı E-posta Şablonu ile Varsayılan E-posta Uygulamasında Aç"
                                 >
                                   <Mail size={12} />
                                   <span>E-posta Gönder ({clientEmail})</span>
