@@ -13,7 +13,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
-  // 🌟 URL'den doğrudan oturum açma parametrelerini kontrol et (İmperosnation / Yeni Sekme)
+  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -27,7 +27,6 @@ export default function App() {
           authenticatedAt: new Date().toISOString()
         };
         localStorage.setItem('sc_session', JSON.stringify(directSession));
-        // Temiz URL için parametreleri temizle
         window.history.replaceState({}, document.title, window.location.pathname);
         return directSession;
       }
@@ -51,14 +50,14 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // Onay Form Detayları
+  // 🌟 Talep Detayları State (Tarih ve Saat Varsayılan Boş Gelir)
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
   const [isUrgent, setIsUrgent] = useState(false);
-  const [deadlineDate, setDeadlineDate] = useState(new Date().toISOString().split('T')[0]);
-  const [deadlineTime, setDeadlineTime] = useState('18:00');
+  const [deadlineDate, setDeadlineDate] = useState('');
+  const [deadlineTime, setDeadlineTime] = useState('');
   const [isLocating, setIsLocating] = useState(false);
-  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true); // Default Kapalı
 
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
@@ -81,7 +80,7 @@ export default function App() {
   });
 
   // Admin State
-  const [adminTab, setAdminTab] = useState('PROVIDERS'); // Sağlayıcılar sekmesi
+  const [adminTab, setAdminTab] = useState('PROVIDERS');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -319,7 +318,7 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // 🌟 SAĞLAYICI OLARAK YENİ SEKMEDE OTURUM AÇ (Tek Tıkla Giriş)
+  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç (İmpersonation)
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
     const cleanPhone = encodeURIComponent(provPhone.trim());
@@ -356,7 +355,8 @@ export default function App() {
     if (!session?.phone) return;
     setLoading(true);
 
-    const deadlineDatetimeISO = `${deadlineDate}T${deadlineTime}:00`;
+    // Tarih/saat girilmişse ISO formatına çevir, girilmemişse null gönder
+    const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
 
     try {
       await axios.post(`${API_BASE}/requests`, {
@@ -370,6 +370,8 @@ export default function App() {
       });
       setQueryText('');
       setSelectedDisambiguation(null);
+      setDeadlineDate('');
+      setDeadlineTime('');
       setStep('INPUT');
       setIsDetailsCollapsed(true);
       setIsUrgent(false);
@@ -635,7 +637,6 @@ export default function App() {
   });
 
   // FİLTRELENMİŞ ADMİN LİSTELERİ
-  // 1. Sağlayıcılar Filtresi
   const filteredProviders = providers.filter(p => {
     const q = searchProviderText.toLowerCase().trim();
     if (!q) return true;
@@ -645,7 +646,6 @@ export default function App() {
     return nameMatch || phoneMatch || kwMatch;
   });
 
-  // 2. Eşleşmeler Filtresi
   const filteredMatchedRequests = matchedRequests.filter(r => {
     const q = searchMatchText.toLowerCase().trim();
     const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter;
@@ -661,7 +661,6 @@ export default function App() {
     return textMatch || userPhoneMatch || provNameMatch || provPhoneMatch || idMatch;
   });
 
-  // 3. SMS Log Filtresi
   const filteredSmsLogs = smsLogs.filter(log => {
     const q = searchSmsText.toLowerCase().trim();
     const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter;
@@ -685,7 +684,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.3 QA</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.4</span>
             </div>
           </div>
 
@@ -1109,7 +1108,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* D. GELİŞMİŞ ONAY EKRANI */}
+              {/* 🌟 🌟 🌟 D. GELİŞMİŞ ONAY EKRANI & TALEP DETAYLARI MENÜSÜ 🌟 🌟 🌟 */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1120,22 +1119,23 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Collapsible Detay Formu */}
+                  {/* 🌟 "Talep Detayları" Collapsible Kartı */}
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
                     <div
                       onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
-                      className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"
+                      className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/70 select-none text-xs"
                     >
-                      <div className="flex items-center space-x-2 text-neutral-800 font-bold">
-                        <Sliders size={15} className="text-neutral-600" />
-                        <span>📋 Ek Tercihler (Konum, Aciliyet, En Son Tarih & Saat, Kanal)</span>
+                      <div className="flex items-center space-x-2 text-neutral-900 font-bold">
+                        <Sliders size={15} className="text-neutral-700" />
+                        <span>Talep Detayları</span>
                       </div>
                       <div className="flex items-center space-x-1 text-neutral-400 font-mono text-[11px]">
-                        <span>{isDetailsCollapsed ? 'Düzenle' : 'Kapat'}</span>
+                        <span>{isDetailsCollapsed ? 'Düzenle / Aç' : 'Kapat'}</span>
                         {isDetailsCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
                       </div>
                     </div>
 
+                    {/* Detaylar Açıldığında Altında Görünen Menü */}
                     {!isDetailsCollapsed && (
                       <div className="p-4 pt-2 border-t border-neutral-200/70 bg-white space-y-3.5">
                         
@@ -1181,12 +1181,12 @@ export default function App() {
                           </label>
                         </div>
 
-                        {/* 3. En Son Tarih & Saat */}
+                        {/* 3. En Son Tarih & Saat (İsteğe Bağlı) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
                               <Calendar size={12} className="text-neutral-700" />
-                              <span>En Son Tarih</span>
+                              <span>En Son Tarih (Opsiyonel)</span>
                             </label>
                             <input
                               type="date"
@@ -1199,7 +1199,7 @@ export default function App() {
                           <div>
                             <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1 flex items-center space-x-1">
                               <Clock size={12} className="text-neutral-700" />
-                              <span>En Son Saat</span>
+                              <span>En Son Saat (Opsiyonel)</span>
                             </label>
                             <input
                               type="time"
@@ -1239,13 +1239,15 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Canlı Nihai Onay Özeti */}
+                  {/* 🌟 Canlı Nihai Onay Özeti (Tarih Güncellenmemişse En Son Tarih Yazmaz) */}
                   <div className="p-3.5 bg-neutral-100/70 rounded-xl border border-neutral-200 text-xs space-y-1.5">
-                    <p className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider font-mono">Talep Detayları:</p>
+                    <p className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider font-mono">Talep Bilgileri:</p>
                     <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-neutral-700">
                       <div>📍 <strong>{locationValue}</strong></div>
                       {isUrgent && <div className="text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</div>}
-                      <div>⏰ En Son: <strong>{deadlineDate} {deadlineTime}</strong></div>
+                      {deadlineDate && (
+                        <div>⏰ En Son: <strong>{deadlineDate} {deadlineTime}</strong></div>
+                      )}
                       <div>📞 Kanal: <strong>{preferredChannel === 'PHONE' ? 'Telefon' : 'SMS'}</strong></div>
                     </div>
                   </div>
@@ -1645,10 +1647,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 4.0 SAĞLAYICILAR (YENİ SEKMEDE OTURUM AÇMA / LOGIN ENTEGRASYONU) */}
+              {/* 4.0 SAĞLAYICILAR */}
               {adminTab === 'PROVIDERS' && (
                 <div className="space-y-3">
-                  {/* Sağlayıcı Arama & Ekleme Barı */}
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
                     <div className="relative w-full sm:w-96">
                       <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
@@ -1673,7 +1674,6 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Sağlayıcı Kartları */}
                   <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
                     {filteredProviders.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">
