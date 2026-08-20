@@ -174,7 +174,7 @@ export default function App() {
           setLocationValue(`${district}, ${city}`);
         } catch {
           setLocationValue(`${latitude.toFixed(3)}, ${longitude.toFixed(3)} (Konum Alındı)`);
-        } finally {
+        } fontally {
           setIsLocating(false);
         }
       },
@@ -596,6 +596,7 @@ export default function App() {
     }
   };
 
+  // Manuel WoZ Atama
   const handleAdminAssign = async (requestId, providerId) => {
     const pId = providerId || selectedProviderMap[requestId];
     if (!pId) return;
@@ -730,12 +731,6 @@ export default function App() {
     return match ? match[1] : null;
   };
 
-  const extractPhone = (str) => {
-    if (!str) return '';
-    const match = str.match(/(\+?\d[\d\s-]{8,})/);
-    return match ? match[1].replace(/[^\d+]/g, '') : '';
-  };
-
   const getKeywordMetrics = (text) => {
     const str = text || '';
     const charCount = str.length;
@@ -759,7 +754,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.5</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.6</span>
             </div>
           </div>
 
@@ -1636,12 +1631,6 @@ export default function App() {
                   ) : (
                     activeProviderRequests.map((req) => {
                       const clientEmail = extractEmail(req.contact_value);
-                      
-                      const extractPhone = (str) => {
-                        if (!str) return '';
-                        const match = str.match(/(\+?\d[\d\s-]{8,})/);
-                        return match ? match[1].replace(/[^\d+]/g, '') : '';
-                      };
                       const cleanPhone = extractPhone(req.contact_value) || session.phone;
                       const phoneDigits = cleanPhone.replace(/\D/g, '');
 
@@ -1674,10 +1663,11 @@ Saygılarımızla,
                       const mailtoBody = encodeURIComponent(emailBodyText);
                       const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
 
-                      const smsMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı talebiniz için yazıyorum.`);
+                      // 🌟 SMS VE WHATSAPP MESAJLARINDA SADECE TALEP METNİ KULLANILIYOR
+                      const smsMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz "${req.raw_text}" talebiniz için yazıyorum.`);
                       const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${smsMessage}`;
 
-                      const waMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`);
+                      const waMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz "${req.raw_text}" talebiniz için iletişime geçiyorum.`);
                       const waLink = `https://wa.me/${phoneDigits}?text=${waMessage}`;
 
                       const callLink = `tel:${cleanPhone}`;
@@ -1711,7 +1701,7 @@ Saygılarımızla,
                               {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             </div>
 
-                            {/* 🌟 DÜZENLENEN KISIM: İLETİŞİM KANAL BUTONLARI (Kanal isimleri direkt buton yapıldı) */}
+                            {/* İLETİŞİM KANAL BUTONLARI */}
                             <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-[11px] font-mono">
                               <span className="font-bold text-neutral-600 mr-1">İletişim Kanalları:</span>
 
