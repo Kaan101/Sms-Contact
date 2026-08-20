@@ -56,7 +56,7 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 Talep Bilgileri State (Çoklu İletişim Kanalları - PHONE, SMS, EMAIL, WHATSAPP)
+  // Talep Bilgileri State
   const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
@@ -144,11 +144,11 @@ export default function App() {
     priorityScore: 100
   });
 
-  // Çoklu İletişim Kanalı Seçim/Kaldırma Fonksiyonu
+  // Çoklu İletişim Kanalı Seçim/Kaldırma
   const togglePreferredChannel = (channel) => {
     setPreferredChannels((prev) => {
       if (prev.includes(channel)) {
-        if (prev.length === 1) return prev; // En az 1 kanal seçili kalmalı
+        if (prev.length === 1) return prev;
         return prev.filter((c) => c !== channel);
       } else {
         return [...prev, channel];
@@ -375,7 +375,6 @@ export default function App() {
     }
   };
 
-  // Müşteri Talep Gönderme
   const handleCustomerFinalSubmit = async (e) => {
     e?.preventDefault();
     if (!session?.phone) return;
@@ -597,7 +596,6 @@ export default function App() {
     }
   };
 
-  // Manuel WoZ Atama
   const handleAdminAssign = async (requestId, providerId) => {
     const pId = providerId || selectedProviderMap[requestId];
     if (!pId) return;
@@ -732,6 +730,12 @@ export default function App() {
     return match ? match[1] : null;
   };
 
+  const extractPhone = (str) => {
+    if (!str) return '';
+    const match = str.match(/(\+?\d[\d\s-]{8,})/);
+    return match ? match[1].replace(/[^\d+]/g, '') : '';
+  };
+
   const getKeywordMetrics = (text) => {
     const str = text || '';
     const charCount = str.length;
@@ -755,7 +759,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.4</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.5</span>
             </div>
           </div>
 
@@ -1306,7 +1310,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 4. İletişim Kanalı Tercihi (ÇOKLU SEÇİM - TELEFON, SMS, EMAIL, WHATSAPP) */}
+                        {/* 4. İletişim Kanalı Tercihi (ÇOKLU SEÇİM) */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihleriniz (Çoklu Seçim)
@@ -1632,8 +1636,21 @@ export default function App() {
                   ) : (
                     activeProviderRequests.map((req) => {
                       const clientEmail = extractEmail(req.contact_value);
-                      const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
                       
+                      const extractPhone = (str) => {
+                        if (!str) return '';
+                        const match = str.match(/(\+?\d[\d\s-]{8,})/);
+                        return match ? match[1].replace(/[^\d+]/g, '') : '';
+                      };
+                      const cleanPhone = extractPhone(req.contact_value) || session.phone;
+                      const phoneDigits = cleanPhone.replace(/\D/g, '');
+
+                      const rawChannels = (req.preferred_channel || 'PHONE').toUpperCase();
+                      const hasPhone = rawChannels.includes('PHONE') || rawChannels.includes('TELEFON');
+                      const hasSms = rawChannels.includes('SMS');
+                      const hasEmail = rawChannels.includes('EMAIL') || rawChannels.includes('E-POSTA');
+                      const hasWhatsapp = rawChannels.includes('WHATSAPP');
+
                       const providerName = providerProfile?.name || req.provider_name || 'Hizmet Sağlayıcı';
                       const providerPhone = providerProfile?.phone || req.provider_phone || session.phone;
                       const providerEmail = providerProfile?.email || req.provider_email || '';
@@ -1653,8 +1670,17 @@ Saygılarımızla,
 📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}
 --------------------------------------------`;
 
+                      const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
                       const mailtoBody = encodeURIComponent(emailBodyText);
                       const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
+
+                      const smsMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı talebiniz için yazıyorum.`);
+                      const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${smsMessage}`;
+
+                      const waMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`);
+                      const waLink = `https://wa.me/${phoneDigits}?text=${waMessage}`;
+
+                      const callLink = `tel:${cleanPhone}`;
 
                       return (
                         <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
@@ -1674,29 +1700,66 @@ Saygılarımızla,
                             </div>
                           </div>
 
-                          <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1.5">
-                            <div className="flex flex-wrap items-center justify-between gap-1">
-                              <p className="font-mono text-neutral-700">
-                                Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
-                              </p>
-                              
-                              {mailtoLink && (
-                                <a
-                                  href={mailtoLink}
-                                  className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-[11px] font-semibold flex items-center space-x-1 transition shadow-xs"
-                                  title="İmzalı E-posta Şablonu ile Varsayılan E-posta Uygulamasında Aç"
-                                >
-                                  <Mail size={12} />
-                                  <span>E-posta Gönder ({clientEmail})</span>
-                                </a>
-                              )}
-                            </div>
+                          <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-2">
+                            <p className="font-mono text-neutral-700">
+                              Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
+                            </p>
 
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
                               <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
                               {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
                               {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
-                              <span>📞 Kanal: <strong>[{req.preferred_channel}]</strong></span>
+                            </div>
+
+                            {/* 🌟 DÜZENLENEN KISIM: İLETİŞİM KANAL BUTONLARI (Kanal isimleri direkt buton yapıldı) */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-[11px] font-mono">
+                              <span className="font-bold text-neutral-600 mr-1">İletişim Kanalları:</span>
+
+                              {hasPhone && (
+                                <a
+                                  href={callLink}
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"
+                                  title="Telefonla Ara"
+                                >
+                                  <Phone size={12} />
+                                  <span>Ara</span>
+                                </a>
+                              )}
+
+                              {hasSms && (
+                                <a
+                                  href={smsLink}
+                                  className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"
+                                  title="SMS Gönder"
+                                >
+                                  <MessageSquare size={12} />
+                                  <span>SMS</span>
+                                </a>
+                              )}
+
+                              {hasWhatsapp && (
+                                <a
+                                  href={waLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"
+                                  title="WhatsApp Üzerinden Yaz"
+                                >
+                                  <MessageCircle size={12} />
+                                  <span>WhatsApp</span>
+                                </a>
+                              )}
+
+                              {hasEmail && mailtoLink && (
+                                <a
+                                  href={mailtoLink}
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"
+                                  title="İmzalı Şablon ile E-posta Gönder"
+                                >
+                                  <Mail size={12} />
+                                  <span>E-posta</span>
+                                </a>
+                              )}
                             </div>
                           </div>
 
