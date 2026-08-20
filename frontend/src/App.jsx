@@ -5,7 +5,7 @@ import {
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
-  ExternalLink, LogIn
+  ExternalLink, LogIn, UserCheck
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -50,14 +50,14 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 Talep Bilgileri State (Tarih ve Saat varsayılan BOŞ gelir)
+  // Talep Bilgileri State
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineTime, setDeadlineTime] = useState('');
   const [isLocating, setIsLocating] = useState(false);
-  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true); // Default: Kapalı
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
 
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
@@ -80,12 +80,16 @@ export default function App() {
   });
 
   // Admin State
-  const [adminTab, setAdminTab] = useState('PROVIDERS');
+  const [adminTab, setAdminTab] = useState('WOZ');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
+
+  // 🌟 WoZ Atama Modal ve Arama State'leri
+  const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
+  const [wozProviderSearch, setWozProviderSearch] = useState('');
 
   // Admin Arama ve Filtre State'leri
   const [searchProviderText, setSearchProviderText] = useState('');
@@ -240,6 +244,7 @@ export default function App() {
     }
   };
 
+  // 🔄 5 Saniyede Bir Canlı Yenileme
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') {
@@ -317,6 +322,7 @@ export default function App() {
     setStep('INPUT');
   };
 
+  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç (İmpersonation)
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
     const cleanPhone = encodeURIComponent(provPhone.trim());
@@ -552,14 +558,16 @@ export default function App() {
     }
   };
 
-  const handleAdminAssign = async (requestId) => {
-    const pId = selectedProviderMap[requestId];
+  // 🌟 Manuel WoZ Atama Fonksiyonu
+  const handleAdminAssign = async (requestId, providerId) => {
+    const pId = providerId || selectedProviderMap[requestId];
     if (!pId) return;
     try {
       await axios.post(`${API_BASE}/requests/assign`, {
         requestId: parseInt(requestId, 10),
         providerId: parseInt(pId, 10)
       });
+      setWozAssignModalReq(null);
       await fetchAdminData();
     } catch {
       console.error('Atama başarısız.');
@@ -666,6 +674,16 @@ export default function App() {
     return phoneMatch || bodyMatch;
   });
 
+  // 🌟 WoZ Popup Arama Filtresi
+  const filteredWozProviders = providers.filter(p => {
+    const q = wozProviderSearch.toLowerCase().trim();
+    if (!q) return true;
+    const nameMatch = (p.name || '').toLowerCase().includes(q);
+    const phoneMatch = (p.phone || '').toLowerCase().includes(q);
+    const kwMatch = (p.service_keywords || []).some(k => k.toLowerCase().includes(q));
+    return nameMatch || phoneMatch || kwMatch;
+  });
+
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -678,7 +696,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.5</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.6</span>
             </div>
           </div>
 
@@ -1102,7 +1120,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 🌟 🌟 D. ONAY EKRANI & TALEP BİLGİLERİ (BİRLEŞTİRİLMİŞ TEK KUTU) 🌟 🌟 🌟 */}
+              {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1113,7 +1131,7 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 🌟 "Talep Bilgileri" - Tıklayınca Açılan Tekil Menü */}
+                  {/* "Talep Bilgileri" - Tıklayınca Açılan Tekil Menü */}
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
                     <div
                       onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
@@ -1124,7 +1142,6 @@ export default function App() {
                           <Sliders size={14} className="text-neutral-700" />
                           <span>Talep Bilgileri</span>
                         </div>
-                        {/* Kapalıyken gösterilen satır içi özet */}
                         <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-mono text-neutral-600">
                           <span>📍 {locationValue}</span>
                           {isUrgent && <span className="text-rose-700 font-bold">🔥 ACİL</span>}
@@ -1139,7 +1156,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Tıklandığında altında açılan düzenleme alanı */}
                     {!isDetailsCollapsed && (
                       <div className="p-4 pt-3 border-t border-neutral-200/70 bg-white space-y-3.5">
                         
@@ -1185,7 +1201,7 @@ export default function App() {
                           </label>
                         </div>
 
-                        {/* 3. En Son Tarih & Saat (Boş bırakılabilir) */}
+                        {/* 3. En Son Tarih & Saat */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <div className="flex items-center justify-between mb-1">
@@ -1625,6 +1641,9 @@ export default function App() {
                 <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
 
                 <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
+                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
+                    WoZ Havuzu ({pendingRequests.length})
+                  </button>
                   <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     Sağlayıcılar ({filteredProviders.length}/{providers.length})
                   </button>
@@ -1642,13 +1661,53 @@ export default function App() {
                     <FolderKanban size={13} />
                     <span>Yol Haritası ({features.length})</span>
                   </button>
-                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    WoZ ({pendingRequests.length})
-                  </button>
                 </div>
               </div>
 
-              {/* 4.0 SAĞLAYICILAR */}
+              {/* 🌟 4.0 WoZ HAVUZU (ARAMA FİLTRELİ POPUP ENTEGRASYONU) */}
+              {adminTab === 'WOZ' && (
+                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1 space-y-3">
+                  {pendingRequests.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-neutral-400">
+                      WoZ havuzunda bekleyen veya manuel müdahale gerektiren talep bulunmuyor.
+                    </div>
+                  ) : (
+                    pendingRequests.map((req) => (
+                      <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                              {req.status}
+                            </span>
+                            <span className="text-neutral-400 font-mono">#REQ-{req.id}</span>
+                          </div>
+                          <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
+                          <div className="flex flex-wrap gap-2 text-neutral-500 font-mono text-[11px]">
+                            <span>👤 İletişim: <strong className="text-neutral-800">{req.contact_value}</strong></span>
+                            <span>📍 {req.location || 'Kadıköy'}</span>
+                            {req.is_urgent && <span className="text-rose-600 font-bold">🔥 ACİL</span>}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <button
+                            onClick={() => {
+                              setWozAssignModalReq(req);
+                              setWozProviderSearch('');
+                            }}
+                            className="px-3.5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition"
+                          >
+                            <UserCheck size={13} />
+                            <span>Sağlayıcı Seç & Ata</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* 4.1 SAĞLAYICILAR */}
               {adminTab === 'PROVIDERS' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1755,7 +1814,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.1 TÜM EŞLEŞMELER */}
+              {/* 4.2 TÜM EŞLEŞMELER */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1847,7 +1906,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.2 SMS LOGLARI */}
+              {/* 4.3 SMS LOGLARI */}
               {adminTab === 'SMS_LOGS' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1908,7 +1967,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.3 TEST SENARYOLARI */}
+              {/* 4.4 TEST SENARYOLARI */}
               {adminTab === 'TESTS' && (
                 <div className="space-y-4">
                   <form onSubmit={handleCreateTest} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
@@ -2082,7 +2141,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.4 PROJE / YOL HARİTASI */}
+              {/* 4.5 PROJE / YOL HARİTASI */}
               {adminTab === 'PROJECT' && (
                 <div className="space-y-4">
                   <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
@@ -2253,50 +2312,117 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.5 WoZ HAVUZU */}
-              {adminTab === 'WOZ' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto pr-1 space-y-3">
-                  {pendingRequests.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-neutral-400">Bekleyen talep yok.</div>
-                  ) : (
-                    pendingRequests.map((req) => (
-                      <div key={req.id} className="p-3 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                        <div>
-                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">{req.status}</span>
-                          <p className="font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
-                          <p className="text-neutral-500 font-mono text-[10px]">İletişim: {req.contact_value}</p>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <select
-                            value={selectedProviderMap[req.id] || ""}
-                            onChange={(e) => setSelectedProviderMap({ ...selectedProviderMap, [req.id]: e.target.value })}
-                            className="text-xs p-1.5 border rounded-lg bg-white outline-none"
-                          >
-                            <option value="" disabled>Sağlayıcı Seç</option>
-                            {providers.map((p) => (
-                              <option key={p.id} value={String(p.id)}>{p.name} (📞 {p.phone}) - Skor: {p.priority_score}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => handleAdminAssign(req.id)}
-                            disabled={!selectedProviderMap[req.id]}
-                            className="px-3 py-1.5 bg-neutral-950 text-white rounded-lg font-semibold"
-                          >
-                            Ata
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
             </div>
           )
         )}
 
-        {/* ADMIN MODAL */}
+        {/* 🌟 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
+        {wozAssignModalReq && (
+          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
+              
+              {/* Modal Başlık */}
+              <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                      #REQ-{wozAssignModalReq.id}
+                    </span>
+                    <h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3>
+                  </div>
+                  <p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p>
+                  <p className="text-[11px] text-neutral-400 font-mono">Müşteri: {wozAssignModalReq.contact_value} • Konum: {wozAssignModalReq.location || 'Kadıköy'}</p>
+                </div>
+                <button 
+                  onClick={() => setWozAssignModalReq(null)}
+                  className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Arama Filtre Çubuğu */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-3 text-neutral-400" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={wozProviderSearch}
+                  onChange={(e) => setWozProviderSearch(e.target.value)}
+                  placeholder="Firma adı, telefon veya hizmet ara (su, çilingir, tesisat)..."
+                  className="w-full pl-9 pr-8 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:border-neutral-950 focus:bg-white transition font-medium"
+                />
+                {wozProviderSearch && (
+                  <button 
+                    onClick={() => setWozProviderSearch('')} 
+                    className="absolute right-3 top-2.5 text-neutral-400 hover:text-neutral-700"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filtrelenmiş Sağlayıcı Listesi */}
+              <div className="overflow-y-auto space-y-2 max-h-[350px] pr-1 flex-1">
+                {filteredWozProviders.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-neutral-400 font-mono">
+                    Arama kriterinize uygun sağlayıcı bulunamadı.
+                  </div>
+                ) : (
+                  filteredWozProviders.map((prov) => (
+                    <div 
+                      key={prov.id}
+                      className="p-3 bg-neutral-50 hover:bg-neutral-100/80 rounded-xl border border-neutral-200 flex items-center justify-between gap-3 text-xs transition group"
+                    >
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-neutral-900 truncate">{prov.name}</h4>
+                          <span className="text-[9px] font-mono bg-neutral-200 px-1.5 py-0.2 rounded font-bold text-neutral-700">
+                            Skor: {prov.priority_score}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-blue-700 font-mono font-semibold">📞 {prov.phone}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(prov.service_keywords || []).slice(0, 4).map((kw, i) => (
+                            <span key={i} className="text-[9px] font-mono px-1.5 py-0.5 bg-white border border-neutral-200 rounded text-neutral-600">
+                              {kw}
+                            </span>
+                          ))}
+                          {(prov.service_keywords || []).length > 4 && (
+                            <span className="text-[9px] font-mono text-neutral-400">+{(prov.service_keywords || []).length - 4}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)}
+                        className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shrink-0 shadow-xs flex items-center space-x-1 transition"
+                      >
+                        <Check size={12} />
+                        <span>Ata</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Modal Alt Kapatma */}
+              <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-[11px] text-neutral-400 font-mono">
+                <span>{filteredWozProviders.length} Sağlayıcı Listelendi</span>
+                <button 
+                  type="button" 
+                  onClick={() => setWozAssignModalReq(null)}
+                  className="px-3 py-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold"
+                >
+                  Vazgeç
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ADMIN SAĞLAYICI DÜZENLEME MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl max-w-md w-full p-5 border space-y-3">
