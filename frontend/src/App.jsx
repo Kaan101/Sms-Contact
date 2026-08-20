@@ -5,7 +5,7 @@ import {
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
-  ExternalLink, LogIn, UserCheck, Tag
+  ExternalLink, LogIn, UserCheck, Tag, MessageCircle
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -56,7 +56,7 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 Talep Bilgileri State (Çoklu İletişim Kanalları - Array)
+  // 🌟 Talep Bilgileri State (Çoklu İletişim Kanalları - PHONE, SMS, EMAIL, WHATSAPP)
   const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
@@ -82,7 +82,7 @@ export default function App() {
     phone: '',
     email: '',
     serviceKeywords: '',
-    communicationChannels: ['PHONE', 'SMS', 'EMAIL'],
+    communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
     priorityScore: 100
   });
 
@@ -140,11 +140,11 @@ export default function App() {
     phone: '',
     email: '',
     serviceKeywords: '',
-    communicationChannels: ['PHONE', 'SMS', 'EMAIL'],
+    communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
     priorityScore: 100
   });
 
-  // 🌟 Çoklu İletişim Kanalı Seçim/Kaldırma Fonksiyonu
+  // Çoklu İletişim Kanalı Seçim/Kaldırma Fonksiyonu
   const togglePreferredChannel = (channel) => {
     setPreferredChannels((prev) => {
       if (prev.includes(channel)) {
@@ -210,7 +210,7 @@ export default function App() {
           phone: prov.phone || '',
           email: prov.email || '',
           serviceKeywords: (prov.service_keywords || []).join(', '),
-          communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL'],
+          communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
           priorityScore: prov.priority_score || 100
         });
       }
@@ -755,7 +755,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.3</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.4</span>
             </div>
           </div>
 
@@ -1179,7 +1179,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 D. ONAY EKRANI & TALEP BİLGİLERİ (ÇOKLU KANAL SEÇİMİ) */}
+              {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1209,7 +1209,8 @@ export default function App() {
                             {preferredChannels.map(c => 
                               c === 'PHONE' ? '📞 Telefon' :
                               c === 'SMS' ? '💬 SMS' :
-                              `📧 E-posta (${contactEmail || 'Girilmedi'})`
+                              c === 'EMAIL' ? `📧 E-posta (${contactEmail || 'Girilmedi'})` :
+                              '🟢 WhatsApp'
                             ).join(' • ')}
                           </span>
                         </div>
@@ -1305,16 +1306,16 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 4. İletişim Kanalı Tercihi (ÇOKLU SEÇİM) */}
+                        {/* 🌟 4. İletişim Kanalı Tercihi (ÇOKLU SEÇİM - TELEFON, SMS, EMAIL, WHATSAPP) */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihleriniz (Çoklu Seçim)
                           </label>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             <button
                               type="button"
                               onClick={() => togglePreferredChannel('PHONE')}
-                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
                               <Phone size={13} />
                               <span className="font-semibold text-[11px]">Telefon</span>
@@ -1323,7 +1324,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => togglePreferredChannel('SMS')}
-                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
                               <MessageSquare size={13} />
                               <span className="font-semibold text-[11px]">SMS</span>
@@ -1332,11 +1333,20 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => togglePreferredChannel('EMAIL')}
-                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
                               <Mail size={13} />
                               <span className="font-semibold text-[11px]">E-posta</span>
                               {preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => togglePreferredChannel('WHATSAPP')}
+                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                            >
+                              <MessageCircle size={13} />
+                              <span className="font-semibold text-[11px]">WhatsApp</span>
+                              {preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
                           </div>
                         </div>
@@ -1575,6 +1585,19 @@ export default function App() {
                             }}
                           />
                           <span>EMAIL</span>
+                        </label>
+                        <label className="flex items-center space-x-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={providerFormData.communicationChannels.includes('WHATSAPP')}
+                            onChange={(e) => {
+                              const newCh = e.target.checked
+                                ? [...providerFormData.communicationChannels, 'WHATSAPP']
+                                : providerFormData.communicationChannels.filter(c => c !== 'WHATSAPP');
+                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
+                            }}
+                          />
+                          <span>WHATSAPP</span>
                         </label>
                       </div>
 
@@ -1903,7 +1926,7 @@ Saygılarımızla,
                     </div>
 
                     <button
-                      onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL'], priorityScore: 100 }); setIsModalOpen(true); }}
+                      onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }}
                       className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shrink-0 shadow-sm w-full sm:w-auto justify-center"
                     >
                       <Plus size={13} />
@@ -1965,7 +1988,7 @@ Saygılarımızla,
                                       phone: prov.phone,
                                       email: prov.email || '',
                                       serviceKeywords: (prov.service_keywords || []).join(', '),
-                                      communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL'],
+                                      communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
                                       priorityScore: prov.priority_score || 100
                                     });
                                     setIsModalOpen(true);
