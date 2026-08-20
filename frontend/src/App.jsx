@@ -5,10 +5,14 @@ import {
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
-  ExternalLink, LogIn, UserCheck
+  ExternalLink, LogIn, UserCheck, Tag
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+// 🌟 Anahtar Kelime Limit Sabitleri
+const MAX_KEYWORD_CHARS = 1000;
+const MAX_KEYWORD_COUNT = 50;
 
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
@@ -81,7 +85,7 @@ export default function App() {
   });
 
   // Admin State
-  const [adminTab, setAdminTab] = useState('WOZ');
+  const [adminTab, setAdminTab] = useState('PROVIDERS');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -551,7 +555,7 @@ export default function App() {
       name: providerFormData.name.trim(),
       phone: session.phone,
       email: providerFormData.email ? providerFormData.email.trim() : null,
-      serviceKeywords: keywordsArray,
+      serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT),
       communicationChannels: providerFormData.communicationChannels,
       priorityScore: parseInt(providerFormData.priorityScore, 10) || 100
     };
@@ -587,12 +591,16 @@ export default function App() {
 
   const handleAdminSaveProvider = async (e) => {
     e.preventDefault();
-    const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    const keywordsArray = modalFormData.serviceKeywords
+      .split(',')
+      .map(k => k.trim().toLowerCase())
+      .filter(Boolean);
+
     const payload = {
       name: modalFormData.name.trim(),
       phone: modalFormData.phone.trim(),
       email: modalFormData.email ? modalFormData.email.trim() : null,
-      serviceKeywords: keywordsArray,
+      serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT),
       communicationChannels: modalFormData.communicationChannels,
       priorityScore: parseInt(modalFormData.priorityScore, 10) || 100
     };
@@ -701,6 +709,18 @@ export default function App() {
     return match ? match[1] : null;
   };
 
+  // 🌟 Anahtar Kelime ve Karakter Sayacı Hesaplayıcı
+  const getKeywordMetrics = (text) => {
+    const str = text || '';
+    const charCount = str.length;
+    const words = str.split(',').map(k => k.trim()).filter(Boolean);
+    const wordCount = words.length;
+    return { charCount, wordCount };
+  };
+
+  const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
+  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
+
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -713,7 +733,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.9</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.0</span>
             </div>
           </div>
 
@@ -1422,7 +1442,7 @@ export default function App() {
                 </div>
 
                 {isProfileOpen && (
-                  <form onSubmit={handleSaveProviderProfile} className="p-5 pt-2 border-t border-neutral-100 space-y-3">
+                  <form onSubmit={handleSaveProviderProfile} className="p-5 pt-2 border-t border-neutral-100 space-y-3.5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme Adı *</label>
@@ -1432,7 +1452,7 @@ export default function App() {
                           value={providerFormData.name}
                           onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })}
                           placeholder="Örn: Erikli Su Kadıköy Bayi"
-                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
+                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 font-medium"
                         />
                       </div>
                       <div>
@@ -1447,18 +1467,36 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* 🌟 GENİŞLETİLMİŞ ANAHTAR KELİME TEXTAREA VE CANLI SAYAÇ */}
                     <div>
-                      <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">
-                        Anahtar Kelimeler (Virgülle Ayırın) *
-                      </label>
-                      <input
-                        type="text"
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
+                          <Tag size={12} className="text-neutral-700" />
+                          <span>Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *</span>
+                        </label>
+                        <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
+                          <span className={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>
+                            {providerKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime
+                          </span>
+                          <span className="text-neutral-300">•</span>
+                          <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>
+                            {providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter
+                          </span>
+                        </div>
+                      </div>
+
+                      <textarea
+                        rows={3}
                         required
+                        maxLength={MAX_KEYWORD_CHARS}
                         value={providerFormData.serviceKeywords}
                         onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })}
-                        placeholder="su, damacana, erikli, kadıköy"
-                        className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
+                        placeholder="su, damacana, erikli, kadıköy, içme suyu, pompa, cam damacana..."
+                        className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition resize-none leading-relaxed"
                       />
+                      <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                        Müşteri aramalarında eşleşmek istediğiniz tüm hizmet, semt ve ürün isimlerini virgülle ayırarak yazabilirsiniz.
+                      </p>
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -1506,10 +1544,11 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1"
+                        disabled={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT || providerKwMetrics.charCount > MAX_KEYWORD_CHARS}
+                        className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition"
                       >
-                        <Save size={12} />
-                        <span>Kaydet</span>
+                        <Save size={13} />
+                        <span>Profili Kaydet</span>
                       </button>
                     </div>
                   </form>
@@ -1536,7 +1575,6 @@ export default function App() {
                       const clientEmail = extractEmail(req.contact_value);
                       const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
                       
-                      // 🌟 E-posta Gövdesi ve Alt İmza Bilgileri (Firma Adı, Adres, Telefon, E-posta)
                       const providerName = providerProfile?.name || req.provider_name || 'Hizmet Sağlayıcı';
                       const providerPhone = providerProfile?.phone || req.provider_phone || session.phone;
                       const providerEmail = providerProfile?.email || req.provider_email || '';
@@ -1577,14 +1615,12 @@ Saygılarımızla,
                             </div>
                           </div>
 
-                          {/* Müşteri İletişim Bilgileri ve Tıklanabilir mailto: Bağlantısı */}
                           <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1.5">
                             <div className="flex flex-wrap items-center justify-between gap-1">
                               <p className="font-mono text-neutral-700">
                                 Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
                               </p>
                               
-                              {/* 🌟 TIKLANABİLİR E-POSTA BAĞLANTISI (İmzalı ve Otomatik Doldurulmuş) */}
                               {mailtoLink && (
                                 <a
                                   href={mailtoLink}
@@ -2422,7 +2458,7 @@ Saygılarımızla,
           )
         )}
 
-        {/* 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
+        {/* 🌟 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
         {wozAssignModalReq && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
@@ -2524,39 +2560,76 @@ Saygılarımızla,
           </div>
         )}
 
-        {/* ADMIN SAĞLAYICI DÜZENLEME MODAL */}
+        {/* 🌟 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL (SAYAÇLI) */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-md w-full p-5 border space-y-3">
+          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border space-y-3.5 shadow-xl">
               <div className="flex items-center justify-between pb-2 border-b">
-                <h3 className="font-bold text-sm">{editingProviderId ? 'Sağlayıcı Düzenle' : 'Yeni Sağlayıcı'}</h3>
-                <button onClick={() => setIsModalOpen(false)}><X size={15} /></button>
+                <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
               </div>
 
               <form onSubmit={handleAdminSaveProvider} className="space-y-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label>
-                  <input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label>
+                    <input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label>
+                    <input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label>
-                  <input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
+                    <input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} placeholder="info@firma.com" className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label>
+                    <input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
+                  </div>
                 </div>
+
+                {/* Modal İçi Sayaçlı Textarea */}
                 <div>
-                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
-                  <input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} placeholder="info@firma.com" className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
+                      <Tag size={12} className="text-neutral-700" />
+                      <span>Anahtar Kelimeler (Virgülle Ayırın) *</span>
+                    </label>
+                    <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
+                      <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>
+                        {modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime
+                      </span>
+                      <span className="text-neutral-300">•</span>
+                      <span className={modalKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>
+                        {modalKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter
+                      </span>
+                    </div>
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    required
+                    maxLength={MAX_KEYWORD_CHARS}
+                    value={modalFormData.serviceKeywords}
+                    onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })}
+                    placeholder="su, damacana, kadıköy, erikli, tesisat..."
+                    className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
+                  />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Anahtar Kelimeler *</label>
-                  <input type="text" required value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="su, damacana" className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label>
-                  <input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
-                </div>
+
                 <div className="flex justify-end space-x-2 pt-2 border-t">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-3 py-1.5 border rounded-lg text-xs font-semibold">Vazgeç</button>
-                  <button type="submit" className="px-3.5 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold">Kaydet</button>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-neutral-700">Vazgeç</button>
+                  <button 
+                    type="submit" 
+                    disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS}
+                    className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-semibold shadow-sm"
+                  >
+                    Kaydet
+                  </button>
                 </div>
               </form>
             </div>
