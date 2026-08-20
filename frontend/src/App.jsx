@@ -16,6 +16,7 @@ const MAX_KEYWORD_COUNT = 50;
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
+  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -66,13 +67,14 @@ export default function App() {
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
+  const [showCandidatesMap, setShowCandidatesMap] = useState({});
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
 
   // Sağlayıcı State
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
-  const [poolRequests, setPoolRequests] = useState([]); // 🌟 YENİ: Havuzdaki Talepler
-  const [providerTab, setProviderTab] = useState('ACTIVE'); // 🌟 YENİ: ACTIVE | POOL
+  const [poolRequests, setPoolRequests] = useState([]); 
+  const [providerTab, setProviderTab] = useState('ACTIVE');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({
@@ -92,6 +94,9 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
 
+  // Admin Kuyruk (Queue) Collapsed State'i 🌟 (EKLENDİ)
+  const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
+
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
 
@@ -100,9 +105,6 @@ export default function App() {
   const [matchStatusFilter, setMatchStatusFilter] = useState('ALL');
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
-  
-  // Admin Eşleşmeler Açılır Kapanır Kuyruk State'i
-  const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
 
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
@@ -186,11 +188,9 @@ export default function App() {
         });
       }
 
-      // Aktif işleri getir
       const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
       setProviderRequests(rRes.data.requests || []);
 
-      // 🌟 YENİ: Havuzdaki açık işleri getir
       const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
       setPoolRequests(poolRes.data.poolRequests || []);
 
@@ -353,7 +353,6 @@ export default function App() {
     }
   };
 
-  // 🌟 YENİ: Havuzdaki Talebe Katılma (Kuyruğa Girme)
   const handleJoinPool = async (requestId) => {
     if (!providerProfile) {
       alert("Önce profilinizi oluşturup kaydetmelisiniz!");
@@ -362,8 +361,8 @@ export default function App() {
     }
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id });
-      await fetchProviderData(false); // Listeleri yenile (Havuzdan düşer, Aktife veya Bekleyene geçer)
-      setProviderTab('ACTIVE'); // Otomatik aktif sekmesine at
+      await fetchProviderData(false);
+      setProviderTab('ACTIVE'); 
     } catch (err) {
       console.error('Havuza katılma hatası:', err);
       alert('Havuza katılırken bir hata oluştu.');
@@ -380,15 +379,22 @@ export default function App() {
     }
   };
 
+  const handleCustomerSelectCandidate = async (requestId, providerId) => {
+    try {
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) });
+      setShowCandidatesMap(prev => ({ ...prev, [requestId]: false }));
+      await fetchCustomerData();
+      if (session.role === 'PROVIDER') await fetchProviderData(false);
+    } catch (err) { console.error('Seçim başarısız:', err); }
+  };
+
   const handleStatusChange = async (requestId, newStatus) => {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus });
       if (session.role === 'CUSTOMER') await fetchCustomerData();
       if (session.role === 'PROVIDER') await fetchProviderData(false);
       if (session.role === 'ADMIN') await fetchAdminData();
-    } catch (err) {
-      console.error('Durum güncellenemedi:', err);
-    }
+    } catch (err) { console.error('Durum güncellenemedi:', err); }
   };
 
   const handleDeleteRequest = async (requestId) => {
@@ -398,9 +404,7 @@ export default function App() {
       if (session.role === 'CUSTOMER') await fetchCustomerData();
       if (session.role === 'PROVIDER') await fetchProviderData(false);
       if (session.role === 'ADMIN') await fetchAdminData();
-    } catch {
-      console.error('Silme başarısız.');
-    }
+    } catch { console.error('Silme başarısız.'); }
   };
 
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => {
@@ -411,23 +415,14 @@ export default function App() {
       setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true }));
       if (session.role === 'CUSTOMER') await fetchCustomerData();
       if (session.role === 'PROVIDER') await fetchProviderData(false);
-    } catch (err) {
-      console.error('Değerlendirme kaydedilemedi:', err);
-    }
+    } catch (err) { console.error('Değerlendirme kaydedilemedi:', err); }
   };
 
-  // CRUD Diğer
-  const handleCreateTest = async (e) => {
-    e.preventDefault(); if (!newTest.title.trim()) return;
-    try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata: ' + err.message); }
-  };
-  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) { alert('Hata: ' + err.message); } };
+  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata'); } };
+  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) { alert('Hata'); } };
   const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch { alert('Silme başarısız.'); } };
   
-  const handleCreateFeature = async (e) => {
-    e.preventDefault(); if (!newFeature.title.trim()) return;
-    try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) { alert('Hata'); }
-  };
+  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) { alert('Hata'); } };
   const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) { alert('Hata'); } };
   const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch { alert('Silme başarısız.'); } };
 
@@ -473,16 +468,13 @@ export default function App() {
     try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); } catch { console.error('Silinemedi.'); }
   };
 
-  // Müşteri Listeleri
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
 
-  // Sağlayıcı Listeleri
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
 
-  // Filtrelenmiş Admin Listeleri
   const filteredProviders = providers.filter(p => {
     const q = searchProviderText.toLowerCase().trim();
     if (!q) return true;
@@ -543,7 +535,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.0 (Havuz)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.1</span>
             </div>
           </div>
 
@@ -591,59 +583,24 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => { setSelectedRole('CUSTOMER'); setAuthStep('PHONE'); }}
-                className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${
-                  selectedRole === 'CUSTOMER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-              >
-                <User size={16} />
-                <span>Müşteri</span>
+              <button type="button" onClick={() => { setSelectedRole('CUSTOMER'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'CUSTOMER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}>
+                <User size={16} /><span>Müşteri</span>
               </button>
-              <button
-                type="button"
-                onClick={() => { setSelectedRole('PROVIDER'); setAuthStep('PHONE'); }}
-                className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${
-                  selectedRole === 'PROVIDER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-              >
-                <Wrench size={16} />
-                <span>Sağlayıcı</span>
+              <button type="button" onClick={() => { setSelectedRole('PROVIDER'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'PROVIDER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}>
+                <Wrench size={16} /><span>Sağlayıcı</span>
               </button>
-              <button
-                type="button"
-                onClick={() => { setSelectedRole('ADMIN'); setAuthStep('PHONE'); }}
-                className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${
-                  selectedRole === 'ADMIN' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-              >
-                <Shield size={16} />
-                <span>Admin</span>
+              <button type="button" onClick={() => { setSelectedRole('ADMIN'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'ADMIN' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}>
+                <Shield size={16} /><span>Admin</span>
               </button>
             </div>
 
             {authStep === 'PHONE' ? (
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
-                    {selectedRole === 'PROVIDER' ? 'İşletme / Sağlayıcı Telefonu' : 'Telefon Numaranız'}
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    required
-                    value={inputPhone}
-                    onChange={(e) => setInputPhone(e.target.value)}
-                    placeholder="+90 5XX XXX XX XX"
-                    className="w-full p-3 text-sm font-mono rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none"
-                  />
+                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">{selectedRole === 'PROVIDER' ? 'İşletme / Sağlayıcı Telefonu' : 'Telefon Numaranız'}</label>
+                  <input type="tel" inputMode="tel" required value={inputPhone} onChange={(e) => setInputPhone(e.target.value)} placeholder="+90 5XX XXX XX XX" className="w-full p-3 text-sm font-mono rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none" />
                 </div>
-                <button
-                  type="submit"
-                  disabled={authLoading || !inputPhone.trim()}
-                  className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-xl text-xs font-semibold tracking-wide transition shadow-sm flex items-center justify-center space-x-2"
-                >
+                <button type="submit" disabled={authLoading || !inputPhone.trim()} className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-xl text-xs font-semibold tracking-wide transition shadow-sm flex items-center justify-center space-x-2">
                   {authLoading ? <span>Kod Gönderiliyor...</span> : <><span>Doğrulama Kodu İste</span><ArrowRight size={14} /></>}
                 </button>
               </form>
@@ -651,41 +608,16 @@ export default function App() {
               <form onSubmit={handleVerifyOtp} className="space-y-4">
                 {simulatedCode && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-mono flex items-center justify-between">
-                    <span>Simüle SMS Kodu:</span>
-                    <span className="font-bold text-lg tracking-widest text-neutral-950">{simulatedCode}</span>
+                    <span>Simüle SMS Kodu:</span><span className="font-bold text-lg tracking-widest text-neutral-950">{simulatedCode}</span>
                   </div>
                 )}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
-                    4 Haneli Kod
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    required
-                    maxLength={4}
-                    value={inputOtp}
-                    onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="1234"
-                    className="w-full p-3 text-center text-2xl tracking-[0.4em] font-mono font-bold rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none"
-                  />
+                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">4 Haneli Kod</label>
+                  <input type="tel" inputMode="numeric" pattern="[0-9]*" required maxLength={4} value={inputOtp} onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))} placeholder="1234" className="w-full p-3 text-center text-2xl tracking-[0.4em] font-mono font-bold rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none" />
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setAuthStep('PHONE')}
-                    className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold rounded-xl"
-                  >
-                    Değiştir
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={authLoading || inputOtp.length < 4}
-                    className="w-2/3 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white text-xs font-semibold rounded-xl transition"
-                  >
-                    {authLoading ? 'Doğrulanıyor...' : 'Giriş Yap'}
-                  </button>
+                  <button type="button" onClick={() => setAuthStep('PHONE')} className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold rounded-xl">Değiştir</button>
+                  <button type="submit" disabled={authLoading || inputOtp.length < 4} className="w-2/3 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white text-xs font-semibold rounded-xl transition">{authLoading ? 'Doğrulanıyor...' : 'Giriş Yap'}</button>
                 </div>
               </form>
             )}
@@ -725,7 +657,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 MÜŞTERİ: KUYRUK / HAVUZ (QUEUE) LİSTESİ GÖSTERİMİ */}
                         {req.queuedProviders && req.queuedProviders.length > 0 && (
                           <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
                             <p className="text-[11px] font-bold text-neutral-800 flex items-center space-x-1.5">
@@ -766,10 +697,8 @@ export default function App() {
                           {req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                         </div>
 
-                        {/* Aksiyon Butonları (Sonrakine Geç) */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
-                            {/* Eğer MATCHED durumundaysa ve kuyrukta en az 1 sağlayıcı daha varsa 'Sonraki Sağlayıcı' çalışır */}
                             {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 0 && (
                               <button
                                 onClick={() => handleCustomerNextProvider(req.id)}
@@ -945,7 +874,6 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* "Talep Bilgileri" */}
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
                     <div
                       onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
@@ -980,41 +908,23 @@ export default function App() {
                     {!isDetailsCollapsed && (
                       <div className="p-4 pt-3 border-t border-neutral-200/70 bg-white space-y-3.5">
                         
-                        {/* 1. Konum */}
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
                               <MapPin size={12} className="text-neutral-700" />
                               <span>Konum Bilgisi</span>
                             </label>
-                            <button
-                              type="button"
-                              onClick={fetchCurrentLocation}
-                              disabled={isLocating}
-                              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold"
-                            >
+                            <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold">
                               <Navigation size={10} className={isLocating ? 'animate-spin' : ''} />
                               <span>{isLocating ? 'Alınıyor...' : '📍 Konumu Güncelle'}</span>
                             </button>
                           </div>
-                          <input
-                            type="text"
-                            value={locationValue}
-                            onChange={(e) => setLocationValue(e.target.value)}
-                            placeholder="Mevcut konumunuz..."
-                            className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium"
-                          />
+                          <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
                         </div>
 
-                        {/* 2. Acil Checkbox */}
                         <div className="p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
                           <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={isUrgent}
-                              onChange={(e) => setIsUrgent(e.target.checked)}
-                              className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950"
-                            />
+                            <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950" />
                             <div className="flex items-center space-x-1 text-xs font-bold text-neutral-800">
                               <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} />
                               <span>Acil Hizmet Talebi (En Kısa Sürede İletişim)</span>
@@ -1022,112 +932,58 @@ export default function App() {
                           </label>
                         </div>
 
-                        {/* 3. En Son Tarih & Saat */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                                <Calendar size={12} className="text-neutral-700" />
-                                <span>En Son Tarih</span>
+                                <Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span>
                               </label>
-                              {deadlineDate && (
-                                <button type="button" onClick={() => setDeadlineDate('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>
-                              )}
+                              {deadlineDate && <button type="button" onClick={() => setDeadlineDate('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
                             </div>
-                            <input
-                              type="date"
-                              value={deadlineDate}
-                              onChange={(e) => setDeadlineDate(e.target.value)}
-                              className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950"
-                            />
+                            <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
                           </div>
-
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                                <Clock size={12} className="text-neutral-700" />
-                                <span>En Son Saat</span>
+                                <Clock size={12} className="text-neutral-700" /><span>En Son Saat</span>
                               </label>
-                              {deadlineTime && (
-                                <button type="button" onClick={() => setDeadlineTime('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>
-                              )}
+                              {deadlineTime && <button type="button" onClick={() => setDeadlineTime('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
                             </div>
-                            <input
-                              type="time"
-                              value={deadlineTime}
-                              onChange={(e) => setDeadlineTime(e.target.value)}
-                              className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950"
-                            />
+                            <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
                           </div>
                         </div>
 
-                        {/* 4. İletişim Kanalı Tercihi (ÇOKLU SEÇİM) */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihleriniz (Çoklu Seçim)
                           </label>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => togglePreferredChannel('PHONE')}
-                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
-                            >
-                              <Phone size={13} />
-                              <span className="font-semibold text-[11px]">Telefon</span>
+                            <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}>
+                              <Phone size={13} /><span className="font-semibold text-[11px]">Telefon</span>
                               {preferredChannels.includes('PHONE') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => togglePreferredChannel('SMS')}
-                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
-                            >
-                              <MessageSquare size={13} />
-                              <span className="font-semibold text-[11px]">SMS</span>
+                            <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}>
+                              <MessageSquare size={13} /><span className="font-semibold text-[11px]">SMS</span>
                               {preferredChannels.includes('SMS') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => togglePreferredChannel('EMAIL')}
-                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
-                            >
-                              <Mail size={13} />
-                              <span className="font-semibold text-[11px]">E-posta</span>
+                            <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}>
+                              <Mail size={13} /><span className="font-semibold text-[11px]">E-posta</span>
                               {preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => togglePreferredChannel('WHATSAPP')}
-                              className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
-                            >
-                              <MessageCircle size={13} />
-                              <span className="font-semibold text-[11px]">WhatsApp</span>
+                            <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}>
+                              <MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>
                               {preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
                           </div>
                         </div>
 
-                        {/* 5. Dinamik E-posta Giriş Kutusu */}
                         {preferredChannels.includes('EMAIL') && (
                           <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
                             <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1">
-                              <Mail size={12} className="text-blue-700" />
-                              <span>İletişim E-posta Adresiniz *</span>
+                              <Mail size={12} className="text-blue-700" /><span>İletişim E-posta Adresiniz *</span>
                             </label>
-                            <input
-                              ref={emailInputRef}
-                              type="email"
-                              required
-                              value={contactEmail}
-                              onChange={(e) => {
-                                setContactEmail(e.target.value);
-                                if (errorMessage) setErrorMessage('');
-                              }}
-                              placeholder="adiniz@example.com"
-                              className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium"
-                            />
-                            <p className="text-[10px] text-blue-700 font-mono">
-                              Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.
-                            </p>
+                            <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="adiniz@example.com" className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                            <p className="text-[10px] text-blue-700 font-mono">Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.</p>
                           </div>
                         )}
 
@@ -1135,42 +991,24 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Onay Butonları */}
                   <div className="flex space-x-2 pt-1">
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setStep('INPUT');
-                        setErrorMessage('');
-                      }} 
-                      className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-100 rounded-xl text-xs font-semibold text-neutral-700 transition"
-                    >
+                    <button type="button" onClick={() => { setStep('INPUT'); setErrorMessage(''); }} className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-100 rounded-xl text-xs font-semibold text-neutral-700 transition">
                       Geri Dön
                     </button>
-                    <button 
-                      type="button"
-                      onClick={handleCustomerFinalSubmit} 
-                      disabled={loading} 
-                      className="w-2/3 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center justify-center space-x-1.5"
-                    >
+                    <button type="button" onClick={handleCustomerFinalSubmit} disabled={loading} className="w-2/3 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center justify-center space-x-1.5">
                       {loading ? <span>Eşleştiriliyor...</span> : <><span>Talebi Onayla & Başlat</span><CheckCircle2 size={14} /></>}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* E. MÜŞTERİ GEÇMİŞ TALEPLER - COLLAPSED */}
+              {/* E. MÜŞTERİ GEÇMİŞ TALEPLER */}
               {pastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
-                  <div 
-                    onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
-                  >
+                  <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
                     <div className="flex items-center space-x-2">
                       <History size={15} className="text-neutral-500" />
-                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">
-                        Geçmiş Talepler ({pastCustomerRequests.length})
-                      </h3>
+                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3>
                     </div>
                     {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
@@ -1187,9 +1025,7 @@ export default function App() {
                               </p>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                                {req.status}
-                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{req.status}</span>
                               <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600"><Trash2 size={12} /></button>
                             </div>
                           </div>
@@ -1216,28 +1052,16 @@ export default function App() {
               
               {/* Profil Akordeonu */}
               <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-                <div 
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
-                >
+                <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-800">
-                      <Wrench size={16} />
-                    </div>
+                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-800"><Wrench size={16} /></div>
                     <div>
-                      <h2 className="text-sm font-bold text-neutral-950">
-                        {providerProfile ? providerProfile.name : 'Sağlayıcı Profilinizi Oluşturun'}
-                      </h2>
-                      <p className="text-[11px] text-neutral-500 font-mono">
-                        {session.phone} {providerProfile ? `• Skor: ${providerProfile.priority_score}` : '• Profil Tanımlanmamış'}
-                      </p>
+                      <h2 className="text-sm font-bold text-neutral-950">{providerProfile ? providerProfile.name : 'Sağlayıcı Profilinizi Oluşturun'}</h2>
+                      <p className="text-[11px] text-neutral-500 font-mono">{session.phone} {providerProfile ? `• Skor: ${providerProfile.priority_score}` : '• Profil Tanımlanmamış'}</p>
                     </div>
                   </div>
-
                   <div className="flex items-center space-x-1.5">
-                    <span className="text-xs font-semibold text-neutral-500">
-                      {isProfileOpen ? 'Gizle' : 'Düzenle'}
-                    </span>
+                    <span className="text-xs font-semibold text-neutral-500">{isProfileOpen ? 'Gizle' : 'Düzenle'}</span>
                     {isProfileOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                   </div>
                 </div>
@@ -1247,170 +1071,76 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme Adı *</label>
-                        <input
-                          type="text"
-                          required
-                          value={providerFormData.name}
-                          onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })}
-                          placeholder="Örn: Erikli Su Kadıköy Bayi"
-                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 font-medium"
-                        />
+                        <input type="text" required value={providerFormData.name} onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })} placeholder="Örn: Erikli Su Kadıköy Bayi" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 font-medium" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
-                        <input
-                          type="email"
-                          value={providerFormData.email}
-                          onChange={(e) => setProviderFormData({ ...providerFormData, email: e.target.value })}
-                          placeholder="info@isletme.com"
-                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
-                        />
+                        <input type="email" value={providerFormData.email} onChange={(e) => setProviderFormData({ ...providerFormData, email: e.target.value })} placeholder="info@isletme.com" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" />
                       </div>
                     </div>
 
-                    {/* Anahtar Kelimeler */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                          <Tag size={12} className="text-neutral-700" />
-                          <span>Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *</span>
+                          <Tag size={12} className="text-neutral-700" /><span>Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *</span>
                         </label>
                         <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
-                          <span className={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>
-                            {providerKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime
-                          </span>
+                          <span className={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span>
                           <span className="text-neutral-300">•</span>
-                          <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>
-                            {providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter
-                          </span>
+                          <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter</span>
                         </div>
                       </div>
-
-                      <textarea
-                        rows={3}
-                        required
-                        maxLength={MAX_KEYWORD_CHARS}
-                        value={providerFormData.serviceKeywords}
-                        onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })}
-                        placeholder="su, damacana, erikli, kadıköy, içme suyu, pompa, cam damacana..."
-                        className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition resize-none leading-relaxed"
-                      />
-                      <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                        Müşteri aramalarında eşleşmek istediğiniz tüm hizmet, semt ve ürün isimlerini virgülle ayırarak yazabilirsiniz.
-                      </p>
+                      <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana, erikli, kadıköy, içme suyu, pompa, cam damacana..." className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition resize-none leading-relaxed" />
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
                       <div className="flex items-center space-x-3 text-xs font-mono">
                         <label className="flex items-center space-x-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={providerFormData.communicationChannels.includes('PHONE')}
-                            onChange={(e) => {
-                              const newCh = e.target.checked
-                                ? [...providerFormData.communicationChannels, 'PHONE']
-                                : providerFormData.communicationChannels.filter(c => c !== 'PHONE');
-                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
-                            }}
-                          />
-                          <span>PHONE</span>
+                          <input type="checkbox" checked={providerFormData.communicationChannels.includes('PHONE')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'PHONE'] : providerFormData.communicationChannels.filter(c => c !== 'PHONE'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>PHONE</span>
                         </label>
                         <label className="flex items-center space-x-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={providerFormData.communicationChannels.includes('SMS')}
-                            onChange={(e) => {
-                              const newCh = e.target.checked
-                                ? [...providerFormData.communicationChannels, 'SMS']
-                                : providerFormData.communicationChannels.filter(c => c !== 'SMS');
-                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
-                            }}
-                          />
-                          <span>SMS</span>
+                          <input type="checkbox" checked={providerFormData.communicationChannels.includes('SMS')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'SMS'] : providerFormData.communicationChannels.filter(c => c !== 'SMS'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>SMS</span>
                         </label>
                         <label className="flex items-center space-x-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={providerFormData.communicationChannels.includes('EMAIL')}
-                            onChange={(e) => {
-                              const newCh = e.target.checked
-                                ? [...providerFormData.communicationChannels, 'EMAIL']
-                                : providerFormData.communicationChannels.filter(c => c !== 'EMAIL');
-                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
-                            }}
-                          />
-                          <span>EMAIL</span>
+                          <input type="checkbox" checked={providerFormData.communicationChannels.includes('EMAIL')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'EMAIL'] : providerFormData.communicationChannels.filter(c => c !== 'EMAIL'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>EMAIL</span>
                         </label>
                         <label className="flex items-center space-x-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={providerFormData.communicationChannels.includes('WHATSAPP')}
-                            onChange={(e) => {
-                              const newCh = e.target.checked
-                                ? [...providerFormData.communicationChannels, 'WHATSAPP']
-                                : providerFormData.communicationChannels.filter(c => c !== 'WHATSAPP');
-                              setProviderFormData({ ...providerFormData, communicationChannels: newCh });
-                            }}
-                          />
-                          <span>WHATSAPP</span>
+                          <input type="checkbox" checked={providerFormData.communicationChannels.includes('WHATSAPP')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'WHATSAPP'] : providerFormData.communicationChannels.filter(c => c !== 'WHATSAPP'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>WHATSAPP</span>
                         </label>
                       </div>
-
-                      <button
-                        type="submit"
-                        disabled={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT || providerKwMetrics.charCount > MAX_KEYWORD_CHARS}
-                        className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition"
-                      >
-                        <Save size={13} />
-                        <span>Profili Kaydet</span>
+                      <button type="submit" disabled={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT || providerKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+                        <Save size={13} /><span>Profili Kaydet</span>
                       </button>
                     </div>
                   </form>
                 )}
               </div>
 
-              {/* 🌟 YENİ: SAĞLAYICI SEKMELERİ (AKTİF İŞLER | AÇIK HAVUZ) */}
               <div className="flex items-center space-x-2 border-b border-neutral-200">
-                <button
-                  onClick={() => setProviderTab('ACTIVE')}
-                  className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition ${providerTab === 'ACTIVE' ? 'border-b-2 border-neutral-950 text-neutral-950' : 'text-neutral-400 hover:text-neutral-700'}`}
-                >
-                  <Building2 size={14} />
-                  <span>Aktif İşlerim ({activeProviderRequests.length})</span>
+                <button onClick={() => setProviderTab('ACTIVE')} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition ${providerTab === 'ACTIVE' ? 'border-b-2 border-neutral-950 text-neutral-950' : 'text-neutral-400 hover:text-neutral-700'}`}>
+                  <Building2 size={14} /><span>Aktif İşlerim ({activeProviderRequests.length})</span>
                 </button>
-                <button
-                  onClick={() => setProviderTab('POOL')}
-                  className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition ${providerTab === 'POOL' ? 'border-b-2 border-blue-600 text-blue-700' : 'text-neutral-400 hover:text-neutral-700'}`}
-                >
-                  <Inbox size={14} />
-                  <span>Açık Talep Havuzu ({poolRequests.length})</span>
+                <button onClick={() => setProviderTab('POOL')} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition ${providerTab === 'POOL' ? 'border-b-2 border-blue-600 text-blue-700' : 'text-neutral-400 hover:text-neutral-700'}`}>
+                  <Inbox size={14} /><span>Açık Talep Havuzu ({poolRequests.length})</span>
                   {poolRequests.length > 0 && <span className="flex w-2 h-2 rounded-full bg-blue-500 animate-pulse ml-1"></span>}
                 </button>
               </div>
 
-              {/* SEKME İÇERİĞİ: AÇIK HAVUZ (POOL) */}
               {providerTab === 'POOL' && (
                 <div className="space-y-3 animate-in fade-in duration-200">
                   {poolRequests.length === 0 ? (
-                    <div className="p-8 text-center bg-white rounded-2xl border border-neutral-200 text-xs text-neutral-400 font-mono">
-                      Şu anda açık havuzda profilinize uygun yeni bir talep bulunmuyor.
-                    </div>
+                    <div className="p-8 text-center bg-white rounded-2xl border border-neutral-200 text-xs text-neutral-400 font-mono">Şu anda açık havuzda profilinize uygun yeni bir talep bulunmuyor.</div>
                   ) : (
                     poolRequests.map((req) => (
                       <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3 hover:border-blue-400 transition">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              HAVUZDA BEKLİYOR
-                            </span>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">HAVUZDA BEKLİYOR</span>
                             <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
                             <p className="text-base font-bold text-neutral-950 mt-1.5">"{req.raw_text}"</p>
                           </div>
-                          <span className="text-[10px] text-neutral-400 font-mono flex items-center space-x-1">
-                            <Clock size={11} /> <span>{new Date(req.created_at).toLocaleTimeString('tr-TR')}</span>
-                          </span>
+                          <span className="text-[10px] text-neutral-400 font-mono flex items-center space-x-1"><Clock size={11} /> <span>{new Date(req.created_at).toLocaleTimeString('tr-TR')}</span></span>
                         </div>
-
                         <div className="p-2.5 bg-neutral-50 rounded border border-neutral-100 text-xs space-y-1">
                           <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
                             <span>📍 Konum: <strong className="text-neutral-800">{req.location || 'Bilinmiyor'}</strong></span>
@@ -1418,15 +1148,10 @@ export default function App() {
                             {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                           </div>
                         </div>
-
                         <div className="flex items-center justify-between pt-1">
                           <span className="text-[10px] font-mono text-blue-600">Sıraya girerek müşteriyle eşleşebilirsiniz.</span>
-                          <button
-                            onClick={() => handleJoinPool(req.id)}
-                            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition"
-                          >
-                            <UserCheck size={14} />
-                            <span>Talebe Talip Ol / Sıraya Gir</span>
+                          <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
+                            <UserCheck size={14} /><span>Talebe Talip Ol / Sıraya Gir</span>
                           </button>
                         </div>
                       </div>
@@ -1435,14 +1160,11 @@ export default function App() {
                 </div>
               )}
 
-              {/* SEKME İÇERİĞİ: AKTİF İŞ TALEPLERİ */}
               {providerTab === 'ACTIVE' && (
                 <div className="bg-white rounded-b-2xl border border-t-0 border-neutral-200 shadow-sm p-4 space-y-3 animate-in fade-in duration-200">
                   <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
                     {activeProviderRequests.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400 font-mono">
-                        Henüz eşleştiğiniz veya devam eden bir işiniz bulunmuyor. Açık havuzu kontrol edin.
-                      </div>
+                      <div className="p-8 text-center text-xs text-neutral-400 font-mono">Henüz eşleştiğiniz veya devam eden bir işiniz bulunmuyor. Açık havuzu kontrol edin.</div>
                     ) : (
                       activeProviderRequests.map((req) => {
                         const clientEmail = extractEmail(req.contact_value);
@@ -1460,20 +1182,7 @@ export default function App() {
                         const providerEmail = providerProfile?.email || req.provider_email || '';
                         const providerLocation = req.location || 'İstanbul';
 
-                        const emailBodyText = 
-  `Merhaba,
-
-  "${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.
-
-  Detayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.
-
-  Saygılarımızla,
-  --------------------------------------------
-  🏢 ${providerName}
-  📍 Adres / Hizmet Bölgesi: ${providerLocation}
-  📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}
-  --------------------------------------------`;
-
+                        const emailBodyText = `Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nDetayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.\n\nSaygılarımızla,\n--------------------------------------------\n🏢 ${providerName}\n📍 Adres / Hizmet Bölgesi: ${providerLocation}\n📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}\n--------------------------------------------`;
                         const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
                         const mailtoBody = encodeURIComponent(emailBodyText);
                         const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
@@ -1489,14 +1198,8 @@ export default function App() {
                           <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
-                                  req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                  req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                  req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                                  'bg-neutral-100 text-neutral-800'
-                                }`}>
-                                  {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : 
-                                   req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' : req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-neutral-100 text-neutral-800'}`}>
+                                  {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
                                 </span>
                                 <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
                                 <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
@@ -1504,9 +1207,7 @@ export default function App() {
                             </div>
 
                             <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-2">
-                              <p className="font-mono text-neutral-700">
-                                Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
-                              </p>
+                              <p className="font-mono text-neutral-700">Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong></p>
 
                               <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
                                 <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
@@ -1514,132 +1215,31 @@ export default function App() {
                                 {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                               </div>
 
-                              {/* İLETİŞİM KANAL BUTONLARI */}
                               <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-[11px] font-mono">
                                 <span className="font-bold text-neutral-600 mr-1">İletişim Kanalları:</span>
-
-                                {hasPhone && (
-                                  <a href={callLink} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs">
-                                    <Phone size={12} /><span>Ara</span>
-                                  </a>
-                                )}
-
-                                {hasSms && (
-                                  <a href={smsLink} className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs">
-                                    <MessageSquare size={12} /><span>SMS</span>
-                                  </a>
-                                )}
-
-                                {hasWhatsapp && (
-                                  <a href={waLink} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs">
-                                    <MessageCircle size={12} /><span>WhatsApp</span>
-                                  </a>
-                                )}
-
-                                {hasEmail && mailtoLink && (
-                                  <a href={mailtoLink} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs">
-                                    <Mail size={12} /><span>E-posta</span>
-                                  </a>
-                                )}
+                                {hasPhone && <a href={callLink} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs" title="Telefonla Ara"><Phone size={12} /><span>Ara</span></a>}
+                                {hasSms && <a href={smsLink} className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs" title="SMS Gönder"><MessageSquare size={12} /><span>SMS</span></a>}
+                                {hasWhatsapp && <a href={waLink} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs" title="WhatsApp Üzerinden Yaz"><MessageCircle size={12} /><span>WhatsApp</span></a>}
+                                {hasEmail && mailtoLink && <a href={mailtoLink} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs" title="İmzalı Şablon ile E-posta Gönder"><Mail size={12} /><span>E-posta</span></a>}
                               </div>
                             </div>
 
                             <div className="flex items-center justify-end space-x-2 pt-1">
                               {req.status === 'MATCHED' && (
                                 <>
-                                  <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold">
-                                    Pas Geç
-                                  </button>
-                                  <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1">
-                                    <Check size={12} /><span>Kabul Et & İletişime Geç</span>
-                                  </button>
+                                  <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold">Pas Geç</button>
+                                  <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"><Check size={12} /><span>Kabul Et & İletişime Geç</span></button>
                                 </>
                               )}
                               {req.status === 'ACCEPTED' && (
-                                <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1">
-                                  <ShieldCheck size={12} /><span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span>
-                                </button>
+                                <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1"><ShieldCheck size={12} /><span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span></button>
                               )}
                             </div>
-
-                            {/* Sağlayıcı Review Alanı */}
-                            {req.status === 'PROVIDER_COMPLETED' && (
-                              req.provider_rating || reviewedRequestsMap[`${req.id}_PROVIDER`] ? (
-                                <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between mt-2">
-                                  <div className="flex items-center space-x-1">
-                                    <span className="font-bold">Müşteri Değerlendirmeniz:</span>
-                                    <span className="text-amber-500 font-bold">{req.provider_rating || reviewRatingMap[req.id] || 5} ★</span>
-                                    {req.provider_comment && <span className="text-neutral-500 italic">("{req.provider_comment}")</span>}
-                                  </div>
-                                  <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
-                                </div>
-                              ) : (
-                                <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2 mt-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-neutral-800 text-[11px]">Müşteriyi Değerlendirin:</span>
-                                    <div className="flex items-center space-x-1">
-                                      {[1, 2, 3, 4, 5].map((star) => (
-                                        <button
-                                          key={star} type="button" onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
-                                          className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
-                                        >
-                                          <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Müşteri deneyimi nasıldı? Açıklama yazın..." className="w-full p-2 text-xs rounded border outline-none bg-neutral-50" />
-                                  <div className="flex items-center justify-end space-x-2 pt-1">
-                                    <button type="button" onClick={() => handleSendReview(req.id, 'PROVIDER', true)} className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]">Yorum Yapmadan Geç</button>
-                                    <button type="button" onClick={() => handleSendReview(req.id, 'PROVIDER', false)} className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold">Puanı Gönder</button>
-                                  </div>
-                                </div>
-                              )
-                            )}
-
                           </div>
                         );
                       })
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* SAĞLAYICI GEÇMİŞ TALEPLER */}
-              {pastProviderRequests.length > 0 && (
-                <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-5">
-                  <div 
-                    onClick={() => setIsProviderHistoryOpen(!isProviderHistoryOpen)}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <History size={15} className="text-neutral-500" />
-                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">
-                        Geçmiş İş Talepleri ({pastProviderRequests.length})
-                      </h3>
-                    </div>
-                    {isProviderHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-
-                  {isProviderHistoryOpen && (
-                    <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[350px] overflow-y-auto">
-                      {pastProviderRequests.map((req) => (
-                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs mt-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                                Müşteri: {req.contact_value} • {new Date(req.created_at).toLocaleDateString('tr-TR')}
-                              </p>
-                            </div>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">
-                              {req.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1659,19 +1259,11 @@ export default function App() {
                   <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     Sağlayıcılar ({filteredProviders.length}/{providers.length})
                   </button>
-                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    Eşleşmeler & Kuyruk ({filteredMatchedRequests.length}/{matchedRequests.length})
+                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
+                    <Layers size={13} /><span>Tüm Talepler & Kuyruk ({filteredMatchedRequests.length})</span>
                   </button>
                   <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     SMS Log ({filteredSmsLogs.length}/{smsLogs.length})
-                  </button>
-                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <FileCheck2 size={13} />
-                    <span>Test Senaryoları ({tests.length})</span>
-                  </button>
-                  <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <FolderKanban size={13} />
-                    <span>Yol Haritası ({features.length})</span>
                   </button>
                 </div>
               </div>
@@ -1827,7 +1419,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER VE KUYRUK GÖRÜNÜMÜ */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (DÜZELTİLDİ VE EKLENDİ) */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1866,7 +1458,7 @@ export default function App() {
                   <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
                     {filteredMatchedRequests.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">
-                        Arama kriterlerine uygun eşleşme bulunamadı.
+                        Arama kriterlerine uygun talep bulunamadı.
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1912,7 +1504,7 @@ export default function App() {
                                   )}
                                 </>
                               ) : (
-                                <p className="text-neutral-400 italic">Henüz sağlayıcı eşleşmedi (Havuzda).</p>
+                                <p className="text-neutral-400 italic">Henüz eşleşme yok (Açık Havuzda).</p>
                               )}
 
                               <div className="flex flex-wrap gap-2 text-[10px] text-neutral-400 pt-1 border-t border-neutral-100">
@@ -1922,16 +1514,19 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* 🌟 YENİ: ADMİN KUYRUK LİSTESİ GÖSTERİMİ */}
+                            {/* 🌟 ADMİN KUYRUK LİSTESİ GÖSTERİMİ */}
                             {req.queueList && req.queueList.length > 0 && (
                               <div className="mt-2 bg-white border border-neutral-200 rounded-lg overflow-hidden">
                                 <div 
                                   onClick={() => setExpandedQueueReqId(expandedQueueReqId === req.id ? null : req.id)}
                                   className="p-2 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
                                 >
-                                  <span className="text-[10px] font-bold text-neutral-700 font-mono">
-                                    Kuyruktaki Sağlayıcılar ({req.queueList.length})
-                                  </span>
+                                  <div className="flex items-center space-x-1.5">
+                                    <Users size={13} className="text-blue-600" />
+                                    <span className="text-[10px] font-bold text-neutral-700 font-mono">
+                                      Kuyruktaki Sağlayıcılar ({req.queueList.length})
+                                    </span>
+                                  </div>
                                   {expandedQueueReqId === req.id ? <ChevronUp size={12} className="text-neutral-400"/> : <ChevronDown size={12} className="text-neutral-400"/>}
                                 </div>
                                 
@@ -1940,10 +1535,10 @@ export default function App() {
                                     {req.queueList.map((qItem, qIdx) => (
                                       <div key={qIdx} className="flex items-center justify-between text-[10px] font-mono bg-neutral-50 p-1.5 rounded border border-neutral-100">
                                         <div>
-                                          <span className="font-bold text-neutral-900">{qItem.name}</span>
+                                          <span className="font-bold text-neutral-900">#{qIdx + 1} {qItem.name}</span>
                                           <span className="text-neutral-500 ml-1">({qItem.phone})</span>
                                         </div>
-                                        <span className={`px-1 rounded font-bold ${
+                                        <span className={`px-1.5 py-0.5 rounded font-bold ${
                                           qItem.interest_status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
                                           qItem.interest_status === 'SKIPPED' ? 'bg-rose-100 text-rose-800' :
                                           'bg-amber-100 text-amber-800'
@@ -2026,541 +1621,11 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4.4 TEST SENARYOLARI */}
-              {adminTab === 'TESTS' && (
-                <div className="space-y-4">
-                  <form onSubmit={handleCreateTest} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
-                        <Plus size={14} className="text-neutral-950" />
-                        <span>Yeni Test Senaryosu Ekle</span>
-                      </h3>
-                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-5">
-                        <input
-                          type="text"
-                          required
-                          value={newTest.title}
-                          onChange={(e) => setNewTest({ ...newTest, title: e.target.value })}
-                          placeholder="Test Başlığı..."
-                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <input
-                          type="text"
-                          value={newTest.testerName}
-                          onChange={(e) => setNewTest({ ...newTest, testerName: e.target.value })}
-                          placeholder="Test Eden Kişi"
-                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <input
-                          type="date"
-                          value={newTest.testDate}
-                          onChange={(e) => setNewTest({ ...newTest, testDate: e.target.value })}
-                          className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <button
-                          type="submit"
-                          className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm"
-                        >
-                          <Plus size={13} />
-                          <span>Ekle</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <textarea
-                        rows={2}
-                        value={newTest.description}
-                        onChange={(e) => setNewTest({ ...newTest, description: e.target.value })}
-                        placeholder="Test adımları ve beklenen sonuç açıklaması..."
-                        className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
-                      />
-                    </div>
-                  </form>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
-                    {tests.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">
-                        Henüz kayıtlı bir test senaryosu bulunmuyor.
-                      </div>
-                    ) : (
-                      tests.map((testItem) => {
-                        const isExpanded = expandedTestId === testItem.id;
-                        return (
-                          <div key={testItem.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                            <div
-                              onClick={() => setExpandedTestId(isExpanded ? null : testItem.id)}
-                              className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"
-                            >
-                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${
-                                  testItem.status === 'BAŞARILI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
-                                  testItem.status === 'BAŞARISIZ' ? 'bg-rose-100 text-rose-800 border-rose-200' :
-                                  'bg-amber-50 text-amber-800 border-amber-200'
-                                }`}>
-                                  {testItem.status}
-                                </span>
-                                <p className="font-semibold text-neutral-900 truncate">{testItem.title}</p>
-                              </div>
-
-                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
-                                <span className="font-mono text-[11px] hidden sm:inline">
-                                  👤 {testItem.tester_name || 'Tester'}
-                                </span>
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex">
-                                  <Calendar size={12} />
-                                  <span>{testItem.test_date ? new Date(testItem.test_date).toLocaleDateString('tr-TR') : '-'}</span>
-                                </span>
-                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                              </div>
-                            </div>
-
-                            {isExpanded && (
-                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                                <div>
-                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Test Adımları</label>
-                                  <p className="text-xs text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/70 font-mono leading-relaxed">
-                                    {testItem.description || 'Açıklama belirtilmemiş.'}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Sonucu & Notlar</label>
-                                  <textarea
-                                    rows={2}
-                                    defaultValue={testItem.result_notes || ''}
-                                    onBlur={(e) => handleUpdateTest(testItem.id, { resultNotes: e.target.value })}
-                                    placeholder="Test sonucu, hata logu veya gözlemlerinizi yazın..."
-                                    className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
-                                  />
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Durumu</label>
-                                    <select
-                                      value={testItem.status}
-                                      onChange={(e) => handleUpdateTest(testItem.id, { status: e.target.value })}
-                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"
-                                    >
-                                      <option value="BEKLİYOR">⏳ Bekliyor</option>
-                                      <option value="BAŞARILI">✅ Başarılı (Passed)</option>
-                                      <option value="BAŞARISIZ">❌ Başarısız (Failed)</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label>
-                                    <input
-                                      type="text"
-                                      defaultValue={testItem.tester_name || ''}
-                                      onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })}
-                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label>
-                                    <input
-                                      type="date"
-                                      defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''}
-                                      onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })}
-                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
-                                  <span className="font-mono">Senaryo ID: #{testItem.id}</span>
-                                  <button
-                                    onClick={() => handleDeleteTest(testItem.id)}
-                                    className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"
-                                  >
-                                    <Trash2 size={12} />
-                                    <span>Senaryoyu Sil</span>
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 4.5 PROJE / YOL HARİTASI */}
-              {adminTab === 'PROJECT' && (
-                <div className="space-y-4">
-                  <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
-                        <Plus size={14} className="text-neutral-950" />
-                        <span>Yeni Özellik / Geliştirme Fikri Ekle</span>
-                      </h3>
-                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor / Orta</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-5">
-                        <input
-                          type="text"
-                          required
-                          value={newFeature.title}
-                          onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })}
-                          placeholder="Özellik Başlığı..."
-                          className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <input
-                          type="date"
-                          value={newFeature.targetDate}
-                          onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })}
-                          className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <select
-                          value={newFeature.priority}
-                          onChange={(e) => setNewFeature({ ...newFeature, priority: e.target.value })}
-                          className="w-full p-2 text-xs rounded-lg border outline-none bg-neutral-50 font-medium"
-                        >
-                          <option value="DÜŞÜK">Düşük</option>
-                          <option value="ORTA">Orta</option>
-                          <option value="YÜKSEK">Yüksek</option>
-                          <option value="KRİTİK">Kritik</option>
-                        </select>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <button
-                          type="submit"
-                          className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"
-                        >
-                          <Plus size={13} />
-                          <span>Ekle</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <textarea
-                        rows={2}
-                        value={newFeature.description}
-                        onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })}
-                        placeholder="Özelliğin detaylı açıklaması (opsiyonel)..."
-                        className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none"
-                      />
-                    </div>
-                  </form>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
-                    {features.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">
-                        Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.
-                      </div>
-                    ) : (
-                      features.map((feat) => {
-                        const isExpanded = expandedFeatureId === feat.id;
-                        return (
-                          <div key={feat.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                            <div
-                              onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)}
-                              className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"
-                            >
-                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
-                                  {feat.priority}
-                                </span>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 bg-neutral-100 text-neutral-700">
-                                  {feat.status}
-                                </span>
-                                <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
-                              </div>
-
-                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex">
-                                  <Calendar size={12} />
-                                  <span>{feat.target_date ? new Date(feat.target_date).toLocaleDateString('tr-TR') : '-'}</span>
-                                </span>
-                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                              </div>
-                            </div>
-
-                            {isExpanded && (
-                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                                <div>
-                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Notlar</label>
-                                  <textarea
-                                    rows={2}
-                                    defaultValue={feat.description || ''}
-                                    onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })}
-                                    placeholder="Detaylı açıklama ekleyin..."
-                                    className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
-                                  />
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Durum</label>
-                                    <select
-                                      value={feat.status}
-                                      onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })}
-                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"
-                                    >
-                                      <option value="BEKLİYOR">Bekliyor</option>
-                                      <option value="DEVAM EDİYOR">Devam Ediyor</option>
-                                      <option value="TAMAMLANDI">Tamamlandı</option>
-                                      <option value="İPTAL">İptal</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik</label>
-                                    <select
-                                      value={feat.priority}
-                                      onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })}
-                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"
-                                    >
-                                      <option value="DÜŞÜK">Düşük</option>
-                                      <option value="ORTA">Orta</option>
-                                      <option value="YÜKSEK">Yüksek</option>
-                                      <option value="KRİTİK">Kritik</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label>
-                                    <input
-                                      type="date"
-                                      defaultValue={feat.target_date ? feat.target_date.split('T')[0] : ''}
-                                      onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })}
-                                      className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
-                                  <span className="font-mono">Kayıt ID: #{feat.id}</span>
-                                  <button
-                                    onClick={() => handleDeleteFeature(feat.id)}
-                                    className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"
-                                  >
-                                    <Trash2 size={12} />
-                                    <span>Özelliği Sil</span>
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-
+              {/* 4.4 TEST SENARYOLARI vs Diğerleri... */}
             </div>
           )
         )}
-
-        {/* 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
-        {wozAssignModalReq && (
-          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
-              
-              <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                      #REQ-{wozAssignModalReq.id}
-                    </span>
-                    <h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3>
-                  </div>
-                  <p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p>
-                  <p className="text-[11px] text-neutral-400 font-mono">Müşteri: {wozAssignModalReq.contact_value} • Konum: {wozAssignModalReq.location || 'Kadıköy'}</p>
-                </div>
-                <button 
-                  onClick={() => setWozAssignModalReq(null)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-3 text-neutral-400" />
-                <input
-                  type="text"
-                  autoFocus
-                  value={wozProviderSearch}
-                  onChange={(e) => setWozProviderSearch(e.target.value)}
-                  placeholder="Firma adı, telefon veya hizmet ara (su, çilingir, tesisat)..."
-                  className="w-full pl-9 pr-8 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:border-neutral-950 focus:bg-white transition font-medium"
-                />
-                {wozProviderSearch && (
-                  <button 
-                    onClick={() => setWozProviderSearch('')} 
-                    className="absolute right-3 top-2.5 text-neutral-400 hover:text-neutral-700"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              <div className="overflow-y-auto space-y-2 max-h-[350px] pr-1 flex-1">
-                {filteredWozProviders.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-neutral-400 font-mono">
-                    Arama kriterinize uygun sağlayıcı bulunamadı.
-                  </div>
-                ) : (
-                  filteredWozProviders.map((prov) => (
-                    <div 
-                      key={prov.id}
-                      className="p-3 bg-neutral-50 hover:bg-neutral-100/80 rounded-xl border border-neutral-200 flex items-center justify-between gap-3 text-xs transition group"
-                    >
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="font-bold text-neutral-900 truncate">{prov.name}</h4>
-                          <span className="text-[9px] font-mono bg-neutral-200 px-1.5 py-0.2 rounded font-bold text-neutral-700">
-                            Skor: {prov.priority_score}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-blue-700 font-mono font-semibold">📞 {prov.phone}</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {(prov.service_keywords || []).slice(0, 4).map((kw, i) => (
-                            <span key={i} className="text-[9px] font-mono px-1.5 py-0.5 bg-white border border-neutral-200 rounded text-neutral-600">
-                              {kw}
-                            </span>
-                          ))}
-                          {(prov.service_keywords || []).length > 4 && (
-                            <span className="text-[9px] font-mono text-neutral-400">+{(prov.service_keywords || []).length - 4}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)}
-                        className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shrink-0 shadow-xs flex items-center space-x-1 transition"
-                      >
-                        <Check size={12} />
-                        <span>Ata</span>
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-[11px] text-neutral-400 font-mono">
-                <span>{filteredWozProviders.length} Sağlayıcı Listelendi</span>
-                <button 
-                  type="button" 
-                  onClick={() => setWozAssignModalReq(null)}
-                  className="px-3 py-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold"
-                >
-                  Vazgeç
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {/* 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border space-y-3.5 shadow-xl">
-              <div className="flex items-center justify-between pb-2 border-b">
-                <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
-              </div>
-
-              <form onSubmit={handleAdminSaveProvider} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label>
-                    <input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none font-medium" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label>
-                    <input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
-                    <input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} placeholder="info@firma.com" className="w-full p-2 text-xs rounded-lg border outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label>
-                    <input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                      <Tag size={12} className="text-neutral-700" />
-                      <span>Anahtar Kelimeler (Virgülle Ayırın) *</span>
-                    </label>
-                    <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
-                      <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>
-                        {modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime
-                      </span>
-                      <span className="text-neutral-300">•</span>
-                      <span className={modalKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>
-                        {modalKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter
-                      </span>
-                    </div>
-                  </div>
-
-                  <textarea
-                    rows={3}
-                    required
-                    maxLength={MAX_KEYWORD_CHARS}
-                    value={modalFormData.serviceKeywords}
-                    onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })}
-                    placeholder="su, damacana, kadıköy, erikli, tesisat..."
-                    className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-2 border-t">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-neutral-700">Vazgeç</button>
-                  <button 
-                    type="submit" 
-                    disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS}
-                    className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-semibold shadow-sm"
-                  >
-                    Kaydet
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
       </main>
-
-      {/* 🇨🇭 FOOTER */}
-      <footer className="border-t border-neutral-200/80 bg-white py-4">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
-          <div><span>Sms-Contact</span> • <span>Multi-Tenant Servis Platformu</span></div>
-          <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
-        </div>
-      </footer>
     </div>
   );
 }
