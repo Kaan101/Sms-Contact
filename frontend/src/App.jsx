@@ -50,7 +50,7 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 Talep Bilgileri State (EMAIL ve İletişim E-postası Eklendi)
+  // Talep Bilgileri State
   const [preferredChannel, setPreferredChannel] = useState('PHONE');
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
@@ -189,7 +189,7 @@ export default function App() {
         phone: prov.phone,
         email: prov.email || '',
         serviceKeywords: (prov.service_keywords || []).join(', '),
-        communicationChannels: prov.communication_channels || ['PHONE', 'SMS'],
+        communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL'],
         priorityScore: prov.priority_score || 100
       });
 
@@ -323,7 +323,6 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
     const cleanPhone = encodeURIComponent(provPhone.trim());
@@ -367,7 +366,6 @@ export default function App() {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
 
-    // EMAIL kanalı seçildiyse contactValue olarak e-posta da dahil edilir
     const finalContactValue = preferredChannel === 'EMAIL' 
       ? `${contactEmail.trim()} (Tel: ${session.phone})`
       : session.phone;
@@ -695,6 +693,13 @@ export default function App() {
     return nameMatch || phoneMatch || kwMatch;
   });
 
+  // 🌟 Yardımcı Fonksiyon: İletişim bilgisinden e-posta adresini ayıklar
+  const extractEmail = (text) => {
+    if (!text) return null;
+    const match = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+  };
+
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -707,7 +712,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.7</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 5.8</span>
             </div>
           </div>
 
@@ -1131,7 +1136,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 D. ONAY EKRANI & TALEP BİLGİLERİ (EMAIL KANALI & GİRİŞ ALANI EKLENDİ) */}
+              {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1253,7 +1258,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 4. İletişim Kanalı Tercihi (PHONE, SMS, EMAIL) */}
+                        {/* 4. İletişim Kanalı Tercihi */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
                             İletişim Kanalı Tercihiniz
@@ -1286,7 +1291,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 5. EMAIL Seçildiyse Açılan Dinamik E-posta Kutusu */}
+                        {/* 5. Dinamik E-posta Giriş Kutusu */}
                         {preferredChannel === 'EMAIL' && (
                           <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
                             <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1">
@@ -1526,124 +1531,147 @@ export default function App() {
                       Henüz aktif bir iş talebi bulunmuyor.
                     </div>
                   ) : (
-                    activeProviderRequests.map((req) => (
-                      <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
-                              req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                              req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                              req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                              'bg-neutral-100 text-neutral-800'
-                            }`}>
-                              {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : 
-                               req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
-                            </span>
-                            <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
-                            <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
-                          </div>
-                        </div>
+                    activeProviderRequests.map((req) => {
+                      const clientEmail = extractEmail(req.contact_value);
+                      const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
+                      const mailtoBody = encodeURIComponent(`Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nİyi çalışmalar.`);
+                      const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
 
-                        <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1">
-                          <p className="font-mono text-neutral-600">
-                            Müşteri İletişim: <strong className="text-neutral-800">{req.contact_value}</strong>
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
-                            <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
-                            {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
-                            {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
-                            <span>📞 Kanal: <strong>[{req.preferred_channel}]</strong></span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end space-x-2 pt-1">
-                          {req.status === 'MATCHED' && (
-                            <>
-                              <button
-                                onClick={() => handleCustomerNextProvider(req.id)}
-                                className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold"
-                              >
-                                Pas Geç
-                              </button>
-                              <button
-                                onClick={() => handleStatusChange(req.id, 'ACCEPTED')}
-                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"
-                              >
-                                <Check size={12} />
-                                <span>Kabul Et & İletişime Geç</span>
-                              </button>
-                            </>
-                          )}
-                          {req.status === 'ACCEPTED' && (
-                            <button
-                              onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')}
-                              className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1"
-                            >
-                              <ShieldCheck size={12} />
-                              <span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Sağlayıcı Review Alanı */}
-                        {req.status === 'PROVIDER_COMPLETED' && (
-                          req.provider_rating || reviewedRequestsMap[`${req.id}_PROVIDER`] ? (
-                            <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between mt-2">
-                              <div className="flex items-center space-x-1">
-                                <span className="font-bold">Müşteri Değerlendirmeniz:</span>
-                                <span className="text-amber-500 font-bold">{req.provider_rating || reviewRatingMap[req.id] || 5} ★</span>
-                                {req.provider_comment && <span className="text-neutral-500 italic">("{req.provider_comment}")</span>}
-                              </div>
-                              <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
+                      return (
+                        <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
+                                req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                                'bg-neutral-100 text-neutral-800'
+                              }`}>
+                                {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : 
+                                 req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
+                              </span>
+                              <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
+                              <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
                             </div>
-                          ) : (
-                            <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2 mt-2">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-neutral-800 text-[11px]">Müşteriyi Değerlendirin:</span>
+                          </div>
+
+                          {/* 🌟 Müşteri İletişim Bilgileri ve Tıklanabilir mailto: Bağlantısı */}
+                          <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-1.5">
+                            <div className="flex flex-wrap items-center justify-between gap-1">
+                              <p className="font-mono text-neutral-700">
+                                Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong>
+                              </p>
+                              
+                              {/* 🌟 TIKLANABİLİR E-POSTA BAĞLANTISI (VARSAYILAN E-POSTA İSTEMCİSİNİ AÇAR) */}
+                              {mailtoLink && (
+                                <a
+                                  href={mailtoLink}
+                                  className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-[11px] font-semibold flex items-center space-x-1 transition shadow-xs"
+                                  title="Varsayılan E-posta Uygulamasında Aç"
+                                >
+                                  <Mail size={12} />
+                                  <span>E-posta Gönder ({clientEmail})</span>
+                                </a>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
+                              <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
+                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                              {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
+                              <span>📞 Kanal: <strong>[{req.preferred_channel}]</strong></span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end space-x-2 pt-1">
+                            {req.status === 'MATCHED' && (
+                              <>
+                                <button
+                                  onClick={() => handleCustomerNextProvider(req.id)}
+                                  className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold"
+                                >
+                                  Pas Geç
+                                </button>
+                                <button
+                                  onClick={() => handleStatusChange(req.id, 'ACCEPTED')}
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"
+                                >
+                                  <Check size={12} />
+                                  <span>Kabul Et & İletişime Geç</span>
+                                </button>
+                              </>
+                            )}
+                            {req.status === 'ACCEPTED' && (
+                              <button
+                                onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')}
+                                className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1"
+                              >
+                                <ShieldCheck size={12} />
+                                <span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Sağlayıcı Review Alanı */}
+                          {req.status === 'PROVIDER_COMPLETED' && (
+                            req.provider_rating || reviewedRequestsMap[`${req.id}_PROVIDER`] ? (
+                              <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between mt-2">
                                 <div className="flex items-center space-x-1">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                      key={star}
-                                      type="button"
-                                      onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
-                                      className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
-                                    >
-                                      <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
-                                    </button>
-                                  ))}
+                                  <span className="font-bold">Müşteri Değerlendirmeniz:</span>
+                                  <span className="text-amber-500 font-bold">{req.provider_rating || reviewRatingMap[req.id] || 5} ★</span>
+                                  {req.provider_comment && <span className="text-neutral-500 italic">("{req.provider_comment}")</span>}
+                                </div>
+                                <span className="text-[10px] font-mono text-emerald-600">SMS Loglandı</span>
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2 mt-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-neutral-800 text-[11px]">Müşteriyi Değerlendirin:</span>
+                                  <div className="flex items-center space-x-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button
+                                        key={star}
+                                        type="button"
+                                        onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })}
+                                        className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
+                                      >
+                                        <Star size={15} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={reviewCommentMap[req.id] || ''}
+                                  onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })}
+                                  placeholder="Müşteri deneyimi nasıldı? Açıklama yazın..."
+                                  className="w-full p-2 text-xs rounded border outline-none bg-neutral-50"
+                                />
+
+                                <div className="flex items-center justify-end space-x-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReview(req.id, 'PROVIDER', true)}
+                                    className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]"
+                                  >
+                                    Yorum Yapmadan Geç
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReview(req.id, 'PROVIDER', false)}
+                                    className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold"
+                                  >
+                                    Puanı Gönder
+                                  </button>
                                 </div>
                               </div>
+                            )
+                          )}
 
-                              <input
-                                type="text"
-                                value={reviewCommentMap[req.id] || ''}
-                                onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })}
-                                placeholder="Müşteri deneyimi nasıldı? Açıklama yazın..."
-                                className="w-full p-2 text-xs rounded border outline-none bg-neutral-50"
-                              />
-
-                              <div className="flex items-center justify-end space-x-2 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSendReview(req.id, 'PROVIDER', true)}
-                                  className="px-2.5 py-1 text-neutral-500 hover:bg-neutral-100 rounded text-[11px]"
-                                >
-                                  Yorum Yapmadan Geç
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSendReview(req.id, 'PROVIDER', false)}
-                                  className="px-3 py-1 bg-neutral-950 text-white rounded text-[11px] font-semibold"
-                                >
-                                  Puanı Gönder
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        )}
-
-                      </div>
-                    ))
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -2372,12 +2400,11 @@ export default function App() {
           )
         )}
 
-        {/* 🌟 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
+        {/* 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
         {wozAssignModalReq && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
               
-              {/* Modal Başlık */}
               <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
                 <div>
                   <div className="flex items-center space-x-2">
@@ -2397,7 +2424,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Arama Filtre Çubuğu */}
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-3 text-neutral-400" />
                 <input
@@ -2418,7 +2444,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Filtrelenmiş Sağlayıcı Listesi */}
               <div className="overflow-y-auto space-y-2 max-h-[350px] pr-1 flex-1">
                 {filteredWozProviders.length === 0 ? (
                   <div className="p-8 text-center text-xs text-neutral-400 font-mono">
@@ -2462,7 +2487,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Modal Alt Kapatma */}
               <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-[11px] text-neutral-400 font-mono">
                 <span>{filteredWozProviders.length} Sağlayıcı Listelendi</span>
                 <button 
