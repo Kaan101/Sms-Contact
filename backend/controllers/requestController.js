@@ -1,346 +1,174 @@
 const { pool } = require('../config/db');
 
-const getNormalizedLast10 = (p) => {
-  if (!p) return '';
-  const digits = p.replace(/\D/g, '');
-  return digits.length >= 10 ? digits.slice(-10) : digits;
-};
-
-const triggerSimulatedNotifications = async (requestId, reqData, providerData, eventType = 'MATCHED') => {
+const logSms = async (requestId, type, phone, body) => {
   try {
-    const channel = reqData.preferred_channel || 'PHONE';
-    const loc = reqData.location || 'Mevcut Konum';
-    const isUrgent = reqData.is_urgent === true;
-    const deadline = reqData.deadline_datetime ? new Date(reqData.deadline_datetime).toLocaleString('tr-TR') : 'Belirtilmedi';
-    
-    let userMsg = '';
-    let providerMsg = '';
-
-    if (eventType === 'MATCHED') {
-      userMsg = `[Sms-Contact] Talebiniz #${requestId} '${providerData.name}' ile eşleştirildi. Sağlayıcı onayı bekleniyor.`;
-      providerMsg = `[Sms-Contact] Yeni İş Fırsatı (#${requestId})! Müşteri Tel: ${reqData.contact_value}. İhtiyaç: "${reqData.raw_text}". Konum: ${loc}${isUrgent ? ' [🔥 ACİL]' : ''}. En Son: ${deadline}. Kanal: ${channel}. Lütfen yanıtlayın.`;
-    } else if (eventType === 'ACCEPTED') {
-      userMsg = `[Sms-Contact] Müjde! '${providerData.name}' talebinizi kabul etti. İletişim: ${providerData.phone}`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı talebi kabul ettiniz. Müşteri (${reqData.contact_value}) ile iletişime geçebilirsiniz.`;
-    } else if (eventType === 'PROVIDER_COMPLETED') {
-      userMsg = `[Sms-Contact] '${providerData.name}' hizmeti tamamladığını bildirdi. Lütfen onaylayın.`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı işi tamamladınız. Müşteri onayı bekleniyor.`;
-    } else if (eventType === 'COMPLETED') {
-      userMsg = `[Sms-Contact] #${requestId} numaralı hizmet tamamlandı olarak onaylandı. Teşekkürler!`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı iş müşteri tarafından onaylandı.`;
-    } else if (eventType === 'CANCELLED') {
-      userMsg = `[Sms-Contact] #${requestId} numaralı talebiniz iptal edildi.`;
-      providerMsg = `[Sms-Contact] #${requestId} numaralı talep iptal edildi.`;
-    }
-
-    if (userMsg && providerMsg && providerData.phone) {
-      pool.query(`
-        INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, channel, message_body)
-        VALUES 
-          ($1, 'USER', $2, 'SMS', $3),
-          ($1, 'PROVIDER', $4, 'SMS', $5);
-      `, [requestId, reqData.contact_value, userMsg, providerData.phone, providerMsg]).catch(err => {
-        console.error('SMS loglama hatası:', err.message);
-      });
-    }
-  } catch (err) {
-    console.error('SMS loglama hatası:', err.message);
+    await pool.query(
+      `INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, message_body) 
+       VALUES ($1, $2, $3, $4)`,
+      [requestId, type, phone, body]
+    );
+  } catch (error) {
+    console.error('SMS Loglama Hatası:', error);
   }
 };
 
-// 1. Yeni Talep Oluşturma
 const createRequest = async (req, res) => {
   try {
-    const { 
-      rawText, 
-      disambiguationChoice, 
-      contactValue, 
-      preferredChannel, 
-      location, 
-      isUrgent, 
-      deadlineDatetime 
-    } = req.body;
-
-    if (!rawText || !contactValue) {
-      return res.status(400).json({ status: 'error', message: 'Metin ve iletişim bilgisi zorunludur.' });
-    }
-
-    const cleanContact = contactValue.trim();
-    const textToAnalyze = (disambiguationChoice || rawText).toLowerCase();
+    const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime } = req.body;
     
-    const tokens = textToAnalyze
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 1);
+    // Yeni talepler doğrudan POOL (Havuz) statüsünde başlar
+    const { rows: requestRows } = await pool.query(
+      `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'POOL') 
+       RETURNING *;`,
+      [rawText, disambiguationChoice, contactValue, preferredChannel || 'PHONE', location, isUrgent || false, deadlineDatetime || null]
+    );
 
-    const { rows: activeProviders } = await pool.query(`
-      SELECT id, name, phone, email, service_keywords, communication_channels, priority_score 
-      FROM service_providers 
-      WHERE is_active = TRUE 
-      ORDER BY priority_score DESC, id ASC;
-    `);
+    const newRequest = requestRows[0];
 
-    const matchedCandidates = [];
-    for (const provider of activeProviders) {
-      const keywords = (provider.service_keywords || []).map(k => k.toLowerCase().trim());
-      const hasMatch = keywords.some(k => 
-        tokens.includes(k) || 
-        textToAnalyze.includes(k) ||
-        k.split(/\s+/).every(part => textToAnalyze.includes(part))
-      );
-      if (hasMatch) {
-        matchedCandidates.push(provider);
-      }
-    }
+    // Müşteriye SMS Log
+    await logSms(
+      newRequest.id, 
+      'USER', 
+      contactValue, 
+      `Talebiniz alınmış ve servis havuzuna eklenmiştir. Hizmet sağlayıcılar sıraya girdiğinde size bilgi vereceğiz.`
+    );
 
-    const topCandidates = matchedCandidates.slice(0, 3);
-    const primaryProvider = topCandidates.length > 0 ? topCandidates[0] : null;
-    const requestStatus = primaryProvider ? 'MATCHED' : 'MANUAL_INTERVENTION';
-
-    const insertQuery = `
-      INSERT INTO requests 
-      (raw_text, disambiguation_choice, keywords, contact_value, preferred_channel, location, is_urgent, deadline_datetime, status, matched_provider_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *;
-    `;
-
-    const values = [
-      rawText.trim(),
-      disambiguationChoice ? disambiguationChoice.trim() : null,
-      tokens,
-      cleanContact,
-      preferredChannel || 'PHONE',
-      location && location.trim() !== '' ? location.trim() : 'İstanbul, Türkiye',
-      isUrgent === true,
-      deadlineDatetime ? new Date(deadlineDatetime) : new Date(),
-      requestStatus,
-      primaryProvider ? primaryProvider.id : null
-    ];
-
-    const { rows: savedRows } = await pool.query(insertQuery, values);
-    const createdReq = savedRows[0];
-
-    if (primaryProvider) {
-      triggerSimulatedNotifications(createdReq.id, createdReq, primaryProvider, 'MATCHED');
-
-      return res.status(201).json({
-        status: 'success',
-        message: `Talebiniz '${primaryProvider.name}' ile eşleştirildi.`,
-        matchedProvider: primaryProvider,
-        candidates: topCandidates,
-        request: createdReq
-      });
-    } else {
-      return res.status(201).json({
-        status: 'success',
-        message: 'Talebiniz alındı. Uygun sağlayıcı onaylandığında SMS ile bildirilecektir.',
-        matchedProvider: null,
-        candidates: [],
-        request: createdReq
-      });
-    }
+    res.status(201).json({ status: 'success', request: newRequest });
   } catch (error) {
-    console.error('Talep oluşturma hatası:', error);
-    res.status(500).json({ status: 'error', message: `Talep oluşturulamadı: ${error.message}` });
+    console.error(error);
+    res.status(500).json({ status: 'error', message: 'Sunucu hatası' });
   }
 };
 
-const getUserRequests = async (req, res) => {
+// 🌟 YENİ: Açık Havuzdaki Talepleri Getir (Sağlayıcı İçin)
+const getOpenPoolRequests = async (req, res) => {
   try {
-    const { phone } = req.query;
-    if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon zorunludur.' });
+    const { providerId } = req.query;
+    
+    // Status = POOL olan ve bu sağlayıcının henüz kuyruğuna GİRMEDİĞİ talepleri getir
+    const { rows } = await pool.query(
+      `SELECT r.* FROM requests r
+       WHERE r.status = 'POOL' 
+       AND NOT EXISTS (
+         SELECT 1 FROM request_interests ri 
+         WHERE ri.request_id = r.id AND ri.provider_id = $1
+       )
+       ORDER BY r.created_at DESC;`,
+      [providerId]
+    );
 
-    const rawPhone = phone.trim();
-    const last10 = getNormalizedLast10(rawPhone);
-
-    const { rows: userRequests } = await pool.query(`
-      SELECT 
-        r.*,
-        p.name AS provider_name,
-        p.phone AS provider_phone,
-        p.email AS provider_email,
-        p.priority_score AS provider_score,
-        rev.rating AS customer_rating,
-        rev.comment AS customer_comment
-      FROM requests r
-      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
-      LEFT JOIN reviews rev ON (r.id = rev.request_id AND rev.reviewer_type = 'CUSTOMER')
-      WHERE r.contact_value = $1 
-         OR RIGHT(REGEXP_REPLACE(r.contact_value, '\\D', '', 'g'), 10) = $2
-      ORDER BY r.id DESC;
-    `, [rawPhone, last10]);
-
-    const { rows: allProviders } = await pool.query(`
-      SELECT id, name, phone, service_keywords, priority_score 
-      FROM service_providers 
-      WHERE is_active = TRUE 
-      ORDER BY priority_score DESC, id ASC;
-    `);
-
-    const enrichedRequests = userRequests.map(reqItem => {
-      const textToAnalyze = (reqItem.disambiguation_choice || reqItem.raw_text).toLowerCase();
-      const tokens = textToAnalyze.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ').split(/\s+/).filter(w => w.length > 1);
-
-      const matched = allProviders.filter(prov => {
-        const kws = (prov.service_keywords || []).map(k => k.toLowerCase().trim());
-        return kws.some(k => tokens.includes(k) || textToAnalyze.includes(k));
-      });
-
-      return {
-        ...reqItem,
-        topCandidates: matched.slice(0, 3)
-      };
-    });
-
-    res.status(200).json({ status: 'success', requests: enrichedRequests });
+    res.status(200).json({ status: 'success', poolRequests: rows });
   } catch (error) {
-    console.error('getUserRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
-const getProviderAssignedRequests = async (req, res) => {
-  try {
-    const { providerId, phone } = req.query;
-
-    if (!providerId && !phone) {
-      return res.status(400).json({ status: 'error', message: 'providerId veya phone zorunludur.' });
-    }
-
-    let pId = parseInt(providerId, 10);
-    const rawPhone = phone ? phone.trim() : '';
-    const last10 = getNormalizedLast10(rawPhone);
-
-    if (isNaN(pId) || pId <= 0) {
-      const { rows: foundProv } = await pool.query(`
-        SELECT id FROM service_providers 
-        WHERE phone = $1 
-           OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2
-        LIMIT 1;
-      `, [rawPhone, last10]);
-
-      if (foundProv.length > 0) {
-        pId = foundProv[0].id;
-      }
-    }
-
-    const query = `
-      SELECT 
-        r.*,
-        p.name AS provider_name,
-        p.phone AS provider_phone,
-        rev.rating AS provider_rating,
-        rev.comment AS provider_comment
-      FROM requests r
-      INNER JOIN service_providers p ON r.matched_provider_id = p.id
-      LEFT JOIN reviews rev ON (r.id = rev.request_id AND rev.reviewer_type = 'PROVIDER')
-      WHERE r.matched_provider_id = $1 
-         OR p.phone = $2
-         OR ($3 <> '' AND RIGHT(REGEXP_REPLACE(p.phone, '\\D', '', 'g'), 10) = $3)
-      ORDER BY r.id DESC;
-    `;
-
-    const { rows } = await pool.query(query, [pId || -1, rawPhone, last10]);
-    res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    console.error('getProviderAssignedRequests hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
-const passToNextProvider = async (req, res) => {
-  try {
-    const { requestId } = req.params;
-    const rId = parseInt(requestId, 10);
-
-    const { rows: reqRows } = await pool.query('SELECT * FROM requests WHERE id = $1', [rId]);
-    if (reqRows.length === 0) return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
-    const targetReq = reqRows[0];
-
-    const textToAnalyze = (targetReq.disambiguation_choice || targetReq.raw_text).toLowerCase();
-    const tokens = textToAnalyze.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, ' ').split(/\s+/).filter(w => w.length > 1);
-
-    const { rows: allProviders } = await pool.query(`
-      SELECT id, name, phone, service_keywords, priority_score 
-      FROM service_providers 
-      WHERE is_active = TRUE 
-      ORDER BY priority_score DESC, id ASC;
-    `);
-
-    const matched = allProviders.filter(prov => {
-      const kws = (prov.service_keywords || []).map(k => k.toLowerCase().trim());
-      return kws.some(k => tokens.includes(k) || textToAnalyze.includes(k));
-    });
-
-    if (matched.length <= 1) {
-      await pool.query("UPDATE requests SET status = 'MANUAL_INTERVENTION', matched_provider_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1", [rId]);
-      return res.status(200).json({
-        status: 'success',
-        message: 'Alternatif başka sağlayıcı bulunamadığı için talep Operatör Havuzuna aktarıldı.'
-      });
-    }
-
-    const currentIndex = matched.findIndex(p => p.id === targetReq.matched_provider_id);
-    const nextIndex = (currentIndex + 1) % matched.length;
-    const nextProvider = matched[nextIndex];
-
-    const { rows: updatedRows } = await pool.query(`
-      UPDATE requests 
-      SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2 
-      RETURNING *;
-    `, [nextProvider.id, rId]);
-
-    triggerSimulatedNotifications(rId, updatedRows[0], nextProvider, 'MATCHED');
-
-    res.status(200).json({
-      status: 'success',
-      message: `Talep başarıyla '${nextProvider.name}' sağlayıcısına yönlendirildi.`,
-      request: updatedRows[0],
-      newProvider: nextProvider
-    });
-  } catch (error) {
-    console.error('passToNextProvider hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
-const selectCandidateProvider = async (req, res) => {
+// 🌟 YENİ: Sağlayıcı Havuzdaki Bir Talebe Talip Olur (Kuyruğa Girer)
+const joinRequestPool = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { providerId } = req.body;
-    const rId = parseInt(requestId, 10);
-    const pId = parseInt(providerId, 10);
 
-    if (isNaN(rId) || isNaN(pId)) {
-      return res.status(400).json({ status: 'error', message: 'Geçersiz ID parametresi.' });
+    // 1. request_interests tablosuna ekle
+    await pool.query(
+      `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'WAITING') ON CONFLICT DO NOTHING`,
+      [requestId, providerId]
+    );
+
+    // 2. Eğer bu talebin henüz matched_provider_id'si yoksa (ilk gelen), onu hemen ata ve status=MATCHED yap
+    const reqCheck = await pool.query(`SELECT matched_provider_id, contact_value FROM requests WHERE id = $1`, [requestId]);
+    
+    if (reqCheck.rows.length > 0 && !reqCheck.rows[0].matched_provider_id) {
+      await pool.query(
+        `UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`,
+        [providerId, requestId]
+      );
+      
+      const provCheck = await pool.query(`SELECT name FROM service_providers WHERE id = $1`, [providerId]);
+      
+      await logSms(
+        requestId,
+        'USER',
+        reqCheck.rows[0].contact_value,
+        `Talebinizle ilgilenen ilk sağlayıcı (${provCheck.rows[0].name}) bulundu. Lütfen sisteme girip değerlendirin.`
+      );
     }
 
-    const { rows: providerRows } = await pool.query('SELECT id, name, phone FROM service_providers WHERE id = $1', [pId]);
-    if (providerRows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Seçilen sağlayıcı bulunamadı.' });
-    }
-
-    const { rows: updatedRows } = await pool.query(`
-      UPDATE requests 
-      SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2 
-      RETURNING *;
-    `, [pId, rId]);
-
-    if (updatedRows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
-    }
-
-    triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
-
-    res.status(200).json({
-      status: 'success',
-      message: `Talep başarıyla '${providerRows[0].name}' sağlayıcısına aktarıldı.`,
-      request: updatedRows[0]
-    });
+    res.status(200).json({ status: 'success', message: 'Talebe talip oldunuz ve sıraya girdiniz.' });
   } catch (error) {
-    console.error('selectCandidateProvider hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// Müşteri İçin Kendi Talepleri ve KUYRUKTAKİ Sağlayıcılar
+const getUserRequests = async (req, res) => {
+  try {
+    const { phone } = req.query;
+    const { rows: requests } = await pool.query(
+      `SELECT r.*, 
+        sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
+        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER' LIMIT 1) as customer_rating
+       FROM requests r
+       LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
+       WHERE r.contact_value LIKE $1
+       ORDER BY r.created_at DESC;`,
+      [`%${phone}%`]
+    );
+
+    // Her talep için kuyruktaki adayları (request_interests) getir
+    for (let r of requests) {
+      if (r.status === 'POOL' || r.status === 'MATCHED') {
+        const { rows: queued } = await pool.query(
+          `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status 
+           FROM request_interests ri
+           JOIN service_providers sp ON ri.provider_id = sp.id
+           WHERE ri.request_id = $1 AND ri.status != 'SKIPPED'
+           ORDER BY ri.created_at ASC;`,
+          [r.id]
+        );
+        r.queuedProviders = queued;
+      }
+    }
+
+    res.status(200).json({ status: 'success', requests });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// Müşteri "Sonrakine Geç" Dediğinde
+const passToNextProvider = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    
+    // Şu anki eşleşmeyi SKIPPED yap
+    await pool.query(
+      `UPDATE request_interests 
+       SET status = 'SKIPPED' 
+       WHERE request_id = $1 AND provider_id = (SELECT matched_provider_id FROM requests WHERE id = $1)`,
+      [requestId]
+    );
+
+    // Kuyruktaki sıradaki (WAITING) kişiyi bul
+    const { rows: nextInQueue } = await pool.query(
+      `SELECT provider_id FROM request_interests 
+       WHERE request_id = $1 AND status = 'WAITING' 
+       ORDER BY created_at ASC LIMIT 1`,
+      [requestId]
+    );
+
+    if (nextInQueue.length > 0) {
+      const nextProviderId = nextInQueue[0].provider_id;
+      await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [nextProviderId, requestId]);
+      await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, nextProviderId]);
+    } else {
+      // Kuyrukta kimse kalmadıysa tekrar POOL'a düşsün
+      await pool.query(`UPDATE requests SET matched_provider_id = NULL, status = 'POOL' WHERE id = $1`, [requestId]);
+    }
+
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -350,36 +178,70 @@ const updateRequestStatus = async (req, res) => {
     const { requestId } = req.params;
     const { newStatus } = req.body;
 
-    const allowedStatuses = ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED'];
-    if (!allowedStatuses.includes(newStatus)) {
-      return res.status(400).json({ status: 'error', message: 'Geçersiz talep durumu.' });
-    }
+    const { rows } = await pool.query(
+      `UPDATE requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *;`,
+      [newStatus, requestId]
+    );
 
-    const { rows } = await pool.query(`
-      UPDATE requests
-      SET status = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      RETURNING *;
-    `, [newStatus, parseInt(requestId, 10)]);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
-    }
-
-    if (rows[0].matched_provider_id) {
-      const { rows: pRows } = await pool.query('SELECT id, name, phone FROM service_providers WHERE id = $1', [rows[0].matched_provider_id]);
-      if (pRows.length > 0) {
-        triggerSimulatedNotifications(rows[0].id, rows[0], pRows[0], newStatus);
+    if (rows.length > 0) {
+      const updatedReq = rows[0];
+      if (newStatus === 'ACCEPTED') {
+        await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Talebiniz sağlayıcı tarafından kabul edildi. İletişime geçilecektir.`);
+      } else if (newStatus === 'PROVIDER_COMPLETED') {
+        await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Sağlayıcı işlemi tamamladığını bildirdi. Lütfen onaylayıp değerlendirin.`);
       }
     }
 
-    res.status(200).json({
-      status: 'success',
-      message: `Talep durumu '${newStatus}' olarak güncellendi.`,
-      request: rows[0]
-    });
+    res.status(200).json({ status: 'success', request: rows[0] });
   } catch (error) {
-    console.error('updateRequestStatus hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+const getProviderAssignedRequests = async (req, res) => {
+  try {
+    const { providerId } = req.query;
+    if (!providerId) return res.status(404).json({ message: 'Provider ID gerekli' });
+
+    const { rows } = await pool.query(
+      `SELECT r.*, 
+        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'PROVIDER' LIMIT 1) as provider_rating
+       FROM requests r
+       WHERE r.matched_provider_id = $1 
+       AND r.status IN ('MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED')
+       ORDER BY r.updated_at DESC;`,
+      [providerId]
+    );
+    res.status(200).json({ status: 'success', requests: rows });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+const getMatchedRequests = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT r.*, sp.name as provider_name, sp.phone as provider_phone 
+      FROM requests r
+      LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
+      ORDER BY r.created_at DESC;
+    `);
+
+    // Her talep için kuyruğu da çek (Admin panelinde göstermek için)
+    for (let r of rows) {
+      const { rows: queued } = await pool.query(
+        `SELECT sp.name, sp.phone, ri.status as interest_status, ri.created_at
+         FROM request_interests ri
+         JOIN service_providers sp ON ri.provider_id = sp.id
+         WHERE ri.request_id = $1
+         ORDER BY ri.created_at ASC;`,
+        [r.id]
+      );
+      r.queueList = queued;
+    }
+
+    res.status(200).json({ status: 'success', requests: rows });
+  } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -388,33 +250,11 @@ const getPendingRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT * FROM requests 
-      WHERE status = 'MANUAL_INTERVENTION' OR status = 'PENDING'
-      ORDER BY id DESC;
+      WHERE status IN ('POOL', 'MANUAL_INTERVENTION')
+      ORDER BY created_at ASC;
     `);
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
-    console.error('getPendingRequests hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
-const getMatchedRequests = async (req, res) => {
-  try {
-    const query = `
-      SELECT 
-        r.*,
-        p.id AS provider_id,
-        p.name AS provider_name,
-        p.phone AS provider_phone
-      FROM requests r
-      LEFT JOIN service_providers p ON r.matched_provider_id = p.id
-      WHERE r.status IN ('MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED')
-      ORDER BY r.id DESC;
-    `;
-    const { rows } = await pool.query(query);
-    res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    console.error('getMatchedRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -422,43 +262,25 @@ const getMatchedRequests = async (req, res) => {
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
-    const rId = parseInt(requestId, 10);
-    const pId = parseInt(providerId, 10);
+    await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
+    
+    // Sağlayıcıyı doğrudan kuyruğa ekle (varsa yoksay)
+    await pool.query(
+      `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE') ON CONFLICT (request_id, provider_id) DO UPDATE SET status = 'ACTIVE'`,
+      [requestId, providerId]
+    );
 
-    const { rows: providerRows } = await pool.query('SELECT id, name, phone FROM service_providers WHERE id = $1', [pId]);
-    if (providerRows.length === 0) return res.status(404).json({ status: 'error', message: 'Sağlayıcı bulunamadı.' });
-
-    const { rows: updatedRows } = await pool.query(`
-      UPDATE requests 
-      SET matched_provider_id = $1, status = 'MATCHED', updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2 
-      RETURNING *;
-    `, [pId, rId]);
-
-    triggerSimulatedNotifications(rId, updatedRows[0], providerRows[0], 'MATCHED');
-
-    res.status(200).json({
-      status: 'success',
-      message: `Talep '${providerRows[0].name}' sağlayıcısına atandı.`,
-      request: updatedRows[0]
-    });
+    res.status(200).json({ status: 'success', message: 'Manuel atama başarılı.' });
   } catch (error) {
-    console.error('assignProviderManually hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
 const getOutboundNotifications = async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT n.*, r.raw_text 
-      FROM outbound_notifications n 
-      LEFT JOIN requests r ON n.request_id = r.id 
-      ORDER BY n.id DESC LIMIT 100;
-    `);
+    const { rows } = await pool.query(`SELECT * FROM outbound_notifications ORDER BY created_at DESC LIMIT 100;`);
     res.status(200).json({ status: 'success', notifications: rows });
   } catch (error) {
-    console.error('getOutboundNotifications hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
@@ -466,24 +288,29 @@ const getOutboundNotifications = async (req, res) => {
 const deleteRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
-    const rId = parseInt(requestId, 10);
-
-    if (isNaN(rId)) return res.status(400).json({ status: 'error', message: 'Geçersiz talep ID.' });
-
-    await pool.query('DELETE FROM outbound_notifications WHERE request_id = $1', [rId]);
-    const { rows } = await pool.query('DELETE FROM requests WHERE id = $1 RETURNING *;', [rId]);
-
-    if (rows.length === 0) return res.status(404).json({ status: 'error', message: 'Silinecek talep bulunamadı.' });
-
-    res.status(200).json({ status: 'success', message: 'Talep kalıcı olarak silindi.' });
+    await pool.query(`DELETE FROM requests WHERE id = $1`, [requestId]);
+    res.status(200).json({ status: 'success' });
   } catch (error) {
-    console.error('deleteRequest hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// TopCandidates seçme rotası artık kullanılmayacak ama geriye dönük uyumluluk için bırakıldı.
+const selectCandidateProvider = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { providerId } = req.body;
+    await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
 module.exports = {
   createRequest,
+  getOpenPoolRequests, // YENİ
+  joinRequestPool,     // YENİ
   getUserRequests,
   getProviderAssignedRequests,
   passToNextProvider,

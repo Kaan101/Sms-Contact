@@ -12,6 +12,8 @@ const {
 } = require('../controllers/providerController');
 const { 
   createRequest, 
+  getOpenPoolRequests,     // YENİ
+  joinRequestPool,         // YENİ
   getUserRequests,
   getProviderAssignedRequests,
   passToNextProvider,
@@ -54,8 +56,10 @@ router.get('/providers/by-phone', getProviderByPhone);
 router.put('/providers/:id', updateProvider);
 router.delete('/providers/:id', deleteProvider);
 
-// 4. Talepler
+// 4. Talepler ve Havuz (Marketplace Queue)
 router.post('/requests', createRequest);
+router.get('/requests/pool', getOpenPoolRequests);                   // 🌟 YENİ: Havuzdaki talepleri getir
+router.post('/requests/:requestId/join-pool', joinRequestPool);      // 🌟 YENİ: Sağlayıcı havuza katılır
 router.get('/requests/my-requests', getUserRequests);
 router.get('/requests/provider-requests', getProviderAssignedRequests);
 router.post('/requests/:requestId/next-provider', passToNextProvider);
