@@ -10,7 +10,6 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-// 🌟 Anahtar Kelime Limit Sabitleri
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
@@ -85,7 +84,7 @@ export default function App() {
   });
 
   // Admin State
-  const [adminTab, setAdminTab] = useState('PROVIDERS');
+  const [adminTab, setAdminTab] = useState('WOZ');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -182,20 +181,25 @@ export default function App() {
     }
   };
 
-  const fetchProviderData = async () => {
+  // 🌟 KRİTİK DÜZELTME: shouldUpdateForm parametresiyle form alanlarını ezmeyi önlüyoruz
+  const fetchProviderData = async (shouldUpdateForm = false) => {
     if (!session?.phone) return;
     try {
       const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
       const prov = pRes.data.provider;
       setProviderProfile(prov);
-      setProviderFormData({
-        name: prov.name,
-        phone: prov.phone,
-        email: prov.email || '',
-        serviceKeywords: (prov.service_keywords || []).join(', '),
-        communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL'],
-        priorityScore: prov.priority_score || 100
-      });
+
+      // Yalnızca ilk yüklemede veya kaydetme işleminden sonra form state'ini güncelle
+      if (shouldUpdateForm) {
+        setProviderFormData({
+          name: prov.name || '',
+          phone: prov.phone || '',
+          email: prov.email || '',
+          serviceKeywords: (prov.service_keywords || []).join(', '),
+          communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL'],
+          priorityScore: prov.priority_score || 100
+        });
+      }
 
       const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
       setProviderRequests(rRes.data.requests || []);
@@ -249,18 +253,19 @@ export default function App() {
     }
   };
 
-  // 🔄 5 Saniyede Bir Canlı Yenileme
+  // 🔄 Sayfa ilk açılışında veri çekme
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') {
         fetchCustomerData();
         fetchCurrentLocation();
       }
-      if (session.role === 'PROVIDER') fetchProviderData();
+      if (session.role === 'PROVIDER') fetchProviderData(true); // İlk açılışta formu doldur
       if (session.role === 'ADMIN') fetchAdminData();
 
+      // 5 saniyelik arka plan yenilemesinde form state'ini EZMİYORUZ (shouldUpdateForm = false)
       const interval = setInterval(() => {
-        if (session.role === 'PROVIDER') fetchProviderData();
+        if (session.role === 'PROVIDER') fetchProviderData(false);
         if (session.role === 'CUSTOMER') fetchCustomerData();
         if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
       }, 5000);
@@ -327,7 +332,6 @@ export default function App() {
     setStep('INPUT');
   };
 
-  // Sağlayıcı Olarak Yeni Sekmede Oturum Aç
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
     const cleanPhone = encodeURIComponent(provPhone.trim());
@@ -405,7 +409,7 @@ export default function App() {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
       await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'PROVIDER') await fetchProviderData(false);
     } catch (err) {
       console.error('İşlem başarısız:', err);
     }
@@ -418,7 +422,7 @@ export default function App() {
       });
       setShowCandidatesMap(prev => ({ ...prev, [requestId]: false }));
       await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'PROVIDER') await fetchProviderData(false);
     } catch (err) {
       console.error('Seçim başarısız:', err);
     }
@@ -428,7 +432,7 @@ export default function App() {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus });
       if (session.role === 'CUSTOMER') await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'PROVIDER') await fetchProviderData(false);
       if (session.role === 'ADMIN') await fetchAdminData();
     } catch (err) {
       console.error('Durum güncellenemedi:', err);
@@ -440,7 +444,7 @@ export default function App() {
     try {
       await axios.delete(`${API_BASE}/requests/${Number(requestId)}`);
       if (session.role === 'CUSTOMER') await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'PROVIDER') await fetchProviderData(false);
       if (session.role === 'ADMIN') await fetchAdminData();
     } catch {
       console.error('Silme başarısız.');
@@ -462,7 +466,7 @@ export default function App() {
       setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true }));
 
       if (session.role === 'CUSTOMER') await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData();
+      if (session.role === 'PROVIDER') await fetchProviderData(false);
     } catch (err) {
       console.error('Değerlendirme kaydedilemedi:', err);
     }
@@ -544,6 +548,7 @@ export default function App() {
     }
   };
 
+  // 🌟 Profil Kaydedildiğinde güncel form verilerini doldur
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -567,13 +572,12 @@ export default function App() {
         await axios.post(`${API_BASE}/providers`, payload);
       }
       setIsProfileOpen(false);
-      await fetchProviderData();
+      await fetchProviderData(true); // Kaydedildikten sonra formu sunucuyla senkronize et
     } catch (err) {
       console.error('Kaydedilemedi:', err);
     }
   };
 
-  // Manuel WoZ Atama
   const handleAdminAssign = async (requestId, providerId) => {
     const pId = providerId || selectedProviderMap[requestId];
     if (!pId) return;
@@ -702,14 +706,12 @@ export default function App() {
     return nameMatch || phoneMatch || kwMatch;
   });
 
-  // E-posta adresini ayıklar
   const extractEmail = (text) => {
     if (!text) return null;
     const match = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
     return match ? match[1] : null;
   };
 
-  // 🌟 Anahtar Kelime ve Karakter Sayacı Hesaplayıcı
   const getKeywordMetrics = (text) => {
     const str = text || '';
     const charCount = str.length;
@@ -733,7 +735,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.0</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.1</span>
             </div>
           </div>
 
@@ -1168,7 +1170,7 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* "Talep Bilgileri" - Tıklayınca Açılan Tekil Menü */}
+                  {/* "Talep Bilgileri" */}
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
                     <div
                       onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
@@ -2458,7 +2460,7 @@ Saygılarımızla,
           )
         )}
 
-        {/* 🌟 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
+        {/* 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
         {wozAssignModalReq && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
@@ -2560,7 +2562,7 @@ Saygılarımızla,
           </div>
         )}
 
-        {/* 🌟 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL (SAYAÇLI) */}
+        {/* 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL (SAYAÇLI) */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
             <div className="bg-white rounded-2xl max-w-lg w-full p-5 border space-y-3.5 shadow-xl">
