@@ -174,7 +174,7 @@ export default function App() {
           setLocationValue(`${district}, ${city}`);
         } catch {
           setLocationValue(`${latitude.toFixed(3)}, ${longitude.toFixed(3)} (Konum Alındı)`);
-        } fontally {
+        } finally {
           setIsLocating(false);
         }
       },
@@ -731,6 +731,12 @@ export default function App() {
     return match ? match[1] : null;
   };
 
+  const extractPhone = (str) => {
+    if (!str) return '';
+    const match = str.match(/(\+?\d[\d\s-]{8,})/);
+    return match ? match[1].replace(/[^\d+]/g, '') : '';
+  };
+
   const getKeywordMetrics = (text) => {
     const str = text || '';
     const charCount = str.length;
@@ -754,7 +760,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.6</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.7</span>
             </div>
           </div>
 
@@ -1663,13 +1669,12 @@ Saygılarımızla,
                       const mailtoBody = encodeURIComponent(emailBodyText);
                       const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
 
-                      // 🌟 SMS VE WHATSAPP MESAJLARINDA SADECE TALEP METNİ KULLANILIYOR
-                      const smsMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz "${req.raw_text}" talebiniz için yazıyorum.`);
-                      const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${smsMessage}`;
+                      // 🌟 SMS VE WHATSAPP MESAJLARINDA HEM ID HEM DE TIRNAK İÇİNDE TALEP METNİ
+                      const commonMsgText = `Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`;
+                      const encodedCommonMsg = encodeURIComponent(commonMsgText);
 
-                      const waMessage = encodeURIComponent(`Merhaba, Sms-Contact üzerinden gönderdiğiniz "${req.raw_text}" talebiniz için iletişime geçiyorum.`);
-                      const waLink = `https://wa.me/${phoneDigits}?text=${waMessage}`;
-
+                      const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${encodedCommonMsg}`;
+                      const waLink = `https://wa.me/${phoneDigits}?text=${encodedCommonMsg}`;
                       const callLink = `tel:${cleanPhone}`;
 
                       return (
@@ -2525,7 +2530,7 @@ Saygılarımızla,
                                     <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik</label>
                                     <select
                                       value={feat.priority}
-                                      onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })}
+                                      onChange={(e) => handleUpdateFeature(feat.priority, { priority: e.target.value })}
                                       className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"
                                     >
                                       <option value="DÜŞÜK">Düşük</option>
