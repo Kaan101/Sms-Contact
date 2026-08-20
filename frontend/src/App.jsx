@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
   ArrowRight, Phone, PhoneCall, MessageSquare, Mail, Plus, Trash2, Edit3, X, Clock, LogOut, 
@@ -48,13 +48,16 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // E-posta alanına odaklanma ref'i
+  const emailInputRef = useRef(null);
+
   // Müşteri State
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // Talep Bilgileri State
-  const [preferredChannel, setPreferredChannel] = useState('PHONE');
+  // 🌟 Talep Bilgileri State (Çoklu İletişim Kanalları - Array)
+  const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
   const [isUrgent, setIsUrgent] = useState(false);
@@ -141,6 +144,19 @@ export default function App() {
     priorityScore: 100
   });
 
+  // 🌟 Çoklu İletişim Kanalı Seçim/Kaldırma Fonksiyonu
+  const togglePreferredChannel = (channel) => {
+    setPreferredChannels((prev) => {
+      if (prev.includes(channel)) {
+        if (prev.length === 1) return prev; // En az 1 kanal seçili kalmalı
+        return prev.filter((c) => c !== channel);
+      } else {
+        return [...prev, channel];
+      }
+    });
+    setErrorMessage('');
+  };
+
   // 📍 Mevcut Konumu Al
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) return;
@@ -181,7 +197,6 @@ export default function App() {
     }
   };
 
-  // 🌟 KRİTİK DÜZELTME: shouldUpdateForm parametresiyle form alanlarını ezmeyi önlüyoruz
   const fetchProviderData = async (shouldUpdateForm = false) => {
     if (!session?.phone) return;
     try {
@@ -189,7 +204,6 @@ export default function App() {
       const prov = pRes.data.provider;
       setProviderProfile(prov);
 
-      // Yalnızca ilk yüklemede veya kaydetme işleminden sonra form state'ini güncelle
       if (shouldUpdateForm) {
         setProviderFormData({
           name: prov.name || '',
@@ -253,17 +267,15 @@ export default function App() {
     }
   };
 
-  // 🔄 Sayfa ilk açılışında veri çekme
   useEffect(() => {
     if (session) {
       if (session.role === 'CUSTOMER') {
         fetchCustomerData();
         fetchCurrentLocation();
       }
-      if (session.role === 'PROVIDER') fetchProviderData(true); // İlk açılışta formu doldur
+      if (session.role === 'PROVIDER') fetchProviderData(true);
       if (session.role === 'ADMIN') fetchAdminData();
 
-      // 5 saniyelik arka plan yenilemesinde form state'ini EZMİYORUZ (shouldUpdateForm = false)
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData(false);
         if (session.role === 'CUSTOMER') fetchCustomerData();
@@ -363,28 +375,34 @@ export default function App() {
     }
   };
 
+  // Müşteri Talep Gönderme
   const handleCustomerFinalSubmit = async (e) => {
     e?.preventDefault();
     if (!session?.phone) return;
 
-    if (preferredChannel === 'EMAIL' && !contactEmail.trim()) {
-      setErrorMessage('Lütfen geçerli bir e-posta adresi giriniz.');
+    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
+      setIsDetailsCollapsed(false);
+      setTimeout(() => {
+        if (emailInputRef.current) emailInputRef.current.focus();
+      }, 100);
       return;
     }
 
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
 
-    const finalContactValue = preferredChannel === 'EMAIL' 
+    const finalContactValue = preferredChannels.includes('EMAIL') 
       ? `${contactEmail.trim()} (Tel: ${session.phone})`
       : session.phone;
+
+    const channelString = preferredChannels.join(', ');
 
     try {
       await axios.post(`${API_BASE}/requests`, {
         rawText: queryText,
         disambiguationChoice: selectedDisambiguation,
         contactValue: finalContactValue,
-        preferredChannel: preferredChannel,
+        preferredChannel: channelString,
         location: locationValue,
         isUrgent: isUrgent,
         deadlineDatetime: deadlineDatetimeISO
@@ -394,9 +412,11 @@ export default function App() {
       setDeadlineDate('');
       setDeadlineTime('');
       setContactEmail('');
+      setPreferredChannels(['PHONE']);
       setStep('INPUT');
       setIsDetailsCollapsed(true);
       setIsUrgent(false);
+      setErrorMessage('');
       await fetchCustomerData();
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
@@ -548,7 +568,6 @@ export default function App() {
     }
   };
 
-  // 🌟 Profil Kaydedildiğinde güncel form verilerini doldur
   const handleSaveProviderProfile = async (e) => {
     e.preventDefault();
     const keywordsArray = providerFormData.serviceKeywords
@@ -572,12 +591,13 @@ export default function App() {
         await axios.post(`${API_BASE}/providers`, payload);
       }
       setIsProfileOpen(false);
-      await fetchProviderData(true); // Kaydedildikten sonra formu sunucuyla senkronize et
+      await fetchProviderData(true);
     } catch (err) {
       console.error('Kaydedilemedi:', err);
     }
   };
 
+  // Manuel WoZ Atama
   const handleAdminAssign = async (requestId, providerId) => {
     const pId = providerId || selectedProviderMap[requestId];
     if (!pId) return;
@@ -735,7 +755,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.1</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 6.3</span>
             </div>
           </div>
 
@@ -1159,7 +1179,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
+              {/* 🌟 D. ONAY EKRANI & TALEP BİLGİLERİ (ÇOKLU KANAL SEÇİMİ) */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
@@ -1186,7 +1206,11 @@ export default function App() {
                           {isUrgent && <span className="text-rose-700 font-bold">🔥 ACİL</span>}
                           {deadlineDate && <span>⏰ {deadlineDate} {deadlineTime}</span>}
                           <span>
-                            {preferredChannel === 'PHONE' ? '📞 Telefon' : preferredChannel === 'SMS' ? '💬 SMS' : `📧 E-posta (${contactEmail || 'Belirtilmedi'})`}
+                            {preferredChannels.map(c => 
+                              c === 'PHONE' ? '📞 Telefon' :
+                              c === 'SMS' ? '💬 SMS' :
+                              `📧 E-posta (${contactEmail || 'Girilmedi'})`
+                            ).join(' • ')}
                           </span>
                         </div>
                       </div>
@@ -1281,51 +1305,58 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 4. İletişim Kanalı Tercihi */}
+                        {/* 🌟 4. İletişim Kanalı Tercihi (ÇOKLU SEÇİM) */}
                         <div>
                           <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">
-                            İletişim Kanalı Tercihiniz
+                            İletişim Kanalı Tercihleriniz (Çoklu Seçim)
                           </label>
                           <div className="grid grid-cols-3 gap-2">
                             <button
                               type="button"
-                              onClick={() => setPreferredChannel('PHONE')}
-                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannel === 'PHONE' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              onClick={() => togglePreferredChannel('PHONE')}
+                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
                               <Phone size={13} />
                               <span className="font-semibold text-[11px]">Telefon</span>
+                              {preferredChannels.includes('PHONE') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
                             <button
                               type="button"
-                              onClick={() => setPreferredChannel('SMS')}
-                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannel === 'SMS' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              onClick={() => togglePreferredChannel('SMS')}
+                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
                               <MessageSquare size={13} />
                               <span className="font-semibold text-[11px]">SMS</span>
+                              {preferredChannels.includes('SMS') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
                             <button
                               type="button"
-                              onClick={() => setPreferredChannel('EMAIL')}
-                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannel === 'EMAIL' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
+                              onClick={() => togglePreferredChannel('EMAIL')}
+                              className={`p-2 rounded-lg border text-left text-xs flex flex-col sm:flex-row items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}
                             >
                               <Mail size={13} />
                               <span className="font-semibold text-[11px]">E-posta</span>
+                              {preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}
                             </button>
                           </div>
                         </div>
 
                         {/* 5. Dinamik E-posta Giriş Kutusu */}
-                        {preferredChannel === 'EMAIL' && (
+                        {preferredChannels.includes('EMAIL') && (
                           <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
                             <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1">
                               <Mail size={12} className="text-blue-700" />
                               <span>İletişim E-posta Adresiniz *</span>
                             </label>
                             <input
+                              ref={emailInputRef}
                               type="email"
                               required
                               value={contactEmail}
-                              onChange={(e) => setContactEmail(e.target.value)}
+                              onChange={(e) => {
+                                setContactEmail(e.target.value);
+                                if (errorMessage) setErrorMessage('');
+                              }}
                               placeholder="adiniz@example.com"
                               className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium"
                             />
@@ -1343,7 +1374,10 @@ export default function App() {
                   <div className="flex space-x-2 pt-1">
                     <button 
                       type="button"
-                      onClick={() => setStep('INPUT')} 
+                      onClick={() => {
+                        setStep('INPUT');
+                        setErrorMessage('');
+                      }} 
                       className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-100 rounded-xl text-xs font-semibold text-neutral-700 transition"
                     >
                       Geri Dön
@@ -1469,7 +1503,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 🌟 GENİŞLETİLMİŞ ANAHTAR KELİME TEXTAREA VE CANLI SAYAÇ */}
+                    {/* Anahtar Kelimeler */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
@@ -2562,7 +2596,7 @@ Saygılarımızla,
           </div>
         )}
 
-        {/* 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL (SAYAÇLI) */}
+        {/* 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
             <div className="bg-white rounded-2xl max-w-lg w-full p-5 border space-y-3.5 shadow-xl">
@@ -2594,7 +2628,6 @@ Saygılarımızla,
                   </div>
                 </div>
 
-                {/* Modal İçi Sayaçlı Textarea */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
