@@ -5,7 +5,7 @@ import {
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
-  ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown
+  ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -68,6 +68,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
+  const [customerHistoryFilter, setCustomerHistoryFilter] = useState('ALL'); // 🌟 YENİ: Müşteri Geçmiş Filtresi
 
   // Müşterinin Kendi Talebindeki Kuyruğu Açıp Kapatma State'i
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
@@ -306,6 +307,15 @@ export default function App() {
     } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
 
+  // 🌟 YENİ: Geçmiş Talebi Tekrarla Form Doldurucu
+  const handleRepeatRequest = (req) => {
+    setQueryText(req.raw_text);
+    if (req.location) setLocationValue(req.location);
+    setIsUrgent(req.is_urgent || false);
+    setStep('INPUT');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleJoinPool = async (requestId) => {
     if (!providerProfile) {
       alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return;
@@ -416,6 +426,12 @@ export default function App() {
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
+
+  // 🌟 YENİ: Geçmiş Talepler İçin Filtreleme Mantığı
+  const filteredPastCustomerRequests = pastCustomerRequests.filter(req => {
+    if (customerHistoryFilter === 'ALL') return true;
+    return req.status === customerHistoryFilter;
+  });
 
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
@@ -530,7 +546,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.0</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.1</span>
             </div>
           </div>
 
@@ -636,10 +652,9 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK (BİRLEŞTİRİLMİŞ YAPI) */}
+                        {/* MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK */}
                         {req.provider_name ? (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
-                            {/* Aktif Sağlayıcı (Tıklanabilir Başlık) */}
                             <div 
                               onClick={() => {
                                 if (req.queuedProviders && req.queuedProviders.length > 1) {
@@ -667,7 +682,6 @@ export default function App() {
                               </div>
                             </div>
                             
-                            {/* Kabul Edildi Bildirimi */}
                             {req.status === 'ACCEPTED' && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
                                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5">
@@ -677,7 +691,6 @@ export default function App() {
                               </div>
                             )}
 
-                            {/* Kuyruktaki Diğer Adaylar (Açılır Liste) */}
                             {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 1 && (
                               <div className="p-3 pt-2 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
@@ -924,28 +937,45 @@ export default function App() {
               )}
 
               {/* E. MÜŞTERİ GEÇMİŞ TALEPLER */}
-              {pastCustomerRequests.length > 0 && (
-                <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+              {filteredPastCustomerRequests.length > 0 && (
+                <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-8">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3></div>
+                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({filteredPastCustomerRequests.length})</h3></div>
                     {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                   {isCustomerHistoryOpen && (
-                    <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[350px] overflow-y-auto">
-                      {pastCustomerRequests.map((req) => (
-                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs mt-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone ? `(📞 ${req.provider_phone})` : ''} • {new Date(req.created_at).toLocaleDateString('tr-TR')}</p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{req.status}</span>
-                              <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600"><Trash2 size={12} /></button>
+                    <div className="p-4 pt-0 border-t border-neutral-100">
+                      
+                      <div className="flex items-center space-x-2 mb-3 mt-3">
+                        <span className="text-[10px] font-mono text-neutral-400 uppercase font-semibold">Filtrele:</span>
+                        <select 
+                          value={customerHistoryFilter} 
+                          onChange={(e) => setCustomerHistoryFilter(e.target.value)}
+                          className="p-1.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium hover:border-neutral-300 transition"
+                        >
+                          <option value="ALL">Tümü</option>
+                          <option value="COMPLETED">Sadece Tamamlananlar</option>
+                          <option value="CANCELLED">Sadece İptal Edilenler</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                        {filteredPastCustomerRequests.map((req) => (
+                          <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
+                                <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone ? `(📞 ${req.provider_phone})` : ''} • {new Date(req.created_at).toLocaleDateString('tr-TR')}</p>
+                              </div>
+                              <div className="flex items-center space-x-1.5">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{req.status}</span>
+                                <button onClick={() => handleRepeatRequest(req)} className="p-1 text-neutral-500 hover:text-blue-700 hover:bg-blue-50 rounded transition" title="Bu Talebi Tekrarla"><RefreshCw size={13} /></button>
+                                <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Sil"><Trash2 size={13} /></button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
