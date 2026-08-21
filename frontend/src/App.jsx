@@ -94,7 +94,7 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
 
-  // 🌟 Admin Tablo Sıralama (Sorting) State'i
+  // Admin Tablo Sıralama (Sorting) State'i
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
 
   // Admin Kuyruk (Queue) Collapsed State'i
@@ -492,7 +492,7 @@ export default function App() {
     return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q);
   });
 
-  // 🌟 YENİ: Dinamik Tablo Sıralama Mantığı
+  // Dinamik Tablo Sıralama Mantığı
   const handleRequestSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -508,7 +508,6 @@ export default function App() {
         let valA = a[sortConfig.key];
         let valB = b[sortConfig.key];
 
-        // Kuyruk sıralamasında kuyruktaki kişi sayısına bakılır
         if (sortConfig.key === 'queue') {
           valA = a.queueList ? a.queueList.length : 0;
           valB = b.queueList ? b.queueList.length : 0;
@@ -571,7 +570,7 @@ export default function App() {
   const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  // 🌟 Admin Tablo Başlık Bileşeni (Sıralama İkonlu)
+  // Admin Tablo Başlık Bileşeni
   const SortableHeader = ({ label, sortKey, align = "left" }) => {
     const isActive = sortConfig.key === sortKey;
     return (
@@ -596,7 +595,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
-      {/* 🧭 NAVIGATION (Genişlik Admin İçin Dinamik %100, Müşteri/Sağlayıcı İçin max-w-5xl) */}
+      {/* 🧭 NAVIGATION */}
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30">
         <div className={`${session?.role === 'ADMIN' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setStep('INPUT')}>
@@ -605,7 +604,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.4 (Havuz)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.5 (Havuz)</span>
             </div>
           </div>
 
@@ -627,7 +626,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* 🏛️ MAIN CONTENT (Genişlik Admin İçin Dinamik) */}
+      {/* 🏛️ MAIN CONTENT */}
       <main className={`w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 ${session?.role === 'ADMIN' ? 'max-w-[100%]' : 'max-w-5xl'}`}>
         
         {errorMessage && (
@@ -1293,7 +1292,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (SIRALANABİLİR DİNAMİK TABLO) */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO GÖRÜNÜMÜ YENİ) */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1316,11 +1315,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
                     {sortedMatchedRequests.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">Arama kriterlerine uygun talep bulunamadı.</div>
                     ) : (
-                      <div className="max-h-[650px] overflow-y-auto overflow-x-hidden w-full">
+                      <div className="overflow-x-auto max-h-[650px] w-full">
                         <table className="w-full text-left text-xs table-auto">
                           <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider sticky top-0 z-10 shadow-sm">
                             <tr>
@@ -1331,6 +1330,7 @@ export default function App() {
                               <SortableHeader label="Müşteri" sortKey="contact_value" />
                               <SortableHeader label="Sağlayıcı" sortKey="provider_name" />
                               <SortableHeader label="Konum / Aciliyet" sortKey="location" />
+                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">İşlem</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-neutral-100">
@@ -1402,12 +1402,23 @@ export default function App() {
                                       {req.is_urgent && <Flame size={12} className="text-rose-600 shrink-0" title="Acil" />}
                                     </div>
                                   </td>
+
+                                  {/* 🌟 YENİ: SİL BUTONU */}
+                                  <td className="px-4 py-3 align-top text-right">
+                                    <button 
+                                      onClick={() => handleDeleteRequest(req.id)}
+                                      className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                                      title="Talebi Sil"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
                                 </tr>
 
                                 {/* KUYRUK LİSTESİ (AÇILIR KAPANIR SATIR) */}
                                 {expandedQueueReqId === req.id && req.queueList && req.queueList.length > 0 && (
                                   <tr className="bg-blue-50/20 border-b border-blue-100/50">
-                                    <td colSpan="7" className="px-4 py-4">
+                                    <td colSpan="8" className="px-4 py-4">
                                       <div className="pl-4 border-l-2 border-blue-400 py-1 space-y-2">
                                         <h4 className="text-[10px] font-bold uppercase tracking-wider text-blue-800 font-mono">Kuyruktaki Sağlayıcılar ({req.queueList.length})</h4>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
