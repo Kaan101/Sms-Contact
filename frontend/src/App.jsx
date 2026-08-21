@@ -184,7 +184,7 @@ export default function App() {
           email: prov.email || '',
           serviceKeywords: (prov.service_keywords || []).join(', '),
           communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
-          priorityScore: prov.priority_score || 100
+          priorityScore: prov.priorityScore || 100
         });
       }
 
@@ -526,16 +526,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
-      {/* 🧭 NAVIGATION */}
+      {/* 🧭 NAVIGATION (Genişlik Admin İçin Dinamik) */}
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className={`${session?.role === 'ADMIN' ? 'max-w-7xl' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setStep('INPUT')}>
             <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">
               SC
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.2 (Havuz)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.3</span>
             </div>
           </div>
 
@@ -549,11 +549,7 @@ export default function App() {
                 {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : '⚙️ Admin'}
               </span>
               <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
-              <button
-                onClick={handleLogout}
-                title="Çıkış Yap"
-                className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"
-              >
+              <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition">
                 <LogOut size={16} />
               </button>
             </div>
@@ -561,11 +557,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* 🏛️ MAIN CONTENT */}
-      <main className="max-w-5xl w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start">
+      {/* 🏛️ MAIN CONTENT (Genişlik Admin İçin Dinamik) */}
+      <main className={`w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 ${session?.role === 'ADMIN' ? 'max-w-7xl' : 'max-w-5xl'}`}>
         
         {errorMessage && (
-          <div className="max-w-2xl mx-auto w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between">
+          <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between">
             <span>{errorMessage}</span>
             <button onClick={() => setErrorMessage('')} className="text-rose-400 hover:text-rose-700 ml-4"><X size={14} /></button>
           </div>
@@ -957,7 +953,7 @@ export default function App() {
                           <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter</span>
                         </div>
                       </div>
-                      <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana, erikli, kadıköy..." className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition resize-none leading-relaxed" />
+                      <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana, erikli, kadıköy, içme suyu..." className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition resize-none leading-relaxed" />
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -983,6 +979,7 @@ export default function App() {
                 </button>
               </div>
 
+              {/* HAVUZ SEKME İÇERİĞİ */}
               {providerTab === 'POOL' && (
                 <div className="space-y-3 animate-in fade-in duration-200">
                   {poolRequests.length === 0 ? (
@@ -1017,6 +1014,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* AKTİF SEKME İÇERİĞİ */}
               {providerTab === 'ACTIVE' && (
                 <div className="bg-white rounded-b-2xl border border-t-0 border-neutral-200 shadow-sm p-4 space-y-3 animate-in fade-in duration-200">
                   <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
@@ -1129,29 +1127,19 @@ export default function App() {
 
           /* ---------------- ⚙️ 4. ADMİN EKRANI ---------------- */
           (
-            <div className="max-w-4xl mx-auto w-full space-y-4">
+            <div className="w-full mx-auto space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
                 <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
 
                 <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
-                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    WoZ Havuzu ({pendingRequests.length})
-                  </button>
-                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    Sağlayıcılar ({filteredProviders.length}/{providers.length})
-                  </button>
+                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
+                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
                   <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
                     <Layers size={13} /><span>Tüm Talepler & Kuyruk ({filteredMatchedRequests.length})</span>
                   </button>
-                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    SMS Log ({filteredSmsLogs.length})
-                  </button>
-                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <FileCheck2 size={13} /><span>Test Senaryoları ({tests.length})</span>
-                  </button>
-                  <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <FolderKanban size={13} /><span>Yol Haritası ({features.length})</span>
-                  </button>
+                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
+                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FileCheck2 size={13} /><span>Test Senaryoları ({tests.length})</span></button>
+                  <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FolderKanban size={13} /><span>Yol Haritası ({features.length})</span></button>
                 </div>
               </div>
 
@@ -1201,7 +1189,7 @@ export default function App() {
                     {filteredProviders.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">Aranan kelimeye uygun servis sağlayıcı bulunamadı.</div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {filteredProviders.map((prov) => (
                           <div key={prov.id} className="p-3.5 bg-neutral-50 hover:bg-[#F4F6F9] rounded-xl border border-neutral-200/90 flex flex-col justify-between space-y-2.5 text-xs transition shadow-xs group">
                             <div>
@@ -1214,12 +1202,13 @@ export default function App() {
                               <p className="text-[11px] text-blue-700 font-mono font-semibold mt-0.5">📞 {prov.phone}</p>
                               {prov.email && <p className="text-[10px] text-neutral-500 font-mono">📧 {prov.email}</p>}
                               <div className="flex flex-wrap gap-1 mt-1.5">
-                                {(prov.service_keywords || []).map((kw, i) => (<span key={i} className="text-[10px] font-mono px-1.5 py-0.5 bg-white border rounded text-neutral-600">{kw}</span>))}
+                                {(prov.service_keywords || []).slice(0, 5).map((kw, i) => (<span key={i} className="text-[10px] font-mono px-1.5 py-0.5 bg-white border rounded text-neutral-600">{kw}</span>))}
+                                {(prov.service_keywords || []).length > 5 && <span className="text-[10px] font-mono text-neutral-400">+{prov.service_keywords.length - 5}</span>}
                               </div>
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
                               <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-[11px] font-semibold flex items-center space-x-1 transition shadow-xs" title="Sağlayıcı olarak yeni sekmede paneli aç">
-                                <LogIn size={12} /><span>Paneli Aç (Yeni Sekme)</span>
+                                <LogIn size={12} /><span>Paneli Aç</span>
                               </button>
                               <div className="flex items-center space-x-1">
                                 <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="p-1 hover:bg-neutral-200 rounded text-neutral-600 transition" title="Düzenle"><Edit3 size={13} /></button>
@@ -1234,7 +1223,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO GÖRÜNÜMÜ - DÜZELTİLDİ) */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO GÖRÜNÜMÜ YENİ) */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1265,13 +1254,13 @@ export default function App() {
                         <table className="w-full text-left text-xs">
                           <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider sticky top-0 z-10 shadow-sm">
                             <tr>
-                              <th className="px-4 py-3 font-semibold border-b border-neutral-200">ID / Tarih</th>
+                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 whitespace-nowrap">ID / Tarih</th>
+                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-center">Kuyruk</th>
                               <th className="px-4 py-3 font-semibold border-b border-neutral-200">Durum</th>
-                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 min-w-[200px]">Talep</th>
+                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 min-w-[250px]">Talep</th>
                               <th className="px-4 py-3 font-semibold border-b border-neutral-200">Müşteri</th>
                               <th className="px-4 py-3 font-semibold border-b border-neutral-200">Sağlayıcı</th>
                               <th className="px-4 py-3 font-semibold border-b border-neutral-200">Konum</th>
-                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">Kuyruk</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-neutral-100">
@@ -1282,8 +1271,20 @@ export default function App() {
                                     <div className="font-mono font-bold text-neutral-900">#REQ-{req.id}</div>
                                     <div className="text-[10px] text-neutral-400 mt-0.5">{new Date(req.created_at).toLocaleDateString('tr-TR')}</div>
                                   </td>
+                                  
+                                  {/* 🌟 KUYRUK (QUEUE) SÜTUNU */}
+                                  <td className="px-4 py-3 align-top text-center">
+                                    {req.queueList && req.queueList.length > 0 ? (
+                                      <button onClick={() => setExpandedQueueReqId(expandedQueueReqId === req.id ? null : req.id)} className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition whitespace-nowrap ${expandedQueueReqId === req.id ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}>
+                                        <Users size={12} /><span>{req.queueList.length} Aday</span>{expandedQueueReqId === req.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                      </button>
+                                    ) : (
+                                      <span className="text-neutral-300 text-[10px] font-mono whitespace-nowrap">0 Aday</span>
+                                    )}
+                                  </td>
+
                                   <td className="px-4 py-3 align-top">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-block whitespace-nowrap ${
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold inline-block whitespace-nowrap ${
                                       req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                                       req.status === 'MATCHED' ? 'bg-blue-100 text-blue-800' :
                                       req.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
@@ -1320,15 +1321,6 @@ export default function App() {
                                       {req.is_urgent && <Flame size={12} className="text-rose-600 shrink-0" title="Acil" />}
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 align-top text-right">
-                                    {req.queueList && req.queueList.length > 0 ? (
-                                      <button onClick={() => setExpandedQueueReqId(expandedQueueReqId === req.id ? null : req.id)} className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition whitespace-nowrap ${expandedQueueReqId === req.id ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}>
-                                        <Users size={12} /><span>{req.queueList.length} Aday</span>{expandedQueueReqId === req.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                      </button>
-                                    ) : (
-                                      <span className="text-neutral-300 text-[10px] font-mono whitespace-nowrap">0 Aday</span>
-                                    )}
-                                  </td>
                                 </tr>
 
                                 {/* KUYRUK LİSTESİ (AÇILIR KAPANIR SATIR) */}
@@ -1337,7 +1329,7 @@ export default function App() {
                                     <td colSpan="7" className="px-4 py-3">
                                       <div className="pl-4 border-l-2 border-blue-400 py-1 space-y-2">
                                         <h4 className="text-[10px] font-bold uppercase tracking-wider text-blue-800 font-mono">Kuyruktaki Sağlayıcılar</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                                           {req.queueList.map((qItem, qIdx) => (
                                             <div key={qIdx} className="bg-white p-2.5 rounded-lg border border-blue-100 shadow-xs flex flex-col space-y-1.5">
                                               <div className="flex items-center justify-between">
@@ -1377,7 +1369,6 @@ export default function App() {
                       <input type="text" value={searchSmsText} onChange={(e) => setSearchSmsText(e.target.value)} placeholder="Telefon veya SMS mesaj metninde ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
                       {searchSmsText && <button onClick={() => setSearchSmsText('')} className="absolute right-2.5 top-2 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
                     </div>
-
                     <div className="flex items-center space-x-2 w-full sm:w-auto">
                       <Filter size={13} className="text-neutral-500" />
                       <select value={smsRecipientFilter} onChange={(e) => setSmsRecipientFilter(e.target.value)} className="p-1.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium w-full sm:w-auto">
@@ -1418,25 +1409,13 @@ export default function App() {
                       <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Test Senaryosu Ekle</span></h3>
                       <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor</span>
                     </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-5">
-                        <input type="text" required value={newTest.title} onChange={(e) => setNewTest({ ...newTest, title: e.target.value })} placeholder="Test Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <input type="text" value={newTest.testerName} onChange={(e) => setNewTest({ ...newTest, testerName: e.target.value })} placeholder="Test Eden Kişi" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <input type="date" value={newTest.testDate} onChange={(e) => setNewTest({ ...newTest, testDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm"><Plus size={13} /><span>Ekle</span></button>
-                      </div>
+                      <div className="sm:col-span-5"><input type="text" required value={newTest.title} onChange={(e) => setNewTest({ ...newTest, title: e.target.value })} placeholder="Test Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-3"><input type="text" value={newTest.testerName} onChange={(e) => setNewTest({ ...newTest, testerName: e.target.value })} placeholder="Test Eden Kişi" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-2"><input type="date" value={newTest.testDate} onChange={(e) => setNewTest({ ...newTest, testDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm"><Plus size={13} /><span>Ekle</span></button></div>
                     </div>
-
-                    <div>
-                      <textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
-                    </div>
+                    <div><textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
                   </form>
 
                   <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
@@ -1458,37 +1437,16 @@ export default function App() {
                                 {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                               </div>
                             </div>
-
                             {isExpanded && (
                               <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                                <div>
-                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Test Adımları</label>
-                                  <p className="text-xs text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/70 font-mono leading-relaxed">{testItem.description || 'Açıklama belirtilmemiş.'}</p>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Sonucu & Notlar</label>
-                                  <textarea rows={2} defaultValue={testItem.result_notes || ''} onBlur={(e) => handleUpdateTest(testItem.id, { resultNotes: e.target.value })} placeholder="Test sonucu, hata logu veya gözlemlerinizi yazın..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
-                                </div>
+                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Test Adımları</label><p className="text-xs text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/70 font-mono leading-relaxed">{testItem.description || 'Açıklama belirtilmemiş.'}</p></div>
+                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Sonucu & Notlar</label><textarea rows={2} defaultValue={testItem.result_notes || ''} onBlur={(e) => handleUpdateTest(testItem.id, { resultNotes: e.target.value })} placeholder="Test sonucu, hata logu veya gözlemlerinizi yazın..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Durumu</label>
-                                    <select value={testItem.status} onChange={(e) => handleUpdateTest(testItem.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
-                                      <option value="BEKLİYOR">⏳ Bekliyor</option><option value="BAŞARILI">✅ Başarılı (Passed)</option><option value="BAŞARISIZ">❌ Başarısız (Failed)</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label>
-                                    <input type="text" defaultValue={testItem.tester_name || ''} onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs" />
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label>
-                                    <input type="date" defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" />
-                                  </div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Durumu</label><select value={testItem.status} onChange={(e) => handleUpdateTest(testItem.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"><option value="BEKLİYOR">⏳ Bekliyor</option><option value="BAŞARILI">✅ Başarılı (Passed)</option><option value="BAŞARISIZ">❌ Başarısız (Failed)</option></select></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label><input type="text" defaultValue={testItem.tester_name || ''} onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs" /></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
                                 </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
-                                  <span className="font-mono">Senaryo ID: #{testItem.id}</span>
-                                  <button onClick={() => handleDeleteTest(testItem.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Senaryoyu Sil</span></button>
-                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400"><span className="font-mono">Senaryo ID: #{testItem.id}</span><button onClick={() => handleDeleteTest(testItem.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Senaryoyu Sil</span></button></div>
                               </div>
                             )}
                           </div>
@@ -1507,27 +1465,17 @@ export default function App() {
                       <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Özellik / Geliştirme Fikri Ekle</span></h3>
                       <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor / Orta</span>
                     </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-5">
-                        <input type="text" required value={newFeature.title} onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })} placeholder="Özellik Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <input type="date" value={newFeature.targetDate} onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" />
-                      </div>
+                      <div className="sm:col-span-5"><input type="text" required value={newFeature.title} onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })} placeholder="Özellik Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-3"><input type="date" value={newFeature.targetDate} onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
                       <div className="sm:col-span-2">
                         <select value={newFeature.priority} onChange={(e) => setNewFeature({ ...newFeature, priority: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none bg-neutral-50 font-medium">
                           <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
                         </select>
                       </div>
-                      <div className="sm:col-span-2">
-                        <button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"><Plus size={13} /><span>Ekle</span></button>
-                      </div>
+                      <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"><Plus size={13} /><span>Ekle</span></button></div>
                     </div>
-
-                    <div>
-                      <textarea rows={2} value={newFeature.description} onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })} placeholder="Özelliğin detaylı açıklaması (opsiyonel)..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none" />
-                    </div>
+                    <div><textarea rows={2} value={newFeature.description} onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })} placeholder="Özelliğin detaylı açıklaması (opsiyonel)..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none" /></div>
                   </form>
 
                   <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
@@ -1552,27 +1500,17 @@ export default function App() {
 
                             {isExpanded && (
                               <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                                <div>
-                                  <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Notlar</label>
-                                  <textarea rows={2} defaultValue={feat.description || ''} onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })} placeholder="Detaylı açıklama ekleyin..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
-                                </div>
+                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Notlar</label><textarea rows={2} defaultValue={feat.description || ''} onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })} placeholder="Detaylı açıklama ekleyin..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                                   <div>
                                     <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Durum</label>
-                                    <select value={feat.status} onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
-                                      <option value="BEKLİYOR">Bekliyor</option><option value="DEVAM EDİYOR">Devam Ediyor</option><option value="TAMAMLANDI">Tamamlandı</option><option value="İPTAL">İptal</option>
-                                    </select>
+                                    <select value={feat.status} onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"><option value="BEKLİYOR">Bekliyor</option><option value="DEVAM EDİYOR">Devam Ediyor</option><option value="TAMAMLANDI">Tamamlandı</option><option value="İPTAL">İptal</option></select>
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik</label>
-                                    <select value={feat.priority} onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
-                                      <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
-                                    </select>
+                                    <select value={feat.priority} onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"><option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option></select>
                                   </div>
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label>
-                                    <input type="date" defaultValue={feat.target_date ? feat.target_date.split('T')[0] : ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" />
-                                  </div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={feat.target_date ? feat.target_date.split('T')[0] : ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
                                   <span className="font-mono">Kayıt ID: #{feat.id}</span>
