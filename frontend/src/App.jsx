@@ -66,8 +66,10 @@ export default function App() {
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
-  const [showCandidatesMap, setShowCandidatesMap] = useState({});
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
+
+  // 🌟 YENİ: Müşterinin Kendi Talebindeki Kuyruğu Açıp Kapatma State'i
+  const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
   // Sağlayıcı State
   const [providerProfile, setProviderProfile] = useState(null);
@@ -199,45 +201,33 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/features`);
       setFeatures(res.data.features || []);
-    } catch (err) {
-      console.error('Özellikler yüklenemedi:', err);
-    }
+    } catch (err) { console.error('Özellikler yüklenemedi:', err); }
   };
 
   const fetchTests = async () => {
     try {
       const res = await axios.get(`${API_BASE}/tests`);
       setTests(res.data.tests || []);
-    } catch (err) {
-      console.error('Testler yüklenemedi:', err);
-    }
+    } catch (err) { console.error('Testler yüklenemedi:', err); }
   };
 
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
-        axios.get(`${API_BASE}/requests/pending`),
-        axios.get(`${API_BASE}/providers`),
-        axios.get(`${API_BASE}/requests/matched`),
-        axios.get(`${API_BASE}/notifications`)
+        axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`),
+        axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`)
       ]);
       setPendingRequests(reqRes.data.requests || []);
       setProviders(provRes.data.providers || []);
       setMatchedRequests(matchRes.data.requests || []);
       setSmsLogs(logRes.data.notifications || []);
-      await fetchFeatures();
-      await fetchTests();
-    } catch (err) {
-      console.error('Admin verileri çekilemedi:', err);
-    }
+      await fetchFeatures(); await fetchTests();
+    } catch (err) { console.error('Admin verileri çekilemedi:', err); }
   };
 
   useEffect(() => {
     if (session) {
-      if (session.role === 'CUSTOMER') {
-        fetchCustomerData();
-        fetchCurrentLocation();
-      }
+      if (session.role === 'CUSTOMER') { fetchCustomerData(); fetchCurrentLocation(); }
       if (session.role === 'PROVIDER') fetchProviderData(true);
       if (session.role === 'ADMIN') fetchAdminData();
 
@@ -252,35 +242,21 @@ export default function App() {
   }, [session, adminTab]);
 
   const handleSendOtp = async (e) => {
-    e.preventDefault();
-    if (!inputPhone.trim()) return;
-    setAuthLoading(true); setErrorMessage('');
+    e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage('');
     try {
       const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() });
-      setSimulatedCode(res.data.simulatedOtp);
-      setAuthStep('OTP');
-    } catch (err) {
-      setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.');
-    } finally {
-      setAuthLoading(false);
-    }
+      setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP');
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } finally { setAuthLoading(false); }
   };
 
   const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!inputOtp.trim()) return;
-    setAuthLoading(true); setErrorMessage('');
+    e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage('');
     try {
       await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() });
       const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() };
-      setSession(newSession);
-      localStorage.setItem('sc_session', JSON.stringify(newSession));
+      setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession));
       setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp('');
-    } catch (err) {
-      setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.');
-    } finally {
-      setAuthLoading(false);
-    }
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } finally { setAuthLoading(false); }
   };
 
   const handleLogout = () => {
@@ -296,9 +272,7 @@ export default function App() {
   };
 
   const handleCustomerInitialSubmit = async (e) => {
-    e?.preventDefault();
-    if (!queryText.trim()) return;
-    setLoading(true); setErrorMessage(''); fetchCurrentLocation();
+    e?.preventDefault(); if (!queryText.trim()) return; setLoading(true); setErrorMessage(''); fetchCurrentLocation();
     try {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
       if (response.data.status === 'ambiguous') {
@@ -306,19 +280,13 @@ export default function App() {
       } else {
         setDisambiguationData(null); setSelectedDisambiguation(null); setStep('CONFIRM');
       }
-    } catch {
-      setStep('CONFIRM');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setStep('CONFIRM'); } finally { setLoading(false); }
   };
 
   const handleCustomerFinalSubmit = async (e) => {
-    e?.preventDefault();
-    if (!session?.phone) return;
+    e?.preventDefault(); if (!session?.phone) return;
     if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
-      setIsDetailsCollapsed(false);
-      setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100);
+      setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100);
       return;
     }
     setLoading(true);
@@ -328,37 +296,22 @@ export default function App() {
 
     try {
       await axios.post(`${API_BASE}/requests`, {
-        rawText: queryText,
-        disambiguationChoice: selectedDisambiguation,
-        contactValue: finalContactValue,
-        preferredChannel: channelString,
-        location: locationValue,
-        isUrgent: isUrgent,
-        deadlineDatetime: deadlineDatetimeISO
+        rawText: queryText, disambiguationChoice: selectedDisambiguation, contactValue: finalContactValue,
+        preferredChannel: channelString, location: locationValue, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
       });
       setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime(''); setContactEmail(''); setPreferredChannels(['PHONE']); setStep('INPUT'); setIsDetailsCollapsed(true); setIsUrgent(false); setErrorMessage('');
       await fetchCustomerData();
-    } catch (err) {
-      setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
 
   const handleJoinPool = async (requestId) => {
     if (!providerProfile) {
-      alert("Önce profilinizi oluşturup kaydetmelisiniz!");
-      setIsProfileOpen(true);
-      return;
+      alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return;
     }
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id });
-      await fetchProviderData(false);
-      setProviderTab('ACTIVE'); 
-    } catch (err) {
-      console.error('Havuza katılma hatası:', err);
-      alert('Havuza katılırken bir hata oluştu.');
-    }
+      await fetchProviderData(false); setProviderTab('ACTIVE'); 
+    } catch (err) { console.error('Havuza katılma hatası:', err); alert('Havuza katılırken bir hata oluştu.'); }
   };
 
   const handleCustomerNextProvider = async (requestId) => {
@@ -366,15 +319,13 @@ export default function App() {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
       await fetchCustomerData();
       if (session.role === 'PROVIDER') await fetchProviderData(false);
-    } catch (err) {
-      console.error('İşlem başarısız:', err);
-    }
+    } catch (err) { console.error('İşlem başarısız:', err); }
   };
 
   const handleCustomerSelectCandidate = async (requestId, providerId) => {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) });
-      setShowCandidatesMap(prev => ({ ...prev, [requestId]: false }));
+      setExpandedCustomerQueueReqId(null);
       await fetchCustomerData();
       if (session.role === 'PROVIDER') await fetchProviderData(false);
     } catch (err) { console.error('Seçim başarısız:', err); }
@@ -481,12 +432,9 @@ export default function App() {
     return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q);
   });
 
-  // Dinamik Tablo Sıralama Mantığı
   const handleRequestSort = (key) => {
     let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
   };
 
@@ -501,20 +449,15 @@ export default function App() {
           valA = a.queueList ? a.queueList.length : 0;
           valB = b.queueList ? b.queueList.length : 0;
         } else if (sortConfig.key === 'provider_name') {
-          valA = a.provider_name || '';
-          valB = b.provider_name || '';
+          valA = a.provider_name || ''; valB = b.provider_name || '';
         } else if (sortConfig.key === 'location') {
-          valA = a.location || '';
-          valB = b.location || '';
+          valA = a.location || ''; valB = b.location || '';
         } else if (sortConfig.key === 'raw_text') {
-          valA = a.raw_text || '';
-          valB = b.raw_text || '';
+          valA = a.raw_text || ''; valB = b.raw_text || '';
         } else if (sortConfig.key === 'contact_value') {
-          valA = a.contact_value || '';
-          valB = b.contact_value || '';
+          valA = a.contact_value || ''; valB = b.contact_value || '';
         } else if (sortConfig.key === 'status') {
-          valA = a.status || '';
-          valB = b.status || '';
+          valA = a.status || ''; valB = b.status || '';
         }
 
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -559,22 +502,14 @@ export default function App() {
   const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  // Admin Tablo Başlık Bileşeni
   const SortableHeader = ({ label, sortKey, align = "left" }) => {
     const isActive = sortConfig.key === sortKey;
     return (
-      <th 
-        className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`}
-        onClick={() => handleRequestSort(sortKey)}
-      >
+      <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`} onClick={() => handleRequestSort(sortKey)}>
         <div className={`flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}>
           <span>{label}</span>
           <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
-            {isActive ? (
-              sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-            ) : (
-              <ArrowUpDown size={12} />
-            )}
+            {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
           </span>
         </div>
       </th>
@@ -593,7 +528,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.6 (Havuz)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.0</span>
             </div>
           </div>
 
@@ -607,9 +542,7 @@ export default function App() {
                 {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : '⚙️ Admin'}
               </span>
               <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
-              <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition">
-                <LogOut size={16} />
-              </button>
+              <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
             </div>
           )}
         </div>
@@ -701,39 +634,82 @@ export default function App() {
                           </div>
                         </div>
 
-                        {req.queuedProviders && req.queuedProviders.length > 0 && (
-                          <div className="p-3 bg-white rounded-lg border border-neutral-200 space-y-2">
-                            <p className="text-[11px] font-bold text-neutral-800 flex items-center space-x-1.5">
-                              <Users size={14} className="text-blue-600" />
-                              <span>Bu Talebinizle İlgilenen Sağlayıcılar ({req.queuedProviders.length}):</span>
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {req.queuedProviders.map((qProv, idx) => {
-                                const isCurrent = req.matched_provider_id === qProv.id;
-                                return (
-                                  <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between ${isCurrent ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-neutral-50 opacity-80'}`}>
-                                    <div>
-                                      <p className="font-bold text-[11px] text-neutral-900">#{idx + 1} {qProv.name} {isCurrent && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1 py-0.5 rounded ml-1">AKTİF</span>}</p>
-                                      {isCurrent ? (
-                                        <p className="text-[11px] font-mono text-blue-700 font-semibold mt-1">📞 {qProv.phone}</p>
-                                      ) : (
-                                        <p className="text-[10px] font-mono text-neutral-500 mt-1">Kuyrukta (Sıra Bekliyor)</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                        {/* AKTİF SAĞLAYICI GÖSTERİMİ */}
+                        {req.provider_name ? (
+                          <div className="p-3 bg-white rounded-lg border border-emerald-200 shadow-sm space-y-2 text-xs">
+                            <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
+                              <span className="text-[10px] font-mono font-bold text-emerald-700">ŞU ANKİ AKTİF SAĞLAYICI</span>
                             </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-1.5">
+                                <Building2 size={14} className="text-neutral-700" />
+                                <span className="font-bold text-neutral-950">{req.provider_name}</span>
+                                <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
+                              </div>
+                            </div>
+                            {req.status === 'ACCEPTED' && (
+                              <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5 mt-2">
+                                <PhoneCall size={13} className="text-emerald-700 animate-bounce" />
+                                <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          req.status === 'POOL' && (
+                            <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 text-xs text-blue-800 font-medium">
+                              ⏳ Talebiniz hizmet sağlayıcıların ortak havuzunda yayınlanmaktadır. İlgilenen sağlayıcılar sıraya girdiğinde aşağıda listelenecektir.
+                            </div>
+                          )
+                        )}
+
+                        {/* 🌟 MÜŞTERİ KUYRUK (QUEUE) GÖRÜNÜMÜ - AÇILIR KAPANIR LİSTE */}
+                        {req.queuedProviders && req.queuedProviders.length > 0 && (
+                          <div className="mt-2 bg-white border border-neutral-200 rounded-lg overflow-hidden transition-all duration-300">
+                            <div 
+                              onClick={() => setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id)}
+                              className="p-2.5 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
+                            >
+                              <div className="flex items-center space-x-1.5">
+                                <Users size={14} className="text-blue-600" />
+                                <span className="text-xs font-bold text-neutral-800">Sıraya Giren Tüm Adaylar ({req.queuedProviders.length})</span>
+                              </div>
+                              {expandedCustomerQueueReqId === req.id ? <ChevronUp size={14} className="text-neutral-500"/> : <ChevronDown size={14} className="text-neutral-500"/>}
+                            </div>
+                            
+                            {expandedCustomerQueueReqId === req.id && (
+                              <div className="p-3 pt-1 border-t border-neutral-100 bg-neutral-50/50">
+                                <div className="space-y-2">
+                                  {req.queuedProviders.map((qProv, idx) => {
+                                    const isCurrent = req.matched_provider_id === qProv.id;
+                                    return (
+                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-neutral-200'}`}>
+                                        <div>
+                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
+                                            <span>#{idx + 1} {qProv.name}</span>
+                                            {isCurrent && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
+                                            {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                            {qProv.interest_status === 'WAITING' && !isCurrent && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">BEKLİYOR</span>}
+                                          </p>
+                                          <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
+                                        </div>
+                                        {!isCurrent && (
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }}
+                                            className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1"
+                                          >
+                                            <Check size={10} /><span>Bunu Seç</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        {!req.provider_name && req.status === 'POOL' && (
-                          <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 text-xs text-blue-800 font-medium">
-                            ⏳ Talebiniz hizmet sağlayıcıların ortak havuzunda yayınlanmaktadır. İlgilenen sağlayıcılar sıraya girdiğinde burada listelenecektir.
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
                           <span>📍 {req.location || 'Mevcut Konum'}</span>
                           {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
                           {req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
@@ -741,9 +717,10 @@ export default function App() {
 
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
-                            {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 0 && (
+                            {/* Aktif sağlayıcı var ve kuyrukta başkaları da varsa 'Sonrakine Geç' butonu gösterilsin */}
+                            {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 1 && (
                               <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700">
-                                <SkipForward size={11} /><span>Anlaşamadık, Sıradakine Geç</span>
+                                <SkipForward size={11} /><span>Anlaşamadık, Otomatik Sıradakine Geç</span>
                               </button>
                             )}
                           </div>
@@ -1285,7 +1262,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (SIRALANABİLİR DİNAMİK TABLO) */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO GÖRÜNÜMÜ YENİ) */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">

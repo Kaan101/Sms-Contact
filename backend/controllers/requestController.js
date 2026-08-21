@@ -16,7 +16,6 @@ const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime } = req.body;
     
-    // Yeni talepler doğrudan POOL (Havuz) statüsünde başlar
     const { rows: requestRows } = await pool.query(
       `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, status) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'POOL') 
@@ -26,13 +25,7 @@ const createRequest = async (req, res) => {
 
     const newRequest = requestRows[0];
 
-    // Müşteriye SMS Log
-    await logSms(
-      newRequest.id, 
-      'USER', 
-      contactValue, 
-      `Talebiniz alınmış ve servis havuzuna eklenmiştir. Hizmet sağlayıcılar sıraya girdiğinde size bilgi vereceğiz.`
-    );
+    await logSms(newRequest.id, 'USER', contactValue, `Talebiniz alınmış ve servis havuzuna eklenmiştir. Hizmet sağlayıcılar sıraya girdiğinde size bilgi vereceğiz.`);
 
     res.status(201).json({ status: 'success', request: newRequest });
   } catch (error) {
@@ -41,12 +34,9 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 GÜNCELLENDİ: Açık Havuzdaki Talepleri Getir (Müşteri "Tamamlandı" yapana kadar havuzda kalır)
 const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
-    
-    // Status = COMPLETED veya CANCELLED "OLMAYAN" ve bu sağlayıcının henüz kuyruğuna GİRMEDİĞİ talepleri getir
     const { rows } = await pool.query(
       `SELECT r.* FROM requests r
        WHERE r.status NOT IN ('COMPLETED', 'CANCELLED') 
@@ -57,7 +47,6 @@ const getOpenPoolRequests = async (req, res) => {
        ORDER BY r.created_at DESC;`,
       [providerId]
     );
-
     res.status(200).json({ status: 'success', poolRequests: rows });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
@@ -69,29 +58,17 @@ const joinRequestPool = async (req, res) => {
     const { requestId } = req.params;
     const { providerId } = req.body;
 
-    // 1. request_interests tablosuna ekle
-    await pool.query(
-      `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'WAITING') ON CONFLICT DO NOTHING`,
-      [requestId, providerId]
-    );
+    await pool.query(`INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'WAITING') ON CONFLICT DO NOTHING`, [requestId, providerId]);
 
-    // 2. Eğer bu talebin henüz matched_provider_id'si yoksa (ilk gelen), onu hemen ata ve status=MATCHED yap
     const reqCheck = await pool.query(`SELECT matched_provider_id, contact_value FROM requests WHERE id = $1`, [requestId]);
     
     if (reqCheck.rows.length > 0 && !reqCheck.rows[0].matched_provider_id) {
-      await pool.query(
-        `UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`,
-        [providerId, requestId]
-      );
+      await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
+      await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, providerId]);
       
       const provCheck = await pool.query(`SELECT name FROM service_providers WHERE id = $1`, [providerId]);
       
-      await logSms(
-        requestId,
-        'USER',
-        reqCheck.rows[0].contact_value,
-        `Talebinizle ilgilenen ilk sağlayıcı (${provCheck.rows[0].name}) bulundu. Lütfen sisteme girip değerlendirin.`
-      );
+      await logSms(requestId, 'USER', reqCheck.rows[0].contact_value, `Talebinizle ilgilenen ilk sağlayıcı (${provCheck.rows[0].name}) bulundu. Lütfen sisteme girip değerlendirin.`);
     }
 
     res.status(200).json({ status: 'success', message: 'Talebe talip oldunuz ve sıraya girdiniz.' });
@@ -100,6 +77,7 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
+// 🌟 GÜNCELLENDİ: "SKIPPED" (Pas geçilenleri) de getir ki müşteri listeden görebilsin
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -120,7 +98,7 @@ const getUserRequests = async (req, res) => {
           `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status 
            FROM request_interests ri
            JOIN service_providers sp ON ri.provider_id = sp.id
-           WHERE ri.request_id = $1 AND ri.status != 'SKIPPED'
+           WHERE ri.request_id = $1
            ORDER BY ri.created_at ASC;`,
           [r.id]
         );
@@ -138,19 +116,13 @@ const passToNextProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
     
-    // Şu anki eşleşmeyi SKIPPED yap
     await pool.query(
-      `UPDATE request_interests 
-       SET status = 'SKIPPED' 
-       WHERE request_id = $1 AND provider_id = (SELECT matched_provider_id FROM requests WHERE id = $1)`,
+      `UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND provider_id = (SELECT matched_provider_id FROM requests WHERE id = $1)`,
       [requestId]
     );
 
-    // Kuyruktaki sıradaki (WAITING) kişiyi bul
     const { rows: nextInQueue } = await pool.query(
-      `SELECT provider_id FROM request_interests 
-       WHERE request_id = $1 AND status = 'WAITING' 
-       ORDER BY created_at ASC LIMIT 1`,
+      `SELECT provider_id FROM request_interests WHERE request_id = $1 AND status = 'WAITING' ORDER BY created_at ASC LIMIT 1`,
       [requestId]
     );
 
@@ -159,9 +131,29 @@ const passToNextProvider = async (req, res) => {
       await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [nextProviderId, requestId]);
       await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, nextProviderId]);
     } else {
-      // Kuyrukta kimse kalmadıysa tekrar POOL'a düşsün
       await pool.query(`UPDATE requests SET matched_provider_id = NULL, status = 'POOL' WHERE id = $1`, [requestId]);
     }
+
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// 🌟 GÜNCELLENDİ: Müşteri listeden serbestçe sağlayıcı seçerse
+const selectCandidateProvider = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { providerId } = req.body;
+    
+    // Aktif olanları Skipped yap
+    await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
+    
+    // Yenisini eşleştir
+    await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
+    
+    // Seçileni Active yap
+    await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, providerId]);
 
     res.status(200).json({ status: 'success' });
   } catch (error) {
@@ -187,11 +179,8 @@ const updateRequestStatus = async (req, res) => {
         await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Sağlayıcı işlemi tamamladığını bildirdi. Lütfen onaylayıp değerlendirin.`);
       }
     }
-
     res.status(200).json({ status: 'success', request: rows[0] });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 const getProviderAssignedRequests = async (req, res) => {
@@ -209,74 +198,41 @@ const getProviderAssignedRequests = async (req, res) => {
       [providerId]
     );
     res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 const getMatchedRequests = async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT r.*, sp.name as provider_name, sp.phone as provider_phone 
-      FROM requests r
-      LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
-      ORDER BY r.created_at DESC;
-    `);
-
+    const { rows } = await pool.query(`SELECT r.*, sp.name as provider_name, sp.phone as provider_phone FROM requests r LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id ORDER BY r.created_at DESC;`);
     for (let r of rows) {
-      const { rows: queued } = await pool.query(
-        `SELECT sp.name, sp.phone, ri.status as interest_status, ri.created_at
-         FROM request_interests ri
-         JOIN service_providers sp ON ri.provider_id = sp.id
-         WHERE ri.request_id = $1
-         ORDER BY ri.created_at ASC;`,
-        [r.id]
-      );
+      const { rows: queued } = await pool.query(`SELECT sp.name, sp.phone, ri.status as interest_status, ri.created_at FROM request_interests ri JOIN service_providers sp ON ri.provider_id = sp.id WHERE ri.request_id = $1 ORDER BY ri.created_at ASC;`, [r.id]);
       r.queueList = queued;
     }
-
     res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 const getPendingRequests = async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT * FROM requests 
-      WHERE status IN ('POOL', 'MANUAL_INTERVENTION')
-      ORDER BY created_at ASC;
-    `);
+    const { rows } = await pool.query(`SELECT * FROM requests WHERE status IN ('POOL', 'MANUAL_INTERVENTION') ORDER BY created_at ASC;`);
     res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 const assignProviderManually = async (req, res) => {
   try {
     const { requestId, providerId } = req.body;
     await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
-    
-    await pool.query(
-      `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE') ON CONFLICT (request_id, provider_id) DO UPDATE SET status = 'ACTIVE'`,
-      [requestId, providerId]
-    );
-
+    await pool.query(`INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE') ON CONFLICT (request_id, provider_id) DO UPDATE SET status = 'ACTIVE'`, [requestId, providerId]);
     res.status(200).json({ status: 'success', message: 'Manuel atama başarılı.' });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 const getOutboundNotifications = async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT * FROM outbound_notifications ORDER BY created_at DESC LIMIT 100;`);
     res.status(200).json({ status: 'success', notifications: rows });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 const deleteRequest = async (req, res) => {
@@ -284,20 +240,7 @@ const deleteRequest = async (req, res) => {
     const { requestId } = req.params;
     await pool.query(`DELETE FROM requests WHERE id = $1`, [requestId]);
     res.status(200).json({ status: 'success' });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
-const selectCandidateProvider = async (req, res) => {
-  try {
-    const { requestId } = req.params;
-    const { providerId } = req.body;
-    await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
-    res.status(200).json({ status: 'success' });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
 module.exports = {
