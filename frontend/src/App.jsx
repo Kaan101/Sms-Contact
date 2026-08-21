@@ -16,6 +16,7 @@ const MAX_KEYWORD_COUNT = 50;
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
+  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -67,7 +68,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
-  
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
@@ -76,7 +76,10 @@ export default function App() {
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
-  const [providerTab, setProviderTab] = useState('ACTIVE');
+  
+  // 🌟 YENİ: Havuz (Pool) Açılır-Kapanır State'i
+  const [isPoolOpen, setIsPoolOpen] = useState(false); 
+  
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({
@@ -320,7 +323,7 @@ export default function App() {
     }
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id });
-      await fetchProviderData(false); setProviderTab('ACTIVE'); 
+      await fetchProviderData(false);
     } catch (err) { console.error('Havuza katılma hatası:', err); alert('Havuza katılırken bir hata oluştu.'); }
   };
 
@@ -548,7 +551,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.3</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.4</span>
             </div>
           </div>
 
@@ -654,7 +657,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK (BİRLEŞTİRİLMİŞ YAPI) */}
+                        {/* 🌟 MÜŞTERİ AKTİF SAĞLAYICI KARTI & AÇILIR KAPANIR LİSTE */}
                         {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) ? (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             
@@ -843,26 +846,12 @@ export default function App() {
                 </div>
               )}
 
-              {step === 'DISAMBIGUATE' && disambiguationData && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
-                  <h3 className="font-semibold text-sm text-neutral-950">Hizmet Amacını Netleştirelim</h3>
-                  <div className="space-y-2">
-                    {disambiguationData.options.map((option) => (
-                      <button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); setStep('CONFIRM'); }} className="w-full text-left p-3 rounded-lg border hover:border-neutral-950 text-xs flex items-center justify-between">
-                        <span>{option.text}</span><ArrowRight size={13} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">Talep Özeti</span>
                     <h2 className="text-base font-bold text-neutral-950 mt-0.5">"{queryText}"</h2>
-                    {selectedDisambiguation && <p className="text-xs text-neutral-500 mt-0.5 font-medium">Hedef: <span className="text-neutral-900">{selectedDisambiguation}</span></p>}
                   </div>
 
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
@@ -932,14 +921,6 @@ export default function App() {
                             <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>{preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
                           </div>
                         </div>
-
-                        {preferredChannels.includes('EMAIL') && (
-                          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
-                            <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1"><Mail size={12} className="text-blue-700" /><span>İletişim E-posta Adresiniz *</span></label>
-                            <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="adiniz@example.com" className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium" />
-                            <p className="text-[10px] text-blue-700 font-mono">Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.</p>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1065,137 +1046,141 @@ export default function App() {
                 )}
               </div>
 
-              <div className="flex items-center space-x-2 border-b border-neutral-200">
-                <button onClick={() => setProviderTab('ACTIVE')} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition ${providerTab === 'ACTIVE' ? 'border-b-2 border-neutral-950 text-neutral-950' : 'text-neutral-400 hover:text-neutral-700'}`}>
-                  <Building2 size={14} /><span>Aktif İşlerim ({activeProviderRequests.length})</span>
-                </button>
-                <button onClick={() => setProviderTab('POOL')} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition ${providerTab === 'POOL' ? 'border-b-2 border-blue-600 text-blue-700' : 'text-neutral-400 hover:text-neutral-700'}`}>
-                  <Inbox size={14} /><span>Açık Talep Havuzu ({poolRequests.length})</span>
-                  {poolRequests.length > 0 && <span className="flex w-2 h-2 rounded-full bg-blue-500 animate-pulse ml-1"></span>}
-                </button>
-              </div>
-
-              {/* HAVUZ SEKME İÇERİĞİ */}
-              {providerTab === 'POOL' && (
-                <div className="space-y-3 animate-in fade-in duration-200">
-                  {poolRequests.length === 0 ? (
-                    <div className="p-8 text-center bg-white rounded-2xl border border-neutral-200 text-xs text-neutral-400 font-mono">Şu anda açık havuzda profilinize uygun yeni bir talep bulunmuyor.</div>
+              {/* 🌟 AKTİF İŞ TALEPLERİ (SABİT) */}
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-mono uppercase font-bold text-neutral-950 flex items-center space-x-1.5">
+                    <Building2 size={14} className="text-blue-600" />
+                    <span>Aktif İşlerim ({activeProviderRequests.length})</span>
+                  </h3>
+                </div>
+                <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
+                  {activeProviderRequests.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-neutral-400 font-mono">Henüz eşleştiğiniz veya devam eden bir işiniz bulunmuyor.</div>
                   ) : (
-                    poolRequests.map((req) => (
-                      <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3 hover:border-blue-400 transition">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                              {req.status === 'POOL' ? 'İLK SİZ TALİP OLUN' : 'AKTİF (KUYRUĞA KATIL)'}
-                            </span>
-                            <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
-                            <p className="text-base font-bold text-neutral-950 mt-1.5">"{req.raw_text}"</p>
+                    activeProviderRequests.map((req) => {
+                      const clientEmail = extractEmail(req.contact_value);
+                      const cleanPhone = extractPhone(req.contact_value) || session.phone;
+                      const phoneDigits = cleanPhone.replace(/\D/g, '');
+                      const rawChannels = (req.preferred_channel || 'PHONE').toUpperCase();
+                      const hasPhone = rawChannels.includes('PHONE') || rawChannels.includes('TELEFON');
+                      const hasSms = rawChannels.includes('SMS');
+                      const hasEmail = rawChannels.includes('EMAIL') || rawChannels.includes('E-POSTA');
+                      const hasWhatsapp = rawChannels.includes('WHATSAPP');
+
+                      const providerName = providerProfile?.name || req.provider_name || 'Hizmet Sağlayıcı';
+                      const providerPhone = providerProfile?.phone || req.provider_phone || session.phone;
+                      const providerEmail = providerProfile?.email || req.provider_email || '';
+                      const providerLocation = req.location || 'İstanbul';
+
+                      const emailBodyText = `Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nDetayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.\n\nSaygılarımızla,\n--------------------------------------------\n🏢 ${providerName}\n📍 Adres / Hizmet Bölgesi: ${providerLocation}\n📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}\n--------------------------------------------`;
+                      const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
+                      const mailtoBody = encodeURIComponent(emailBodyText);
+                      const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
+
+                      const commonMsgText = `Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`;
+                      const encodedCommonMsg = encodeURIComponent(commonMsgText);
+
+                      const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${encodedCommonMsg}`;
+                      const waLink = `https://wa.me/${phoneDigits}?text=${encodedCommonMsg}`;
+                      const callLink = `tel:${cleanPhone}`;
+
+                      return (
+                        <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' : req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-neutral-100 text-neutral-800'}`}>
+                                {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
+                              </span>
+                              <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
+                              <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
+                            </div>
                           </div>
-                          <span className="text-[10px] text-neutral-400 font-mono flex items-center space-x-1"><Clock size={11} /> <span>{new Date(req.created_at).toLocaleTimeString('tr-TR')}</span></span>
-                        </div>
-                        <div className="p-2.5 bg-neutral-50 rounded border border-neutral-100 text-xs space-y-1">
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
-                            <span>📍 Konum: <strong className="text-neutral-800">{req.location || 'Bilinmiyor'}</strong></span>
-                            {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
-                            {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
+
+                          <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-2">
+                            <p className="font-mono text-neutral-700">Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong></p>
+
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
+                              <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
+                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                              {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-[11px] font-mono">
+                              <span className="font-bold text-neutral-600 mr-1">İletişim Kanalları:</span>
+                              {hasPhone && <a href={callLink} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><Phone size={12} /><span>Ara</span></a>}
+                              {hasSms && <a href={smsLink} className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><MessageSquare size={12} /><span>SMS</span></a>}
+                              {hasWhatsapp && <a href={waLink} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><MessageCircle size={12} /><span>WhatsApp</span></a>}
+                              {hasEmail && mailtoLink && <a href={mailtoLink} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><Mail size={12} /><span>E-posta</span></a>}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end space-x-2 pt-1">
+                            {req.status === 'MATCHED' && (
+                              <>
+                                <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold">Pas Geç</button>
+                                <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"><Check size={12} /><span>Kabul Et & İletişime Geç</span></button>
+                              </>
+                            )}
+                            {req.status === 'ACCEPTED' && (
+                              <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1"><ShieldCheck size={12} /><span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span></button>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between pt-1">
-                          <span className="text-[10px] font-mono text-blue-600">
-                            {req.status === 'POOL' ? 'Talebe ilk talip olan siz olarak müşteriyle hemen eşleşin.' : 'Başka bir sağlayıcı eşleşmiş, ancak kuyruğa girerek sıranızı bekleyebilirsiniz.'}
-                          </span>
-                          <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
-                            <UserCheck size={14} /><span>Sıraya Gir</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
-              )}
+              </div>
 
-              {/* AKTİF SEKME İÇERİĞİ */}
-              {providerTab === 'ACTIVE' && (
-                <div className="bg-white rounded-b-2xl border border-t-0 border-neutral-200 shadow-sm p-4 space-y-3 animate-in fade-in duration-200">
-                  <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
-                    {activeProviderRequests.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400 font-mono">Henüz eşleştiğiniz veya devam eden bir işiniz bulunmuyor.</div>
+              {/* 🌟 YENİ: AÇIK TALEP HAVUZU (AÇILIR KAPANIR / COLLAPSIBLE) */}
+              <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-5">
+                <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
+                  <div className="flex items-center space-x-2">
+                    <Inbox size={15} className="text-blue-600" />
+                    <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Açık Talep Havuzu ({poolRequests.length})</h3>
+                    {poolRequests.length > 0 && <span className="flex w-2 h-2 rounded-full bg-blue-500 animate-pulse ml-1"></span>}
+                  </div>
+                  {isPoolOpen ? <ChevronUp size={16} className="text-neutral-500"/> : <ChevronDown size={16} className="text-neutral-500"/>}
+                </div>
+                {isPoolOpen && (
+                  <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[400px] overflow-y-auto">
+                    {poolRequests.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-neutral-400 font-mono">Şu anda açık havuzda profilinize uygun yeni bir talep bulunmuyor.</div>
                     ) : (
-                      activeProviderRequests.map((req) => {
-                        const clientEmail = extractEmail(req.contact_value);
-                        const cleanPhone = extractPhone(req.contact_value) || session.phone;
-                        const phoneDigits = cleanPhone.replace(/\D/g, '');
-                        const rawChannels = (req.preferred_channel || 'PHONE').toUpperCase();
-                        const hasPhone = rawChannels.includes('PHONE') || rawChannels.includes('TELEFON');
-                        const hasSms = rawChannels.includes('SMS');
-                        const hasEmail = rawChannels.includes('EMAIL') || rawChannels.includes('E-POSTA');
-                        const hasWhatsapp = rawChannels.includes('WHATSAPP');
-
-                        const providerName = providerProfile?.name || req.provider_name || 'Hizmet Sağlayıcı';
-                        const providerPhone = providerProfile?.phone || req.provider_phone || session.phone;
-                        const providerEmail = providerProfile?.email || req.provider_email || '';
-                        const providerLocation = req.location || 'İstanbul';
-
-                        const emailBodyText = `Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nDetayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.\n\nSaygılarımızla,\n--------------------------------------------\n🏢 ${providerName}\n📍 Adres / Hizmet Bölgesi: ${providerLocation}\n📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}\n--------------------------------------------`;
-                        const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
-                        const mailtoBody = encodeURIComponent(emailBodyText);
-                        const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
-
-                        const commonMsgText = `Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`;
-                        const encodedCommonMsg = encodeURIComponent(commonMsgText);
-
-                        const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${encodedCommonMsg}`;
-                        const waLink = `https://wa.me/${phoneDigits}?text=${encodedCommonMsg}`;
-                        const callLink = `tel:${cleanPhone}`;
-
-                        return (
-                          <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' : req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-neutral-100 text-neutral-800'}`}>
-                                  {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
-                                </span>
-                                <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
-                                <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
-                              </div>
+                      poolRequests.map((req) => (
+                        <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3 hover:border-blue-400 transition">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                                {req.status === 'POOL' ? 'İLK SİZ TALİP OLUN' : 'AKTİF (KUYRUĞA KATIL)'}
+                              </span>
+                              <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
+                              <p className="text-base font-bold text-neutral-950 mt-1.5">"{req.raw_text}"</p>
                             </div>
-
-                            <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-2">
-                              <p className="font-mono text-neutral-700">Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong></p>
-
-                              <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
-                                <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
-                                {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
-                                {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-[11px] font-mono">
-                                <span className="font-bold text-neutral-600 mr-1">İletişim Kanalları:</span>
-                                {hasPhone && <a href={callLink} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><Phone size={12} /><span>Ara</span></a>}
-                                {hasSms && <a href={smsLink} className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><MessageSquare size={12} /><span>SMS</span></a>}
-                                {hasWhatsapp && <a href={waLink} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><MessageCircle size={12} /><span>WhatsApp</span></a>}
-                                {hasEmail && mailtoLink && <a href={mailtoLink} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><Mail size={12} /><span>E-posta</span></a>}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-end space-x-2 pt-1">
-                              {req.status === 'MATCHED' && (
-                                <>
-                                  <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold">Pas Geç</button>
-                                  <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"><Check size={12} /><span>Kabul Et & İletişime Geç</span></button>
-                                </>
-                              )}
-                              {req.status === 'ACCEPTED' && (
-                                <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1"><ShieldCheck size={12} /><span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span></button>
-                              )}
+                            <span className="text-[10px] text-neutral-400 font-mono flex items-center space-x-1"><Clock size={11} /> <span>{new Date(req.created_at).toLocaleTimeString('tr-TR')}</span></span>
+                          </div>
+                          <div className="p-2.5 bg-neutral-50 rounded border border-neutral-100 text-xs space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
+                              <span>📍 Konum: <strong className="text-neutral-800">{req.location || 'Bilinmiyor'}</strong></span>
+                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                              {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             </div>
                           </div>
-                        );
-                      })
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-[10px] font-mono text-blue-600">
+                              {req.status === 'POOL' ? 'Talebe ilk talip olan siz olarak müşteriyle hemen eşleşin.' : 'Başka bir sağlayıcı eşleşmiş, ancak kuyruğa girerek sıranızı bekleyebilirsiniz.'}
+                            </span>
+                            <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
+                              <UserCheck size={14} /><span>Sıraya Gir</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* SAĞLAYICI GEÇMİŞ TALEPLER */}
               {pastProviderRequests.length > 0 && (
@@ -1323,7 +1308,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO) */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
