@@ -16,6 +16,7 @@ const MAX_KEYWORD_COUNT = 50;
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
+  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -68,7 +69,7 @@ export default function App() {
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
 
-  // 🌟 YENİ: Müşterinin Kendi Talebindeki Kuyruğu Açıp Kapatma State'i
+  // Müşterinin Kendi Talebindeki Kuyruğu Açıp Kapatma State'i
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
   // Sağlayıcı State
@@ -284,7 +285,8 @@ export default function App() {
   };
 
   const handleCustomerFinalSubmit = async (e) => {
-    e?.preventDefault(); if (!session?.phone) return;
+    e?.preventDefault();
+    if (!session?.phone) return;
     if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
       setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100);
       return;
@@ -634,55 +636,55 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* AKTİF SAĞLAYICI GÖSTERİMİ */}
+                        {/* 🌟 MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK (BİRLEŞTİRİLMİŞ YAPI) */}
                         {req.provider_name ? (
-                          <div className="p-3 bg-white rounded-lg border border-emerald-200 shadow-sm space-y-2 text-xs">
-                            <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
-                              <span className="text-[10px] font-mono font-bold text-emerald-700">ŞU ANKİ AKTİF SAĞLAYICI</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-1.5">
-                                <Building2 size={14} className="text-neutral-700" />
-                                <span className="font-bold text-neutral-950">{req.provider_name}</span>
-                                <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
-                              </div>
-                            </div>
-                            {req.status === 'ACCEPTED' && (
-                              <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5 mt-2">
-                                <PhoneCall size={13} className="text-emerald-700 animate-bounce" />
-                                <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          req.status === 'POOL' && (
-                            <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 text-xs text-blue-800 font-medium">
-                              ⏳ Talebiniz hizmet sağlayıcıların ortak havuzunda yayınlanmaktadır. İlgilenen sağlayıcılar sıraya girdiğinde aşağıda listelenecektir.
-                            </div>
-                          )
-                        )}
-
-                        {/* 🌟 MÜŞTERİ KUYRUK (QUEUE) GÖRÜNÜMÜ - AÇILIR KAPANIR LİSTE */}
-                        {req.queuedProviders && req.queuedProviders.length > 0 && (
-                          <div className="mt-2 bg-white border border-neutral-200 rounded-lg overflow-hidden transition-all duration-300">
+                          <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
+                            {/* Aktif Sağlayıcı (Tıklanabilir Başlık) */}
                             <div 
-                              onClick={() => setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id)}
-                              className="p-2.5 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none"
+                              onClick={() => {
+                                if (req.queuedProviders && req.queuedProviders.length > 1) {
+                                  setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id);
+                                }
+                              }}
+                              className={`p-3 flex items-center justify-between ${req.queuedProviders && req.queuedProviders.length > 1 ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}
                             >
-                              <div className="flex items-center space-x-1.5">
-                                <Users size={14} className="text-blue-600" />
-                                <span className="text-xs font-bold text-neutral-800">Sıraya Giren Tüm Adaylar ({req.queuedProviders.length})</span>
+                              <div className="space-y-1.5 w-full">
+                                <div className="text-[10px] font-mono font-bold text-emerald-700">ŞU ANKİ AKTİF SAĞLAYICI</div>
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center space-x-1.5">
+                                    <Building2 size={14} className="text-neutral-700" />
+                                    <span className="font-bold text-neutral-950">{req.provider_name}</span>
+                                    <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
+                                  </div>
+                                  
+                                  {req.queuedProviders && req.queuedProviders.length > 1 && (
+                                    <div className="flex items-center space-x-1 text-neutral-400">
+                                      <span className="text-[10px] font-bold">Diğer Adaylar ({req.queuedProviders.length - 1})</span>
+                                      {expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              {expandedCustomerQueueReqId === req.id ? <ChevronUp size={14} className="text-neutral-500"/> : <ChevronDown size={14} className="text-neutral-500"/>}
                             </div>
                             
-                            {expandedCustomerQueueReqId === req.id && (
-                              <div className="p-3 pt-1 border-t border-neutral-100 bg-neutral-50/50">
+                            {/* Kabul Edildi Bildirimi */}
+                            {req.status === 'ACCEPTED' && !expandedCustomerQueueReqId && (
+                              <div className="px-3 pb-3">
+                                 <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5">
+                                   <PhoneCall size={13} className="text-emerald-700 animate-bounce" />
+                                   <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></span>
+                                 </div>
+                              </div>
+                            )}
+
+                            {/* Kuyruktaki Diğer Adaylar (Açılır Liste) */}
+                            {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 1 && (
+                              <div className="p-3 pt-2 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
                                   {req.queuedProviders.map((qProv, idx) => {
                                     const isCurrent = req.matched_provider_id === qProv.id;
                                     return (
-                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-neutral-200'}`}>
+                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
                                         <div>
                                           <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
                                             <span>#{idx + 1} {qProv.name}</span>
@@ -707,6 +709,12 @@ export default function App() {
                               </div>
                             )}
                           </div>
+                        ) : (
+                          req.status === 'POOL' && (
+                            <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 text-xs text-blue-800 font-medium mt-2">
+                              ⏳ Talebiniz hizmet sağlayıcıların ortak havuzunda yayınlanmaktadır. İlgilenen sağlayıcılar sıraya girdiğinde burada listelenecektir.
+                            </div>
+                          )
                         )}
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
@@ -717,10 +725,9 @@ export default function App() {
 
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
-                            {/* Aktif sağlayıcı var ve kuyrukta başkaları da varsa 'Sonrakine Geç' butonu gösterilsin */}
                             {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 1 && (
                               <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700">
-                                <SkipForward size={11} /><span>Anlaşamadık, Otomatik Sıradakine Geç</span>
+                                <SkipForward size={11} /><span>Otomatik Sıradakine Geç</span>
                               </button>
                             )}
                           </div>
@@ -1262,7 +1269,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO GÖRÜNÜMÜ YENİ) */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO) */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1375,11 +1382,7 @@ export default function App() {
 
                                   {/* SİL BUTONU */}
                                   <td className="px-4 py-3 align-top text-right">
-                                    <button 
-                                      onClick={() => handleDeleteRequest(req.id)}
-                                      className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                                      title="Talebi Sil"
-                                    >
+                                    <button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Talebi Sil">
                                       <Trash2 size={14} />
                                     </button>
                                   </td>
