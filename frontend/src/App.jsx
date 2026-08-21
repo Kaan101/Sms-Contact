@@ -68,9 +68,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
-  const [customerHistoryFilter, setCustomerHistoryFilter] = useState('ALL'); // 🌟 YENİ: Müşteri Geçmiş Filtresi
+  
+  // 🌟 YENİ: Müşteri Geçmiş Metin Arama Filtresi
+  const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
 
-  // Müşterinin Kendi Talebindeki Kuyruğu Açıp Kapatma State'i
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
   // Sağlayıcı State
@@ -307,7 +308,6 @@ export default function App() {
     } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
 
-  // 🌟 YENİ: Geçmiş Talebi Tekrarla Form Doldurucu
   const handleRepeatRequest = (req) => {
     setQueryText(req.raw_text);
     if (req.location) setLocationValue(req.location);
@@ -427,10 +427,15 @@ export default function App() {
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
 
-  // 🌟 YENİ: Geçmiş Talepler İçin Filtreleme Mantığı
+  // 🌟 YENİ: Geçmiş Talepler İçin Dinamik Arama (Search) Filtresi
   const filteredPastCustomerRequests = pastCustomerRequests.filter(req => {
-    if (customerHistoryFilter === 'ALL') return true;
-    return req.status === customerHistoryFilter;
+    const q = searchCustomerHistoryText.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (req.raw_text || '').toLowerCase().includes(q) ||
+      (req.provider_name || '').toLowerCase().includes(q) ||
+      (req.status || '').toLowerCase().includes(q)
+    );
   });
 
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
@@ -546,7 +551,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.1</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.2</span>
             </div>
           </div>
 
@@ -937,44 +942,51 @@ export default function App() {
               )}
 
               {/* E. MÜŞTERİ GEÇMİŞ TALEPLER */}
-              {filteredPastCustomerRequests.length > 0 && (
+              {pastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-8">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({filteredPastCustomerRequests.length})</h3></div>
+                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3></div>
                     {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                   {isCustomerHistoryOpen && (
                     <div className="p-4 pt-0 border-t border-neutral-100">
                       
-                      <div className="flex items-center space-x-2 mb-3 mt-3">
-                        <span className="text-[10px] font-mono text-neutral-400 uppercase font-semibold">Filtrele:</span>
-                        <select 
-                          value={customerHistoryFilter} 
-                          onChange={(e) => setCustomerHistoryFilter(e.target.value)}
-                          className="p-1.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium hover:border-neutral-300 transition"
-                        >
-                          <option value="ALL">Tümü</option>
-                          <option value="COMPLETED">Sadece Tamamlananlar</option>
-                          <option value="CANCELLED">Sadece İptal Edilenler</option>
-                        </select>
+                      <div className="relative mb-3 mt-3">
+                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                        <input 
+                          type="text" 
+                          value={searchCustomerHistoryText} 
+                          onChange={(e) => setSearchCustomerHistoryText(e.target.value)}
+                          placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." 
+                          className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium"
+                        />
+                        {searchCustomerHistoryText && (
+                          <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700">
+                            <X size={13} />
+                          </button>
+                        )}
                       </div>
 
                       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                        {filteredPastCustomerRequests.map((req) => (
-                          <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                                <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone ? `(📞 ${req.provider_phone})` : ''} • {new Date(req.created_at).toLocaleDateString('tr-TR')}</p>
-                              </div>
-                              <div className="flex items-center space-x-1.5">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{req.status}</span>
-                                <button onClick={() => handleRepeatRequest(req)} className="p-1 text-neutral-500 hover:text-blue-700 hover:bg-blue-50 rounded transition" title="Bu Talebi Tekrarla"><RefreshCw size={13} /></button>
-                                <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Sil"><Trash2 size={13} /></button>
+                        {filteredPastCustomerRequests.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-neutral-400 font-mono">Aramanıza uygun geçmiş talep bulunamadı.</div>
+                        ) : (
+                          filteredPastCustomerRequests.map((req) => (
+                            <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
+                                  <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone ? `(📞 ${req.provider_phone})` : ''} • {new Date(req.created_at).toLocaleDateString('tr-TR')}</p>
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{req.status}</span>
+                                  <button onClick={() => handleRepeatRequest(req)} className="p-1 text-neutral-500 hover:text-blue-700 hover:bg-blue-50 rounded transition" title="Bu Talebi Tekrarla"><RefreshCw size={13} /></button>
+                                  <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Sil"><Trash2 size={13} /></button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     </div>
                   )}
@@ -1345,13 +1357,11 @@ export default function App() {
                               <React.Fragment key={req.id}>
                                 <tr className={`hover:bg-neutral-50 transition ${expandedQueueReqId === req.id ? 'bg-blue-50/30' : ''}`}>
                                   
-                                  {/* ID ve Tarih */}
                                   <td className="px-4 py-3 align-top whitespace-normal">
                                     <div className="font-mono font-bold text-neutral-900">#REQ-{req.id}</div>
                                     <div className="text-[10px] text-neutral-400 mt-0.5">{new Date(req.created_at).toLocaleDateString('tr-TR')}</div>
                                   </td>
                                   
-                                  {/* KUYRUK SÜTUNU */}
                                   <td className="px-4 py-3 align-top text-center">
                                     {req.queueList && req.queueList.length > 0 ? (
                                       <button onClick={() => setExpandedQueueReqId(expandedQueueReqId === req.id ? null : req.id)} className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition whitespace-nowrap ${expandedQueueReqId === req.id ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}>
@@ -1362,7 +1372,6 @@ export default function App() {
                                     )}
                                   </td>
 
-                                  {/* Durum */}
                                   <td className="px-4 py-3 align-top">
                                     <span className={`px-2 py-0.5 rounded text-[9px] font-bold inline-block whitespace-nowrap ${
                                       req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
@@ -1375,17 +1384,14 @@ export default function App() {
                                     </span>
                                   </td>
 
-                                  {/* Talep Metni */}
                                   <td className="px-4 py-3 align-top font-semibold text-neutral-900 whitespace-normal">
                                     "{req.raw_text}"
                                   </td>
 
-                                  {/* Müşteri */}
                                   <td className="px-4 py-3 align-top whitespace-normal">
                                     <div className="font-mono text-neutral-800">{req.contact_value}</div>
                                   </td>
 
-                                  {/* Sağlayıcı */}
                                   <td className="px-4 py-3 align-top whitespace-normal">
                                     {req.provider_name ? (
                                       <div className="space-y-1">
@@ -1402,7 +1408,6 @@ export default function App() {
                                     )}
                                   </td>
 
-                                  {/* Konum / Aciliyet */}
                                   <td className="px-4 py-3 align-top whitespace-normal">
                                     <div className="text-neutral-700 flex items-center space-x-1">
                                       <span>{req.location || 'Kadıköy'}</span>
@@ -1410,7 +1415,6 @@ export default function App() {
                                     </div>
                                   </td>
 
-                                  {/* SİL BUTONU */}
                                   <td className="px-4 py-3 align-top text-right">
                                     <button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Talebi Sil">
                                       <Trash2 size={14} />
@@ -1418,7 +1422,6 @@ export default function App() {
                                   </td>
                                 </tr>
 
-                                {/* KUYRUK LİSTESİ (AÇILIR KAPANIR SATIR) */}
                                 {expandedQueueReqId === req.id && req.queueList && req.queueList.length > 0 && (
                                   <tr className="bg-blue-50/20 border-b border-blue-100/50">
                                     <td colSpan="8" className="px-4 py-4">
