@@ -16,7 +16,6 @@ const MAX_KEYWORD_COUNT = 50;
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
-  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -78,12 +77,7 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    serviceKeywords: '',
-    communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
-    priorityScore: 100
+    name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100
   });
 
   // Admin State
@@ -94,10 +88,7 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
 
-  // Admin Tablo Sıralama (Sorting) State'i
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
-
-  // Admin Kuyruk (Queue) Collapsed State'i
   const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
 
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
@@ -182,9 +173,7 @@ export default function App() {
 
       if (shouldUpdateForm) {
         setProviderFormData({
-          name: prov.name || '',
-          phone: prov.phone || '',
-          email: prov.email || '',
+          name: prov.name || '', phone: prov.phone || '', email: prov.email || '',
           serviceKeywords: (prov.service_keywords || []).join(', '),
           communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
           priorityScore: prov.priority_score || 100
@@ -604,7 +593,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.5 (Havuz)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 7.6 (Havuz)</span>
             </div>
           </div>
 
@@ -1058,7 +1047,9 @@ export default function App() {
                       <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3 hover:border-blue-400 transition">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">HAVUZDA BEKLİYOR</span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                              {req.status === 'POOL' ? 'İLK SİZ TALİP OLUN' : 'AKTİF (KUYRUĞA KATIL)'}
+                            </span>
                             <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
                             <p className="text-base font-bold text-neutral-950 mt-1.5">"{req.raw_text}"</p>
                           </div>
@@ -1072,9 +1063,11 @@ export default function App() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between pt-1">
-                          <span className="text-[10px] font-mono text-blue-600">Sıraya girerek müşteriyle eşleşebilirsiniz.</span>
+                          <span className="text-[10px] font-mono text-blue-600">
+                            {req.status === 'POOL' ? 'Talebe ilk talip olan siz olarak müşteriyle hemen eşleşin.' : 'Başka bir sağlayıcı eşleşmiş, ancak kuyruğa girerek sıranızı bekleyebilirsiniz.'}
+                          </span>
                           <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
-                            <UserCheck size={14} /><span>Talebe Talip Ol / Sıraya Gir</span>
+                            <UserCheck size={14} /><span>Sıraya Gir</span>
                           </button>
                         </div>
                       </div>
@@ -1292,7 +1285,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (TABLO GÖRÜNÜMÜ YENİ) */}
+              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI (SIRALANABİLİR DİNAMİK TABLO) */}
               {adminTab === 'ALL_MATCHED' && (
                 <div className="space-y-3">
                   <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
@@ -1315,11 +1308,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+                  <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
                     {sortedMatchedRequests.length === 0 ? (
                       <div className="p-8 text-center text-xs text-neutral-400">Arama kriterlerine uygun talep bulunamadı.</div>
                     ) : (
-                      <div className="overflow-x-auto max-h-[650px] w-full">
+                      <div className="max-h-[650px] overflow-y-auto overflow-x-hidden w-full">
                         <table className="w-full text-left text-xs table-auto">
                           <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider sticky top-0 z-10 shadow-sm">
                             <tr>
@@ -1344,7 +1337,7 @@ export default function App() {
                                     <div className="text-[10px] text-neutral-400 mt-0.5">{new Date(req.created_at).toLocaleDateString('tr-TR')}</div>
                                   </td>
                                   
-                                  {/* 🌟 KUYRUK SÜTUNU (ID'nin Yanında ve Ortalanmış) */}
+                                  {/* KUYRUK SÜTUNU */}
                                   <td className="px-4 py-3 align-top text-center">
                                     {req.queueList && req.queueList.length > 0 ? (
                                       <button onClick={() => setExpandedQueueReqId(expandedQueueReqId === req.id ? null : req.id)} className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition whitespace-nowrap ${expandedQueueReqId === req.id ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}>
@@ -1403,7 +1396,7 @@ export default function App() {
                                     </div>
                                   </td>
 
-                                  {/* 🌟 YENİ: SİL BUTONU */}
+                                  {/* SİL BUTONU */}
                                   <td className="px-4 py-3 align-top text-right">
                                     <button 
                                       onClick={() => handleDeleteRequest(req.id)}

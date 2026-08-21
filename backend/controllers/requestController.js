@@ -41,15 +41,15 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 YENİ: Açık Havuzdaki Talepleri Getir (Sağlayıcı İçin)
+// 🌟 GÜNCELLENDİ: Açık Havuzdaki Talepleri Getir (Müşteri "Tamamlandı" yapana kadar havuzda kalır)
 const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
     
-    // Status = POOL olan ve bu sağlayıcının henüz kuyruğuna GİRMEDİĞİ talepleri getir
+    // Status = COMPLETED veya CANCELLED "OLMAYAN" ve bu sağlayıcının henüz kuyruğuna GİRMEDİĞİ talepleri getir
     const { rows } = await pool.query(
       `SELECT r.* FROM requests r
-       WHERE r.status = 'POOL' 
+       WHERE r.status NOT IN ('COMPLETED', 'CANCELLED') 
        AND NOT EXISTS (
          SELECT 1 FROM request_interests ri 
          WHERE ri.request_id = r.id AND ri.provider_id = $1
@@ -64,7 +64,6 @@ const getOpenPoolRequests = async (req, res) => {
   }
 };
 
-// 🌟 YENİ: Sağlayıcı Havuzdaki Bir Talebe Talip Olur (Kuyruğa Girer)
 const joinRequestPool = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -101,7 +100,6 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
-// Müşteri İçin Kendi Talepleri ve KUYRUKTAKİ Sağlayıcılar
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -116,9 +114,8 @@ const getUserRequests = async (req, res) => {
       [`%${phone}%`]
     );
 
-    // Her talep için kuyruktaki adayları (request_interests) getir
     for (let r of requests) {
-      if (r.status === 'POOL' || r.status === 'MATCHED') {
+      if (r.status !== 'CANCELLED') {
         const { rows: queued } = await pool.query(
           `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status 
            FROM request_interests ri
@@ -137,7 +134,6 @@ const getUserRequests = async (req, res) => {
   }
 };
 
-// Müşteri "Sonrakine Geç" Dediğinde
 const passToNextProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -227,7 +223,6 @@ const getMatchedRequests = async (req, res) => {
       ORDER BY r.created_at DESC;
     `);
 
-    // Her talep için kuyruğu da çek (Admin panelinde göstermek için)
     for (let r of rows) {
       const { rows: queued } = await pool.query(
         `SELECT sp.name, sp.phone, ri.status as interest_status, ri.created_at
@@ -264,7 +259,6 @@ const assignProviderManually = async (req, res) => {
     const { requestId, providerId } = req.body;
     await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
     
-    // Sağlayıcıyı doğrudan kuyruğa ekle (varsa yoksay)
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE') ON CONFLICT (request_id, provider_id) DO UPDATE SET status = 'ACTIVE'`,
       [requestId, providerId]
@@ -295,7 +289,6 @@ const deleteRequest = async (req, res) => {
   }
 };
 
-// TopCandidates seçme rotası artık kullanılmayacak ama geriye dönük uyumluluk için bırakıldı.
 const selectCandidateProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -309,8 +302,8 @@ const selectCandidateProvider = async (req, res) => {
 
 module.exports = {
   createRequest,
-  getOpenPoolRequests, // YENİ
-  joinRequestPool,     // YENİ
+  getOpenPoolRequests, 
+  joinRequestPool,     
   getUserRequests,
   getProviderAssignedRequests,
   passToNextProvider,
