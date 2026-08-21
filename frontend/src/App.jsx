@@ -16,7 +16,6 @@ const MAX_KEYWORD_COUNT = 50;
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
-  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -69,7 +68,6 @@ export default function App() {
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
   
-  // 🌟 YENİ: Müşteri Geçmiş Metin Arama Filtresi
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
@@ -427,7 +425,6 @@ export default function App() {
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
 
-  // 🌟 YENİ: Geçmiş Talepler İçin Dinamik Arama (Search) Filtresi
   const filteredPastCustomerRequests = pastCustomerRequests.filter(req => {
     const q = searchCustomerHistoryText.toLowerCase().trim();
     if (!q) return true;
@@ -551,7 +548,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.2</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.3</span>
             </div>
           </div>
 
@@ -657,29 +654,40 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK */}
-                        {req.provider_name ? (
+                        {/* 🌟 MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK (BİRLEŞTİRİLMİŞ YAPI) */}
+                        {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) ? (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
+                            
                             <div 
                               onClick={() => {
-                                if (req.queuedProviders && req.queuedProviders.length > 1) {
+                                if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) {
                                   setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id);
                                 }
                               }}
-                              className={`p-3 flex items-center justify-between ${req.queuedProviders && req.queuedProviders.length > 1 ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}
+                              className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}
                             >
                               <div className="space-y-1.5 w-full">
-                                <div className="text-[10px] font-mono font-bold text-emerald-700">ŞU ANKİ AKTİF SAĞLAYICI</div>
+                                <div className="text-[10px] font-mono font-bold text-emerald-700">
+                                  {req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)'}
+                                </div>
                                 <div className="flex items-center justify-between w-full">
                                   <div className="flex items-center space-x-1.5">
                                     <Building2 size={14} className="text-neutral-700" />
-                                    <span className="font-bold text-neutral-950">{req.provider_name}</span>
-                                    <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
+                                    {req.provider_name ? (
+                                      <>
+                                        <span className="font-bold text-neutral-950">{req.provider_name}</span>
+                                        <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
+                                      </>
+                                    ) : (
+                                      <span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>
+                                    )}
                                   </div>
                                   
-                                  {req.queuedProviders && req.queuedProviders.length > 1 && (
+                                  {req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1) && (
                                     <div className="flex items-center space-x-1 text-neutral-400">
-                                      <span className="text-[10px] font-bold">Diğer Adaylar ({req.queuedProviders.length - 1})</span>
+                                      <span className="text-[10px] font-bold">
+                                        {req.provider_name ? `Diğer Adaylar (${req.queuedProviders.length - 1})` : `Tüm Adaylar (${req.queuedProviders.length})`}
+                                      </span>
                                       {expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                     </div>
                                   )}
@@ -687,17 +695,21 @@ export default function App() {
                               </div>
                             </div>
                             
-                            {req.status === 'ACCEPTED' && !expandedCustomerQueueReqId && (
+                            {(req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED') && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
-                                 <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] text-emerald-950 flex items-center space-x-1.5">
-                                   <PhoneCall size={13} className="text-emerald-700 animate-bounce" />
-                                   <span>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></span>
+                                 <div className={`p-2 rounded text-[11px] flex items-center space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
+                                   {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce" />}
+                                   <span>
+                                     {req.status === 'PROVIDER_COMPLETED' 
+                                       ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> 
+                                       : <>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}
+                                   </span>
                                  </div>
                               </div>
                             )}
 
-                            {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 1 && (
-                              <div className="p-3 pt-2 border-t border-emerald-100 bg-neutral-50/50">
+                            {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 0 && (
+                              <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
                                   {req.queuedProviders.map((qProv, idx) => {
                                     const isCurrent = req.matched_provider_id === qProv.id;
@@ -942,10 +954,10 @@ export default function App() {
               )}
 
               {/* E. MÜŞTERİ GEÇMİŞ TALEPLER */}
-              {pastCustomerRequests.length > 0 && (
+              {filteredPastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-8">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3></div>
+                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({filteredPastCustomerRequests.length})</h3></div>
                     {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                   {isCustomerHistoryOpen && (
