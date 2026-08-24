@@ -600,7 +600,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.4</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.5</span>
             </div>
           </div>
 
@@ -1029,10 +1029,10 @@ export default function App() {
               )}
 
               {/* E. MÜŞTERİ GEÇMİŞ TALEPLER */}
-              {filteredPastCustomerRequests.length > 0 && (
+              {pastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-8">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({filteredPastCustomerRequests.length})</h3></div>
+                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3></div>
                     {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                   {isCustomerHistoryOpen && (
