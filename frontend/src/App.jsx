@@ -288,25 +288,8 @@ export default function App() {
     window.open(directUrl, '_blank');
   };
 
-  const handleCustomerInitialSubmit = async (e) => {
-    e?.preventDefault(); if (!queryText.trim()) return; setLoading(true); setErrorMessage(''); fetchCurrentLocation();
-    try {
-      const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
-      if (response.data.status === 'ambiguous') {
-        setDisambiguationData(response.data); setStep('DISAMBIGUATE');
-      } else {
-        setDisambiguationData(null); setSelectedDisambiguation(null); setStep('CONFIRM');
-      }
-    } catch { setStep('CONFIRM'); } finally { setLoading(false); }
-  };
-
-  const handleCustomerFinalSubmit = async (e) => {
-    e?.preventDefault();
-    if (!session?.phone) return;
-    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
-      setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100);
-      return;
-    }
+  // 🌟 GÜNCEL: Nihai gönderme işlemi (Tek Fonksiyon)
+  const submitFinalRequest = async (disambiguationChoice) => {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
@@ -314,12 +297,57 @@ export default function App() {
 
     try {
       await axios.post(`${API_BASE}/requests`, {
-        rawText: queryText, disambiguationChoice: selectedDisambiguation, contactValue: finalContactValue,
-        preferredChannel: channelString, location: locationValue, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
+        rawText: queryText, 
+        disambiguationChoice: disambiguationChoice, 
+        contactValue: finalContactValue,
+        preferredChannel: channelString, 
+        location: locationValue, 
+        isUrgent: isUrgent, 
+        deadlineDatetime: deadlineDatetimeISO
       });
-      setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime(''); setContactEmail(''); setPreferredChannels(['PHONE']); setStep('INPUT'); setIsDetailsCollapsed(true); setIsUrgent(false); setErrorMessage('');
+      setQueryText(''); 
+      setSelectedDisambiguation(null); 
+      setDeadlineDate(''); 
+      setDeadlineTime(''); 
+      setContactEmail(''); 
+      setPreferredChannels(['PHONE']); 
+      setStep('INPUT'); 
+      setIsDetailsCollapsed(true); 
+      setIsUrgent(false); 
+      setErrorMessage('');
       await fetchCustomerData();
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
+    } catch (err) { 
+      setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); 
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  // 🌟 GÜNCEL: "Gönder" butonuna basıldığındaki Birleşik Akış
+  const handleCustomerCombinedSubmit = async (e) => {
+    e?.preventDefault();
+    if (!queryText.trim()) return;
+    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
+      setIsDetailsCollapsed(false); 
+      setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100);
+      return;
+    }
+    
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
+      if (response.data.status === 'ambiguous') {
+        setDisambiguationData(response.data);
+        setStep('DISAMBIGUATE'); // Belirsizse direkt seçim ekranına atar
+        setLoading(false);
+      } else {
+        await submitFinalRequest(null); // Doğrudan havuza gönderir
+      }
+    } catch { 
+      await submitFinalRequest(null); // Hata olsa da gönderir
+    }
   };
 
   const handleRepeatRequest = (req) => {
@@ -848,20 +876,99 @@ export default function App() {
                 </div>
               )}
 
-              {/* C. YENİ TALEP GİRİŞ FORMU */}
+              {/* 🌟 C. YENİ TALEP GİRİŞ FORMU (TEK ADIMLI YAPI) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
                   <div className="text-center space-y-1">
                     <h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2>
                     <p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p>
                   </div>
-                  <form onSubmit={handleCustomerInitialSubmit} className="space-y-3">
-                    <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950">
-                      <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerInitialSubmit(); } }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-xs text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" required />
-                      <div className="flex items-center justify-between pt-1.5 border-t border-neutral-200/60 px-1 text-[11px] text-neutral-400">
+                  
+                  <form onSubmit={handleCustomerCombinedSubmit} className="space-y-3">
+                    <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
+                      
+                      <div className="flex gap-2">
+                        <textarea 
+                          rows={2} 
+                          value={queryText} 
+                          onChange={(e) => setQueryText(e.target.value)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(); } }} 
+                          placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." 
+                          className="w-full p-2 text-xs text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" 
+                          required 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} 
+                          className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"
+                          title="Gelişmiş Seçenekleri Göster/Gizle"
+                        >
+                          {isDetailsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                        </button>
+                      </div>
+
+                      {!isDetailsCollapsed && (
+                        <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-3.5">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Bilgisi</span></label>
+                              <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold">
+                                <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /><span>{isLocating ? 'Alınıyor...' : '📍 Konumu Güncelle'}</span>
+                              </button>
+                            </div>
+                            <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                          </div>
+
+                          <div className="p-2.5 bg-white rounded-lg border border-neutral-200">
+                            <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                              <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950" />
+                              <div className="flex items-center space-x-1 text-xs font-bold text-neutral-800">
+                                <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span>Acil Hizmet Talebi (En Kısa Sürede İletişim)</span>
+                              </div>
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span></label>
+                                {deadlineDate && <button type="button" onClick={() => setDeadlineDate('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
+                              </div>
+                              <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950" />
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Clock size={12} className="text-neutral-700" /><span>En Son Saat</span></label>
+                                {deadlineTime && <button type="button" onClick={() => setDeadlineTime('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
+                              </div>
+                              <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950" />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">İletişim Kanalı Tercihleriniz</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><Phone size={13} /><span className="font-semibold text-[11px]">Telefon</span>{preferredChannels.includes('PHONE') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
+                              <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><MessageSquare size={13} /><span className="font-semibold text-[11px]">SMS</span>{preferredChannels.includes('SMS') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
+                              <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><Mail size={13} /><span className="font-semibold text-[11px]">E-posta</span>{preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
+                              <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>{preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
+                            </div>
+                          </div>
+
+                          {preferredChannels.includes('EMAIL') && (
+                            <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
+                              <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1"><Mail size={12} className="text-blue-700" /><span>İletişim E-posta Adresiniz *</span></label>
+                              <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="adiniz@example.com" className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                              <p className="text-[10px] text-blue-700 font-mono">Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2 mt-2 border-t border-neutral-200/60 px-1 text-[11px] text-neutral-400">
                         <span className="font-mono">Enter ile gönderin</span>
-                        <button type="submit" disabled={loading || !queryText.trim()} className="ml-auto px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
-                          {loading ? 'Çözümleniyor...' : <><span>Devam Et</span><ArrowRight size={12} /></>}
+                        <button type="submit" disabled={loading || !queryText.trim()} className="ml-auto px-5 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
+                          {loading ? <span>Gönderiliyor...</span> : <><span>Gönder</span><ArrowRight size={14} /></>}
                         </button>
                       </div>
                     </div>
@@ -869,100 +976,30 @@ export default function App() {
                 </div>
               )}
 
-              {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
-              {step === 'CONFIRM' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
-                  <div className="border-b pb-3">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">Talep Özeti</span>
-                    <h2 className="text-base font-bold text-neutral-950 mt-0.5">"{queryText}"</h2>
-                    {selectedDisambiguation && <p className="text-xs text-neutral-500 mt-0.5 font-medium">Hedef: <span className="text-neutral-900">{selectedDisambiguation}</span></p>}
+              {/* D. BELİRSİZLİK ÇÖZÜM EKRANI (DISAMBIGUATE) */}
+              {step === 'DISAMBIGUATE' && disambiguationData && (
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="text-center">
+                    <h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3>
+                    <p className="text-xs text-neutral-500 mt-1">Lütfen tam olarak hangi hizmeti aradığınızı seçin:</p>
                   </div>
-
-                  <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                    <div onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/70 select-none text-xs">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5 font-bold text-neutral-900">
-                          <Sliders size={14} className="text-neutral-700" /><span>Talep Bilgileri</span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-mono text-neutral-600">
-                          <span>📍 {locationValue}</span>
-                          {isUrgent && <span className="text-rose-700 font-bold">🔥 ACİL</span>}
-                          {deadlineDate && <span>⏰ {deadlineDate} {deadlineTime}</span>}
-                          <span>
-                            {preferredChannels.map(c => c === 'PHONE' ? '📞 Telefon' : c === 'SMS' ? '💬 SMS' : c === 'EMAIL' ? `📧 E-posta (${contactEmail || 'Girilmedi'})` : '🟢 WhatsApp').join(' • ')}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1 text-neutral-400 font-mono text-[11px] shrink-0 ml-2">
-                        <span>{isDetailsCollapsed ? 'Düzenle' : 'Kapat'}</span>{isDetailsCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-                      </div>
-                    </div>
-
-                    {!isDetailsCollapsed && (
-                      <div className="p-4 pt-3 border-t border-neutral-200/70 bg-white space-y-3.5">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Bilgisi</span></label>
-                            <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold">
-                              <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /><span>{isLocating ? 'Alınıyor...' : '📍 Konumu Güncelle'}</span>
-                            </button>
-                          </div>
-                          <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
-                        </div>
-
-                        <div className="p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
-                          <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                            <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950" />
-                            <div className="flex items-center space-x-1 text-xs font-bold text-neutral-800">
-                              <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span>Acil Hizmet Talebi (En Kısa Sürede İletişim)</span>
-                            </div>
-                          </label>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span></label>
-                              {deadlineDate && <button type="button" onClick={() => setDeadlineDate('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
-                            </div>
-                            <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
-                          </div>
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Clock size={12} className="text-neutral-700" /><span>En Son Saat</span></label>
-                              {deadlineTime && <button type="button" onClick={() => setDeadlineTime('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
-                            </div>
-                            <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">İletişim Kanalı Tercihleriniz (Çoklu Seçim)</label>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}><Phone size={13} /><span className="font-semibold text-[11px]">Telefon</span>{preferredChannels.includes('PHONE') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                            <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}><MessageSquare size={13} /><span className="font-semibold text-[11px]">SMS</span>{preferredChannels.includes('SMS') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                            <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span className="font-semibold text-[11px]">E-posta</span>{preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                            <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>{preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                          </div>
-                        </div>
-
-                        {preferredChannels.includes('EMAIL') && (
-                          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
-                            <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1"><Mail size={12} className="text-blue-700" /><span>İletişim E-posta Adresiniz *</span></label>
-                            <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="adiniz@example.com" className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium" />
-                            <p className="text-[10px] text-blue-700 font-mono">Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    {disambiguationData.options.map((option) => (
+                      <button 
+                        key={option.id} 
+                        onClick={() => { 
+                          setSelectedDisambiguation(option.text); 
+                          submitFinalRequest(option.text); 
+                        }} 
+                        disabled={loading}
+                        className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold flex items-center justify-between transition"
+                      >
+                        <span>{option.text}</span>
+                        {loading && selectedDisambiguation === option.text ? <Navigation size={14} className="animate-spin text-neutral-400" /> : <ArrowRight size={14} className="text-neutral-400" />}
+                      </button>
+                    ))}
                   </div>
-
-                  <div className="flex space-x-2 pt-1">
-                    <button type="button" onClick={() => { setStep('INPUT'); setErrorMessage(''); }} className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-100 rounded-xl text-xs font-semibold text-neutral-700 transition">Geri Dön</button>
-                    <button type="button" onClick={handleCustomerFinalSubmit} disabled={loading} className="w-2/3 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center justify-center space-x-1.5">
-                      {loading ? <span>Eşleştiriliyor...</span> : <><span>Talebi Onayla & Başlat</span><CheckCircle2 size={14} /></>}
-                    </button>
-                  </div>
+                  <button type="button" onClick={() => setStep('INPUT')} className="w-full py-2.5 text-xs text-neutral-500 hover:text-neutral-900 font-semibold transition">Geri Dön</button>
                 </div>
               )}
 
