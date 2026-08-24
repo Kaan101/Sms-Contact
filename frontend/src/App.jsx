@@ -6,7 +6,7 @@ import {
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
   ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
-  Settings // 🌟 YENİ İKON EKLENDİ
+  Settings, Timer, AlertTriangle
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -92,8 +92,11 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
   
-  // 🌟 YENİ: Sistem Değişkenleri State
-  const [systemSettings, setSystemSettings] = useState({ default_deadline_days: 10 });
+  const [systemSettings, setSystemSettings] = useState({ 
+    default_deadline_days: 10,
+    timeout_matched_mins: 15,
+    timeout_accepted_hours: 24
+  });
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
@@ -228,7 +231,6 @@ export default function App() {
       setSmsLogs(logRes.data.notifications || []);
       await fetchFeatures(); await fetchTests();
 
-      // 🌟 YENİ: Sistem ayarlarını çek
       try {
         const setRes = await axios.get(`${API_BASE}/settings`);
         if (setRes.data.settings) setSystemSettings(setRes.data.settings);
@@ -434,14 +436,13 @@ export default function App() {
     try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); } catch { console.error('Silinemedi.'); }
   };
 
-  // 🌟 YENİ: Sistem Ayarı Kaydetme Fonksiyonu
   const handleSaveSystemSetting = async (key, value) => {
     try {
       await axios.put(`${API_BASE}/settings`, { key, value });
       alert('Sistem parametresi başarıyla güncellendi!');
     } catch (err) {
       console.error('Ayar güncellenirken hata:', err);
-      alert('Hata: API bağlantısını ve veritabanı ayarlarını kontrol edin.');
+      alert('Hata: Yaptığınız ayar kaydedilemedi.');
     }
   };
 
@@ -572,7 +573,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.1</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.2 (Cron/Auto)</span>
             </div>
           </div>
 
@@ -864,19 +865,6 @@ export default function App() {
                       </div>
                     </div>
                   </form>
-                </div>
-              )}
-
-              {step === 'DISAMBIGUATE' && disambiguationData && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
-                  <h3 className="font-semibold text-sm text-neutral-950">Hizmet Amacını Netleştirelim</h3>
-                  <div className="space-y-2">
-                    {disambiguationData.options.map((option) => (
-                      <button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); setStep('CONFIRM'); }} className="w-full text-left p-3 rounded-lg border hover:border-neutral-950 text-xs flex items-center justify-between">
-                        <span>{option.text}</span><ArrowRight size={13} />
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )}
 
@@ -1271,7 +1259,7 @@ export default function App() {
                   
                   {/* 🌟 YENİ: SİSTEM DEĞİŞKENLERİ TABI */}
                   <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <Settings size={13} /><span>Sistem Değişkenleri</span>
+                    <Settings size={13} /><span>Sistem Ayarları</span>
                   </button>
                 </div>
               </div>
@@ -1282,38 +1270,71 @@ export default function App() {
                   <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm space-y-4">
                     <div className="flex items-center space-x-2 border-b pb-3">
                       <Settings className="text-neutral-700" size={18} />
-                      <h3 className="font-bold text-neutral-950">Sistem Parametreleri ve Ayarlar</h3>
+                      <h3 className="font-bold text-neutral-950">Sistem Parametreleri ve Zaman Aşımları</h3>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Parametre 1: Varsayılan Bekleme Süresi */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      
+                      {/* Parametre 1 */}
                       <div className="p-4 bg-[#FAFBFD] rounded-xl border border-neutral-200 space-y-3">
-                        <div>
-                          <label className="block text-xs font-bold text-neutral-900 mb-1">Varsayılan Talep Geçerlilik Süresi (Gün)</label>
-                          <p className="text-[10px] text-neutral-500 font-mono mb-2">Müşteri özel bir son tarih (deadline) belirlemezse, talep kaç gün sonra sistemden / açık havuzdan otomatik olarak düşsün?</p>
+                        <div className="flex items-center space-x-1.5">
+                          <Clock size={16} className="text-blue-600" />
+                          <label className="block text-xs font-bold text-neutral-900">Varsayılan Bitiş Süresi (Gün)</label>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <p className="text-[10px] text-neutral-500 font-mono h-10">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</p>
+                        <div className="flex items-center space-x-2 pt-2">
                           <input 
-                            type="number" 
-                            min="1"
+                            type="number" min="1"
                             value={systemSettings.default_deadline_days || ''} 
                             onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})}
-                            className="w-24 p-2 text-xs font-mono font-bold text-center rounded-lg border border-neutral-300 outline-none focus:border-neutral-950 bg-white" 
+                            className="w-20 p-2 text-xs font-mono font-bold text-center rounded-lg border border-neutral-300 outline-none focus:border-neutral-950 bg-white" 
                           />
-                          <button 
-                            onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)}
-                            className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1"
-                          >
+                          <button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
+                            <Save size={14} /><span>Kaydet</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Parametre 2 (Kabul Etmeme - Otomatik Pas) */}
+                      <div className="p-4 bg-[#FAFBFD] rounded-xl border border-neutral-200 space-y-3">
+                        <div className="flex items-center space-x-1.5">
+                          <Timer size={16} className="text-rose-500" />
+                          <label className="block text-xs font-bold text-neutral-900">Onay Bekleme (Dakika)</label>
+                        </div>
+                        <p className="text-[10px] text-neutral-500 font-mono h-10">Eşleşen sağlayıcı bu süre içinde işi <b>kabul etmezse</b>, sistem otomatik sıradakine geçer.</p>
+                        <div className="flex items-center space-x-2 pt-2">
+                          <input 
+                            type="number" min="1"
+                            value={systemSettings.timeout_matched_mins || ''} 
+                            onChange={(e) => setSystemSettings({...systemSettings, timeout_matched_mins: e.target.value})}
+                            className="w-20 p-2 text-xs font-mono font-bold text-center rounded-lg border border-neutral-300 outline-none focus:border-neutral-950 bg-white" 
+                          />
+                          <button onClick={() => handleSaveSystemSetting('timeout_matched_mins', systemSettings.timeout_matched_mins)} className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
+                            <Save size={14} /><span>Kaydet</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Parametre 3 (Tamamlamama - Otomatik Pas) */}
+                      <div className="p-4 bg-rose-50/50 rounded-xl border border-rose-200/60 space-y-3 relative overflow-hidden">
+                        <div className="flex items-center space-x-1.5">
+                          <AlertTriangle size={16} className="text-rose-600" />
+                          <label className="block text-xs font-bold text-rose-950">Teslim Etmeme (Saat)</label>
+                        </div>
+                        <p className="text-[10px] text-rose-700/80 font-mono h-10">Kabul edilen iş bu sürede <b>tamamlanmazsa</b> sıradakine geçer (Dikkat: Sahada kargaşa yaratabilir).</p>
+                        <div className="flex items-center space-x-2 pt-2">
+                          <input 
+                            type="number" min="1"
+                            value={systemSettings.timeout_accepted_hours || ''} 
+                            onChange={(e) => setSystemSettings({...systemSettings, timeout_accepted_hours: e.target.value})}
+                            className="w-20 p-2 text-xs font-mono font-bold text-center rounded-lg border border-rose-300 outline-none focus:border-rose-950 bg-white text-rose-950" 
+                          />
+                          <button onClick={() => handleSaveSystemSetting('timeout_accepted_hours', systemSettings.timeout_accepted_hours)} className="flex-1 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
                             <Save size={14} /><span>Kaydet</span>
                           </button>
                         </div>
                       </div>
                       
-                      {/* İleride eklenebilecek diğer parametreler için boş alan */}
-                      <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 border-dashed flex flex-col items-center justify-center text-center space-y-2 opacity-60">
-                        <Plus size={20} className="text-neutral-400" />
-                        <span className="text-xs font-mono text-neutral-500">Yeni parametreler buraya eklenecek</span>
-                      </div>
                     </div>
                   </div>
                 </div>

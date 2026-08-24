@@ -1,9 +1,7 @@
-// backend/controllers/settingsController.js
 const { pool } = require('../config/db');
 
 const getSettings = async (req, res) => {
   try {
-    // 1. Tablo yoksa otomatik oluştur
     await pool.query(`
       CREATE TABLE IF NOT EXISTS system_settings (
         setting_key VARCHAR(100) PRIMARY KEY,
@@ -12,17 +10,13 @@ const getSettings = async (req, res) => {
       );
     `);
     
-    // 2. Varsayılan değişkeni ekle (Eğer daha önce eklenmemişse)
-    await pool.query(`
-      INSERT INTO system_settings (setting_key, setting_value, description) 
-      VALUES ('default_deadline_days', '10', 'Son tarihi belirlenmemiş talepler için varsayılan bekleme süresi (gün)')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
+    // Varsayılan değişkenleri ekle
+    await pool.query(`INSERT INTO system_settings (setting_key, setting_value, description) VALUES ('default_deadline_days', '10', 'Son tarihi belirlenmemiş talepler (gün)') ON CONFLICT DO NOTHING;`);
+    await pool.query(`INSERT INTO system_settings (setting_key, setting_value, description) VALUES ('timeout_matched_mins', '15', 'İşi kabul etmeme süresi (dakika)') ON CONFLICT DO NOTHING;`);
+    await pool.query(`INSERT INTO system_settings (setting_key, setting_value, description) VALUES ('timeout_accepted_hours', '24', 'İşi tamamlamama süresi (saat)') ON CONFLICT DO NOTHING;`);
 
-    // 3. Ayarları getir
     const { rows } = await pool.query(`SELECT * FROM system_settings`);
     
-    // Frontend'in kolay okuması için key-value objesine çevir
     const settingsObj = {};
     rows.forEach(r => { settingsObj[r.setting_key] = r.setting_value; });
     
@@ -35,10 +29,7 @@ const getSettings = async (req, res) => {
 const updateSetting = async (req, res) => {
   try {
     const { key, value } = req.body;
-    await pool.query(
-      `UPDATE system_settings SET setting_value = $1 WHERE setting_key = $2`,
-      [String(value), key]
-    );
+    await pool.query(`UPDATE system_settings SET setting_value = $1 WHERE setting_key = $2`, [String(value), key]);
     res.status(200).json({ status: 'success' });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });

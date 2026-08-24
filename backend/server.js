@@ -8,6 +8,10 @@ const apiRoutes = require('./routes/apiRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ... diğer kodlar
+const { startCronJobs } = require('./services/cronJob');
+startCronJobs(); // Sunucu kalktığında botu da çalıştır
+
 // Middleware
 app.use(cors());
 app.use(express.json());
