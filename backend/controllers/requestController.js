@@ -34,9 +34,16 @@ const createRequest = async (req, res) => {
   }
 };
 
+// 🌟 GÜNCELLENDİ: Sadece sağlayıcının "Anahtar Kelimeleri" ile eşleşen talepler havuza düşer.
 const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
+
+    // 1. Sağlayıcının anahtar kelimelerini veritabanından çek
+    const provRes = await pool.query(`SELECT service_keywords FROM service_providers WHERE id = $1`, [providerId]);
+    const providerKeywords = provRes.rows.length > 0 ? (provRes.rows[0].service_keywords || []) : [];
+
+    // 2. Havuzdaki uygun olan tüm talepleri çek
     const { rows } = await pool.query(
       `SELECT r.* FROM requests r
        WHERE r.status NOT IN ('COMPLETED', 'CANCELLED') 
@@ -47,7 +54,25 @@ const getOpenPoolRequests = async (req, res) => {
        ORDER BY r.created_at DESC;`,
       [providerId]
     );
-    res.status(200).json({ status: 'success', poolRequests: rows });
+
+    // 3. Akıllı Filtreleme (Kelime eşleşmesi)
+    let filteredPool = [];
+    
+    if (providerKeywords.length > 0) {
+      // Eğer kelimesi varsa sadece eşleşenleri göster
+      filteredPool = rows.filter(req => {
+        // Talebin metnini küçük harfe çevirip birleştiriyoruz
+        const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`.toLowerCase();
+        
+        // Sağlayıcının kelimelerinden en az biri (some) talep metninde geçiyorsa listeye al
+        return providerKeywords.some(kw => textToSearch.includes(kw.toLowerCase()));
+      });
+    } else {
+      // Sağlayıcının henüz hiç anahtar kelimesi yoksa listeyi boş gönder
+      filteredPool = [];
+    }
+
+    res.status(200).json({ status: 'success', poolRequests: filteredPool });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
@@ -77,7 +102,6 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
-// 🌟 GÜNCELLENDİ: "SKIPPED" (Pas geçilenleri) de getir ki müşteri listeden görebilsin
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -140,19 +164,13 @@ const passToNextProvider = async (req, res) => {
   }
 };
 
-// 🌟 GÜNCELLENDİ: Müşteri listeden serbestçe sağlayıcı seçerse
 const selectCandidateProvider = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { providerId } = req.body;
     
-    // Aktif olanları Skipped yap
     await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
-    
-    // Yenisini eşleştir
     await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
-    
-    // Seçileni Active yap
     await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, providerId]);
 
     res.status(200).json({ status: 'success' });
