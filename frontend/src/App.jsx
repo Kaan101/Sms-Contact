@@ -600,7 +600,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.3</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.4</span>
             </div>
           </div>
 
@@ -707,7 +707,7 @@ export default function App() {
                         </div>
 
                         {/* MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK */}
-                        {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) ? (
+                        {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             
                             <div 
@@ -791,12 +791,6 @@ export default function App() {
                               </div>
                             )}
                           </div>
-                        ) : (
-                          req.status === 'POOL' && (
-                            <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100/50 text-xs text-blue-800 font-medium mt-2">
-                              ⏳ Talebiniz hizmet sağlayıcıların ortak havuzunda yayınlanmaktadır. İlgilenen sağlayıcılar sıraya girdiğinde burada listelenecektir.
-                            </div>
-                          )
                         )}
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
@@ -1205,7 +1199,7 @@ export default function App() {
 
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
                               <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
-                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
                               {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             </div>
 
@@ -1266,7 +1260,7 @@ export default function App() {
                           <div className="p-2.5 bg-neutral-50 rounded border border-neutral-100 text-xs space-y-1">
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
                               <span>📍 Konum: <strong className="text-neutral-800">{req.location || 'Bilinmiyor'}</strong></span>
-                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
                               {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             </div>
                           </div>
