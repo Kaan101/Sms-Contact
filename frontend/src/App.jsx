@@ -600,7 +600,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.2 (Tables)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.3</span>
             </div>
           </div>
 
@@ -801,7 +801,7 @@ export default function App() {
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
                           <span>📍 {req.location || 'Mevcut Konum'}</span>
-                          {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">🔥 ACİL</span>}
+                          {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
                           {req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                         </div>
 
@@ -892,7 +892,7 @@ export default function App() {
                           onChange={(e) => setQueryText(e.target.value)} 
                           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(); } }} 
                           placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." 
-                          className="w-full p-2 text-xs text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" 
+                          className="w-full p-2 text-base font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
                           required 
                         />
                         <button 
@@ -905,18 +905,44 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* 🌟 SÜREKLİ GÖRÜNEN ÖZET BİLGİ ALANI */}
-                      <div className="flex flex-wrap items-center gap-2.5 px-2 pb-2 text-[10px] font-mono text-neutral-500">
-                        <span>📍 {locationValue || 'Konum Yok'}</span>
-                        {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">🔥 ACİL</span>}
-                        {deadlineDate && <span>⏰ {deadlineDate} {deadlineTime}</span>}
-                        <span>
-                          {preferredChannels.map(c => c === 'PHONE' ? '📞 Telefon' : c === 'SMS' ? '💬 SMS' : c === 'EMAIL' ? `📧 E-posta` : '🟢 WhatsApp').join(' • ')}
+                      {/* 🌟 SÜREKLİ GÖRÜNEN ÖZET BİLGİ ALANI (EMOJİSİZ & MONOKROM İKONLU) */}
+                      <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
+                        <span className="flex items-center space-x-1">
+                          <MapPin size={12}/>
+                          <span>{locationValue || 'Konum Yok'}</span>
                         </span>
+                        
+                        {isUrgent && (
+                          <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                            ACİL
+                          </span>
+                        )}
+                        
+                        {deadlineDate && (
+                          <span className="flex items-center space-x-1">
+                            <Clock size={12}/>
+                            <span>{deadlineDate} {deadlineTime}</span>
+                          </span>
+                        )}
+                        
+                        <div className="flex items-center space-x-2 border-l border-neutral-200 pl-2">
+                          {preferredChannels.map((c, idx) => (
+                            <React.Fragment key={c}>
+                              <span className="flex items-center space-x-1">
+                                {c === 'PHONE' && <Phone size={11} />}
+                                {c === 'SMS' && <MessageSquare size={11} />}
+                                {c === 'EMAIL' && <Mail size={11} />}
+                                {c === 'WHATSAPP' && <MessageCircle size={11} />}
+                                <span>{c === 'PHONE' ? 'Telefon' : c === 'SMS' ? 'SMS' : c === 'EMAIL' ? 'E-posta' : 'WhatsApp'}</span>
+                              </span>
+                              {idx < preferredChannels.length - 1 && <span className="text-neutral-300">•</span>}
+                            </React.Fragment>
+                          ))}
+                        </div>
                       </div>
 
                       {!isDetailsCollapsed && (
-                        <div className="pt-3 border-t border-neutral-200/70 space-y-3.5">
+                        <div className="mt-4 pt-5 border-t border-neutral-200/70 space-y-4">
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Bilgisi</span></label>
@@ -973,7 +999,7 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between pt-2 mt-2 border-t border-neutral-200/60 px-1 text-[11px] text-neutral-400">
+                      <div className="flex items-center justify-between pt-3 mt-1 border-t border-neutral-200/60 px-1 text-[11px] text-neutral-400">
                         <span className="font-mono">Enter ile gönderin</span>
                         <button type="submit" disabled={loading || !queryText.trim()} className="ml-auto px-5 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
                           {loading ? <span>Gönderiliyor...</span> : <><span>Gönder</span><ArrowRight size={14} /></>}
