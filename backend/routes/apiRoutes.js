@@ -42,6 +42,13 @@ const {
   deleteTest
 } = require('../controllers/testController');
 
+// 1. Dosyanın en üstüne import edin
+const { getSettings, updateSetting } = require('../controllers/settingsController');
+
+// 2. Rotaları (router) tanımladığınız yere ekleyin
+router.get('/settings', getSettings);
+router.put('/settings', updateSetting);
+
 // 1. Auth / OTP
 router.post('/auth/send-otp', sendOtp);
 router.post('/auth/verify-otp', verifyOtp);

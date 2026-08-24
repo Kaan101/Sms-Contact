@@ -5,7 +5,8 @@ import {
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
-  ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw
+  ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
+  Settings // 🌟 YENİ İKON EKLENDİ
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -16,7 +17,6 @@ const MAX_KEYWORD_COUNT = 50;
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
-  // URL'den doğrudan oturum açma (İmpersonation)
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -76,10 +76,8 @@ export default function App() {
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
-  
-  // 🌟 YENİ: Havuz (Pool) Açılır-Kapanır State'i
-  const [isPoolOpen, setIsPoolOpen] = useState(false); 
-  
+  const [providerTab, setProviderTab] = useState('ACTIVE');
+  const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({
@@ -93,6 +91,9 @@ export default function App() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
+  
+  // 🌟 YENİ: Sistem Değişkenleri State
+  const [systemSettings, setSystemSettings] = useState({ default_deadline_days: 10 });
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
@@ -226,6 +227,15 @@ export default function App() {
       setMatchedRequests(matchRes.data.requests || []);
       setSmsLogs(logRes.data.notifications || []);
       await fetchFeatures(); await fetchTests();
+
+      // 🌟 YENİ: Sistem ayarlarını çek
+      try {
+        const setRes = await axios.get(`${API_BASE}/settings`);
+        if (setRes.data.settings) setSystemSettings(setRes.data.settings);
+      } catch (e) {
+        console.warn('Sistem ayarları API bağlantısı henüz aktif olmayabilir.');
+      }
+
     } catch (err) { console.error('Admin verileri çekilemedi:', err); }
   };
 
@@ -323,7 +333,7 @@ export default function App() {
     }
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id });
-      await fetchProviderData(false);
+      await fetchProviderData(false); setProviderTab('ACTIVE'); 
     } catch (err) { console.error('Havuza katılma hatası:', err); alert('Havuza katılırken bir hata oluştu.'); }
   };
 
@@ -422,6 +432,17 @@ export default function App() {
   const handleAdminDeleteProvider = async (id) => {
     if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return;
     try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); } catch { console.error('Silinemedi.'); }
+  };
+
+  // 🌟 YENİ: Sistem Ayarı Kaydetme Fonksiyonu
+  const handleSaveSystemSetting = async (key, value) => {
+    try {
+      await axios.put(`${API_BASE}/settings`, { key, value });
+      alert('Sistem parametresi başarıyla güncellendi!');
+    } catch (err) {
+      console.error('Ayar güncellenirken hata:', err);
+      alert('Hata: API bağlantısını ve veritabanı ayarlarını kontrol edin.');
+    }
   };
 
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING'].includes((r.status || '').toUpperCase()));
@@ -547,11 +568,11 @@ export default function App() {
         <div className={`${session?.role === 'ADMIN' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setStep('INPUT')}>
             <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">
-              SC
+              MB
             </div>
             <div className="flex items-baseline space-x-2">
-              <span className="font-semibold text-base tracking-tight text-neutral-950">Sms-Contact</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 8.4</span>
+              <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.1</span>
             </div>
           </div>
 
@@ -657,7 +678,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 🌟 MÜŞTERİ AKTİF SAĞLAYICI KARTI & AÇILIR KAPANIR LİSTE */}
+                        {/* MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK */}
                         {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) ? (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             
@@ -846,12 +867,26 @@ export default function App() {
                 </div>
               )}
 
+              {step === 'DISAMBIGUATE' && disambiguationData && (
+                <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
+                  <h3 className="font-semibold text-sm text-neutral-950">Hizmet Amacını Netleştirelim</h3>
+                  <div className="space-y-2">
+                    {disambiguationData.options.map((option) => (
+                      <button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); setStep('CONFIRM'); }} className="w-full text-left p-3 rounded-lg border hover:border-neutral-950 text-xs flex items-center justify-between">
+                        <span>{option.text}</span><ArrowRight size={13} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* D. ONAY EKRANI & TALEP BİLGİLERİ */}
               {step === 'CONFIRM' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-5">
                   <div className="border-b pb-3">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">Talep Özeti</span>
                     <h2 className="text-base font-bold text-neutral-950 mt-0.5">"{queryText}"</h2>
+                    {selectedDisambiguation && <p className="text-xs text-neutral-500 mt-0.5 font-medium">Hedef: <span className="text-neutral-900">{selectedDisambiguation}</span></p>}
                   </div>
 
                   <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
@@ -921,6 +956,14 @@ export default function App() {
                             <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>{preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
                           </div>
                         </div>
+
+                        {preferredChannels.includes('EMAIL') && (
+                          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
+                            <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1"><Mail size={12} className="text-blue-700" /><span>İletişim E-posta Adresiniz *</span></label>
+                            <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="adiniz@example.com" className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                            <p className="text-[10px] text-blue-700 font-mono">Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1074,11 +1117,11 @@ export default function App() {
                       const providerLocation = req.location || 'İstanbul';
 
                       const emailBodyText = `Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nDetayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.\n\nSaygılarımızla,\n--------------------------------------------\n🏢 ${providerName}\n📍 Adres / Hizmet Bölgesi: ${providerLocation}\n📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}\n--------------------------------------------`;
-                      const mailtoSubject = encodeURIComponent(`Sms-Contact Hizmet Talebi Hk. (#REQ-${req.id})`);
+                      const mailtoSubject = encodeURIComponent(`Mobool Hizmet Talebi Hk. (#REQ-${req.id})`);
                       const mailtoBody = encodeURIComponent(emailBodyText);
                       const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
 
-                      const commonMsgText = `Merhaba, Sms-Contact üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`;
+                      const commonMsgText = `Merhaba, Mobool üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`;
                       const encodedCommonMsg = encodeURIComponent(commonMsgText);
 
                       const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${encodedCommonMsg}`;
@@ -1223,10 +1266,58 @@ export default function App() {
                     <Layers size={13} /><span>Tüm Talepler & Kuyruk ({filteredMatchedRequests.length})</span>
                   </button>
                   <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
-                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FileCheck2 size={13} /><span>Test Senaryoları ({tests.length})</span></button>
+                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FileCheck2 size={13} /><span>Test Senaryolar ({tests.length})</span></button>
                   <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FolderKanban size={13} /><span>Yol Haritası ({features.length})</span></button>
+                  
+                  {/* 🌟 YENİ: SİSTEM DEĞİŞKENLERİ TABI */}
+                  <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
+                    <Settings size={13} /><span>Sistem Değişkenleri</span>
+                  </button>
                 </div>
               </div>
+
+              {/* 🌟 YENİ: SİSTEM DEĞİŞKENLERİ İÇERİĞİ */}
+              {adminTab === 'SETTINGS' && (
+                <div className="space-y-4">
+                  <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm space-y-4">
+                    <div className="flex items-center space-x-2 border-b pb-3">
+                      <Settings className="text-neutral-700" size={18} />
+                      <h3 className="font-bold text-neutral-950">Sistem Parametreleri ve Ayarlar</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Parametre 1: Varsayılan Bekleme Süresi */}
+                      <div className="p-4 bg-[#FAFBFD] rounded-xl border border-neutral-200 space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-neutral-900 mb-1">Varsayılan Talep Geçerlilik Süresi (Gün)</label>
+                          <p className="text-[10px] text-neutral-500 font-mono mb-2">Müşteri özel bir son tarih (deadline) belirlemezse, talep kaç gün sonra sistemden / açık havuzdan otomatik olarak düşsün?</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input 
+                            type="number" 
+                            min="1"
+                            value={systemSettings.default_deadline_days || ''} 
+                            onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})}
+                            className="w-24 p-2 text-xs font-mono font-bold text-center rounded-lg border border-neutral-300 outline-none focus:border-neutral-950 bg-white" 
+                          />
+                          <button 
+                            onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)}
+                            className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1"
+                          >
+                            <Save size={14} /><span>Kaydet</span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* İleride eklenebilecek diğer parametreler için boş alan */}
+                      <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 border-dashed flex flex-col items-center justify-center text-center space-y-2 opacity-60">
+                        <Plus size={20} className="text-neutral-400" />
+                        <span className="text-xs font-mono text-neutral-500">Yeni parametreler buraya eklenecek</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 4.0 WoZ HAVUZU */}
               {adminTab === 'WOZ' && (
@@ -1758,7 +1849,7 @@ export default function App() {
       {/* 🇨🇭 FOOTER */}
       <footer className="border-t border-neutral-200/80 bg-white py-4">
         <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
-          <div><span>Sms-Contact</span> • <span>Multi-Tenant Servis Platformu</span></div>
+          <div><span>Mobool</span> • <span>Multi-Tenant Servis Platformu</span></div>
           <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
         </div>
       </footer>
