@@ -34,16 +34,24 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 GÜNCELLENDİ: Sadece sağlayıcının "Anahtar Kelimeleri" ile eşleşen talepler havuza düşer.
+// --- YARDIMCI FONKSİYON: Metni temizleyip kelimelere ayırır ---
+const extractWords = (text) => {
+  if (!text) return [];
+  // Noktalama işaretlerini boşlukla değiştir, boşluklardan böl ve 2 harften küçük kelimeleri (ve, a vs.) at ("su" kelimesi 2 harfli olduğu için kalır)
+  return text.toLowerCase()
+             .replace(/[.,!?/:;()'"-]/g, ' ')
+             .split(/\s+/)
+             .filter(w => w.length >= 2);
+};
+
+// 🌟 GÜNCELLENDİ: Akıllı Kelime Kesişimi Algoritması (Smart Word Intersection)
 const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
 
-    // 1. Sağlayıcının anahtar kelimelerini veritabanından çek
     const provRes = await pool.query(`SELECT service_keywords FROM service_providers WHERE id = $1`, [providerId]);
     const providerKeywords = provRes.rows.length > 0 ? (provRes.rows[0].service_keywords || []) : [];
 
-    // 2. Havuzdaki uygun olan tüm talepleri çek
     const { rows } = await pool.query(
       `SELECT r.* FROM requests r
        WHERE r.status NOT IN ('COMPLETED', 'CANCELLED') 
@@ -55,21 +63,34 @@ const getOpenPoolRequests = async (req, res) => {
       [providerId]
     );
 
-    // 3. Akıllı Filtreleme (Kelime eşleşmesi)
     let filteredPool = [];
     
     if (providerKeywords.length > 0) {
-      // Eğer kelimesi varsa sadece eşleşenleri göster
+      // Sağlayıcının tüm anahtar kelimelerini tek bir havuzda toplayıp benzersiz kelimelere ayırıyoruz.
+      // Örn: ["su kaçağı", "damacana su"] -> ["su", "kaçağı", "damacana", "su"]
+      const provWordsArray = extractWords(providerKeywords.join(' '));
+
       filteredPool = rows.filter(req => {
-        // Talebin metnini küçük harfe çevirip birleştiriyoruz
-        const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`.toLowerCase();
-        
-        // Sağlayıcının kelimelerinden en az biri (some) talep metninde geçiyorsa listeye al
-        return providerKeywords.some(kw => textToSearch.includes(kw.toLowerCase()));
+        // Talebin içeriğini de kelimelere ayırıyoruz.
+        // Örn: "Acil su tesisatı lazım" -> ["acil", "su", "tesisatı", "lazım"]
+        const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
+        const reqWords = extractWords(textToSearch);
+
+        // Herhangi bir talep kelimesi, sağlayıcının herhangi bir kelimesiyle eşleşiyor mu?
+        return reqWords.some(reqWord => {
+          return provWordsArray.some(provWord => {
+            // 1. Durum: Birebir kelime eşleşmesi (Örn: "su" === "su")
+            if (reqWord === provWord) return true;
+            
+            // 2. Durum: Kök kelime veya kelime öbeği geçişi (Örn: "boya" ve "boyacı")
+            // Yanlış eşleşmeyi önlemek için (Örn: "su" kelimesinin "sunum" içinde yakalanmaması için) 2 harften büyük olma şartı aranır.
+            if (reqWord.length > 2 && provWord.includes(reqWord)) return true;
+            if (provWord.length > 2 && reqWord.includes(provWord)) return true;
+            
+            return false;
+          });
+        });
       });
-    } else {
-      // Sağlayıcının henüz hiç anahtar kelimesi yoksa listeyi boş gönder
-      filteredPool = [];
     }
 
     res.status(200).json({ status: 'success', poolRequests: filteredPool });
