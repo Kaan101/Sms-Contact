@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
+
+// 🌟 YENİ: Harita Kütüphaneleri
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
 import { 
   ArrowRight, Phone, PhoneCall, MessageSquare, Mail, Plus, Trash2, Edit3, X, Clock, LogOut, 
   KeyRound, History, Building2, Check, Ban, ShieldCheck, SkipForward, Layers, Radio, 
@@ -13,6 +19,42 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
+
+// 🌟 YENİ: Harita İkonu (Vite/Webpack hatalarını önlemek için özel SVG DivIcon)
+const customMarkerIcon = new L.DivIcon({
+  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+         </div>`,
+  className: '',
+  iconSize: [0, 0],
+  iconAnchor: [0, 0]
+});
+
+// 🌟 YENİ: Harita Tıklama Yöneticisi
+function MapClickHandler({ position, setPosition, setLocationValue }) {
+  const map = useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      setPosition({ lat, lng });
+      
+      // Tıklanan yerin adresini bul
+      axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+        .then(res => {
+           const addr = res.data.address;
+           const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
+           setLocationValue(str || `${lat.toFixed(5)}, ${lng.toFixed(5)} (Harita İşareti)`);
+        }).catch(() => setLocationValue(`${lat.toFixed(5)}, ${lng.toFixed(5)} (GPS)`));
+    }
+  });
+  
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 15);
+    }
+  }, [position, map]);
+
+  return position ? <Marker position={position} icon={customMarkerIcon} /> : null;
+}
 
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
@@ -57,13 +99,18 @@ export default function App() {
   
   const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
   const [contactEmail, setContactEmail] = useState('');
-  const [locationValue, setLocationValue] = useState('İstanbul, Türkiye');
+  const [locationValue, setLocationValue] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineTime, setDeadlineTime] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
-  const [showMap, setShowMap] = useState(false); // 🌟 YENİ: Harita Gösterimi için state
+  
+  // 🌟 YENİ: Harita State'leri
+  const [showMap, setShowMap] = useState(false);
+  const [mapPosition, setMapPosition] = useState(null);
+  const [mapSearchText, setMapSearchText] = useState('');
+  const [isMapSearching, setIsMapSearching] = useState(false);
 
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
@@ -140,20 +187,42 @@ export default function App() {
     setErrorMessage('');
   };
 
+  const handleMapSearch = async () => {
+    if (!mapSearchText.trim()) return;
+    setIsMapSearching(true);
+    try {
+      const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=1`);
+      if (res.data && res.data.length > 0) {
+        const { lat, lon, display_name } = res.data[0];
+        const newPos = { lat: parseFloat(lat), lng: parseFloat(lon) };
+        setMapPosition(newPos);
+        setLocationValue(display_name);
+      } else {
+        alert('Aradığınız adres bulunamadı.');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsMapSearching(false);
+    }
+  };
+
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) return;
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        setMapPosition({ lat: latitude, lng: longitude });
+        setShowMap(true);
         try {
           const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
           const addr = geoRes.data.address;
-          const district = addr.suburb || addr.district || addr.town || addr.city_district || 'Kadıköy';
-          const city = addr.city || addr.province || 'İstanbul';
-          setLocationValue(`${district}, ${city}`);
+          const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
+          const city = addr.city || addr.province || '';
+          setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
         } catch {
-          setLocationValue(`${latitude.toFixed(3)}, ${longitude.toFixed(3)} (Konum Alındı)`);
+          setLocationValue(`${latitude.toFixed(4)}, ${longitude.toFixed(4)} (GPS)`);
         } finally {
           setIsLocating(false);
         }
@@ -171,9 +240,7 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
       setMyCustomerRequests(res.data.requests || []);
-    } catch (err) {
-      console.error('Müşteri talepleri çekilemedi:', err);
-    }
+    } catch (err) { console.error('Müşteri talepleri çekilemedi:', err); }
   };
 
   const fetchProviderData = async (shouldUpdateForm = false) => {
@@ -245,7 +312,7 @@ export default function App() {
 
   useEffect(() => {
     if (session) {
-      if (session.role === 'CUSTOMER') { fetchCustomerData(); fetchCurrentLocation(); }
+      if (session.role === 'CUSTOMER') { fetchCustomerData(); }
       if (session.role === 'PROVIDER') fetchProviderData(true);
       if (session.role === 'ADMIN') fetchAdminData();
 
@@ -301,7 +368,7 @@ export default function App() {
         disambiguationChoice: disambiguationChoice, 
         contactValue: finalContactValue,
         preferredChannel: channelString, 
-        location: locationValue, 
+        location: locationValue || 'Belirtilmedi', 
         isUrgent: isUrgent, 
         deadlineDatetime: deadlineDatetimeISO
       });
@@ -310,10 +377,12 @@ export default function App() {
       setDeadlineDate(''); 
       setDeadlineTime(''); 
       setContactEmail(''); 
+      setLocationValue('');
       setPreferredChannels(['PHONE']); 
       setStep('INPUT'); 
       setIsDetailsCollapsed(true); 
-      setShowMap(false); // Haritayı da kapat
+      setShowMap(false); 
+      setMapPosition(null);
       setIsUrgent(false); 
       setErrorMessage('');
       await fetchCustomerData();
@@ -602,7 +671,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.5</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.6 (Maps)</span>
             </div>
           </div>
 
@@ -980,6 +1049,7 @@ export default function App() {
                             )}
                           </div>
 
+                          {/* 🌟 YENİ: KONUM SEÇİMİ VE HARİTA BÖLÜMÜ (EN ALTTA) */}
                           <div className="pt-3 border-t border-neutral-100">
                             <div className="flex items-center justify-between mb-1.5">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
@@ -995,28 +1065,41 @@ export default function App() {
                                 </button>
                               </div>
                             </div>
-                            <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz veya adres girin..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" />
                             
+                            <input 
+                              type="text" 
+                              value={locationValue} 
+                              onChange={(e) => setLocationValue(e.target.value)} 
+                              placeholder="Mevcut konumunuz veya adres girin..." 
+                              className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" 
+                            />
+                            
+                            {/* HARİTA KONTEYNERİ */}
                             {showMap && (
-                              <div 
-                                onClick={() => {
-                                  setLocationValue("Haritadan İşaretlenen Konum (Sistem Testi)");
-                                  setShowMap(false);
-                                }}
-                                className="mt-2 relative w-full h-40 bg-blue-50 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer border border-blue-200 group hover:border-blue-400 transition"
-                                title="Burayı İşaretle"
-                              >
-                                {/* Statik OpenStreetMap Arkaplanı */}
-                                <div className="absolute inset-0 opacity-40 bg-[url('https://a.tile.openstreetmap.org/14/9398/6175.png')] bg-cover bg-center group-hover:scale-105 transition-transform duration-500"></div>
-                                <div className="absolute inset-0 bg-blue-900/10 group-hover:bg-transparent transition"></div>
-                                
-                                <div className="z-10 flex flex-col items-center animate-in zoom-in duration-300">
-                                   <MapPin size={36} className="text-rose-600 drop-shadow-md -mt-4 group-hover:-translate-y-2 transition-transform" />
-                                   <div className="w-3 h-1 bg-black/20 rounded-[100%] blur-[1px] mt-0.5"></div>
-                                   <span className="bg-white/90 backdrop-blur px-2.5 py-1 text-[10px] font-bold mt-2 rounded-md shadow-sm text-neutral-800 border border-neutral-200">
-                                     Burayı İşaretle
-                                   </span>
+                              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300">
+                                <div className="flex gap-2">
+                                  <div className="relative flex-1">
+                                     <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                                     <input 
+                                       type="text" 
+                                       value={mapSearchText} 
+                                       onChange={(e) => setMapSearchText(e.target.value)} 
+                                       onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); handleMapSearch(); } }} 
+                                       placeholder="Sokak, mahalle veya mekan arayın..." 
+                                       className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950" 
+                                     />
+                                  </div>
+                                  <button type="button" onClick={handleMapSearch} disabled={isMapSearching} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-400 text-white rounded-lg text-xs font-semibold transition">
+                                    {isMapSearching ? 'Bulunuyor...' : 'Ara'}
+                                  </button>
                                 </div>
+                                <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
+                                  <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
+                                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                                    <MapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} />
+                                  </MapContainer>
+                                </div>
+                                <div className="text-[10px] text-neutral-500 font-mono text-center">Haritada istediğiniz noktaya tıklayarak GPS koordinatını işaretleyebilirsiniz.</div>
                               </div>
                             )}
                           </div>
