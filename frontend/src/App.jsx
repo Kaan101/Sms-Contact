@@ -63,6 +63,7 @@ export default function App() {
   const [deadlineTime, setDeadlineTime] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
+  const [showMap, setShowMap] = useState(false); // 🌟 YENİ: Harita Gösterimi için state
 
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
@@ -312,6 +313,7 @@ export default function App() {
       setPreferredChannels(['PHONE']); 
       setStep('INPUT'); 
       setIsDetailsCollapsed(true); 
+      setShowMap(false); // Haritayı da kapat
       setIsUrgent(false); 
       setErrorMessage('');
       await fetchCustomerData();
@@ -937,16 +939,7 @@ export default function App() {
 
                       {!isDetailsCollapsed && (
                         <div className="mt-4 pt-5 border-t border-neutral-200/70 space-y-4">
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum</span></label>
-                              <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold">
-                                <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /><span>{isLocating ? 'Alınıyor...' : '📍 Konumu Güncelle'}</span>
-                              </button>
-                            </div>
-                            <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
-                          </div>
-
+                          
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                               <div className="flex items-center justify-between mb-1">
@@ -963,10 +956,10 @@ export default function App() {
                               <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950" />
                             </div>
                             <div className="flex items-end">
-                               <label className="flex items-center justify-center space-x-2 w-full p-2 h-[34px] bg-white rounded-lg border border-neutral-200 cursor-pointer select-none transition hover:bg-neutral-50">
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950" />
-                                <div className="flex items-center space-x-1.5 text-xs font-bold text-neutral-800">
-                                  <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span>ACİL</span>
+                               <label className={`flex items-center justify-center space-x-2 w-full p-2 h-[34px] rounded-lg border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-1.5 text-xs font-bold">
+                                  <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL</span>
                                 </div>
                               </label>
                             </div>
@@ -983,6 +976,47 @@ export default function App() {
                             {preferredChannels.includes('EMAIL') && (
                               <div className="animate-in fade-in duration-150">
                                 <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz (Örn: adiniz@example.com)" className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-3 border-t border-neutral-100">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
+                                <MapPin size={12} className="text-neutral-700" /><span>Konum</span>
+                              </label>
+                              <div className="flex items-center space-x-2">
+                                <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold transition">
+                                  <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /><span>{isLocating ? 'Bulunuyor...' : 'GPS Kullan'}</span>
+                                </button>
+                                <span className="text-neutral-300">|</span>
+                                <button type="button" onClick={() => setShowMap(!showMap)} className="text-[10px] font-mono text-emerald-600 hover:text-emerald-800 flex items-center space-x-1 font-semibold transition">
+                                  <MapPin size={10} /><span>{showMap ? 'Haritayı Kapat' : 'Haritada Göster'}</span>
+                                </button>
+                              </div>
+                            </div>
+                            <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz veya adres girin..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" />
+                            
+                            {showMap && (
+                              <div 
+                                onClick={() => {
+                                  setLocationValue("Haritadan İşaretlenen Konum (Sistem Testi)");
+                                  setShowMap(false);
+                                }}
+                                className="mt-2 relative w-full h-40 bg-blue-50 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer border border-blue-200 group hover:border-blue-400 transition"
+                                title="Burayı İşaretle"
+                              >
+                                {/* Statik OpenStreetMap Arkaplanı */}
+                                <div className="absolute inset-0 opacity-40 bg-[url('https://a.tile.openstreetmap.org/14/9398/6175.png')] bg-cover bg-center group-hover:scale-105 transition-transform duration-500"></div>
+                                <div className="absolute inset-0 bg-blue-900/10 group-hover:bg-transparent transition"></div>
+                                
+                                <div className="z-10 flex flex-col items-center animate-in zoom-in duration-300">
+                                   <MapPin size={36} className="text-rose-600 drop-shadow-md -mt-4 group-hover:-translate-y-2 transition-transform" />
+                                   <div className="w-3 h-1 bg-black/20 rounded-[100%] blur-[1px] mt-0.5"></div>
+                                   <span className="bg-white/90 backdrop-blur px-2.5 py-1 text-[10px] font-bold mt-2 rounded-md shadow-sm text-neutral-800 border border-neutral-200">
+                                     Burayı İşaretle
+                                   </span>
+                                </div>
                               </div>
                             )}
                           </div>
