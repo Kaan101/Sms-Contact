@@ -97,7 +97,7 @@ export default function App() {
     timeout_matched_mins: 15,
     timeout_accepted_hours: 24
   });
-  const [settingsTab, setSettingsTab] = useState('GENERAL'); // 🌟 YENİ: Sistem ayarları iç sekmeleri
+  const [settingsTab, setSettingsTab] = useState('GENERAL');
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
@@ -574,7 +574,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.2</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.2 (Tables)</span>
             </div>
           </div>
 
@@ -1264,7 +1264,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 YENİ: SİSTEM DEĞİŞKENLERİ İÇERİĞİ (TABULAR TASARIM) */}
+              {/* 🌟 YENİ: SİSTEM DEĞİŞKENLERİ İÇERİĞİ (TABULAR/TABLE TASARIM) */}
               {adminTab === 'SETTINGS' && (
                 <div className="space-y-4">
                   <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
@@ -1289,83 +1289,139 @@ export default function App() {
                     {/* Sekme İçerikleri */}
                     <div className="min-h-[250px]">
                       
-                      {/* --- GENEL AYARLAR --- */}
+                      {/* --- GENEL AYARLAR TABLOSU --- */}
                       {settingsTab === 'GENERAL' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                          <div className="p-4 bg-[#FAFBFD] rounded-xl border border-neutral-200 space-y-3">
-                            <div className="flex items-center space-x-1.5">
-                              <Clock size={16} className="text-blue-600" />
-                              <label className="block text-xs font-bold text-neutral-900">Varsayılan Bitiş Süresi (Gün)</label>
-                            </div>
-                            <p className="text-[10px] text-neutral-500 font-mono h-10">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</p>
-                            <div className="flex items-center space-x-2 pt-2">
-                              <input 
-                                type="number" min="1"
-                                value={systemSettings.default_deadline_days || ''} 
-                                onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})}
-                                className="w-20 p-2 text-xs font-mono font-bold text-center rounded-lg border border-neutral-300 outline-none focus:border-neutral-950 bg-white" 
-                              />
-                              <button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
-                                <Save size={14} /><span>Kaydet</span>
-                              </button>
-                            </div>
-                          </div>
+                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
+                          <table className="w-full text-left text-xs table-auto">
+                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
+                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
+                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
+                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 bg-white">
+                              <tr className="hover:bg-neutral-50 transition">
+                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
+                                  <div className="flex items-center space-x-1.5">
+                                    <Clock size={14} className="text-blue-600"/>
+                                    <span>Varsayılan Bitiş Süresi</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 align-middle text-neutral-500">
+                                  Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?
+                                </td>
+                                <td className="px-4 py-3 align-middle text-center">
+                                  <input 
+                                    type="number" min="1" 
+                                    value={systemSettings.default_deadline_days || ''} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} 
+                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 align-middle text-right">
+                                  <button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
+                                    <Save size={12} /><span>Kaydet</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       )}
 
-                      {/* --- ZAMAN AŞIMLARI --- */}
+                      {/* --- ZAMAN AŞIMLARI TABLOSU --- */}
                       {settingsTab === 'TIMEOUTS' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                          
-                          <div className="p-4 bg-[#FAFBFD] rounded-xl border border-neutral-200 space-y-3">
-                            <div className="flex items-center space-x-1.5">
-                              <Timer size={16} className="text-rose-500" />
-                              <label className="block text-xs font-bold text-neutral-900">Onay Bekleme (Dakika)</label>
-                            </div>
-                            <p className="text-[10px] text-neutral-500 font-mono h-10">Eşleşen sağlayıcı bu süre içinde işi <b>kabul etmezse</b>, sistem otomatik sıradakine geçer.</p>
-                            <div className="flex items-center space-x-2 pt-2">
-                              <input 
-                                type="number" min="1"
-                                value={systemSettings.timeout_matched_mins || ''} 
-                                onChange={(e) => setSystemSettings({...systemSettings, timeout_matched_mins: e.target.value})}
-                                className="w-20 p-2 text-xs font-mono font-bold text-center rounded-lg border border-neutral-300 outline-none focus:border-neutral-950 bg-white" 
-                              />
-                              <button onClick={() => handleSaveSystemSetting('timeout_matched_mins', systemSettings.timeout_matched_mins)} className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
-                                <Save size={14} /><span>Kaydet</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="p-4 bg-rose-50/50 rounded-xl border border-rose-200/60 space-y-3 relative overflow-hidden">
-                            <div className="flex items-center space-x-1.5">
-                              <AlertTriangle size={16} className="text-rose-600" />
-                              <label className="block text-xs font-bold text-rose-950">Teslim Etmeme (Saat)</label>
-                            </div>
-                            <p className="text-[10px] text-rose-700/80 font-mono h-10">Kabul edilen iş bu sürede <b>tamamlanmazsa</b> sıradakine geçer (Sahada kargaşa yaratabilir).</p>
-                            <div className="flex items-center space-x-2 pt-2">
-                              <input 
-                                type="number" min="1"
-                                value={systemSettings.timeout_accepted_hours || ''} 
-                                onChange={(e) => setSystemSettings({...systemSettings, timeout_accepted_hours: e.target.value})}
-                                className="w-20 p-2 text-xs font-mono font-bold text-center rounded-lg border border-rose-300 outline-none focus:border-rose-950 bg-white text-rose-950" 
-                              />
-                              <button onClick={() => handleSaveSystemSetting('timeout_accepted_hours', systemSettings.timeout_accepted_hours)} className="flex-1 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
-                                <Save size={14} /><span>Kaydet</span>
-                              </button>
-                            </div>
-                          </div>
-
+                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
+                          <table className="w-full text-left text-xs table-auto">
+                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
+                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
+                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
+                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 bg-white">
+                              {/* Timeout Onay Bekleme */}
+                              <tr className="hover:bg-neutral-50 transition">
+                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
+                                  <div className="flex items-center space-x-1.5">
+                                    <Timer size={14} className="text-rose-500"/>
+                                    <span>Onay Bekleme (Dk)</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 align-middle text-neutral-500">
+                                  Eşleşen sağlayıcı bu süre içinde işi <b>kabul etmezse</b>, sistem otomatik sıradakine geçer.
+                                </td>
+                                <td className="px-4 py-3 align-middle text-center">
+                                  <input 
+                                    type="number" min="1" 
+                                    value={systemSettings.timeout_matched_mins || ''} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_matched_mins: e.target.value})} 
+                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 align-middle text-right">
+                                  <button onClick={() => handleSaveSystemSetting('timeout_matched_mins', systemSettings.timeout_matched_mins)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
+                                    <Save size={12} /><span>Kaydet</span>
+                                  </button>
+                                </td>
+                              </tr>
+                              
+                              {/* Timeout Teslim Etmeme */}
+                              <tr className="hover:bg-rose-50/30 transition">
+                                <td className="px-4 py-3 align-middle font-bold text-rose-950">
+                                  <div className="flex items-center space-x-1.5">
+                                    <AlertTriangle size={14} className="text-rose-600"/>
+                                    <span>Teslim Etmeme (Saat)</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 align-middle text-rose-700/80">
+                                  Kabul edilen iş bu sürede <b>tamamlanmazsa</b> sıradakine geçer (Sahada kargaşa yaratabilir).
+                                </td>
+                                <td className="px-4 py-3 align-middle text-center">
+                                  <input 
+                                    type="number" min="1" 
+                                    value={systemSettings.timeout_accepted_hours || ''} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_accepted_hours: e.target.value})} 
+                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-rose-300 outline-none focus:border-rose-950 text-rose-950" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 align-middle text-right">
+                                  <button onClick={() => handleSaveSystemSetting('timeout_accepted_hours', systemSettings.timeout_accepted_hours)} className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
+                                    <Save size={12} /><span>Kaydet</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       )}
 
-                      {/* --- API & ENTEGRASYON --- */}
+                      {/* --- API & ENTEGRASYON TABLOSU --- */}
                       {settingsTab === 'INTEGRATIONS' && (
-                        <div className="flex flex-col items-center justify-center text-center p-12 border border-dashed border-neutral-300 rounded-xl space-y-3 opacity-80 animate-in fade-in duration-200">
-                          <Link2 size={32} className="text-neutral-400" />
-                          <div>
-                            <h4 className="font-bold text-sm text-neutral-800">WhatsApp & SMS API</h4>
-                            <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">Twilio ve Meta (WhatsApp Cloud API) webhook key ve token ayarları yakında buraya eklenecektir.</p>
-                          </div>
+                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
+                          <table className="w-full text-left text-xs table-auto">
+                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3 font-semibold w-1/4">Entegrasyon Adı</th>
+                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
+                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
+                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 bg-white">
+                              <tr>
+                                <td colSpan="4" className="px-4 py-12 text-center text-neutral-400">
+                                  <Link2 size={24} className="mx-auto mb-2 text-neutral-300" />
+                                  <span className="font-semibold text-neutral-600 block">WhatsApp & SMS API Değişkenleri</span>
+                                  <span className="text-[10px]">Twilio ve Meta (WhatsApp Cloud API) webhook key ve token ayarları yakında buraya eklenecektir.</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       )}
                       
