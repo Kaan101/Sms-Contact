@@ -288,7 +288,6 @@ export default function App() {
     window.open(directUrl, '_blank');
   };
 
-  // 🌟 GÜNCEL: Nihai gönderme işlemi (Tek Fonksiyon)
   const submitFinalRequest = async (disambiguationChoice) => {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
@@ -323,7 +322,6 @@ export default function App() {
     }
   };
 
-  // 🌟 GÜNCEL: "Gönder" butonuna basıldığındaki Birleşik Akış
   const handleCustomerCombinedSubmit = async (e) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
@@ -340,13 +338,13 @@ export default function App() {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
       if (response.data.status === 'ambiguous') {
         setDisambiguationData(response.data);
-        setStep('DISAMBIGUATE'); // Belirsizse direkt seçim ekranına atar
+        setStep('DISAMBIGUATE');
         setLoading(false);
       } else {
-        await submitFinalRequest(null); // Doğrudan havuza gönderir
+        await submitFinalRequest(null);
       }
     } catch { 
-      await submitFinalRequest(null); // Hata olsa da gönderir
+      await submitFinalRequest(null); 
     }
   };
 
@@ -876,7 +874,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 C. YENİ TALEP GİRİŞ FORMU (TEK ADIMLI YAPI) */}
+              {/* 🌟 C. YENİ TALEP GİRİŞ FORMU (TEK ADIMLI & ÖZET GÖRÜNÜMLÜ YAPI) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
                   <div className="text-center space-y-1">
@@ -907,8 +905,18 @@ export default function App() {
                         </button>
                       </div>
 
+                      {/* 🌟 SÜREKLİ GÖRÜNEN ÖZET BİLGİ ALANI */}
+                      <div className="flex flex-wrap items-center gap-2.5 px-2 pb-2 text-[10px] font-mono text-neutral-500">
+                        <span>📍 {locationValue || 'Konum Yok'}</span>
+                        {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">🔥 ACİL</span>}
+                        {deadlineDate && <span>⏰ {deadlineDate} {deadlineTime}</span>}
+                        <span>
+                          {preferredChannels.map(c => c === 'PHONE' ? '📞 Telefon' : c === 'SMS' ? '💬 SMS' : c === 'EMAIL' ? `📧 E-posta` : '🟢 WhatsApp').join(' • ')}
+                        </span>
+                      </div>
+
                       {!isDetailsCollapsed && (
-                        <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-3.5">
+                        <div className="pt-3 border-t border-neutral-200/70 space-y-3.5">
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Bilgisi</span></label>
