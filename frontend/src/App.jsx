@@ -23,7 +23,7 @@ const MAX_KEYWORD_COUNT = 50;
 // Harita İkonu
 const customMarkerIcon = new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
          </div>`,
   className: '',
   iconSize: [0, 0],
@@ -31,24 +31,25 @@ const customMarkerIcon = new L.DivIcon({
 });
 
 // Harita Tıklama Yöneticisi
-function MapClickHandler({ position, setPosition, setLocationValue }) {
+function MapClickHandler({ position, setPosition, setLocationValue, setCoordinates }) {
   const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
       setPosition({ lat, lng });
+      setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
       
       axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
         .then(res => {
            const addr = res.data.address;
            const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-           setLocationValue(str || `${lat.toFixed(5)}, ${lng.toFixed(5)} (Harita İşareti)`);
-        }).catch(() => setLocationValue(`${lat.toFixed(5)}, ${lng.toFixed(5)} (GPS)`));
+           setLocationValue(str || 'Haritadan İşaretlendi');
+        }).catch(() => setLocationValue('Haritadan İşaretlendi'));
     }
   });
   
   useEffect(() => {
     if (position) {
-      map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 15);
+      map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 16);
     }
   }, [position, map]);
 
@@ -99,6 +100,7 @@ export default function App() {
   const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
+  const [coordinates, setCoordinates] = useState(''); // 🌟 YENİ: Koordinat State'i
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineTime, setDeadlineTime] = useState('');
@@ -108,20 +110,17 @@ export default function App() {
   // Harita State'leri
   const [showMap, setShowMap] = useState(false);
   const [mapPosition, setMapPosition] = useState(null);
-  
-  // 🌟 YENİ: Canlı Arama (Autocomplete) State'leri
   const [mapSearchText, setMapSearchText] = useState('');
   const [isMapSearching, setIsMapSearching] = useState(false);
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // 🌟 YENİ: Otomatik Arama Efekti (Yazı yazıldıkça çalışır)
+  // Harita Arama Efekti
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
         setIsMapSearching(true);
         try {
-          // Türkiye adreslerini öncelemek için countrycodes eklendi
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
           setMapSuggestions(res.data);
           setIsSuggestionsVisible(true);
@@ -134,7 +133,7 @@ export default function App() {
         setMapSuggestions([]);
         setIsSuggestionsVisible(false);
       }
-    }, 400); // Kullanıcı yazmayı bıraktıktan 400ms sonra arar (Performans için)
+    }, 400);
 
     return () => clearTimeout(delayDebounceFn);
   }, [mapSearchText]);
@@ -221,6 +220,7 @@ export default function App() {
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         setMapPosition({ lat: latitude, lng: longitude });
+        setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
         setShowMap(true);
         try {
           const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
@@ -229,7 +229,7 @@ export default function App() {
           const city = addr.city || addr.province || '';
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
         } catch {
-          setLocationValue(`${latitude.toFixed(4)}, ${longitude.toFixed(4)} (GPS)`);
+          setLocationValue(`Haritadan İşaretlendi`);
         } finally {
           setIsLocating(false);
         }
@@ -371,13 +371,16 @@ export default function App() {
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
     const channelString = preferredChannels.join(', ');
 
+    // Konum ve Koordinatları birleştir
+    const backendLocation = coordinates ? `${locationValue || 'Belirtilmedi'} [GPS: ${coordinates}]` : (locationValue || 'Belirtilmedi');
+
     try {
       await axios.post(`${API_BASE}/requests`, {
         rawText: queryText, 
         disambiguationChoice: disambiguationChoice, 
         contactValue: finalContactValue,
         preferredChannel: channelString, 
-        location: locationValue || 'Belirtilmedi', 
+        location: backendLocation, 
         isUrgent: isUrgent, 
         deadlineDatetime: deadlineDatetimeISO
       });
@@ -387,6 +390,7 @@ export default function App() {
       setDeadlineTime(''); 
       setContactEmail(''); 
       setLocationValue('');
+      setCoordinates('');
       setPreferredChannels(['PHONE']); 
       setStep('INPUT'); 
       setIsDetailsCollapsed(true); 
@@ -494,7 +498,7 @@ export default function App() {
     } catch (err) { console.error('Değerlendirme kaydedilemedi:', err); }
   };
 
-  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata'); } };
+  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new DatetoISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata'); } };
   const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) { alert('Hata'); } };
   const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch { alert('Silme başarısız.'); } };
   
@@ -681,7 +685,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.7 (AutoSuggest)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.8 (Modern Map)</span>
             </div>
           </div>
 
@@ -1059,11 +1063,11 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* 🌟 YENİ: KONUM SEÇİMİ VE HARİTA BÖLÜMÜ (EN ALTTA) */}
+                          {/* 🌟 GÜNCEL: KONUM SEÇİMİ VE KOORDİNAT SİSTEMİ */}
                           <div className="pt-3 border-t border-neutral-100">
                             <div className="flex items-center justify-between mb-1.5">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                                <MapPin size={12} className="text-neutral-700" /><span>Konum</span>
+                                <MapPin size={12} className="text-neutral-700" /><span>Konum Seçimi</span>
                               </label>
                               <div className="flex items-center space-x-2">
                                 <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold transition">
@@ -1076,15 +1080,29 @@ export default function App() {
                               </div>
                             </div>
                             
-                            <input 
-                              type="text" 
-                              value={locationValue} 
-                              onChange={(e) => setLocationValue(e.target.value)} 
-                              placeholder="Mevcut konumunuz veya adres girin..." 
-                              className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" 
-                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="sm:col-span-2">
+                                <input 
+                                  type="text" 
+                                  value={locationValue} 
+                                  onChange={(e) => setLocationValue(e.target.value)} 
+                                  placeholder="Açık adres veya konum adı..." 
+                                  className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" 
+                                />
+                              </div>
+                              <div className="sm:col-span-1">
+                                <input 
+                                  type="text" 
+                                  value={coordinates} 
+                                  readOnly 
+                                  placeholder="Koordinat (Enlem, Boylam)" 
+                                  className="w-full p-2.5 text-[11px] rounded-lg border border-neutral-200 outline-none bg-neutral-100 font-mono text-neutral-500 transition cursor-not-allowed" 
+                                  title="Haritadan seçildiğinde otomatik dolar"
+                                />
+                              </div>
+                            </div>
                             
-                            {/* HARİTA KONTEYNERİ */}
+                            {/* HARİTA KONTEYNERİ (MODERN CARTO VOYAGER) */}
                             {showMap && (
                               <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300 flex flex-col">
                                 <div className="relative w-full z-50">
@@ -1104,7 +1122,7 @@ export default function App() {
                                      </div>
                                    )}
                                    
-                                   {/* 🌟 CANLI ARAMA SONUÇLARI (DROPDOWN) */}
+                                   {/* CANLI ARAMA SONUÇLARI (DROPDOWN) */}
                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
                                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl z-[9999] max-h-48 overflow-y-auto divide-y divide-neutral-100">
                                        {mapSuggestions.map((sug, idx) => (
@@ -1112,9 +1130,10 @@ export default function App() {
                                            key={idx} 
                                            className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer transition flex items-start space-x-2"
                                            onMouseDown={(e) => {
-                                             e.preventDefault(); // Input'un focusunu kaybetmesini engeller
+                                             e.preventDefault();
                                              const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) };
                                              setMapPosition(newPos);
+                                             setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`);
                                              setLocationValue(sug.display_name);
                                              setMapSearchText(sug.display_name);
                                              setIsSuggestionsVisible(false);
@@ -1129,12 +1148,16 @@ export default function App() {
                                 </div>
                                 
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
+                                  {/* YENİ CARTO VOYAGER TILE LAYER */}
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
-                                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
-                                    <MapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} />
+                                    <TileLayer 
+                                      url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" 
+                                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' 
+                                    />
+                                    <MapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} />
                                   </MapContainer>
                                 </div>
-                                <div className="text-[10px] text-neutral-500 font-mono text-center">Haritada istediğiniz noktaya tıklayarak GPS koordinatını işaretleyebilirsiniz.</div>
+                                <div className="text-[10px] text-neutral-500 font-mono text-center">Haritada istediğiniz noktaya tıklayarak nokta atışı koordinat işaretleyebilirsiniz.</div>
                               </div>
                             )}
                           </div>
@@ -1270,7 +1293,7 @@ export default function App() {
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Tag size={12} className="text-neutral-700" /><span>Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *</span></label>
+                        <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Tag size={12} className="text-neutral-700" /><span>Hizmet Anahtar Kelim Kelimeleri (Virgülle Ayırın) *</span></label>
                         <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
                           <span className={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span><span className="text-neutral-300">•</span>
                           <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter</span>
