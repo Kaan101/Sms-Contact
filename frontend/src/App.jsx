@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 
-// 🌟 YENİ: Harita Kütüphaneleri
+// Harita Kütüphaneleri
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -20,7 +20,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-// 🌟 YENİ: Harita İkonu (Vite/Webpack hatalarını önlemek için özel SVG DivIcon)
+// Harita İkonu
 const customMarkerIcon = new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
@@ -30,14 +30,13 @@ const customMarkerIcon = new L.DivIcon({
   iconAnchor: [0, 0]
 });
 
-// 🌟 YENİ: Harita Tıklama Yöneticisi
+// Harita Tıklama Yöneticisi
 function MapClickHandler({ position, setPosition, setLocationValue }) {
   const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
       setPosition({ lat, lng });
       
-      // Tıklanan yerin adresini bul
       axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
         .then(res => {
            const addr = res.data.address;
@@ -106,11 +105,39 @@ export default function App() {
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   
-  // 🌟 YENİ: Harita State'leri
+  // Harita State'leri
   const [showMap, setShowMap] = useState(false);
   const [mapPosition, setMapPosition] = useState(null);
+  
+  // 🌟 YENİ: Canlı Arama (Autocomplete) State'leri
   const [mapSearchText, setMapSearchText] = useState('');
   const [isMapSearching, setIsMapSearching] = useState(false);
+  const [mapSuggestions, setMapSuggestions] = useState([]);
+  const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
+
+  // 🌟 YENİ: Otomatik Arama Efekti (Yazı yazıldıkça çalışır)
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (mapSearchText.length > 2) {
+        setIsMapSearching(true);
+        try {
+          // Türkiye adreslerini öncelemek için countrycodes eklendi
+          const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
+          setMapSuggestions(res.data);
+          setIsSuggestionsVisible(true);
+        } catch (err) {
+          console.error('Harita arama hatası:', err);
+        } finally {
+          setIsMapSearching(false);
+        }
+      } else {
+        setMapSuggestions([]);
+        setIsSuggestionsVisible(false);
+      }
+    }, 400); // Kullanıcı yazmayı bıraktıktan 400ms sonra arar (Performans için)
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [mapSearchText]);
 
   const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
@@ -187,26 +214,6 @@ export default function App() {
     setErrorMessage('');
   };
 
-  const handleMapSearch = async () => {
-    if (!mapSearchText.trim()) return;
-    setIsMapSearching(true);
-    try {
-      const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=1`);
-      if (res.data && res.data.length > 0) {
-        const { lat, lon, display_name } = res.data[0];
-        const newPos = { lat: parseFloat(lat), lng: parseFloat(lon) };
-        setMapPosition(newPos);
-        setLocationValue(display_name);
-      } else {
-        alert('Aradığınız adres bulunamadı.');
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsMapSearching(false);
-    }
-  };
-
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) return;
     setIsLocating(true);
@@ -240,7 +247,9 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
       setMyCustomerRequests(res.data.requests || []);
-    } catch (err) { console.error('Müşteri talepleri çekilemedi:', err); }
+    } catch (err) {
+      console.error('Müşteri talepleri çekilemedi:', err);
+    }
   };
 
   const fetchProviderData = async (shouldUpdateForm = false) => {
@@ -383,6 +392,7 @@ export default function App() {
       setIsDetailsCollapsed(true); 
       setShowMap(false); 
       setMapPosition(null);
+      setMapSearchText('');
       setIsUrgent(false); 
       setErrorMessage('');
       await fetchCustomerData();
@@ -671,7 +681,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.6 (Maps)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.7 (AutoSuggest)</span>
             </div>
           </div>
 
@@ -1076,23 +1086,48 @@ export default function App() {
                             
                             {/* HARİTA KONTEYNERİ */}
                             {showMap && (
-                              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300">
-                                <div className="flex gap-2">
-                                  <div className="relative flex-1">
-                                     <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                     <input 
-                                       type="text" 
-                                       value={mapSearchText} 
-                                       onChange={(e) => setMapSearchText(e.target.value)} 
-                                       onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); handleMapSearch(); } }} 
-                                       placeholder="Sokak, mahalle veya mekan arayın..." 
-                                       className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950" 
-                                     />
-                                  </div>
-                                  <button type="button" onClick={handleMapSearch} disabled={isMapSearching} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-400 text-white rounded-lg text-xs font-semibold transition">
-                                    {isMapSearching ? 'Bulunuyor...' : 'Ara'}
-                                  </button>
+                              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300 flex flex-col">
+                                <div className="relative w-full z-50">
+                                   <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                                   <input 
+                                     type="text" 
+                                     value={mapSearchText} 
+                                     onChange={(e) => setMapSearchText(e.target.value)} 
+                                     onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }}
+                                     onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)}
+                                     placeholder="Sokak, mahalle veya mekan arayın..." 
+                                     className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950 shadow-sm" 
+                                   />
+                                   {isMapSearching && (
+                                     <div className="absolute right-3 top-2.5">
+                                       <Navigation size={14} className="animate-spin text-blue-500" />
+                                     </div>
+                                   )}
+                                   
+                                   {/* 🌟 CANLI ARAMA SONUÇLARI (DROPDOWN) */}
+                                   {isSuggestionsVisible && mapSuggestions.length > 0 && (
+                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl z-[9999] max-h-48 overflow-y-auto divide-y divide-neutral-100">
+                                       {mapSuggestions.map((sug, idx) => (
+                                         <div 
+                                           key={idx} 
+                                           className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer transition flex items-start space-x-2"
+                                           onMouseDown={(e) => {
+                                             e.preventDefault(); // Input'un focusunu kaybetmesini engeller
+                                             const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) };
+                                             setMapPosition(newPos);
+                                             setLocationValue(sug.display_name);
+                                             setMapSearchText(sug.display_name);
+                                             setIsSuggestionsVisible(false);
+                                           }}
+                                         >
+                                           <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" />
+                                           <span>{sug.display_name}</span>
+                                         </div>
+                                       ))}
+                                     </div>
+                                   )}
                                 </div>
+                                
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
                                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
