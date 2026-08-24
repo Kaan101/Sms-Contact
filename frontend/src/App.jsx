@@ -886,7 +886,7 @@ export default function App() {
                           onChange={(e) => setQueryText(e.target.value)} 
                           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(); } }} 
                           placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." 
-                          className="w-full p-2 text-base font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
+                          className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
                           required 
                         />
                         <button 
@@ -939,7 +939,7 @@ export default function App() {
                         <div className="mt-4 pt-5 border-t border-neutral-200/70 space-y-4">
                           <div>
                             <div className="flex items-center justify-between mb-1">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Bilgisi</span></label>
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum</span></label>
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold">
                                 <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /><span>{isLocating ? 'Alınıyor...' : '📍 Konumu Güncelle'}</span>
                               </button>
@@ -947,16 +947,7 @@ export default function App() {
                             <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Mevcut konumunuz..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
                           </div>
 
-                          <div className="p-2.5 bg-white rounded-lg border border-neutral-200">
-                            <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                              <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950" />
-                              <div className="flex items-center space-x-1 text-xs font-bold text-neutral-800">
-                                <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span>Acil Hizmet Talebi (En Kısa Sürede İletişim)</span>
-                              </div>
-                            </label>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span></label>
@@ -971,25 +962,31 @@ export default function App() {
                               </div>
                               <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950" />
                             </div>
+                            <div className="flex items-end">
+                               <label className="flex items-center justify-center space-x-2 w-full p-2 h-[34px] bg-white rounded-lg border border-neutral-200 cursor-pointer select-none transition hover:bg-neutral-50">
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="w-4 h-4 text-neutral-950 rounded border-neutral-300 focus:ring-neutral-950" />
+                                <div className="flex items-center space-x-1.5 text-xs font-bold text-neutral-800">
+                                  <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span>ACİL</span>
+                                </div>
+                              </label>
+                            </div>
                           </div>
 
-                          <div>
-                            <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">İletişim Kanalı Tercihleriniz</label>
+                          <div className="space-y-2">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><Phone size={13} /><span className="font-semibold text-[11px]">Telefon</span>{preferredChannels.includes('PHONE') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
                               <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><MessageSquare size={13} /><span className="font-semibold text-[11px]">SMS</span>{preferredChannels.includes('SMS') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
                               <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><Mail size={13} /><span className="font-semibold text-[11px]">E-posta</span>{preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
                               <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>{preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
                             </div>
+                            
+                            {preferredChannels.includes('EMAIL') && (
+                              <div className="animate-in fade-in duration-150">
+                                <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz (Örn: adiniz@example.com)" className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                              </div>
+                            )}
                           </div>
 
-                          {preferredChannels.includes('EMAIL') && (
-                            <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1.5 animate-in fade-in duration-150">
-                              <label className="block text-[10px] font-mono uppercase font-bold text-blue-900 flex items-center space-x-1"><Mail size={12} className="text-blue-700" /><span>İletişim E-posta Adresiniz *</span></label>
-                              <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="adiniz@example.com" className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none bg-white focus:border-neutral-950 font-medium" />
-                              <p className="text-[10px] text-blue-700 font-mono">Teklif ve bilgilendirmeler bu e-posta adresine iletilecektir.</p>
-                            </div>
-                          )}
                         </div>
                       )}
 
