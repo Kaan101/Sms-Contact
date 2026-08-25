@@ -42,7 +42,7 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// 🌟 DÜZELTME: İzole Edilmiş Güvenli Harita Bileşenleri
+// İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -80,7 +80,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   return position ? <Marker position={position} icon={icon || customMarkerIcon} /> : null;
 }
 
-// 🌟 DÜZELTME: İzole Edilmiş Admin Tablo Başlığı
+// İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   const isActive = sortConfig.key === sortKey;
   const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
@@ -533,6 +533,7 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
+        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -786,7 +787,6 @@ export default function App() {
 
           </div>
         ) : session.role === 'PROVIDER' ? (
-          /* ---------------- 🛠️ 3. SERVİS SAĞLAYICI (PROVIDER EKRANI) ---------------- */
           <div className="max-w-3xl mx-auto w-full space-y-5">
               <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
                  <h2 className="text-sm font-bold text-neutral-950">Sağlayıcı Paneli</h2>
@@ -829,8 +829,8 @@ export default function App() {
               </div>
           </div>
         ) : session.role === 'TRACKER' ? (
-          /* ---------------- 🗺️ 5. TRACKER (TAKİP) EKRANI ---------------- */
-          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex">
+          /* ---------------- 🗺️ 5. TRACKER (TAKİP) EKRANI (BOŞLUK DÜZELTİLDİ) ---------------- */
+          <div className="absolute inset-0 top-0.5 bg-neutral-100 overflow-hidden flex">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
