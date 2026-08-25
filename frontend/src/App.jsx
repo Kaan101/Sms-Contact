@@ -42,7 +42,7 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// HARİTA YÖNETİCİSİ (Çökme Korumalı)
+// HARİTA YÖNETİCİSİ
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -53,7 +53,7 @@ function TrackerMapController({ center }) {
   return null;
 }
 
-// HARİTA TIKLAMA YÖNETİCİSİ (Çökme Korumalı)
+// HARİTA TIKLAMA YÖNETİCİSİ
 function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
   const map = useMapEvents({
     click(e) {
@@ -81,7 +81,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   return position ? <Marker position={position} icon={icon || customMarkerIcon} /> : null;
 }
 
-// ADMİN TABLO BAŞLIĞI (İzole Edildi)
+// ADMİN TABLO BAŞLIĞI
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -508,10 +508,14 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
+  // 🌟 DÜZELTME: TRACKER LİSTESİ FİLTRELEME (Harita ile Eşzamanlı)
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
-    return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.location || '').toLowerCase().includes(q) || String(r.id).includes(q);
+    return (r.raw_text || '').toLowerCase().includes(q) || 
+           (r.contact_value || '').toLowerCase().includes(q) || 
+           (r.location || '').toLowerCase().includes(q) ||
+           String(r.id).includes(q);
   });
 
   const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
@@ -562,7 +566,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.4 (Stable Core)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.5 (Tracker Filtered)</span>
             </div>
           </div>
 
@@ -836,6 +840,11 @@ export default function App() {
                   </div>
                   {isCustomerHistoryOpen && (
                     <div className="p-4 pt-0 border-t border-neutral-100">
+                      <div className="relative mb-3 mt-3">
+                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                        <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
+                        {searchCustomerHistoryText && <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
+                      </div>
                       <div className="space-y-3 mt-3 max-h-[350px] overflow-y-auto">
                         {filteredPastCustomerRequests.map((req) => (
                            <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
@@ -927,7 +936,8 @@ export default function App() {
                   <TrackerMapController center={trackerMapCenter} />
                   <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setTrackerMapSelectedAddress} setCoordinates={setCoordinates} icon={trackerSelectionIcon} />
                   
-                  {trackerRequests.map(req => {
+                  {/* 🌟 DÜZELTME: FİLTRELİ LİSTEYİ HARİTAYA BAS */}
+                  {filteredTrackerRequests.map(req => {
                     const coords = extractGPS(req.location);
                     if (coords) {
                       return (
@@ -1277,6 +1287,26 @@ export default function App() {
                 </div>
               )}
 
+              {/* WOZ ATAMA MODAL */}
+              {wozAssignModalReq && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
+                    <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+                      <div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div>
+                      <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
+                    </div>
+                    <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 flex-1">
+                      {filteredWozProviders.map((prov) => (
+                        <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs">
+                          <div><h4 className="font-bold text-neutral-900">{prov.name}</h4><p className="text-[11px] text-blue-700 font-mono">📞 {prov.phone}</p></div>
+                          <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-3 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold">Ata</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* SAĞLAYICI EKLE/DÜZENLE MODAL */}
               {isModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
@@ -1315,7 +1345,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-
           </div>
         )}
       </main>
