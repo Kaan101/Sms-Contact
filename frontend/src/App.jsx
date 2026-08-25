@@ -42,7 +42,7 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// 🌟 DÜZELTME: Harita Bileşenleri Ana Bileşenin Dışına Alındı (Çökmeyi Önler)
+// 🌟 DÜZELTME: İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -53,20 +53,21 @@ function TrackerMapController({ center }) {
   return null;
 }
 
-// 🌟 DÜZELTME: Ortak Harita Tıklama Yöneticisi
 function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
   const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
-      setPosition({ lat, lng });
+      if (setPosition) setPosition({ lat, lng });
       if (setCoordinates) setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
       
       axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
         .then(res => {
            const addr = res.data.address;
            const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-           setLocationValue(str || 'Haritadan İşaretlendi');
-        }).catch(() => setLocationValue('Haritadan İşaretlendi'));
+           if (setLocationValue) setLocationValue(str || 'Haritadan İşaretlendi');
+        }).catch(() => {
+           if (setLocationValue) setLocationValue('Haritadan İşaretlendi');
+        });
     }
   });
   
@@ -76,15 +77,18 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
     }
   }, [position, map]);
 
-  return position ? <Marker position={position} icon={icon} /> : null;
+  return position ? <Marker position={position} icon={icon || customMarkerIcon} /> : null;
 }
 
-// 🌟 DÜZELTME: Sıralanabilir Tablo Başlığı (Çökmeyi Önler)
+// 🌟 DÜZELTME: İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   const isActive = sortConfig.key === sortKey;
+  const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
+  const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+  
   return (
-    <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`} onClick={() => handleRequestSort(sortKey)}>
-      <div className={`flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}>
+    <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap ${alignClass}`} onClick={() => handleRequestSort(sortKey)}>
+      <div className={`flex items-center space-x-1 ${justifyClass}`}>
         <span>{label}</span>
         <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
           {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
@@ -105,7 +109,6 @@ const extractGPS = (loc) => {
   }
   return null;
 };
-
 const extractAddress = (loc) => {
   if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
   return loc.replace(/\[GPS:.*?\]/g, '').trim();
@@ -121,11 +124,16 @@ export default function App() {
       const urlPhone = urlParams.get('phone');
 
       if (urlRole && urlPhone) {
-        const directSession = { role: urlRole.toUpperCase(), phone: decodeURIComponent(urlPhone), authenticatedAt: new Date().toISOString() };
+        const directSession = {
+          role: urlRole.toUpperCase(),
+          phone: decodeURIComponent(urlPhone),
+          authenticatedAt: new Date().toISOString()
+        };
         localStorage.setItem('sc_session', JSON.stringify(directSession));
         window.history.replaceState({}, document.title, window.location.pathname);
         return directSession;
       }
+
       const saved = localStorage.getItem('sc_session');
       return saved ? JSON.parse(saved) : null;
     } catch { return null; }
@@ -162,7 +170,6 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // Müşteri Harita Arama Efekti
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
@@ -240,7 +247,6 @@ export default function App() {
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
 
-  // Tracker Harita Arama Efekti
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (trackerMapSearchText.length > 2) {
@@ -263,7 +269,9 @@ export default function App() {
       if (prev.includes(channel)) {
         if (prev.length === 1) return prev;
         return prev.filter((c) => c !== channel);
-      } else { return [...prev, channel]; }
+      } else {
+        return [...prev, channel];
+      }
     });
     setErrorMessage('');
   };
@@ -283,10 +291,16 @@ export default function App() {
           const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
           const city = addr.city || addr.province || '';
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
-        } catch { setLocationValue(`Haritadan İşaretlendi`); } 
-        finally { setIsLocating(false); }
+        } catch {
+          setLocationValue(`Haritadan İşaretlendi`);
+        } finally {
+          setIsLocating(false);
+        }
       },
-      (err) => { console.warn('Konum alınamadı:', err.message); setIsLocating(false); },
+      (err) => {
+        console.warn('Konum alınamadı:', err.message);
+        setIsLocating(false);
+      },
       { timeout: 8000 }
     );
   };
@@ -327,7 +341,6 @@ export default function App() {
 
   const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
   const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
-  
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
@@ -376,7 +389,18 @@ export default function App() {
 
   const handleSendOtp = async (e) => { e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); try { const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP'); } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } finally { setAuthLoading(false); } };
   const handleVerifyOtp = async (e) => { e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage(''); try { await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() }); const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() }; setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession)); setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp(''); } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } finally { setAuthLoading(false); } };
-  const handleLogout = () => { localStorage.removeItem('sc_session'); setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); };
+  
+  const handleLogout = () => { 
+    localStorage.removeItem('sc_session'); 
+    setSession(null); 
+    setProviderProfile(null); 
+    setIsProfileOpen(false); 
+    setIsCustomerHistoryOpen(false); 
+    setIsProviderHistoryOpen(false); 
+    setMyCustomerRequests([]); 
+    setStep('INPUT'); 
+    setAdminTab('WOZ');
+  };
 
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
@@ -485,7 +509,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.1 (Bulletproof Maps)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.1 (Bulletproof)</span>
             </div>
           </div>
 
@@ -516,7 +540,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ---------------- 🚪 1. GİRİŞ EKRANI ---------------- */}
+        {/* ---------------- EKRAN KONTROLLERİ ---------------- */}
         {!session ? (
           <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto w-full space-y-6 mt-8">
             <div className="text-center space-y-2">
@@ -561,17 +585,13 @@ export default function App() {
             )}
           </div>
         ) : session.role === 'CUSTOMER' ? (
-          /* ---------------- 👤 2. SERVİS TALEP EDEN (MÜŞTERİ EKRANI) ---------------- */
           <div className="max-w-2xl mx-auto w-full space-y-6">
-              
-              {/* A. AKTİF TALEPLER */}
               {activeCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
                     <span>Aktif Talepleriniz ({activeCustomerRequests.length})</span>
                   </h3>
-
                   <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
                     {activeCustomerRequests.map((req) => (
                       <div key={req.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 space-y-3">
@@ -591,60 +611,30 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* MÜŞTERİ AKTİF SAĞLAYICI VE AÇILIR KAPANIR KUYRUK */}
                         {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
-                            
-                            <div 
-                              onClick={() => {
-                                if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) {
-                                  setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id);
-                                }
-                              }}
-                              className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}
-                            >
+                            <div onClick={() => { if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
                               <div className="space-y-1.5 w-full">
-                                <div className="text-[10px] font-mono font-bold text-emerald-700">
-                                  {req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)'}
-                                </div>
+                                <div className="text-[10px] font-mono font-bold text-emerald-700">{req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)'}</div>
                                 <div className="flex items-center justify-between w-full">
                                   <div className="flex items-center space-x-1.5">
                                     <Building2 size={14} className="text-neutral-700" />
-                                    {req.provider_name ? (
-                                      <>
-                                        <span className="font-bold text-neutral-950">{req.provider_name}</span>
-                                        <span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span>
-                                      </>
-                                    ) : (
-                                      <span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>
-                                    )}
+                                    {req.provider_name ? (<><span className="font-bold text-neutral-950">{req.provider_name}</span><span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
                                   </div>
-                                  
                                   {req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1) && (
-                                    <div className="flex items-center space-x-1 text-neutral-400">
-                                      <span className="text-[10px] font-bold">
-                                        {req.provider_name ? `Diğer Adaylar (${req.queuedProviders.length - 1})` : `Tüm Adaylar (${req.queuedProviders.length})`}
-                                      </span>
-                                      {expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    </div>
+                                    <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${req.queuedProviders.length - 1})` : `Tüm Adaylar (${req.queuedProviders.length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            
                             {(req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED') && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
                                  <div className={`p-2 rounded text-[11px] flex items-center space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
                                    {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce" />}
-                                   <span>
-                                     {req.status === 'PROVIDER_COMPLETED' 
-                                       ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> 
-                                       : <>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}
-                                   </span>
+                                   <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
                                  </div>
                               </div>
                             )}
-
                             {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 0 && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
@@ -653,22 +643,10 @@ export default function App() {
                                     return (
                                       <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
                                         <div>
-                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
-                                            <span>#{idx + 1} {qProv.name}</span>
-                                            {isCurrent && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
-                                            {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
-                                            {qProv.interest_status === 'WAITING' && !isCurrent && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">BEKLİYOR</span>}
-                                          </p>
+                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5"><span>#{idx + 1} {qProv.name}</span>{isCurrent && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}{qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}{qProv.interest_status === 'WAITING' && !isCurrent && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">BEKLİYOR</span>}</p>
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
                                         </div>
-                                        {!isCurrent && (
-                                          <button 
-                                            onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }}
-                                            className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1"
-                                          >
-                                            <Check size={10} /><span>Bunu Seç</span>
-                                          </button>
-                                        )}
+                                        {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
                                       </div>
                                     );
                                   })}
@@ -677,32 +655,12 @@ export default function App() {
                             )}
                           </div>
                         )}
-
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {extractAddress(req.location)}</span>
-                          {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
-                          {req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
+                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                         </div>
-
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">
-                            {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 1 && (
-                              <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700">
-                                <SkipForward size={11} /><span>Otomatik Sıradakine Geç</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="flex items-center space-x-1.5 ml-auto">
-                            {(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED') && (
-                              <button onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm">
-                                <ShieldCheck size={12} /><span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span>
-                              </button>
-                            )}
-                            <button onClick={() => handleStatusChange(req.id, 'CANCELLED')} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px]" title="Talebi İptal Et">
-                              <Ban size={12} /> İptal
-                            </button>
-                          </div>
+                          <div className="flex items-center space-x-1.5">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
+                          <div className="flex items-center space-x-1.5 ml-auto">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED') && (<button onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"><ShieldCheck size={12} /><span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span></button>)}<button onClick={() => handleStatusChange(req.id, 'CANCELLED')} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px]" title="Talebi İptal Et"><Ban size={12} /> İptal</button></div>
                         </div>
                       </div>
                     ))}
@@ -710,42 +668,17 @@ export default function App() {
                 </div>
               )}
 
-              {/* B. DEĞERLENDİRME ALANI */}
               {pendingReviewCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border-2 border-emerald-400/80 shadow-md p-5 space-y-4">
-                  <div className="flex items-center space-x-2 text-emerald-800">
-                    <Sparkles size={18} className="text-amber-500" />
-                    <h3 className="text-xs font-mono uppercase font-bold tracking-wider">Hizmet Tamamlandı! Lütfen Değerlendirin ({pendingReviewCustomerRequests.length})</h3>
-                  </div>
-
+                  <div className="flex items-center space-x-2 text-emerald-800"><Sparkles size={18} className="text-amber-500" /><h3 className="text-xs font-mono uppercase font-bold tracking-wider">Hizmet Tamamlandı! Lütfen Değerlendirin ({pendingReviewCustomerRequests.length})</h3></div>
                   <div className="space-y-3">
                     {pendingReviewCustomerRequests.map((req) => (
                       <div key={req.id} className="bg-emerald-50/40 rounded-xl border border-emerald-200 p-4 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
-                            <p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p>
-                            <p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p>
-                          </div>
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span>
-                        </div>
-
+                        <div className="flex items-start justify-between"><div><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p><p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span></div>
                         <div className="p-3 bg-white rounded-lg border border-neutral-200/90 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-neutral-800 text-xs">Hizmet Deneyiminizi Puanlayın:</span>
-                            <div className="flex items-center space-x-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <button key={star} type="button" onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })} className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}>
-                                  <Star size={18} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} />
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                          <div className="flex items-center justify-between"><span className="font-bold text-neutral-800 text-xs">Hizmet Deneyiminizi Puanlayın:</span><div className="flex items-center space-x-1">{[1, 2, 3, 4, 5].map((star) => (<button key={star} type="button" onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })} className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}><Star size={18} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} /></button>))}</div></div>
                           <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Açıklama veya yorumunuzu yazın (opsiyonel)..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
-                          <div className="flex items-center justify-end space-x-2 pt-1">
-                            <button type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-1.5 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold">Yorum Yapmadan Geç</button>
-                            <button type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm">Puanı Gönder</button>
-                          </div>
+                          <div className="flex items-center justify-end space-x-2 pt-1"><button type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-1.5 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold">Yorum Yapmadan Geç</button><button type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm">Puanı Gönder</button></div>
                         </div>
                       </div>
                     ))}
@@ -753,188 +686,72 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 C. YENİ TALEP GİRİŞ FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
-                  <div className="text-center space-y-1">
-                    <h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2>
-                    <p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p>
-                  </div>
-                  
+                  <div className="text-center space-y-1"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
                   <form onSubmit={(e) => handleCustomerCombinedSubmit(e, false)} className="space-y-3">
                     <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
-                      
                       <div className="flex gap-2">
-                        <textarea 
-                          rows={2} 
-                          value={queryText} 
-                          onChange={(e) => setQueryText(e.target.value)} 
-                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, false); } }} 
-                          placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." 
-                          className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
-                          required 
-                        />
-                        <button 
-                          type="button" 
-                          onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} 
-                          className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"
-                          title="Gelişmiş Seçenekleri Göster/Gizle"
-                        >
-                          {isDetailsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                        </button>
+                        <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, false); } }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" required />
+                        <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
-
-                      {/* ÖZET BİLGİ ALANI */}
                       <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
-                        <span className="flex items-center space-x-1">
-                          <MapPin size={12}/>
-                          <span className="truncate max-w-[200px]">{locationValue || 'Konum Yok'}</span>
-                        </span>
+                        <span className="flex items-center space-x-1"><MapPin size={12}/><span className="truncate max-w-[200px]">{locationValue || 'Konum Yok'}</span></span>
                         {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
                         {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
-                        <div className="flex items-center space-x-2 border-l border-neutral-200 pl-2">
-                          {preferredChannels.map((c, idx) => (
-                            <React.Fragment key={c}>
-                              <span className="flex items-center space-x-1">
-                                {c === 'PHONE' && <Phone size={11} />}
-                                {c === 'SMS' && <MessageSquare size={11} />}
-                                {c === 'EMAIL' && <Mail size={11} />}
-                                {c === 'WHATSAPP' && <MessageCircle size={11} />}
-                                <span>{c === 'PHONE' ? 'Telefon' : c === 'SMS' ? 'SMS' : c === 'EMAIL' ? 'E-posta' : 'WhatsApp'}</span>
-                              </span>
-                              {idx < preferredChannels.length - 1 && <span className="text-neutral-300">•</span>}
-                            </React.Fragment>
-                          ))}
-                        </div>
                       </div>
-
                       {!isDetailsCollapsed && (
                         <div className="mt-4 pt-5 border-t border-neutral-200/70 space-y-4">
-                          
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span></label>
-                                {deadlineDate && <button type="button" onClick={() => setDeadlineDate('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
-                              </div>
-                              <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950" />
-                            </div>
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Clock size={12} className="text-neutral-700" /><span>En Son Saat</span></label>
-                                {deadlineTime && <button type="button" onClick={() => setDeadlineTime('')} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
-                              </div>
-                              <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950" />
-                            </div>
-                            <div className="flex items-end">
-                               <label className={`flex items-center justify-center space-x-2 w-full p-2 h-[34px] rounded-lg border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-1.5 text-xs font-bold">
-                                  <Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL</span>
-                                </div>
-                              </label>
-                            </div>
+                            <div><div className="flex items-center justify-between mb-1"><label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span></label></div><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
+                            <div><div className="flex items-center justify-between mb-1"><label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Clock size={12} className="text-neutral-700" /><span>En Son Saat</span></label></div><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
+                            <div className="flex items-end"><label className={`flex items-center justify-center space-x-2 w-full p-2 h-[34px] rounded-lg border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}><input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" /><div className="flex items-center space-x-1.5 text-xs font-bold"><Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL</span></div></label></div>
                           </div>
-
                           <div className="space-y-2">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><Phone size={13} /><span className="font-semibold text-[11px]">Telefon</span>{preferredChannels.includes('PHONE') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                              <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><MessageSquare size={13} /><span className="font-semibold text-[11px]">SMS</span>{preferredChannels.includes('SMS') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                              <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><Mail size={13} /><span className="font-semibold text-[11px]">E-posta</span>{preferredChannels.includes('EMAIL') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
-                              <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-left text-xs flex items-center justify-center sm:justify-start space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}><MessageCircle size={13} /><span className="font-semibold text-[11px]">WhatsApp</span>{preferredChannels.includes('WHATSAPP') && <Check size={12} className="ml-auto hidden sm:inline" />}</button>
+                              <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white'}`}><Phone size={13} /><span>Telefon</span></button>
+                              <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white'}`}><MessageSquare size={13} /><span>SMS</span></button>
                             </div>
-                            
-                            {preferredChannels.includes('EMAIL') && (
-                              <div className="animate-in fade-in duration-150">
-                                <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz (Örn: adiniz@example.com)" className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
-                              </div>
-                            )}
                           </div>
-
-                          {/* 🌟 KONUM SEÇİMİ VE HARİTA BÖLÜMÜ */}
                           <div className="pt-3 border-t border-neutral-100">
                             <div className="flex items-center justify-between mb-1.5">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                                <MapPin size={12} className="text-neutral-700" /><span>Konum Seçimi</span>
-                              </label>
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Seçimi</span></label>
                               <div className="flex items-center space-x-2">
-                                <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 flex items-center space-x-1 font-semibold transition">
-                                  <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /><span>{isLocating ? 'Bulunuyor...' : 'GPS Kullan'}</span>
-                                </button>
-                                <span className="text-neutral-300">|</span>
-                                <button type="button" onClick={() => setShowMap(!showMap)} className="text-[10px] font-mono text-emerald-600 hover:text-emerald-800 flex items-center space-x-1 font-semibold transition">
-                                  <MapPin size={10} /><span>{showMap ? 'Haritayı Kapat' : 'Haritada Göster'}</span>
-                                </button>
+                                <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 font-semibold"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> GPS Kullan</button>
+                                <button type="button" onClick={() => setShowMap(!showMap)} className="text-[10px] font-mono text-emerald-600 font-semibold"><MapPin size={10} /> {showMap ? 'Haritayı Kapat' : 'Haritada Göster'}</button>
                               </div>
                             </div>
-                            
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div className="sm:col-span-2">
-                                <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" />
-                              </div>
-                              <div className="sm:col-span-1">
-                                <input type="text" value={coordinates} readOnly placeholder="Koordinat (Enlem, Boylam)" className="w-full p-2.5 text-[11px] rounded-lg border border-neutral-200 outline-none bg-neutral-100 font-mono text-neutral-500 transition cursor-not-allowed" />
-                              </div>
+                              <div className="sm:col-span-2"><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
+                              <div className="sm:col-span-1"><input type="text" value={coordinates} readOnly placeholder="Koordinat" className="w-full p-2.5 text-[11px] rounded-lg border outline-none bg-neutral-100 font-mono text-neutral-500 cursor-not-allowed" /></div>
                             </div>
-                            
                             {showMap && (
-                              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300 flex flex-col">
+                              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 flex flex-col">
                                 <div className="relative w-full z-[1000]">
                                    <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                   <input 
-                                     type="text" 
-                                     value={mapSearchText} 
-                                     onChange={(e) => setMapSearchText(e.target.value)} 
-                                     onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }}
-                                     onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)}
-                                     placeholder="Sokak, mahalle veya mekan arayın..." 
-                                     className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950 shadow-sm" 
-                                   />
-                                   {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
-                                   
+                                   <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Sokak, mahalle veya mekan arayın..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border outline-none focus:border-neutral-950 shadow-sm" />
                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
-                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y divide-neutral-100">
+                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
                                        {mapSuggestions.map((sug, idx) => (
-                                         <div 
-                                           key={idx} 
-                                           className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer transition flex items-start space-x-2"
-                                           onMouseDown={(e) => {
-                                             e.preventDefault();
-                                             const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) };
-                                             setMapPosition(newPos);
-                                             setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`);
-                                             setLocationValue(sug.display_name);
-                                             setMapSearchText(sug.display_name);
-                                             setIsSuggestionsVisible(false);
-                                           }}
-                                         >
-                                           <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" />
-                                           <span>{sug.display_name}</span>
+                                         <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(sug.display_name); setIsSuggestionsVisible(false); }}>
+                                           <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
                                          </div>
                                        ))}
                                      </div>
                                    )}
                                 </div>
-                                
-                                <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
+                                <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0">
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
-                                    <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap' />
+                                    <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                                     <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                   </MapContainer>
                                 </div>
-                                <div className="text-[10px] text-neutral-500 font-mono text-center">Haritada istediğiniz noktaya tıklayarak nokta atışı koordinat işaretleyebilirsiniz.</div>
                               </div>
                             )}
                           </div>
                         </div>
                       )}
-
-                      <div className="flex items-center justify-between pt-3 mt-1 border-t border-neutral-200/60 px-1 text-[11px] text-neutral-400">
-                        <span className="font-mono">Enter ile gönderin</span>
-                        <button type="submit" disabled={loading || !queryText.trim()} className="ml-auto px-5 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
-                          {loading ? <span>Gönderiliyor...</span> : <><span>Gönder</span><ArrowRight size={14} /></>}
-                        </button>
-                      </div>
+                      <div className="flex items-center justify-end pt-3 mt-1 border-t border-neutral-200/60 px-1"><button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm transition">Gönder</button></div>
                     </div>
                   </form>
                 </div>
@@ -942,62 +759,25 @@ export default function App() {
 
               {/* D. BELİRSİZLİK ÇÖZÜM EKRANI */}
               {step === 'DISAMBIGUATE' && disambiguationData && (
-                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="text-center">
-                    <h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3>
-                    <p className="text-xs text-neutral-500 mt-1">Lütfen tam olarak hangi hizmeti aradığınızı seçin:</p>
-                  </div>
-                  <div className="space-y-2">
-                    {disambiguationData.options.map((option) => (
-                      <button 
-                        key={option.id} 
-                        onClick={() => { setSelectedDisambiguation(option.text); submitFinalRequest(option.text); }} 
-                        disabled={loading}
-                        className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold flex items-center justify-between transition"
-                      >
-                        <span>{option.text}</span>
-                        {loading && selectedDisambiguation === option.text ? <Navigation size={14} className="animate-spin text-neutral-400" /> : <ArrowRight size={14} className="text-neutral-400" />}
-                      </button>
-                    ))}
-                  </div>
-                  <button type="button" onClick={() => setStep('INPUT')} className="w-full py-2.5 text-xs text-neutral-500 hover:text-neutral-900 font-semibold transition">Geri Dön</button>
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
+                  <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
+                  <div className="space-y-2">{disambiguationData.options.map((option) => (<button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); submitFinalRequest(option.text); }} className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold">{option.text}</button>))}</div>
                 </div>
               )}
 
-              {/* E. MÜŞTERİ GEÇMİŞ TALEPLER */}
               {pastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-8">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3></div>
-                    {isCustomerHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş Talepler ({pastCustomerRequests.length})</h3>
                   </div>
                   {isCustomerHistoryOpen && (
                     <div className="p-4 pt-0 border-t border-neutral-100">
-                      <div className="relative mb-3 mt-3">
-                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                        <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
-                        {searchCustomerHistoryText && <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
-                      </div>
-                      <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                        {filteredPastCustomerRequests.length === 0 ? (
-                          <div className="p-4 text-center text-xs text-neutral-400 font-mono">Aramanıza uygun geçmiş talep bulunamadı.</div>
-                        ) : (
-                          filteredPastCustomerRequests.map((req) => (
-                            <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                                  <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone ? `(📞 ${req.provider_phone})` : ''} • {new Date(req.created_at).toLocaleDateString('tr-TR')}</p>
-                                </div>
-                                <div className="flex items-center space-x-1.5">
-                                  <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{req.status}</span>
-                                  <button onClick={() => handleRepeatRequest(req)} className="p-1 text-neutral-500 hover:text-blue-700 hover:bg-blue-50 rounded transition" title="Bu Talebi Tekrarla"><RefreshCw size={13} /></button>
-                                  <button onClick={() => handleDeleteRequest(req.id)} className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Sil"><Trash2 size={13} /></button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
+                      <div className="space-y-3 mt-3 max-h-[350px] overflow-y-auto">
+                        {filteredPastCustomerRequests.map((req) => (
+                           <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
+                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{new Date(req.created_at).toLocaleDateString('tr-TR')}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
+                           </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -1008,284 +788,66 @@ export default function App() {
         ) : session.role === 'PROVIDER' ? (
           /* ---------------- 🛠️ 3. SERVİS SAĞLAYICI (PROVIDER EKRANI) ---------------- */
           <div className="max-w-3xl mx-auto w-full space-y-5">
-              
-              {/* Profil Akordeonu */}
-              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-                <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-800"><Wrench size={16} /></div>
-                    <div>
-                      <h2 className="text-sm font-bold text-neutral-950">{providerProfile ? providerProfile.name : 'Sağlayıcı Profilinizi Oluşturun'}</h2>
-                      <p className="text-[11px] text-neutral-500 font-mono">{session.phone} {providerProfile ? `• Skor: ${providerProfile.priority_score}` : '• Profil Tanımlanmamış'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <span className="text-xs font-semibold text-neutral-500">{isProfileOpen ? 'Gizle' : 'Düzenle'}</span>
-                    {isProfileOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                  </div>
-                </div>
-
-                {isProfileOpen && (
-                  <form onSubmit={handleSaveProviderProfile} className="p-5 pt-2 border-t border-neutral-100 space-y-3.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İşletme Adı *</label>
-                        <input type="text" required value={providerFormData.name} onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })} placeholder="Örn: Erikli Su Kadıköy Bayi" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 font-medium" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
-                        <input type="email" value={providerFormData.email} onChange={(e) => setProviderFormData({ ...providerFormData, email: e.target.value })} placeholder="info@isletme.com" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Tag size={12} className="text-neutral-700" /><span>Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *</span></label>
-                        <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
-                          <span className={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span><span className="text-neutral-300">•</span>
-                          <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter</span>
-                        </div>
-                      </div>
-                      <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana, erikli, kadıköy, içme suyu..." className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition resize-none leading-relaxed" />
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center space-x-3 text-xs font-mono">
-                        <label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={providerFormData.communicationChannels.includes('PHONE')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'PHONE'] : providerFormData.communicationChannels.filter(c => c !== 'PHONE'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>PHONE</span></label>
-                        <label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={providerFormData.communicationChannels.includes('SMS')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'SMS'] : providerFormData.communicationChannels.filter(c => c !== 'SMS'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>SMS</span></label>
-                        <label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={providerFormData.communicationChannels.includes('EMAIL')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'EMAIL'] : providerFormData.communicationChannels.filter(c => c !== 'EMAIL'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>EMAIL</span></label>
-                        <label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={providerFormData.communicationChannels.includes('WHATSAPP')} onChange={(e) => { const newCh = e.target.checked ? [...providerFormData.communicationChannels, 'WHATSAPP'] : providerFormData.communicationChannels.filter(c => c !== 'WHATSAPP'); setProviderFormData({ ...providerFormData, communicationChannels: newCh }); }} /><span>WHATSAPP</span></label>
-                      </div>
-                      <button type="submit" disabled={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT || providerKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition"><Save size={13} /><span>Profili Kaydet</span></button>
-                    </div>
-                  </form>
-                )}
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
+                 <h2 className="text-sm font-bold text-neutral-950">Sağlayıcı Paneli</h2>
+                 <p className="text-xs text-neutral-500">Mevcut telefon: {session.phone}</p>
+                 <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="mt-2 text-xs text-blue-600 underline">Profili Düzenle</button>
               </div>
 
-              {/* 🌟 AKTİF İŞ TALEPLERİ (SABİT) */}
-              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-mono uppercase font-bold text-neutral-950 flex items-center space-x-1.5">
-                    <Building2 size={14} className="text-blue-600" />
-                    <span>Aktif İşlerim ({activeProviderRequests.length})</span>
-                  </h3>
-                </div>
-                <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
-                  {activeProviderRequests.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-neutral-400 font-mono">Henüz eşleştiğiniz veya devam eden bir işiniz bulunmuyor.</div>
-                  ) : (
-                    activeProviderRequests.map((req) => {
-                      const clientEmail = extractEmail(req.contact_value);
-                      const cleanPhone = extractPhone(req.contact_value) || session.phone;
-                      const phoneDigits = cleanPhone.replace(/\D/g, '');
-                      const rawChannels = (req.preferred_channel || 'PHONE').toUpperCase();
-                      const hasPhone = rawChannels.includes('PHONE') || rawChannels.includes('TELEFON');
-                      const hasSms = rawChannels.includes('SMS');
-                      const hasEmail = rawChannels.includes('EMAIL') || rawChannels.includes('E-POSTA');
-                      const hasWhatsapp = rawChannels.includes('WHATSAPP');
-
-                      const providerName = providerProfile?.name || req.provider_name || 'Hizmet Sağlayıcı';
-                      const providerPhone = providerProfile?.phone || req.provider_phone || session.phone;
-                      const providerEmail = providerProfile?.email || req.provider_email || '';
-                      const providerLocation = req.location || 'İstanbul';
-
-                      const emailBodyText = `Merhaba,\n\n"${req.raw_text}" talebiniz ile ilgili olarak iletişime geçiyorum.\n\nDetayları görüşmek ve hizmet planlamasını yapmak üzere tarafınıza dönüş yapılmıştır.\n\nSaygılarımızla,\n--------------------------------------------\n🏢 ${providerName}\n📍 Adres / Hizmet Bölgesi: ${providerLocation}\n📞 Tel: ${providerPhone}${providerEmail ? `\n📧 E-posta: ${providerEmail}` : ''}\n--------------------------------------------`;
-                      const mailtoSubject = encodeURIComponent(`Mobool Hizmet Talebi Hk. (#REQ-${req.id})`);
-                      const mailtoBody = encodeURIComponent(emailBodyText);
-                      const mailtoLink = clientEmail ? `mailto:${clientEmail}?subject=${mailtoSubject}&body=${mailtoBody}` : null;
-
-                      const commonMsgText = `Merhaba, Mobool üzerinden gönderdiğiniz #${req.id} numaralı "${req.raw_text}" talebiniz için iletişime geçiyorum.`;
-                      const encodedCommonMsg = encodeURIComponent(commonMsgText);
-
-                      const smsLink = `sms:${cleanPhone}${navigator.userAgent.match(/iPhone|iPad|iPod/i) ? '&' : '?'}body=${encodedCommonMsg}`;
-                      const waLink = `https://wa.me/${phoneDigits}?text=${encodedCommonMsg}`;
-                      const callLink = `tel:${cleanPhone}`;
-
-                      return (
-                        <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border border-neutral-200 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'MATCHED' ? 'bg-blue-50 text-blue-700 border border-blue-200' : req.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-neutral-100 text-neutral-800'}`}>
-                                {req.status === 'MATCHED' ? 'ONAY BEKLİYOR' : req.status === 'PROVIDER_COMPLETED' ? 'HİZMET TESLİM EDİLDİ (MÜŞTERİ ONAYI BEKLENİYOR)' : req.status}
-                              </span>
-                              <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
-                              <p className="text-sm font-semibold text-neutral-900 mt-1">"{req.raw_text}"</p>
-                            </div>
-                          </div>
-
-                          <div className="p-2.5 bg-white rounded border border-neutral-200/70 text-xs space-y-2">
-                            <p className="font-mono text-neutral-700">Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong></p>
-
-                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
-                              <span>📍 Konum: <strong>{extractAddress(req.location)}</strong></span>
-                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
-                              {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-[11px] font-mono">
-                              <span className="font-bold text-neutral-600 mr-1">İletişim Kanalları:</span>
-                              {hasPhone && <a href={callLink} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><Phone size={12} /><span>Ara</span></a>}
-                              {hasSms && <a href={smsLink} className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><MessageSquare size={12} /><span>SMS</span></a>}
-                              {hasWhatsapp && <a href={waLink} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><MessageCircle size={12} /><span>WhatsApp</span></a>}
-                              {hasEmail && mailtoLink && <a href={mailtoLink} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-md font-semibold flex items-center space-x-1 transition shadow-xs"><Mail size={12} /><span>E-posta</span></a>}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end space-x-2 pt-1">
-                            {req.status === 'MATCHED' && (
-                              <>
-                                <button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 text-neutral-700 rounded text-xs font-semibold">Pas Geç</button>
-                                <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center space-x-1"><Check size={12} /><span>Kabul Et & İletişime Geç</span></button>
-                              </>
-                            )}
-                            {req.status === 'ACCEPTED' && (
-                              <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold flex items-center space-x-1"><ShieldCheck size={12} /><span>Hizmeti Teslim Et (Müşteri Onayına Sun)</span></button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* 🌟 YENİ: AÇIK TALEP HAVUZU (AÇILIR KAPANIR / COLLAPSIBLE) */}
-              <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-5">
-                <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                  <div className="flex items-center space-x-2">
-                    <Inbox size={15} className="text-blue-600" />
-                    <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Açık Talep Havuzu ({poolRequests.length})</h3>
-                    {poolRequests.length > 0 && <span className="flex w-2 h-2 rounded-full bg-blue-500 animate-pulse ml-1"></span>}
-                  </div>
-                  {isPoolOpen ? <ChevronUp size={16} className="text-neutral-500"/> : <ChevronDown size={16} className="text-neutral-500"/>}
-                </div>
-                {isPoolOpen && (
-                  <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[400px] overflow-y-auto">
-                    {poolRequests.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400 font-mono">Şu anda açık havuzda profilinize uygun yeni bir talep bulunmuyor.</div>
-                    ) : (
-                      poolRequests.map((req) => (
-                        <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3 hover:border-blue-400 transition">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                                {req.status === 'POOL' ? 'İLK SİZ TALİP OLUN' : 'AKTİF (KUYRUĞA KATIL)'}
-                              </span>
-                              <span className="text-[10px] font-mono text-neutral-400 ml-1.5">#REQ-{req.id}</span>
-                              <p className="text-base font-bold text-neutral-950 mt-1.5">"{req.raw_text}"</p>
-                            </div>
-                            <span className="text-[10px] text-neutral-400 font-mono flex items-center space-x-1"><Clock size={11} /> <span>{new Date(req.created_at).toLocaleTimeString('tr-TR')}</span></span>
-                          </div>
-                          <div className="p-2.5 bg-neutral-50 rounded border border-neutral-100 text-xs space-y-1">
-                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
-                              <span>📍 Konum: <strong className="text-neutral-800">{extractAddress(req.location)}</strong></span>
-                              {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
-                              {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="text-[10px] font-mono text-blue-600">
-                              {req.status === 'POOL' ? 'Talebe ilk talip olan siz olarak müşteriyle hemen eşleşin.' : 'Başka bir sağlayıcı eşleşmiş, ancak kuyruğa girerek sıranızı bekleyebilirsiniz.'}
-                            </span>
-                            <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
-                              <UserCheck size={14} /><span>Sıraya Gir</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* SAĞLAYICI GEÇMİŞ TALEPLER */}
-              {pastProviderRequests.length > 0 && (
-                <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-5">
-                  <div onClick={() => setIsProviderHistoryOpen(!isProviderHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
-                    <div className="flex items-center space-x-2"><History size={15} className="text-neutral-500" /><h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Geçmiş İş Talepleri ({pastProviderRequests.length})</h3></div>
-                    {isProviderHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                  {isProviderHistoryOpen && (
-                    <div className="p-4 pt-0 space-y-3 border-t border-neutral-100 max-h-[350px] overflow-y-auto">
-                      {pastProviderRequests.map((req) => (
-                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs mt-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Müşteri: {req.contact_value} • {new Date(req.created_at).toLocaleDateString('tr-TR')}</p>
-                            </div>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">{req.status}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {isProfileOpen && (
+                <form onSubmit={handleSaveProviderProfile} className="bg-white p-5 rounded-2xl border shadow-sm space-y-3.5">
+                  <input type="text" required value={providerFormData.name} onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })} placeholder="İşletme Adı" className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  <textarea rows={3} required value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana..." className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Profili Kaydet</button>
+                </form>
               )}
 
+              <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
+                <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
+                <div className="space-y-3">
+                  {activeProviderRequests.map((req) => (
+                    <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border space-y-3">
+                       <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}" - <span className="text-[10px] bg-blue-100 text-blue-800 px-2 rounded">{req.status}</span></p>
+                       <p className="text-xs text-neutral-700">Müşteri: {req.contact_value}</p>
+                       {req.status === 'MATCHED' && <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-semibold">Kabul Et</button>}
+                       {req.status === 'ACCEPTED' && <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold">Teslim Et</button>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
+                <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Açık Talep Havuzu ({poolRequests.length})</h3>
+                <div className="space-y-3">
+                  {poolRequests.map((req) => (
+                    <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3">
+                      <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}"</p>
+                      <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">Sıraya Gir</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
           </div>
         ) : session.role === 'TRACKER' ? (
           /* ---------------- 🗺️ 5. TRACKER (TAKİP) EKRANI ---------------- */
           <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex">
-              
-              {/* Ekle ve Liste (Menü) Butonları */}
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
-                 <button 
-                   onClick={() => {
-                     setCoordinates(trackerMapSelectedPos ? `${trackerMapSelectedPos.lat.toFixed(6)}, ${trackerMapSelectedPos.lng.toFixed(6)}` : '');
-                     setLocationValue(trackerMapSelectedAddress);
-                     setIsTrackerAddModalOpen(true);
-                   }}
-                   className="flex items-center space-x-2 bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 rounded-xl shadow-lg transition"
-                 >
-                   <Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span>
-                 </button>
-                 <button 
-                   onClick={() => setIsTrackerListOpen(!isTrackerListOpen)}
-                   className="flex items-center space-x-2 bg-white hover:bg-neutral-50 text-neutral-900 border border-neutral-200 px-4 py-2.5 rounded-xl shadow-md transition"
-                 >
-                   <Layers size={16} className="text-neutral-500" /> <span className="font-semibold text-sm">Görev Listesi</span>
-                 </button>
+                 <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
+                 <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
               </div>
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
-                
-                {/* TRACKER HARİTA ARAMA ÇUBUĞU */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-80 sm:w-96">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
-                    <input 
-                      type="text" 
-                      value={trackerMapSearchText} 
-                      onChange={(e) => setTrackerMapSearchText(e.target.value)} 
-                      onFocus={() => { if(trackerMapSuggestions.length > 0) setIsTrackerSuggestionsVisible(true); }}
-                      onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)}
-                      placeholder="Haritada adres ara ve git..." 
-                      className="w-full pl-10 pr-4 py-3 text-sm rounded-xl border-none outline-none focus:ring-2 focus:ring-blue-500 shadow-lg bg-white/90 backdrop-blur-sm"
-                    />
-                    {isTrackerMapSearching && <Navigation size={14} className="absolute right-4 top-3.5 animate-spin text-blue-500" />}
+                    <input type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm" />
                   </div>
-                  
                   {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-neutral-100 z-[9999]">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
                       {trackerMapSuggestions.map((sug, idx) => (
-                        <div 
-                          key={idx} 
-                          className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer transition flex items-start space-x-2"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) };
-                            setTrackerMapCenter([newPos.lat, newPos.lng]); 
-                            setTrackerMapSelectedPos(newPos); 
-                            setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`);
-                            setLocationValue(sug.display_name);
-                            setTrackerMapSearchText(sug.display_name);
-                            setIsTrackerSuggestionsVisible(false);
-                          }}
-                        >
-                          <MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" />
-                          <span>{sug.display_name}</span>
+                        <div key={idx} className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setTrackerMapCenter([newPos.lat, newPos.lng]); setTrackerMapSelectedPos(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setTrackerMapSearchText(sug.display_name); setIsTrackerSuggestionsVisible(false); }}>
+                          <MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
                         </div>
                       ))}
                     </div>
@@ -1293,39 +855,20 @@ export default function App() {
                 </div>
 
                 <MapContainer center={trackerMapCenter} zoom={12} className="absolute inset-0 w-full h-full z-0">
-                  <TileLayer 
-                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" 
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' 
-                  />
+                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                   <TrackerMapController center={trackerMapCenter} />
-                  <SharedMapClickHandler 
-                     position={trackerMapSelectedPos} 
-                     setPosition={setTrackerMapSelectedPos} 
-                     setLocationValue={setTrackerMapSelectedAddress} 
-                     setCoordinates={setCoordinates}
-                     icon={trackerSelectionIcon} 
-                  />
+                  <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setCoordinates={setCoordinates} icon={trackerSelectionIcon} />
                   
                   {trackerRequests.map(req => {
                     const coords = extractGPS(req.location);
                     if (coords) {
                       return (
-                        <Marker 
-                          position={coords} 
-                          icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} 
-                          key={req.id}
-                        >
+                        <Marker position={coords} icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} key={req.id}>
                           <Popup className="custom-popup">
                             <div className="w-48 p-1">
-                               <div className="flex justify-between items-center mb-1">
-                                 <span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span>
-                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span>
-                               </div>
+                               <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
-                                  <p>👤 {req.contact_value}</p>
-                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
-                               </div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
                             </div>
                           </Popup>
                         </Marker>
@@ -1338,57 +881,26 @@ export default function App() {
 
               {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200">
                   <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
-                    <div className="flex items-center justify-between">
-                       <h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3>
-                       <button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={16}/></button>
-                    </div>
-                    <div className="relative">
-                       <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                       <input 
-                         type="text" 
-                         value={trackerSearch} 
-                         onChange={(e) => setTrackerSearch(e.target.value)}
-                         placeholder="Talep, adres veya tel ara..." 
-                         className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200"
-                       />
-                       {trackerSearch && <button onClick={() => setTrackerSearch('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
-                    </div>
+                    <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={16}/></button></div>
+                    <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200" /></div>
                   </div>
-
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50 pb-20">
-                    {filteredTrackerRequests.length === 0 ? (
-                      <div className="text-center text-xs text-neutral-400 mt-10 font-mono">Listelenecek operasyon bulunamadı.</div>
-                    ) : (
-                      filteredTrackerRequests.map(req => {
-                        const coords = extractGPS(req.location);
-                        return (
-                          <div 
-                            key={req.id} 
-                            onClick={() => { if(coords) setTrackerMapCenter(coords); }}
-                            className={`p-3 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}
-                          >
-                            <div className="flex items-start justify-between mb-1">
-                              <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
-                            </div>
-                            <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
-                            
-                            <div className="space-y-1 text-[10px] font-mono text-neutral-500">
-                               <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
-                               <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
-                               
-                               {coords ? (
-                                 <p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>
-                               ) : (
-                                 <p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>
-                               )}
-                            </div>
+                    {filteredTrackerRequests.map(req => {
+                      const coords = extractGPS(req.location);
+                      return (
+                        <div key={req.id} onClick={() => { if(coords) setTrackerMapCenter(coords); }} className={`p-3 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}>
+                          <div className="flex items-start justify-between mb-1"><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-100">{req.status}</span></div>
+                          <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
+                          <div className="space-y-1 text-[10px] font-mono text-neutral-500">
+                             <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
+                             <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
+                             {coords ? (<p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>) : (<p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>)}
                           </div>
-                        )
-                      })
-                    )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -1398,52 +910,21 @@ export default function App() {
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
                   <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
-                       <div>
-                         <h3 className="font-bold text-sm text-neutral-950">Manuel Operasyon Ekle</h3>
-                         <p className="text-[10px] text-neutral-500 font-mono">Merkezden havuza yeni talep bırakın.</p>
-                       </div>
+                       <div><h3 className="font-bold text-sm text-neutral-950">Manuel Operasyon Ekle</h3><p className="text-[10px] text-neutral-500 font-mono">Merkezden havuza yeni talep bırakın.</p></div>
                        <button onClick={() => setIsTrackerAddModalOpen(false)} className="p-1 text-neutral-400 hover:text-neutral-900 bg-neutral-100 rounded-md transition"><X size={16}/></button>
                     </div>
 
                     <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-3">
                       <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
-                        
-                        <div className="flex gap-2">
-                          <textarea 
-                            rows={2} 
-                            value={queryText} 
-                            onChange={(e) => setQueryText(e.target.value)} 
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, true); } }} 
-                            placeholder="Müşterinin talebini girin..." 
-                            className="w-full p-2 text-sm font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
-                            required 
-                          />
-                        </div>
-
+                        <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin..." className="w-full p-2 text-sm font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                         <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
-                                <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
-                                <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="flex items-center space-x-2 w-full p-2 rounded-lg border cursor-pointer hover:bg-neutral-50">
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="rounded" />
-                                <span className="text-xs font-bold text-rose-600">ACİL TALEP</span>
-                              </label>
+                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
+                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label><input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" /></div>
                             </div>
                         </div>
-
                         <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
-                          <button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
-                            {loading ? <span>Gönderiliyor...</span> : <><span>Operasyonu Başlat</span><ArrowRight size={14} /></>}
-                          </button>
+                          <button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold">Operasyonu Başlat</button>
                         </div>
                       </div>
                     </form>
@@ -1451,6 +932,144 @@ export default function App() {
                 </div>
               )}
 
+          </div>
+        ) : session.role === 'ADMIN' ? (
+          /* ---------------- ⚙️ 4. ADMİN EKRANI ---------------- */
+          <div className="w-full mx-auto space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+                <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
+
+                <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
+                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
+                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
+                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Layers size={13} /><span>Tüm Talepler & Kuyruk ({filteredMatchedRequests.length})</span></button>
+                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
+                  <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Settings size={13} /><span>Sistem Ayarları</span></button>
+                </div>
+              </div>
+
+              {/* SİSTEM AYARLARI */}
+              {adminTab === 'SETTINGS' && (
+                <div className="space-y-4">
+                  <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                    <h3 className="font-bold text-neutral-950 mb-4">Sistem Ayarları ve Parametreler</h3>
+                    <div className="overflow-x-auto w-full border rounded-xl">
+                      <table className="w-full text-left text-xs table-auto">
+                        <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
+                          <tr><th className="px-4 py-3 w-1/4">Ayar Adı</th><th className="px-4 py-3 w-2/4">Açıklama</th><th className="px-4 py-3 w-32 text-center">Değer</th><th className="px-4 py-3 w-24 text-right">İşlem</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 bg-white">
+                          <tr className="hover:bg-neutral-50">
+                            <td className="px-4 py-3 font-bold text-neutral-900">Varsayılan Bitiş Süresi</td>
+                            <td className="px-4 py-3 text-neutral-500">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</td>
+                            <td className="px-4 py-3 text-center"><input type="number" min="1" value={systemSettings.default_deadline_days || ''} onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none" /></td>
+                            <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold">Kaydet</button></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* WOZ HAVUZU */}
+              {adminTab === 'WOZ' && (
+                <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3">
+                  {pendingRequests.map((req) => (
+                    <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
+                        <span className="text-[11px] text-neutral-500">👤 {req.contact_value} | 📍 {extractAddress(req.location)}</span>
+                      </div>
+                      <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Sağlayıcı Seç & Ata</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* SAĞLAYICILAR */}
+              {adminTab === 'PROVIDERS' && (
+                <div className="space-y-3">
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {filteredProviders.map((prov) => (
+                          <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
+                            <h3 className="font-bold text-neutral-900">{prov.name}</h3>
+                            <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+                            <div className="mt-2 pt-2 border-t"><button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 text-xs font-semibold">Sil</button></div>
+                          </div>
+                        ))}
+                      </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TÜM EŞLEŞMELER & KUYRUK EKRANI */}
+              {adminTab === 'ALL_MATCHED' && (
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm max-h-[650px] overflow-y-auto">
+                    <table className="w-full text-left text-xs table-auto">
+                      <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm">
+                        <tr>
+                          <SortableHeader label="ID / Tarih" sortKey="id" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Durum" sortKey="status" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Talep Metni" sortKey="raw_text" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Müşteri" sortKey="contact_value" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Sağlayıcı" sortKey="provider_name" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Konum / Aciliyet" sortKey="location" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {sortedMatchedRequests.map((req) => (
+                          <tr key={req.id} className="hover:bg-neutral-50 transition">
+                            <td className="px-4 py-3 font-mono font-bold text-neutral-900">#REQ-{req.id}</td>
+                            <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
+                            <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
+                            <td className="px-4 py-3 font-mono text-neutral-800">{req.contact_value}</td>
+                            <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
+                            <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
+                            <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                </div>
+              )}
+
+              {/* SMS LOGLARI */}
+              {adminTab === 'SMS_LOGS' && (
+                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
+                  {filteredSmsLogs.map((log) => (
+                    <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
+                        <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
+                        <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span>
+                      </div>
+                      <p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed text-neutral-800">{log.message_body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* WOZ ATAMA MODAL */}
+              {wozAssignModalReq && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
+                    <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+                      <div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div>
+                      <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
+                    </div>
+                    <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 flex-1">
+                      {filteredWozProviders.map((prov) => (
+                        <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs">
+                          <div><h4 className="font-bold text-neutral-900">{prov.name}</h4><p className="text-[11px] text-blue-700 font-mono">📞 {prov.phone}</p></div>
+                          <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-3 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold">Ata</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
           </div>
         ) : null}
       </main>
