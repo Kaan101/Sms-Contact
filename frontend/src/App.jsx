@@ -242,6 +242,7 @@ export default function App() {
   const [isTrackerListOpen, setIsTrackerListOpen] = useState(true);
   const [isTrackerAddModalOpen, setIsTrackerAddModalOpen] = useState(false);
   const [trackerMapSelectedPos, setTrackerMapSelectedPos] = useState(null);
+  const [trackerMapSelectedAddress, setTrackerMapSelectedAddress] = useState('');
   const [trackerMapSearchText, setTrackerMapSearchText] = useState('');
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
@@ -429,6 +430,7 @@ export default function App() {
       if (fromTracker) {
         setIsTrackerAddModalOpen(false);
         setTrackerMapSelectedPos(null);
+        setTrackerMapSelectedAddress('');
         setTrackerMapSearchText('');
         fetchTrackerData();
         alert("Talep başarıyla oluşturuldu ve haritaya eklendi.");
@@ -509,7 +511,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.1 (Bulletproof)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.2 (Map Fix)</span>
             </div>
           </div>
 
@@ -846,7 +848,7 @@ export default function App() {
                   {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
                       {trackerMapSuggestions.map((sug, idx) => (
-                        <div key={idx} className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setTrackerMapCenter([newPos.lat, newPos.lng]); setTrackerMapSelectedPos(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setTrackerMapSearchText(sug.display_name); setIsTrackerSuggestionsVisible(false); }}>
+                        <div key={idx} className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setTrackerMapCenter([newPos.lat, newPos.lng]); setTrackerMapSelectedPos(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setTrackerMapSearchText(sug.display_name); setTrackerMapSelectedAddress(sug.display_name); setIsTrackerSuggestionsVisible(false); }}>
                           <MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
                         </div>
                       ))}
@@ -857,7 +859,7 @@ export default function App() {
                 <MapContainer center={trackerMapCenter} zoom={12} className="absolute inset-0 w-full h-full z-0">
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                   <TrackerMapController center={trackerMapCenter} />
-                  <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setCoordinates={setCoordinates} icon={trackerSelectionIcon} />
+                  <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setTrackerMapSelectedAddress} setCoordinates={setCoordinates} icon={trackerSelectionIcon} />
                   
                   {trackerRequests.map(req => {
                     const coords = extractGPS(req.location);
