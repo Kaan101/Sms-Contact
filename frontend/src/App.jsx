@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 
 // Harita Kütüphaneleri
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -12,7 +12,7 @@ import {
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
   ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
-  Settings, Timer, AlertTriangle, Link2
+  Settings, Timer, AlertTriangle, Link2, Map as MapIcon
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -30,7 +30,28 @@ const customMarkerIcon = new L.DivIcon({
   iconAnchor: [0, 0]
 });
 
-// Harita Tıklama Yöneticisi
+// Kırmızı İşaret İkonu (Acil Talepler İçin)
+const urgentMarkerIcon = new L.DivIcon({
+  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+         </div>`,
+  className: '',
+  iconSize: [0, 0],
+  iconAnchor: [0, 0]
+});
+
+// Harita FlyTo Yöneticisi (Takip Ekranı İçin)
+function TrackerMapController({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.flyTo(center, 16, { duration: 1.5 });
+    }
+  }, [center, map]);
+  return null;
+}
+
+// Müşteri Ekranı GPS Yöneticisi
 function MapClickHandler({ position, setPosition, setLocationValue, setCoordinates }) {
   const map = useMapEvents({
     click(e) {
@@ -55,6 +76,17 @@ function MapClickHandler({ position, setPosition, setLocationValue, setCoordinat
 
   return position ? <Marker position={position} icon={customMarkerIcon} /> : null;
 }
+
+// Ortak GPS Çıkarıcılar
+const extractGPS = (loc) => {
+  if(!loc) return null;
+  const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
+  return match ? [parseFloat(match[1]), parseFloat(match[2])] : null;
+};
+const extractAddress = (loc) => {
+  if(!loc) return 'Bilinmiyor';
+  return loc.replace(/\[GPS:.*?\]/g, '').trim();
+};
 
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
@@ -100,14 +132,13 @@ export default function App() {
   const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
-  const [coordinates, setCoordinates] = useState(''); // 🌟 YENİ: Koordinat State'i
+  const [coordinates, setCoordinates] = useState(''); 
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineTime, setDeadlineTime] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   
-  // Harita State'leri
   const [showMap, setShowMap] = useState(false);
   const [mapPosition, setMapPosition] = useState(null);
   const [mapSearchText, setMapSearchText] = useState('');
@@ -200,6 +231,13 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
+
+  // 🌟 YENİ: TRACKER (Takip) Ekranı State'leri
+  const [trackerRequests, setTrackerRequests] = useState([]);
+  const [trackerSearch, setTrackerSearch] = useState('');
+  const [trackerMapCenter, setTrackerMapCenter] = useState([41.0082, 28.9784]); // İstanbul
+  const [isTrackerListOpen, setIsTrackerListOpen] = useState(true);
+  const [isTrackerAddModalOpen, setIsTrackerAddModalOpen] = useState(false);
 
   const togglePreferredChannel = (channel) => {
     setPreferredChannels((prev) => {
@@ -315,8 +353,29 @@ export default function App() {
       } catch (e) {
         console.warn('Sistem ayarları API bağlantısı henüz aktif olmayabilir.');
       }
-
     } catch (err) { console.error('Admin verileri çekilemedi:', err); }
+  };
+
+  // 🌟 YENİ: Takip (Tracker) Ekranı Veri Çekme Fonksiyonu
+  const fetchTrackerData = async () => {
+    try {
+      const [reqRes, matchRes] = await Promise.all([
+        axios.get(`${API_BASE}/requests/pending`),
+        axios.get(`${API_BASE}/requests/matched`)
+      ]);
+      const allReqs = [...(reqRes.data.requests || []), ...(matchRes.data.requests || [])];
+      
+      // Tekrar edenleri temizle (ID'ye göre)
+      const uniqueReqsMap = new Map();
+      allReqs.forEach(item => uniqueReqsMap.set(item.id, item));
+      const uniqueReqs = Array.from(uniqueReqsMap.values());
+      
+      // Sonuca göre sırala (En yeni en üstte)
+      uniqueReqs.sort((a, b) => b.id - a.id);
+      setTrackerRequests(uniqueReqs);
+    } catch (err) {
+      console.error('Takip verileri çekilemedi:', err);
+    }
   };
 
   useEffect(() => {
@@ -324,11 +383,13 @@ export default function App() {
       if (session.role === 'CUSTOMER') { fetchCustomerData(); }
       if (session.role === 'PROVIDER') fetchProviderData(true);
       if (session.role === 'ADMIN') fetchAdminData();
+      if (session.role === 'TRACKER') fetchTrackerData();
 
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData(false);
         if (session.role === 'CUSTOMER') fetchCustomerData();
         if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
+        if (session.role === 'TRACKER') fetchTrackerData();
       }, 5000);
 
       return () => clearInterval(interval);
@@ -365,7 +426,7 @@ export default function App() {
     window.open(directUrl, '_blank');
   };
 
-  const submitFinalRequest = async (disambiguationChoice) => {
+  const submitFinalRequest = async (disambiguationChoice, fromTracker = false) => {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
@@ -399,7 +460,14 @@ export default function App() {
       setMapSearchText('');
       setIsUrgent(false); 
       setErrorMessage('');
-      await fetchCustomerData();
+      
+      if (fromTracker) {
+        setIsTrackerAddModalOpen(false);
+        fetchTrackerData();
+        alert("Talep başarıyla oluşturuldu ve haritaya eklendi.");
+      } else {
+        await fetchCustomerData();
+      }
     } catch (err) { 
       setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); 
     } finally { 
@@ -407,7 +475,7 @@ export default function App() {
     }
   };
 
-  const handleCustomerCombinedSubmit = async (e) => {
+  const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
     e?.preventDefault();
     if (!queryText.trim()) return;
     if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
@@ -426,16 +494,16 @@ export default function App() {
         setStep('DISAMBIGUATE');
         setLoading(false);
       } else {
-        await submitFinalRequest(null);
+        await submitFinalRequest(null, fromTracker);
       }
     } catch { 
-      await submitFinalRequest(null); 
+      await submitFinalRequest(null, fromTracker); 
     }
   };
 
   const handleRepeatRequest = (req) => {
     setQueryText(req.raw_text);
-    if (req.location) setLocationValue(req.location);
+    if (req.location) setLocationValue(extractAddress(req.location));
     setIsUrgent(req.is_urgent || false);
     setStep('INPUT');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -484,6 +552,7 @@ export default function App() {
       if (session.role === 'CUSTOMER') await fetchCustomerData();
       if (session.role === 'PROVIDER') await fetchProviderData(false);
       if (session.role === 'ADMIN') await fetchAdminData();
+      if (session.role === 'TRACKER') await fetchTrackerData();
     } catch { console.error('Silme başarısız.'); }
   };
 
@@ -498,7 +567,7 @@ export default function App() {
     } catch (err) { console.error('Değerlendirme kaydedilemedi:', err); }
   };
 
-  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new DatetoISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata'); } };
+  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata'); } };
   const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) { alert('Hata'); } };
   const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch { alert('Silme başarısız.'); } };
   
@@ -588,6 +657,16 @@ export default function App() {
     if (!q) return true;
     return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q);
   });
+  
+  // 🌟 YENİ: TRACKER LİSTESİ FİLTRELEME
+  const filteredTrackerRequests = trackerRequests.filter(r => {
+    const q = trackerSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (r.raw_text || '').toLowerCase().includes(q) || 
+           (r.contact_value || '').toLowerCase().includes(q) || 
+           (r.location || '').toLowerCase().includes(q) ||
+           String(r.id).includes(q);
+  });
 
   const handleRequestSort = (key) => {
     let direction = 'asc';
@@ -673,19 +752,24 @@ export default function App() {
     );
   };
 
+  // Dinamik Main Class'ı (Takip ekranında padding olmamalı)
+  let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
+  if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
+  if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 h-[calc(100vh-64px)] overflow-hidden relative flex-1 flex flex-col bg-neutral-100";
+
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
       
       {/* 🧭 NAVIGATION */}
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30">
-        <div className={`${session?.role === 'ADMIN' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
+        <div className={`${session?.role === 'ADMIN' || session?.role === 'TRACKER' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setStep('INPUT')}>
             <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">
               MB
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.8 (Modern Map)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.9 (Control Tower)</span>
             </div>
           </div>
 
@@ -694,9 +778,10 @@ export default function App() {
               <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase border ${
                 session.role === 'CUSTOMER' ? 'bg-blue-50 text-blue-800 border-blue-200' :
                 session.role === 'PROVIDER' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                session.role === 'TRACKER' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
                 'bg-neutral-900 text-white border-neutral-900'
               }`}>
-                {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : '⚙️ Admin'}
+                {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : session.role === 'TRACKER' ? '🗺️ Takip' : '⚙️ Admin'}
               </span>
               <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
               <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
@@ -706,9 +791,9 @@ export default function App() {
       </header>
 
       {/* 🏛️ MAIN CONTENT */}
-      <main className={`w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 ${session?.role === 'ADMIN' ? 'max-w-[100%]' : 'max-w-5xl'}`}>
+      <main className={mainContainerClass}>
         
-        {errorMessage && (
+        {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between">
             <span>{errorMessage}</span>
             <button onClick={() => setErrorMessage('')} className="text-rose-400 hover:text-rose-700 ml-4"><X size={14} /></button>
@@ -717,17 +802,18 @@ export default function App() {
 
         {/* ---------------- 🚪 1. GİRİŞ EKRANI ---------------- */}
         {!session ? (
-          <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto w-full space-y-6">
+          <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto w-full space-y-6 mt-8">
             <div className="text-center space-y-2">
               <div className="w-12 h-12 bg-neutral-950 text-white rounded-2xl mx-auto flex items-center justify-center shadow-sm font-mono text-lg font-bold"><KeyRound size={22} /></div>
               <h2 className="text-2xl font-bold tracking-tight text-neutral-950">Giriş Yapın</h2>
               <p className="text-xs text-neutral-500">Lütfen sisteme hangi rolde bağlanmak istediğinizi seçin.</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 text-xs font-semibold">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 text-xs font-semibold">
               <button type="button" onClick={() => { setSelectedRole('CUSTOMER'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'CUSTOMER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}><User size={16} /><span>Müşteri</span></button>
               <button type="button" onClick={() => { setSelectedRole('PROVIDER'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'PROVIDER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}><Wrench size={16} /><span>Sağlayıcı</span></button>
               <button type="button" onClick={() => { setSelectedRole('ADMIN'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'ADMIN' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}><Shield size={16} /><span>Admin</span></button>
+              <button type="button" onClick={() => { setSelectedRole('TRACKER'); setAuthStep('PHONE'); }} className={`py-2.5 rounded-lg transition flex flex-col items-center space-y-1 ${selectedRole === 'TRACKER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}><MapIcon size={16} /><span>Takip</span></button>
             </div>
 
             {authStep === 'PHONE' ? (
@@ -879,7 +965,7 @@ export default function App() {
                         )}
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {req.location || 'Mevcut Konum'}</span>
+                          <span>📍 {extractAddress(req.location)}</span>
                           {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
                           {req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                         </div>
@@ -988,7 +1074,7 @@ export default function App() {
                       <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
                         <span className="flex items-center space-x-1">
                           <MapPin size={12}/>
-                          <span>{locationValue || 'Konum Yok'}</span>
+                          <span className="truncate max-w-[200px]">{locationValue || 'Konum Yok'}</span>
                         </span>
                         
                         {isUrgent && (
@@ -1105,7 +1191,7 @@ export default function App() {
                             {/* HARİTA KONTEYNERİ (MODERN CARTO VOYAGER) */}
                             {showMap && (
                               <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300 flex flex-col">
-                                <div className="relative w-full z-50">
+                                <div className="relative w-full z-[1000]">
                                    <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
                                    <input 
                                      type="text" 
@@ -1124,7 +1210,7 @@ export default function App() {
                                    
                                    {/* CANLI ARAMA SONUÇLARI (DROPDOWN) */}
                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
-                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl z-[9999] max-h-48 overflow-y-auto divide-y divide-neutral-100">
+                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y divide-neutral-100">
                                        {mapSuggestions.map((sug, idx) => (
                                          <div 
                                            key={idx} 
@@ -1148,7 +1234,6 @@ export default function App() {
                                 </div>
                                 
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
-                                  {/* YENİ CARTO VOYAGER TILE LAYER */}
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
                                     <TileLayer 
                                       url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" 
@@ -1293,7 +1378,7 @@ export default function App() {
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Tag size={12} className="text-neutral-700" /><span>Hizmet Anahtar Kelim Kelimeleri (Virgülle Ayırın) *</span></label>
+                        <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Tag size={12} className="text-neutral-700" /><span>Hizmet Anahtar Kelimeleri (Virgülle Ayırın) *</span></label>
                         <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
                           <span className={providerKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span><span className="text-neutral-300">•</span>
                           <span className={providerKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>{providerKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter</span>
@@ -1370,7 +1455,7 @@ export default function App() {
                             <p className="font-mono text-neutral-700">Müşteri İletişim: <strong className="text-neutral-900">{req.contact_value}</strong></p>
 
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100">
-                              <span>📍 Konum: <strong>{req.location || 'Mevcut Konum'}</strong></span>
+                              <span>📍 Konum: <strong>{extractAddress(req.location)}</strong></span>
                               {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
                               {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             </div>
@@ -1431,7 +1516,7 @@ export default function App() {
                           </div>
                           <div className="p-2.5 bg-neutral-50 rounded border border-neutral-100 text-xs space-y-1">
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500">
-                              <span>📍 Konum: <strong className="text-neutral-800">{req.location || 'Bilinmiyor'}</strong></span>
+                              <span>📍 Konum: <strong className="text-neutral-800">{extractAddress(req.location)}</strong></span>
                               {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}
                               {req.deadline_datetime && <span>⏰ En Son: <strong>{new Date(req.deadline_datetime).toLocaleString('tr-TR')}</strong></span>}
                             </div>
@@ -1473,6 +1558,183 @@ export default function App() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+            </div>
+          ) :
+
+          /* ---------------- 🗺️ 5. YENİ: TRACKER (TAKİP) EKRANI ---------------- */
+          session.role === 'TRACKER' ? (
+            <div className="relative w-full h-full bg-neutral-100 overflow-hidden flex">
+              
+              {/* Ekle ve Liste (Menü) Butonları */}
+              <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
+                 <button 
+                   onClick={() => setIsTrackerAddModalOpen(true)}
+                   className="flex items-center space-x-2 bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 rounded-xl shadow-lg transition"
+                 >
+                   <Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span>
+                 </button>
+                 <button 
+                   onClick={() => setIsTrackerListOpen(!isTrackerListOpen)}
+                   className="flex items-center space-x-2 bg-white hover:bg-neutral-50 text-neutral-900 border border-neutral-200 px-4 py-2.5 rounded-xl shadow-md transition"
+                 >
+                   <Layers size={16} className="text-neutral-500" /> <span className="font-semibold text-sm">Görev Listesi</span>
+                 </button>
+              </div>
+
+              {/* HARİTA ALANI */}
+              <div className="flex-1 w-full h-full z-0 relative">
+                <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }}>
+                  <TileLayer 
+                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" 
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' 
+                  />
+                  <TrackerMapController center={trackerMapCenter} />
+                  
+                  {trackerRequests.map(req => {
+                    const coords = extractGPS(req.location);
+                    if (coords) {
+                      return (
+                        <Marker 
+                          position={coords} 
+                          icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} 
+                          key={req.id}
+                        >
+                          <Popup className="custom-popup">
+                            <div className="w-48 p-1">
+                               <div className="flex justify-between items-center mb-1">
+                                 <span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span>
+                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span>
+                               </div>
+                               <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
+                                  <p>👤 {req.contact_value}</p>
+                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
+                               </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    }
+                    return null;
+                  })}
+                </MapContainer>
+              </div>
+
+              {/* SAĞ LİSTE PANELİ */}
+              {isTrackerListOpen && (
+                <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                  <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
+                    <div className="flex items-center justify-between">
+                       <h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3>
+                       <button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={16}/></button>
+                    </div>
+                    <div className="relative">
+                       <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                       <input 
+                         type="text" 
+                         value={trackerSearch} 
+                         onChange={(e) => setTrackerSearch(e.target.value)}
+                         placeholder="Talep, adres veya tel ara..." 
+                         className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium"
+                       />
+                       {trackerSearch && <button onClick={() => setTrackerSearch('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50">
+                    {filteredTrackerRequests.length === 0 ? (
+                      <div className="text-center text-xs text-neutral-400 mt-10 font-mono">Listelenecek operasyon bulunamadı.</div>
+                    ) : (
+                      filteredTrackerRequests.map(req => {
+                        const coords = extractGPS(req.location);
+                        return (
+                          <div 
+                            key={req.id} 
+                            onClick={() => { if(coords) setTrackerMapCenter(coords); }}
+                            className={`p-3 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}
+                          >
+                            <div className="flex items-start justify-between mb-1">
+                              <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
+                            </div>
+                            <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
+                            
+                            <div className="space-y-1 text-[10px] font-mono text-neutral-500">
+                               <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
+                               <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{extractAddress(req.location)}</span></p>
+                               
+                               {coords ? (
+                                 <p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Navigation size={10}/> <span>Haritaya Git</span></p>
+                               ) : (
+                                 <p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>
+                               )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* YENİ TALEP EKLEME MODALI (Takip Ekranı İçin Müşteri Formu Re-use) */}
+              {isTrackerAddModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+                       <div>
+                         <h3 className="font-bold text-sm text-neutral-950">Manuel Operasyon Ekle</h3>
+                         <p className="text-[10px] text-neutral-500 font-mono">Merkezden havuza yeni talep bırakın.</p>
+                       </div>
+                       <button onClick={() => setIsTrackerAddModalOpen(false)} className="p-1 text-neutral-400 hover:text-neutral-900 bg-neutral-100 rounded-md transition"><X size={16}/></button>
+                    </div>
+
+                    <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-3">
+                      <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
+                        
+                        <div className="flex gap-2">
+                          <textarea 
+                            rows={2} 
+                            value={queryText} 
+                            onChange={(e) => setQueryText(e.target.value)} 
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, true); } }} 
+                            placeholder="Müşterinin talebini girin..." 
+                            className="w-full p-2 text-sm font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
+                            required 
+                          />
+                        </div>
+
+                        <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
+                                <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
+                                <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <label className="flex items-center space-x-2 w-full p-2 rounded-lg border cursor-pointer hover:bg-neutral-50">
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="rounded" />
+                                <span className="text-xs font-bold text-rose-600">ACİL TALEP</span>
+                              </label>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
+                          <button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
+                            {loading ? <span>Gönderiliyor...</span> : <><span>Operasyonu Başlat</span><ArrowRight size={14} /></>}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
 
@@ -1680,7 +1942,7 @@ export default function App() {
                           <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
                           <div className="flex flex-wrap gap-2 text-neutral-500 font-mono text-[11px]">
                             <span>👤 İletişim: <strong className="text-neutral-800">{req.contact_value}</strong></span>
-                            <span>📍 {req.location || 'Kadıköy'}</span>
+                            <span>📍 {extractAddress(req.location)}</span>
                             {req.is_urgent && <span className="text-rose-600 font-bold">🔥 ACİL</span>}
                           </div>
                         </div>
@@ -1846,7 +2108,7 @@ export default function App() {
 
                                   <td className="px-4 py-3 align-top whitespace-normal">
                                     <div className="text-neutral-700 flex items-center space-x-1">
-                                      <span>{req.location || 'Kadıköy'}</span>
+                                      <span>{extractAddress(req.location)}</span>
                                       {req.is_urgent && <Flame size={12} className="text-rose-600 shrink-0" title="Acil" />}
                                     </div>
                                   </td>
@@ -2081,7 +2343,7 @@ export default function App() {
 
         {/* 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
         {wozAssignModalReq && (
-          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000] animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
               
               <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
@@ -2093,7 +2355,7 @@ export default function App() {
                     <h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3>
                   </div>
                   <p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p>
-                  <p className="text-[11px] text-neutral-400 font-mono">Müşteri: {wozAssignModalReq.contact_value} • Konum: {wozAssignModalReq.location || 'Kadıköy'}</p>
+                  <p className="text-[11px] text-neutral-400 font-mono">Müşteri: {wozAssignModalReq.contact_value} • Konum: {extractAddress(wozAssignModalReq.location)}</p>
                 </div>
                 <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition"><X size={18} /></button>
               </div>
@@ -2195,12 +2457,14 @@ export default function App() {
       </main>
 
       {/* 🇨🇭 FOOTER */}
-      <footer className="border-t border-neutral-200/80 bg-white py-4">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
-          <div><span>Mobool</span> • <span>Multi-Tenant Servis Platformu</span></div>
-          <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
-        </div>
-      </footer>
+      {session?.role !== 'TRACKER' && (
+        <footer className="border-t border-neutral-200/80 bg-white py-4 z-10">
+          <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
+            <div><span>Mobool</span> • <span>Multi-Tenant Servis Platformu</span></div>
+            <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
