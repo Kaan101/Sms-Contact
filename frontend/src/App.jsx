@@ -12,7 +12,7 @@ import {
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
   ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
-  Settings, Timer, AlertTriangle, Link2, Map as MapIcon
+  Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -42,23 +42,70 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// Harita FlyTo Yöneticisi
+// 🌟 DÜZELTME: Harita Bileşenleri Ana Bileşenin Dışına Alındı (Çökmeyi Önler)
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
-    if (center && Array.isArray(center) && center.length === 2 && center[0] && center[1]) {
+    if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
       map.flyTo(center, 16, { duration: 1.5 });
     }
   }, [center, map]);
   return null;
 }
 
-// Ortak GPS Çıkarıcılar
+// 🌟 DÜZELTME: Ortak Harita Tıklama Yöneticisi
+function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
+  const map = useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      setPosition({ lat, lng });
+      if (setCoordinates) setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      
+      axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+        .then(res => {
+           const addr = res.data.address;
+           const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
+           setLocationValue(str || 'Haritadan İşaretlendi');
+        }).catch(() => setLocationValue('Haritadan İşaretlendi'));
+    }
+  });
+  
+  useEffect(() => {
+    if (position && !isNaN(position.lat) && !isNaN(position.lng)) {
+      map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 16);
+    }
+  }, [position, map]);
+
+  return position ? <Marker position={position} icon={icon} /> : null;
+}
+
+// 🌟 DÜZELTME: Sıralanabilir Tablo Başlığı (Çökmeyi Önler)
+function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
+  const isActive = sortConfig.key === sortKey;
+  return (
+    <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`} onClick={() => handleRequestSort(sortKey)}>
+      <div className={`flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}>
+        <span>{label}</span>
+        <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
+          {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
+        </span>
+      </div>
+    </th>
+  );
+}
+
+// Güvenli GPS Çıkarıcılar
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
-  return match ? [parseFloat(match[1]), parseFloat(match[2])] : null;
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
+  }
+  return null;
 };
+
 const extractAddress = (loc) => {
   if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
   return loc.replace(/\[GPS:.*?\]/g, '').trim();
@@ -74,16 +121,11 @@ export default function App() {
       const urlPhone = urlParams.get('phone');
 
       if (urlRole && urlPhone) {
-        const directSession = {
-          role: urlRole.toUpperCase(),
-          phone: decodeURIComponent(urlPhone),
-          authenticatedAt: new Date().toISOString()
-        };
+        const directSession = { role: urlRole.toUpperCase(), phone: decodeURIComponent(urlPhone), authenticatedAt: new Date().toISOString() };
         localStorage.setItem('sc_session', JSON.stringify(directSession));
         window.history.replaceState({}, document.title, window.location.pathname);
         return directSession;
       }
-
       const saved = localStorage.getItem('sc_session');
       return saved ? JSON.parse(saved) : null;
     } catch { return null; }
@@ -120,26 +162,7 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // Müşteri Formu Harita Tıklaması
-  function CustomerMapClickHandler() {
-    const map = useMapEvents({
-      click(e) {
-        const { lat, lng } = e.latlng;
-        setMapPosition({ lat, lng });
-        setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-        
-        axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
-          .then(res => {
-             const addr = res.data.address;
-             const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-             setLocationValue(str || 'Haritadan İşaretlendi');
-          }).catch(() => setLocationValue('Haritadan İşaretlendi'));
-      }
-    });
-    useEffect(() => { if (mapPosition) map.flyTo(mapPosition, map.getZoom() > 14 ? map.getZoom() : 16); }, [mapPosition, map]);
-    return mapPosition ? <Marker position={mapPosition} icon={customMarkerIcon} /> : null;
-  }
-
+  // Müşteri Harita Arama Efekti
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
@@ -205,40 +228,17 @@ export default function App() {
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
 
-  // 🌟 YENİ: TRACKER (Takip) Ekranı State'leri
+  // TRACKER State
   const [trackerRequests, setTrackerRequests] = useState([]);
   const [trackerSearch, setTrackerSearch] = useState('');
-  const [trackerMapCenter, setTrackerMapCenter] = useState([41.0082, 28.9784]); // İstanbul
+  const [trackerMapCenter, setTrackerMapCenter] = useState([41.0082, 28.9784]); 
   const [isTrackerListOpen, setIsTrackerListOpen] = useState(true);
   const [isTrackerAddModalOpen, setIsTrackerAddModalOpen] = useState(false);
-  
-  // Tracker Harita İşaretleme ve Arama
   const [trackerMapSelectedPos, setTrackerMapSelectedPos] = useState(null);
   const [trackerMapSearchText, setTrackerMapSearchText] = useState('');
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
-
-  // Tracker Harita Tıklama Yöneticisi
-  function TrackerMapClickHandler() {
-    useMapEvents({
-      click(e) {
-        const { lat, lng } = e.latlng;
-        setTrackerMapSelectedPos({ lat, lng });
-        setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-        
-        axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
-          .then(res => {
-             const addr = res.data.address;
-             const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-             setLocationValue(str || 'Haritadan İşaretlendi');
-          }).catch(() => {
-             setLocationValue('Haritadan İşaretlendi');
-          });
-      }
-    });
-    return trackerMapSelectedPos ? <Marker position={trackerMapSelectedPos} icon={trackerSelectionIcon} /> : null;
-  }
 
   // Tracker Harita Arama Efekti
   useEffect(() => {
@@ -263,9 +263,7 @@ export default function App() {
       if (prev.includes(channel)) {
         if (prev.length === 1) return prev;
         return prev.filter((c) => c !== channel);
-      } else {
-        return [...prev, channel];
-      }
+      } else { return [...prev, channel]; }
     });
     setErrorMessage('');
   };
@@ -285,16 +283,10 @@ export default function App() {
           const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
           const city = addr.city || addr.province || '';
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
-        } catch {
-          setLocationValue(`Haritadan İşaretlendi`);
-        } finally {
-          setIsLocating(false);
-        }
+        } catch { setLocationValue(`Haritadan İşaretlendi`); } 
+        finally { setIsLocating(false); }
       },
-      (err) => {
-        console.warn('Konum alınamadı:', err.message);
-        setIsLocating(false);
-      },
+      (err) => { console.warn('Konum alınamadı:', err.message); setIsLocating(false); },
       { timeout: 8000 }
     );
   };
@@ -335,6 +327,7 @@ export default function App() {
 
   const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
   const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
+  
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
@@ -476,8 +469,6 @@ export default function App() {
   const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  const SortableHeader = ({ label, sortKey, align = "left" }) => { const isActive = sortConfig.key === sortKey; return ( <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`} onClick={() => handleRequestSort(sortKey)}> <div className={`flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}> <span>{label}</span> <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}> {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)} </span> </div> </th> ); };
-
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
   if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 relative flex-1 flex flex-col bg-neutral-100 overflow-hidden";
@@ -494,7 +485,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.0 (Control Tower)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.1 (Bulletproof Maps)</span>
             </div>
           </div>
 
@@ -518,7 +509,6 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
-        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -526,7 +516,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ---------------- TERNARY CHAIN BAŞLANGICI ---------------- */}
+        {/* ---------------- 🚪 1. GİRİŞ EKRANI ---------------- */}
         {!session ? (
           <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto w-full space-y-6 mt-8">
             <div className="text-center space-y-2">
@@ -794,6 +784,7 @@ export default function App() {
                         </button>
                       </div>
 
+                      {/* ÖZET BİLGİ ALANI */}
                       <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
                         <span className="flex items-center space-x-1">
                           <MapPin size={12}/>
@@ -860,6 +851,7 @@ export default function App() {
                             )}
                           </div>
 
+                          {/* 🌟 KONUM SEÇİMİ VE HARİTA BÖLÜMÜ */}
                           <div className="pt-3 border-t border-neutral-100">
                             <div className="flex items-center justify-between mb-1.5">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
@@ -927,7 +919,7 @@ export default function App() {
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
                                     <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap' />
-                                    <CustomerMapClickHandler />
+                                    <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                   </MapContainer>
                                 </div>
                                 <div className="text-[10px] text-neutral-500 font-mono text-center">Haritada istediğiniz noktaya tıklayarak nokta atışı koordinat işaretleyebilirsiniz.</div>
@@ -1286,7 +1278,8 @@ export default function App() {
                             const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) };
                             setTrackerMapCenter([newPos.lat, newPos.lng]); 
                             setTrackerMapSelectedPos(newPos); 
-                            setTrackerMapSelectedAddress(sug.display_name);
+                            setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`);
+                            setLocationValue(sug.display_name);
                             setTrackerMapSearchText(sug.display_name);
                             setIsTrackerSuggestionsVisible(false);
                           }}
@@ -1305,7 +1298,13 @@ export default function App() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' 
                   />
                   <TrackerMapController center={trackerMapCenter} />
-                  <TrackerMapClickHandler />
+                  <SharedMapClickHandler 
+                     position={trackerMapSelectedPos} 
+                     setPosition={setTrackerMapSelectedPos} 
+                     setLocationValue={setTrackerMapSelectedAddress} 
+                     setCoordinates={setCoordinates}
+                     icon={trackerSelectionIcon} 
+                  />
                   
                   {trackerRequests.map(req => {
                     const coords = extractGPS(req.location);
@@ -1453,604 +1452,7 @@ export default function App() {
               )}
 
           </div>
-        ) : (
-          /* ---------------- ⚙️ 4. ADMİN EKRANI ---------------- */
-          <div className="w-full mx-auto space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
-                <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
-
-                <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
-                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
-                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
-                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <Layers size={13} /><span>Tüm Talepler & Kuyruk ({filteredMatchedRequests.length})</span>
-                  </button>
-                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
-                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FileCheck2 size={13} /><span>Test Senaryolar ({tests.length})</span></button>
-                  <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FolderKanban size={13} /><span>Yol Haritası ({features.length})</span></button>
-                  
-                  <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>
-                    <Settings size={13} /><span>Sistem Ayarları</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 🌟 YENİ: SİSTEM DEĞİŞKENLERİ İÇERİĞİ (TABULAR/TABLE TASARIM) */}
-              {adminTab === 'SETTINGS' && (
-                <div className="space-y-4">
-                  <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Settings className="text-neutral-700" size={18} />
-                      <h3 className="font-bold text-neutral-950">Sistem Ayarları ve Parametreler</h3>
-                    </div>
-
-                    {/* Alt Sekmeler (Tabs) */}
-                    <div className="flex items-center space-x-6 border-b border-neutral-200 mb-5">
-                      <button onClick={() => setSettingsTab('GENERAL')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'GENERAL' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
-                        Genel Kurallar
-                      </button>
-                      <button onClick={() => setSettingsTab('TIMEOUTS')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'TIMEOUTS' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
-                        Zaman Aşımları (Timeout)
-                      </button>
-                      <button onClick={() => setSettingsTab('INTEGRATIONS')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'INTEGRATIONS' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
-                        API & Entegrasyon
-                      </button>
-                    </div>
-
-                    {/* Sekme İçerikleri */}
-                    <div className="min-h-[250px]">
-                      
-                      {/* --- GENEL AYARLAR TABLOSU --- */}
-                      {settingsTab === 'GENERAL' && (
-                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
-                          <table className="w-full text-left text-xs table-auto">
-                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
-                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
-                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
-                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 bg-white">
-                              <tr className="hover:bg-neutral-50 transition">
-                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
-                                  <div className="flex items-center space-x-1.5">
-                                    <Clock size={14} className="text-blue-600"/>
-                                    <span>Varsayılan Bitiş Süresi</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 align-middle text-neutral-500">
-                                  Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?
-                                </td>
-                                <td className="px-4 py-3 align-middle text-center">
-                                  <input 
-                                    type="number" min="1" 
-                                    value={systemSettings.default_deadline_days || ''} 
-                                    onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} 
-                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 align-middle text-right">
-                                  <button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
-                                    <Save size={12} /><span>Kaydet</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {/* --- ZAMAN AŞIMLARI TABLOSU --- */}
-                      {settingsTab === 'TIMEOUTS' && (
-                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
-                          <table className="w-full text-left text-xs table-auto">
-                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
-                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
-                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
-                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 bg-white">
-                              {/* Timeout Onay Bekleme */}
-                              <tr className="hover:bg-neutral-50 transition">
-                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
-                                  <div className="flex items-center space-x-1.5">
-                                    <Timer size={14} className="text-rose-500"/>
-                                    <span>Onay Bekleme (Dk)</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 align-middle text-neutral-500">
-                                  Eşleşen sağlayıcı bu süre içinde işi <b>kabul etmezse</b>, sistem otomatik sıradakine geçer.
-                                </td>
-                                <td className="px-4 py-3 align-middle text-center">
-                                  <input 
-                                    type="number" min="1" 
-                                    value={systemSettings.timeout_matched_mins || ''} 
-                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_matched_mins: e.target.value})} 
-                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 align-middle text-right">
-                                  <button onClick={() => handleSaveSystemSetting('timeout_matched_mins', systemSettings.timeout_matched_mins)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
-                                    <Save size={12} /><span>Kaydet</span>
-                                  </button>
-                                </td>
-                              </tr>
-                              
-                              {/* Timeout Teslim Etmeme */}
-                              <tr className="hover:bg-rose-50/30 transition">
-                                <td className="px-4 py-3 align-middle font-bold text-rose-950">
-                                  <div className="flex items-center space-x-1.5">
-                                    <AlertTriangle size={14} className="text-rose-600"/>
-                                    <span>Teslim Etmeme (Saat)</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 align-middle text-rose-700/80">
-                                  Kabul edilen iş bu sürede <b>tamamlanmazsa</b> sıradakine geçer (Sahada kargaşa yaratabilir).
-                                </td>
-                                <td className="px-4 py-3 align-middle text-center">
-                                  <input 
-                                    type="number" min="1" 
-                                    value={systemSettings.timeout_accepted_hours || ''} 
-                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_accepted_hours: e.target.value})} 
-                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-rose-300 outline-none focus:border-rose-950 text-rose-950" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 align-middle text-right">
-                                  <button onClick={() => handleSaveSystemSetting('timeout_accepted_hours', systemSettings.timeout_accepted_hours)} className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
-                                    <Save size={12} /><span>Kaydet</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {/* --- API & ENTEGRASYON TABLOSU --- */}
-                      {settingsTab === 'INTEGRATIONS' && (
-                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
-                          <table className="w-full text-left text-xs table-auto">
-                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3 font-semibold w-1/4">Entegrasyon Adı</th>
-                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
-                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
-                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 bg-white">
-                              <tr>
-                                <td colSpan="4" className="px-4 py-12 text-center text-neutral-400">
-                                  <Link2 size={24} className="mx-auto mb-2 text-neutral-300" />
-                                  <span className="font-semibold text-neutral-600 block">WhatsApp & SMS API Değişkenleri</span>
-                                  <span className="text-[10px]">Twilio ve Meta (WhatsApp Cloud API) webhook key ve token ayarları yakında buraya eklenecektir.</span>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 4.0 WoZ HAVUZU */}
-              {adminTab === 'WOZ' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1 space-y-3">
-                  {pendingRequests.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-neutral-400">WoZ havuzunda bekleyen veya manuel müdahale gerektiren talep bulunmuyor.</div>
-                  ) : (
-                    pendingRequests.map((req) => (
-                      <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2"><span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">{req.status}</span><span className="text-neutral-400 font-mono">#REQ-{req.id}</span></div>
-                          <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
-                          <div className="flex flex-wrap gap-2 text-neutral-500 font-mono text-[11px]">
-                            <span>👤 İletişim: <strong className="text-neutral-800">{req.contact_value}</strong></span>
-                            <span>📍 {extractAddress(req.location)}</span>
-                            {req.is_urgent && <span className="text-rose-600 font-bold">🔥 ACİL</span>}
-                          </div>
-                        </div>
-                        <div className="shrink-0">
-                          <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
-                            <UserCheck size={13} /><span>Sağlayıcı Seç & Ata</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {/* 4.1 SAĞLAYICILAR */}
-              {adminTab === 'PROVIDERS' && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
-                    <div className="relative w-full sm:w-96">
-                      <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                      <input type="text" value={searchProviderText} onChange={(e) => setSearchProviderText(e.target.value)} placeholder="Firma adı, telefon veya anahtar kelime ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
-                      {searchProviderText && <button onClick={() => setSearchProviderText('')} className="absolute right-2.5 top-2 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
-                    </div>
-                    <button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shrink-0 shadow-sm w-full sm:w-auto justify-center">
-                      <Plus size={13} /><span>Yeni Sağlayıcı Ekle</span>
-                    </button>
-                  </div>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
-                    {filteredProviders.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">Aranan kelimeye uygun servis sağlayıcı bulunamadı.</div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {filteredProviders.map((prov) => (
-                          <div key={prov.id} className="p-3.5 bg-neutral-50 hover:bg-[#F4F6F9] rounded-xl border border-neutral-200/90 flex flex-col justify-between space-y-2.5 text-xs transition shadow-xs group">
-                            <div>
-                              <div className="flex items-start justify-between">
-                                <div onClick={() => handleOpenProviderDirectSession(prov.phone)} className="cursor-pointer hover:underline flex items-center space-x-1" title="Bu sağlayıcı olarak yeni sekmede oturum aç">
-                                  <h3 className="font-bold text-neutral-900 group-hover:text-blue-600 transition">{prov.name}</h3><ExternalLink size={12} className="text-neutral-400 group-hover:text-blue-600 inline" />
-                                </div>
-                                <span className="text-[10px] font-mono bg-neutral-200 px-1.5 py-0.5 rounded font-bold text-neutral-700">Skor: {prov.priority_score}</span>
-                              </div>
-                              <p className="text-[11px] text-blue-700 font-mono font-semibold mt-0.5">📞 {prov.phone}</p>
-                              {prov.email && <p className="text-[10px] text-neutral-500 font-mono">📧 {prov.email}</p>}
-                              <div className="flex flex-wrap gap-1 mt-1.5">
-                                {(prov.service_keywords || []).slice(0, 5).map((kw, i) => (<span key={i} className="text-[10px] font-mono px-1.5 py-0.5 bg-white border rounded text-neutral-600">{kw}</span>))}
-                                {(prov.service_keywords || []).length > 5 && <span className="text-[10px] font-mono text-neutral-400">+{prov.service_keywords.length - 5}</span>}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
-                              <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-[11px] font-semibold flex items-center space-x-1 transition shadow-xs" title="Sağlayıcı olarak yeni sekmede paneli aç">
-                                <LogIn size={12} /><span>Paneli Aç</span>
-                              </button>
-                              <div className="flex items-center space-x-1">
-                                <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="p-1 hover:bg-neutral-200 rounded text-neutral-600 transition" title="Düzenle"><Edit3 size={13} /></button>
-                                <button onClick={() => handleAdminDeleteProvider(prov.id)} className="p-1 text-rose-600 hover:bg-rose-50 rounded transition" title="Sil"><Trash2 size={13} /></button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 🌟 4.2 TÜM EŞLEŞMELER & KUYRUK EKRANI */}
-              {adminTab === 'ALL_MATCHED' && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
-                    <div className="relative w-full sm:w-80">
-                      <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                      <input type="text" value={searchMatchText} onChange={(e) => setSearchMatchText(e.target.value)} placeholder="Talep metni, tel, sağlayıcı ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
-                      {searchMatchText && <button onClick={() => setSearchMatchText('')} className="absolute right-2.5 top-2 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
-                    </div>
-                    <div className="flex items-center space-x-2 w-full sm:w-auto">
-                      <Filter size={13} className="text-neutral-500" />
-                      <select value={matchStatusFilter} onChange={(e) => setMatchStatusFilter(e.target.value)} className="p-1.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium w-full sm:w-auto">
-                        <option value="ALL">Tüm Durumlar</option>
-                        <option value="POOL">POOL (Açık Havuzda)</option>
-                        <option value="MATCHED">MATCHED (Onay Bekliyor)</option>
-                        <option value="ACCEPTED">ACCEPTED (Kabul Edildi)</option>
-                        <option value="PROVIDER_COMPLETED">PROVIDER_COMPLETED (Teslim Edildi)</option>
-                        <option value="COMPLETED">COMPLETED (Tamamlandı)</option>
-                        <option value="CANCELLED">CANCELLED (İptal)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm">
-                    {sortedMatchedRequests.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">Arama kriterlerine uygun talep bulunamadı.</div>
-                    ) : (
-                      <div className="max-h-[650px] overflow-y-auto overflow-x-hidden w-full">
-                        <table className="w-full text-left text-xs table-auto">
-                          <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider sticky top-0 z-10 shadow-sm">
-                            <tr>
-                              <SortableHeader label="ID / Tarih" sortKey="id" />
-                              <SortableHeader label="Kuyruk" sortKey="queue" align="center" />
-                              <SortableHeader label="Durum" sortKey="status" />
-                              <SortableHeader label="Talep Metni" sortKey="raw_text" />
-                              <SortableHeader label="Müşteri" sortKey="contact_value" />
-                              <SortableHeader label="Sağlayıcı" sortKey="provider_name" />
-                              <SortableHeader label="Konum / Aciliyet" sortKey="location" />
-                              <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">İşlem</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-neutral-100">
-                            {sortedMatchedRequests.map((req) => (
-                              <React.Fragment key={req.id}>
-                                <tr className={`hover:bg-neutral-50 transition ${expandedQueueReqId === req.id ? 'bg-blue-50/30' : ''}`}>
-                                  
-                                  <td className="px-4 py-3 align-top whitespace-normal">
-                                    <div className="font-mono font-bold text-neutral-900">#REQ-{req.id}</div>
-                                    <div className="text-[10px] text-neutral-400 mt-0.5">{new Date(req.created_at).toLocaleDateString('tr-TR')}</div>
-                                  </td>
-                                  
-                                  <td className="px-4 py-3 align-top text-center">
-                                    {req.queueList && req.queueList.length > 0 ? (
-                                      <button onClick={() => setExpandedQueueReqId(expandedQueueReqId === req.id ? null : req.id)} className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition whitespace-nowrap ${expandedQueueReqId === req.id ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}>
-                                        <Users size={12} /><span>{req.queueList.length} Aday</span>{expandedQueueReqId === req.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                      </button>
-                                    ) : (
-                                      <span className="text-neutral-300 text-[10px] font-mono whitespace-nowrap">0 Aday</span>
-                                    )}
-                                  </td>
-
-                                  <td className="px-4 py-3 align-top">
-                                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold inline-block whitespace-nowrap ${
-                                      req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                      req.status === 'MATCHED' ? 'bg-blue-100 text-blue-800' :
-                                      req.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
-                                      req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                      req.status === 'COMPLETED' ? 'bg-emerald-200 text-emerald-950' : 'bg-neutral-200'
-                                    }`}>
-                                      {req.status}
-                                    </span>
-                                  </td>
-
-                                  <td className="px-4 py-3 align-top font-semibold text-neutral-900 whitespace-normal">
-                                    "{req.raw_text}"
-                                  </td>
-
-                                  <td className="px-4 py-3 align-top whitespace-normal">
-                                    <div className="font-mono text-neutral-800">{req.contact_value}</div>
-                                  </td>
-
-                                  <td className="px-4 py-3 align-top whitespace-normal">
-                                    {req.provider_name ? (
-                                      <div className="space-y-1">
-                                        <div className="font-bold text-neutral-900">{req.provider_name}</div>
-                                        {req.provider_phone && (
-                                          <div className="flex items-center space-x-1.5">
-                                            <span className="font-mono text-[11px] text-blue-700">{req.provider_phone}</span>
-                                            <button onClick={() => handleOpenProviderDirectSession(req.provider_phone)} className="text-[10px] text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded transition" title="Giriş Yap"><ExternalLink size={11} /></button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className="text-neutral-400 italic text-[11px]">Atanmadı (Havuz)</span>
-                                    )}
-                                  </td>
-
-                                  <td className="px-4 py-3 align-top whitespace-normal">
-                                    <div className="text-neutral-700 flex items-center space-x-1">
-                                      <span>{extractAddress(req.location)}</span>
-                                      {req.is_urgent && <Flame size={12} className="text-rose-600 shrink-0" title="Acil" />}
-                                    </div>
-                                  </td>
-
-                                  <td className="px-4 py-3 align-top text-right">
-                                    <button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" title="Talebi Sil">
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                </tr>
-
-                                {expandedQueueReqId === req.id && req.queueList && req.queueList.length > 0 && (
-                                  <tr className="bg-blue-50/20 border-b border-blue-100/50">
-                                    <td colSpan="8" className="px-4 py-4">
-                                      <div className="pl-4 border-l-2 border-blue-400 py-1 space-y-2">
-                                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-blue-800 font-mono">Kuyruktaki Sağlayıcılar ({req.queueList.length})</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-                                          {req.queueList.map((qItem, qIdx) => (
-                                            <div key={qIdx} className="bg-white p-2.5 rounded-lg border border-blue-100 shadow-xs flex flex-col space-y-1.5">
-                                              <div className="flex items-center justify-between">
-                                                <span className="font-bold text-[11px] text-neutral-900">#{qIdx + 1} {qItem.name}</span>
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono ${
-                                                  qItem.interest_status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
-                                                  qItem.interest_status === 'SKIPPED' ? 'bg-rose-100 text-rose-800' :
-                                                  'bg-amber-100 text-amber-800'
-                                                }`}>
-                                                  {qItem.interest_status}
-                                                </span>
-                                              </div>
-                                              <div className="font-mono text-[10px] text-neutral-500">📞 {qItem.phone}</div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 4.3 SMS LOGLARI */}
-              {adminTab === 'SMS_LOGS' && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5">
-                    <div className="relative w-full sm:w-80">
-                      <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                      <input type="text" value={searchSmsText} onChange={(e) => setSearchSmsText(e.target.value)} placeholder="Telefon veya SMS mesaj metninde ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
-                      {searchSmsText && <button onClick={() => setSearchSmsText('')} className="absolute right-2.5 top-2 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
-                    </div>
-
-                    <div className="flex items-center space-x-2 w-full sm:w-auto">
-                      <Filter size={13} className="text-neutral-500" />
-                      <select value={smsRecipientFilter} onChange={(e) => setSmsRecipientFilter(e.target.value)} className="p-1.5 text-xs rounded-lg border outline-none bg-neutral-50 font-medium w-full sm:w-auto">
-                        <option value="ALL">Tüm Alıcılar</option>
-                        <option value="USER">USER (Müşteri Bildirimleri)</option>
-                        <option value="PROVIDER">PROVIDER (Sağlayıcı Bildirimleri)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1 space-y-2.5">
-                    {filteredSmsLogs.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">Kriterlere uygun SMS günlüğü bulunamadı.</div>
-                    ) : (
-                      filteredSmsLogs.map((log) => (
-                        <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
-                          <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
-                            <div className="flex items-center space-x-2">
-                              <span className={`font-bold px-1.5 py-0.5 rounded border ${log.recipient_type === 'USER' ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-purple-50 text-purple-800 border-purple-200'}`}>{log.recipient_type}</span>
-                              <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
-                              <span className="px-2 py-0.5 bg-neutral-200/80 text-neutral-700 rounded font-mono font-bold flex items-center space-x-1"><Clock size={11} /><span>{new Date(log.created_at).toLocaleString('tr-TR')}</span></span>
-                            </div>
-                            <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-bold">{log.sent_status}</span>
-                          </div>
-                          <p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed text-neutral-800">{log.message_body}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 4.4 TEST SENARYOLARI */}
-              {adminTab === 'TESTS' && (
-                <div className="space-y-4">
-                  <form onSubmit={handleCreateTest} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Test Senaryosu Ekle</span></h3>
-                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-5"><input type="text" required value={newTest.title} onChange={(e) => setNewTest({ ...newTest, title: e.target.value })} placeholder="Test Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
-                      <div className="sm:col-span-3"><input type="text" value={newTest.testerName} onChange={(e) => setNewTest({ ...newTest, testerName: e.target.value })} placeholder="Test Eden Kişi" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
-                      <div className="sm:col-span-2"><input type="date" value={newTest.testDate} onChange={(e) => setNewTest({ ...newTest, testDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
-                      <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm"><Plus size={13} /><span>Ekle</span></button></div>
-                    </div>
-
-                    <div><textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
-                  </form>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
-                    {tests.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir test senaryosu bulunmuyor.</div>
-                    ) : (
-                      tests.map((testItem) => {
-                        const isExpanded = expandedTestId === testItem.id;
-                        return (
-                          <div key={testItem.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                            <div onClick={() => setExpandedTestId(isExpanded ? null : testItem.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
-                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${testItem.status === 'BAŞARILI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : testItem.status === 'BAŞARISIZ' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>{testItem.status}</span>
-                                <p className="font-semibold text-neutral-900 truncate">{testItem.title}</p>
-                              </div>
-                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
-                                <span className="font-mono text-[11px] hidden sm:inline">👤 {testItem.tester_name || 'Tester'}</span>
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{testItem.test_date ? new Date(testItem.test_date).toLocaleDateString('tr-TR') : '-'}</span></span>
-                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                              </div>
-                            </div>
-                            {isExpanded && (
-                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Test Adımları</label><p className="text-xs text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/70 font-mono leading-relaxed">{testItem.description || 'Açıklama belirtilmemiş.'}</p></div>
-                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Sonucu & Notlar</label><textarea rows={2} defaultValue={testItem.result_notes || ''} onBlur={(e) => handleUpdateTest(testItem.id, { resultNotes: e.target.value })} placeholder="Test sonucu, hata logu veya gözlemlerinizi yazın..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Durumu</label>
-                                    <select value={testItem.status} onChange={(e) => handleUpdateTest(testItem.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
-                                      <option value="BEKLİYOR">⏳ Bekliyor</option><option value="BAŞARILI">✅ Başarılı (Passed)</option><option value="BAŞARISIZ">❌ Başarısız (Failed)</option>
-                                    </select>
-                                  </div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label><input type="text" defaultValue={testItem.tester_name || ''} onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs" /></div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
-                                </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
-                                  <span className="font-mono">Senaryo ID: #{testItem.id}</span>
-                                  <button onClick={() => handleDeleteTest(testItem.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Senaryoyu Sil</span></button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 4.5 PROJE / YOL HARİTASI */}
-              {adminTab === 'PROJECT' && (
-                <div className="space-y-4">
-                  <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Özellik / Geliştirme Fikri Ekle</span></h3>
-                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor / Orta</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-5"><input type="text" required value={newFeature.title} onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })} placeholder="Özellik Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
-                      <div className="sm:col-span-3"><input type="date" value={newFeature.targetDate} onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
-                      <div className="sm:col-span-2">
-                        <select value={newFeature.priority} onChange={(e) => setNewFeature({ ...newFeature, priority: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none bg-neutral-50 font-medium">
-                          <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
-                        </select>
-                      </div>
-                      <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"><Plus size={13} /><span>Ekle</span></button></div>
-                    </div>
-                    <div><textarea rows={2} value={newFeature.description} onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })} placeholder="Özelliğin detaylı açıklaması (opsiyonel)..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none" /></div>
-                  </form>
-
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
-                    {features.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.</div>
-                    ) : (
-                      features.map((feat) => {
-                        const isExpanded = expandedFeatureId === feat.id;
-                        return (
-                          <div key={feat.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                            <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
-                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 bg-neutral-100 text-neutral-700">{feat.status}</span>
-                                <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
-                              </div>
-                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{feat.target_date ? new Date(feat.target_date).toLocaleDateString('tr-TR') : '-'}</span></span>
-                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                              </div>
-                            </div>
-
-                            {isExpanded && (
-                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Notlar</label><textarea rows={2} defaultValue={feat.description || ''} onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })} placeholder="Detaylı açıklama ekleyin..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Durum</label>
-                                    <select value={feat.status} onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
-                                      <option value="BEKLİYOR">Bekliyor</option><option value="DEVAM EDİYOR">Devam Ediyor</option><option value="TAMAMLANDI">Tamamlandı</option><option value="İPTAL">İptal</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik</label>
-                                    <select value={feat.priority} onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
-                                      <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
-                                    </select>
-                                  </div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={feat.target_date ? feat.target_date.split('T')[0] : ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
-                                </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
-                                  <span className="font-mono">Kayıt ID: #{feat.id}</span>
-                                  <button onClick={() => handleDeleteFeature(feat.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Özelliği Sil</span></button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-
-          </div>
-        )}
+        ) : null}
       </main>
 
       {/* 🇨🇭 FOOTER */}
