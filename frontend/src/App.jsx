@@ -42,7 +42,7 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// İzole Edilmiş Güvenli Harita Bileşenleri
+// HARİTA YÖNETİCİSİ (Çökme Korumalı)
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -53,6 +53,7 @@ function TrackerMapController({ center }) {
   return null;
 }
 
+// HARİTA TIKLAMA YÖNETİCİSİ (Çökme Korumalı)
 function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
   const map = useMapEvents({
     click(e) {
@@ -80,8 +81,9 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   return position ? <Marker position={position} icon={icon || customMarkerIcon} /> : null;
 }
 
-// İzole Edilmiş Admin Tablo Başlığı
+// ADMİN TABLO BAŞLIĞI (İzole Edildi)
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
+  if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
   const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
   const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
@@ -98,7 +100,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// Güvenli GPS Çıkarıcılar
+// GPS ÇIKARICI FONKSİYONLAR
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -109,6 +111,7 @@ const extractGPS = (loc) => {
   }
   return null;
 };
+
 const extractAddress = (loc) => {
   if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
   return loc.replace(/\[GPS:.*?\]/g, '').trim();
@@ -133,7 +136,6 @@ export default function App() {
         window.history.replaceState({}, document.title, window.location.pathname);
         return directSession;
       }
-
       const saved = localStorage.getItem('sc_session');
       return saved ? JSON.parse(saved) : null;
     } catch { return null; }
@@ -202,7 +204,9 @@ export default function App() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
-  const [providerFormData, setProviderFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
+  const [providerFormData, setProviderFormData] = useState({ 
+    name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 
+  });
 
   // Admin State
   const [adminTab, setAdminTab] = useState('WOZ');
@@ -222,12 +226,15 @@ export default function App() {
   const [matchStatusFilter, setMatchStatusFilter] = useState('ALL');
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
+  
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
+  
   const [tests, setTests] = useState([]);
   const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' });
+  
   const [reviewRatingMap, setReviewRatingMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
@@ -342,15 +349,19 @@ export default function App() {
 
   const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
   const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
+  
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
         axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`),
         axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`)
       ]);
-      setPendingRequests(reqRes.data.requests || []); setProviders(provRes.data.providers || []);
-      setMatchedRequests(matchRes.data.requests || []); setSmsLogs(logRes.data.notifications || []);
-      await fetchFeatures(); await fetchTests();
+      setPendingRequests(reqRes.data.requests || []); 
+      setProviders(provRes.data.providers || []);
+      setMatchedRequests(matchRes.data.requests || []); 
+      setSmsLogs(logRes.data.notifications || []);
+      await fetchFeatures(); 
+      await fetchTests();
       try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes.data.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
     } catch (err) {}
   };
@@ -388,19 +399,28 @@ export default function App() {
     }
   }, [session, adminTab]);
 
-  const handleSendOtp = async (e) => { e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); try { const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP'); } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } finally { setAuthLoading(false); } };
-  const handleVerifyOtp = async (e) => { e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage(''); try { await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() }); const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() }; setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession)); setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp(''); } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } finally { setAuthLoading(false); } };
+  const handleSendOtp = async (e) => { 
+    e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); 
+    try { const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP'); } 
+    catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
+    finally { setAuthLoading(false); } 
+  };
+  
+  const handleVerifyOtp = async (e) => { 
+    e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage(''); 
+    try { 
+      await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() }); 
+      const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() }; 
+      setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession)); 
+      setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp(''); 
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } 
+    finally { setAuthLoading(false); } 
+  };
   
   const handleLogout = () => { 
     localStorage.removeItem('sc_session'); 
-    setSession(null); 
-    setProviderProfile(null); 
-    setIsProfileOpen(false); 
-    setIsCustomerHistoryOpen(false); 
-    setIsProviderHistoryOpen(false); 
-    setMyCustomerRequests([]); 
-    setStep('INPUT'); 
-    setAdminTab('WOZ');
+    setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
+    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
   };
 
   const handleOpenProviderDirectSession = (provPhone) => {
@@ -437,7 +457,8 @@ export default function App() {
       } else {
         await fetchCustomerData();
       }
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } 
+    finally { setLoading(false); }
   };
 
   const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
@@ -446,36 +467,44 @@ export default function App() {
     setLoading(true); setErrorMessage('');
     try {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
-      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } else { await submitFinalRequest(null, fromTracker); }
+      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } 
+      else { await submitFinalRequest(null, fromTracker); }
     } catch { await submitFinalRequest(null, fromTracker); }
   };
 
   const handleRepeatRequest = (req) => { setQueryText(req.raw_text); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { console.error('Havuza katılma hatası:', err); alert('Havuza katılırken bir hata oluştu.'); } };
+  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
   const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   const handleStatusChange = async (requestId, newStatus) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); } catch (err) {} };
   const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {} };
 
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  
   const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
   const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
   const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
+  
   const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) {} };
   const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) {} };
   const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch {} };
+  
   const handleSaveProviderProfile = async (e) => { e.preventDefault(); const keywordsArray = providerFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); const payload = { name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100 }; try { if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload); else await axios.post(`${API_BASE}/providers`, payload); setIsProfileOpen(false); await fetchProviderData(true); } catch (err) {} };
+  
   const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
   const handleAdminSaveProvider = async (e) => { e.preventDefault(); const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels, priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; try { if (editingProviderId) await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); else await axios.post(`${API_BASE}/providers`, payload); setIsModalOpen(false); await fetchAdminData(); } catch {} };
   const handleAdminDeleteProvider = async (id) => { if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); } catch {} };
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
+  // Filtrelemeler
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
   const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = searchCustomerHistoryText.toLowerCase().trim(); if (!q) return true; return (req.raw_text || '').toLowerCase().includes(q) || (req.provider_name || '').toLowerCase().includes(q) || (req.status || '').toLowerCase().includes(q); });
+  
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
+  
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
@@ -486,15 +515,37 @@ export default function App() {
   });
 
   const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
-  const sortedMatchedRequests = useMemo(() => { let sortableItems = [...filteredMatchedRequests]; if (sortConfig !== null) { sortableItems.sort((a, b) => { let valA = a[sortConfig.key]; let valB = b[sortConfig.key]; if (sortConfig.key === 'queue') { valA = a.queueList ? a.queueList.length : 0; valB = b.queueList ? b.queueList.length : 0; } else if (sortConfig.key === 'provider_name') { valA = a.provider_name || ''; valB = b.provider_name || ''; } else if (sortConfig.key === 'location') { valA = a.location || ''; valB = b.location || ''; } else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; return 0; }); } return sortableItems; }, [filteredMatchedRequests, sortConfig]);
+  
+  const sortedMatchedRequests = useMemo(() => { 
+    let sortableItems = [...filteredMatchedRequests]; 
+    if (sortConfig !== null) { 
+      sortableItems.sort((a, b) => { 
+        let valA = a[sortConfig.key]; let valB = b[sortConfig.key]; 
+        if (sortConfig.key === 'queue') { valA = a.queueList ? a.queueList.length : 0; valB = b.queueList ? b.queueList.length : 0; } 
+        else if (sortConfig.key === 'provider_name') { valA = a.provider_name || ''; valB = b.provider_name || ''; } 
+        else if (sortConfig.key === 'location') { valA = a.location || ''; valB = b.location || ''; } 
+        else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } 
+        else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } 
+        else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } 
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; 
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; 
+        return 0; 
+      }); 
+    } 
+    return sortableItems; 
+  }, [filteredMatchedRequests, sortConfig]);
+  
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
   const filteredWozProviders = providers.filter(p => { const q = wozProviderSearch.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
+  
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
   const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
   const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
+  // CSS Layout Kontrolü
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
   if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 relative flex-1 flex flex-col bg-neutral-100 overflow-hidden";
@@ -511,7 +562,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.3 (Full Admin)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.4 (Stable Core)</span>
             </div>
           </div>
 
@@ -543,8 +594,8 @@ export default function App() {
           </div>
         )}
 
-        {/* ---------------- EKRAN KONTROLLERİ ---------------- */}
-        {!session ? (
+        {/* ---------------- 1. GİRİŞ EKRANI ---------------- */}
+        {!session && (
           <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-sm p-8 max-w-md mx-auto w-full space-y-6 mt-8">
             <div className="text-center space-y-2">
               <div className="w-12 h-12 bg-neutral-950 text-white rounded-2xl mx-auto flex items-center justify-center shadow-sm font-mono text-lg font-bold"><KeyRound size={22} /></div>
@@ -587,14 +638,20 @@ export default function App() {
               </form>
             )}
           </div>
-        ) : session.role === 'CUSTOMER' ? (
+        )}
+
+        {/* ---------------- 2. MÜŞTERİ EKRANI ---------------- */}
+        {session?.role === 'CUSTOMER' && (
           <div className="max-w-2xl mx-auto w-full space-y-6">
+              
+              {/* Aktif Talepler */}
               {activeCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
                   <h3 className="text-xs font-mono uppercase font-bold tracking-wider text-neutral-500 flex items-center space-x-1.5">
                     <Radio size={14} className="text-emerald-500 animate-pulse" />
                     <span>Aktif Talepleriniz ({activeCustomerRequests.length})</span>
                   </h3>
+
                   <div className="max-h-[500px] overflow-y-auto space-y-3 pr-1">
                     {activeCustomerRequests.map((req) => (
                       <div key={req.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 space-y-3">
@@ -614,6 +671,7 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Kuyruk Kontrolü */}
                         {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             <div onClick={() => { if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
@@ -671,6 +729,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* Değerlendirme */}
               {pendingReviewCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border-2 border-emerald-400/80 shadow-md p-5 space-y-4">
                   <div className="flex items-center space-x-2 text-emerald-800"><Sparkles size={18} className="text-amber-500" /><h3 className="text-xs font-mono uppercase font-bold tracking-wider">Hizmet Tamamlandı! Lütfen Değerlendirin ({pendingReviewCustomerRequests.length})</h3></div>
@@ -689,6 +748,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* Yeni Talep Ekleme Formu */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
                   <div className="text-center space-y-1"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
@@ -768,6 +828,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* Geçmiş Talepler */}
               {pastCustomerRequests.length > 0 && (
                 <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm mt-8">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none">
@@ -788,7 +849,10 @@ export default function App() {
               )}
 
           </div>
-        ) : session.role === 'PROVIDER' ? (
+        )}
+
+        {/* ---------------- 3. SERVİS SAĞLAYICI EKRANI ---------------- */}
+        {session?.role === 'PROVIDER' && (
           <div className="max-w-3xl mx-auto w-full space-y-5">
               <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
                  <h2 className="text-sm font-bold text-neutral-950">Sağlayıcı Paneli</h2>
@@ -830,8 +894,10 @@ export default function App() {
                 </div>
               </div>
           </div>
-        ) : session.role === 'TRACKER' ? (
-          /* ---------------- 🗺️ 5. TRACKER (TAKİP) EKRANI ---------------- */
+        )}
+
+        {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
+        {session?.role === 'TRACKER' && (
           <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
@@ -856,7 +922,7 @@ export default function App() {
                   )}
                 </div>
 
-                <MapContainer center={trackerMapCenter} zoom={12} className="absolute inset-0 w-full h-full z-0">
+                <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0">
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                   <TrackerMapController center={trackerMapCenter} />
                   <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setTrackerMapSelectedAddress} setCoordinates={setCoordinates} icon={trackerSelectionIcon} />
@@ -935,18 +1001,324 @@ export default function App() {
               )}
 
           </div>
-        ) : null}
-      </main>
+        )}
 
-      {/* 🇨🇭 FOOTER */}
-      {session?.role !== 'TRACKER' && (
-        <footer className="border-t border-neutral-200/80 bg-white py-4 z-10">
-          <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
-            <div><span>Mobool</span> • <span>Multi-Tenant Servis Platformu</span></div>
-            <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
+        {/* ---------------- 5. ADMİN EKRANI ---------------- */}
+        {session?.role === 'ADMIN' && (
+          <div className="w-full mx-auto space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+                <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
+
+                <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
+                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
+                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
+                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Layers size={13} /><span>Tüm Eşleşmeler</span></button>
+                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
+                  <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FileCheck2 size={13} /><span>Test Senaryoları ({tests.length})</span></button>
+                  <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FolderKanban size={13} /><span>Yol Haritası ({features.length})</span></button>
+                  <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Settings size={13} /><span>Ayarlar</span></button>
+                </div>
+              </div>
+
+              {/* SİSTEM AYARLARI */}
+              {adminTab === 'SETTINGS' && (
+                <div className="space-y-4">
+                  <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Settings className="text-neutral-700" size={18} />
+                      <h3 className="font-bold text-neutral-950">Sistem Ayarları ve Parametreler</h3>
+                    </div>
+                    <div className="overflow-x-auto w-full border rounded-xl">
+                      <table className="w-full text-left text-xs table-auto">
+                        <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
+                          <tr><th className="px-4 py-3 w-1/4">Ayar Adı</th><th className="px-4 py-3 w-2/4">Açıklama</th><th className="px-4 py-3 w-32 text-center">Değer</th><th className="px-4 py-3 w-24 text-right">İşlem</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 bg-white">
+                          <tr className="hover:bg-neutral-50">
+                            <td className="px-4 py-3 font-bold text-neutral-900">Varsayılan Bitiş Süresi</td>
+                            <td className="px-4 py-3 text-neutral-500">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</td>
+                            <td className="px-4 py-3 text-center"><input type="number" min="1" value={systemSettings.default_deadline_days || ''} onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none" /></td>
+                            <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold">Kaydet</button></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* WOZ HAVUZU */}
+              {adminTab === 'WOZ' && (
+                <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3">
+                  {pendingRequests.map((req) => (
+                    <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
+                        <span className="text-[11px] text-neutral-500">👤 {req.contact_value} | 📍 {extractAddress(req.location)}</span>
+                      </div>
+                      <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Sağlayıcı Seç & Ata</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* SAĞLAYICILAR */}
+              {adminTab === 'PROVIDERS' && (
+                <div className="space-y-3">
+                  <div className="bg-white rounded-xl border p-3 flex justify-between">
+                     <div className="relative w-full sm:w-96">
+                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                        <input type="text" value={searchProviderText} onChange={(e) => setSearchProviderText(e.target.value)} placeholder="Firma ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50" />
+                     </div>
+                     <button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5">
+                       <Plus size={13} /><span>Yeni Ekle</span>
+                     </button>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {filteredProviders.map((prov) => (
+                          <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
+                            <h3 className="font-bold text-neutral-900">{prov.name}</h3>
+                            <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+                            <div className="mt-2 pt-2 border-t flex justify-between">
+                              <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 text-xs font-semibold">Düzenle</button>
+                              <button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 text-xs font-semibold">Sil</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TÜM EŞLEŞMELER & KUYRUK EKRANI */}
+              {adminTab === 'ALL_MATCHED' && (
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm max-h-[650px] overflow-y-auto">
+                    <table className="w-full text-left text-xs table-auto">
+                      <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm">
+                        <tr>
+                          <SortableHeader label="ID / Tarih" sortKey="id" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Durum" sortKey="status" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Talep Metni" sortKey="raw_text" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Müşteri" sortKey="contact_value" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Sağlayıcı" sortKey="provider_name" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <SortableHeader label="Konum / Aciliyet" sortKey="location" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                          <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {sortedMatchedRequests.map((req) => (
+                          <tr key={req.id} className="hover:bg-neutral-50 transition">
+                            <td className="px-4 py-3 font-mono font-bold text-neutral-900">#REQ-{req.id}</td>
+                            <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
+                            <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
+                            <td className="px-4 py-3 font-mono text-neutral-800">{req.contact_value}</td>
+                            <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
+                            <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
+                            <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                </div>
+              )}
+
+              {/* SMS LOGLARI */}
+              {adminTab === 'SMS_LOGS' && (
+                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
+                  {filteredSmsLogs.map((log) => (
+                    <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
+                        <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
+                        <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span>
+                      </div>
+                      <p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed text-neutral-800">{log.message_body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* TEST SENARYOLARI */}
+              {adminTab === 'TESTS' && (
+                <div className="space-y-4">
+                  <form onSubmit={handleCreateTest} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Test Senaryosu Ekle</span></h3>
+                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-5"><input type="text" required value={newTest.title} onChange={(e) => setNewTest({ ...newTest, title: e.target.value })} placeholder="Test Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-3"><input type="text" value={newTest.testerName} onChange={(e) => setNewTest({ ...newTest, testerName: e.target.value })} placeholder="Test Eden Kişi" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-2"><input type="date" value={newTest.testDate} onChange={(e) => setNewTest({ ...newTest, testDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm"><Plus size={13} /><span>Ekle</span></button></div>
+                    </div>
+
+                    <div><textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
+                  </form>
+
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
+                    {tests.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir test senaryosu bulunmuyor.</div>
+                    ) : (
+                      tests.map((testItem) => {
+                        const isExpanded = expandedTestId === testItem.id;
+                        return (
+                          <div key={testItem.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
+                            <div onClick={() => setExpandedTestId(isExpanded ? null : testItem.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
+                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${testItem.status === 'BAŞARILI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : testItem.status === 'BAŞARISIZ' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>{testItem.status}</span>
+                                <p className="font-semibold text-neutral-900 truncate">{testItem.title}</p>
+                              </div>
+                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
+                                <span className="font-mono text-[11px] hidden sm:inline">👤 {testItem.tester_name || 'Tester'}</span>
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{testItem.test_date ? new Date(testItem.test_date).toLocaleDateString('tr-TR') : '-'}</span></span>
+                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                              </div>
+                            </div>
+                            {isExpanded && (
+                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
+                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Test Adımları</label><p className="text-xs text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/70 font-mono leading-relaxed">{testItem.description || 'Açıklama belirtilmemiş.'}</p></div>
+                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Sonucu & Notlar</label><textarea rows={2} defaultValue={testItem.result_notes || ''} onBlur={(e) => handleUpdateTest(testItem.id, { resultNotes: e.target.value })} placeholder="Test sonucu, hata logu veya gözlemlerinizi yazın..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                  <div>
+                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Durumu</label>
+                                    <select value={testItem.status} onChange={(e) => handleUpdateTest(testItem.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
+                                      <option value="BEKLİYOR">⏳ Bekliyor</option><option value="BAŞARILI">✅ Başarılı (Passed)</option><option value="BAŞARISIZ">❌ Başarısız (Failed)</option>
+                                    </select>
+                                  </div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label><input type="text" defaultValue={testItem.tester_name || ''} onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs" /></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
+                                  <span className="font-mono">Senaryo ID: #{testItem.id}</span>
+                                  <button onClick={() => handleDeleteTest(testItem.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Senaryoyu Sil</span></button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* YOL HARİTASI (PROJE) */}
+              {adminTab === 'PROJECT' && (
+                <div className="space-y-4">
+                  <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Özellik / Geliştirme Fikri Ekle</span></h3>
+                      <span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor / Orta</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-5"><input type="text" required value={newFeature.title} onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })} placeholder="Özellik Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-3"><input type="date" value={newFeature.targetDate} onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
+                      <div className="sm:col-span-2">
+                        <select value={newFeature.priority} onChange={(e) => setNewFeature({ ...newFeature, priority: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none bg-neutral-50 font-medium">
+                          <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"><Plus size={13} /><span>Ekle</span></button></div>
+                    </div>
+                    <div><textarea rows={2} value={newFeature.description} onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })} placeholder="Özelliğin detaylı açıklaması (opsiyonel)..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none" /></div>
+                  </form>
+
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
+                    {features.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.</div>
+                    ) : (
+                      features.map((feat) => {
+                        const isExpanded = expandedFeatureId === feat.id;
+                        return (
+                          <div key={feat.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
+                            <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
+                              <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 bg-neutral-100 text-neutral-700">{feat.status}</span>
+                                <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
+                              </div>
+                              <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{feat.target_date ? new Date(feat.target_date).toLocaleDateString('tr-TR') : '-'}</span></span>
+                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
+                                <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Notlar</label><textarea rows={2} defaultValue={feat.description || ''} onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })} placeholder="Detaylı açıklama ekleyin..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                  <div>
+                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Durum</label>
+                                    <select value={feat.status} onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
+                                      <option value="BEKLİYOR">Bekliyor</option><option value="DEVAM EDİYOR">Devam Ediyor</option><option value="TAMAMLANDI">Tamamlandı</option><option value="İPTAL">İptal</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik</label>
+                                    <select value={feat.priority} onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs">
+                                      <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
+                                    </select>
+                                  </div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={feat.target_date ? feat.target_date.split('T')[0] : ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
+                                  <span className="font-mono">Kayıt ID: #{feat.id}</span>
+                                  <button onClick={() => handleDeleteFeature(feat.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Özelliği Sil</span></button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SAĞLAYICI EKLE/DÜZENLE MODAL */}
+              {isModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl">
+                    <div className="flex items-center justify-between pb-2 border-b">
+                      <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
+                      <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+                    </div>
+
+                    <form onSubmit={handleAdminSaveProvider} className="space-y-3 mt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none font-medium" /></div>
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" /></div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none" /></div>
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" /></div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label>
+                          <div className="flex space-x-2 text-[10px] font-mono font-bold">
+                            <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span>
+                          </div>
+                        </div>
+                        <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
+                      </div>
+
+                      <div className="flex justify-end space-x-2 pt-2 border-t">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-neutral-700">Vazgeç</button>
+                        <button type="submit" disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-4 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold shadow-sm">Kaydet</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
           </div>
-        </footer>
-      )}
+        )}
+      </main>
     </div>
   );
 }
