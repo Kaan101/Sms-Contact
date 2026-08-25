@@ -231,8 +231,7 @@ export default function App() {
           .then(res => {
              const addr = res.data.address;
              const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-             const finalAddr = str || 'Haritadan İşaretlendi';
-             setLocationValue(finalAddr);
+             setLocationValue(str || 'Haritadan İşaretlendi');
           }).catch(() => {
              setLocationValue('Haritadan İşaretlendi');
           });
@@ -764,7 +763,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 C. YENİ TALEP GİRİŞ FORMU (TEK ADIMLI & ÖZET GÖRÜNÜMLÜ YAPI) */}
+              {/* 🌟 C. YENİ TALEP GİRİŞ FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
                   <div className="text-center space-y-1">
@@ -795,26 +794,13 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* 🌟 SÜREKLİ GÖRÜNEN ÖZET BİLGİ ALANI (EMOJİSİZ & MONOKROM İKONLU) */}
                       <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
                         <span className="flex items-center space-x-1">
                           <MapPin size={12}/>
                           <span className="truncate max-w-[200px]">{locationValue || 'Konum Yok'}</span>
                         </span>
-                        
-                        {isUrgent && (
-                          <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
-                            ACİL
-                          </span>
-                        )}
-                        
-                        {deadlineDate && (
-                          <span className="flex items-center space-x-1">
-                            <Clock size={12}/>
-                            <span>{deadlineDate} {deadlineTime}</span>
-                          </span>
-                        )}
-                        
+                        {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
+                        {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
                         <div className="flex items-center space-x-2 border-l border-neutral-200 pl-2">
                           {preferredChannels.map((c, idx) => (
                             <React.Fragment key={c}>
@@ -874,7 +860,6 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* 🌟 GÜNCEL: KONUM SEÇİMİ VE KOORDİNAT SİSTEMİ */}
                           <div className="pt-3 border-t border-neutral-100">
                             <div className="flex items-center justify-between mb-1.5">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
@@ -893,27 +878,13 @@ export default function App() {
                             
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               <div className="sm:col-span-2">
-                                <input 
-                                  type="text" 
-                                  value={locationValue} 
-                                  onChange={(e) => setLocationValue(e.target.value)} 
-                                  placeholder="Açık adres veya konum adı..." 
-                                  className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" 
-                                />
+                                <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition" />
                               </div>
                               <div className="sm:col-span-1">
-                                <input 
-                                  type="text" 
-                                  value={coordinates} 
-                                  readOnly 
-                                  placeholder="Koordinat (Enlem, Boylam)" 
-                                  className="w-full p-2.5 text-[11px] rounded-lg border border-neutral-200 outline-none bg-neutral-100 font-mono text-neutral-500 transition cursor-not-allowed" 
-                                  title="Haritadan seçildiğinde otomatik dolar"
-                                />
+                                <input type="text" value={coordinates} readOnly placeholder="Koordinat (Enlem, Boylam)" className="w-full p-2.5 text-[11px] rounded-lg border border-neutral-200 outline-none bg-neutral-100 font-mono text-neutral-500 transition cursor-not-allowed" />
                               </div>
                             </div>
                             
-                            {/* HARİTA KONTEYNERİ (MODERN CARTO VOYAGER) */}
                             {showMap && (
                               <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-300 flex flex-col">
                                 <div className="relative w-full z-[1000]">
@@ -927,13 +898,8 @@ export default function App() {
                                      placeholder="Sokak, mahalle veya mekan arayın..." 
                                      className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950 shadow-sm" 
                                    />
-                                   {isMapSearching && (
-                                     <div className="absolute right-3 top-2.5">
-                                       <Navigation size={14} className="animate-spin text-blue-500" />
-                                     </div>
-                                   )}
+                                   {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
                                    
-                                   {/* CANLI ARAMA SONUÇLARI (DROPDOWN) */}
                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
                                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y divide-neutral-100">
                                        {mapSuggestions.map((sug, idx) => (
@@ -959,12 +925,8 @@ export default function App() {
                                 </div>
                                 
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0 shadow-inner">
-                                  {/* YENİ CARTO VOYAGER TILE LAYER */}
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
-                                    <TileLayer 
-                                      url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" 
-                                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' 
-                                    />
+                                    <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap' />
                                     <CustomerMapClickHandler />
                                   </MapContainer>
                                 </div>
@@ -972,7 +934,6 @@ export default function App() {
                               </div>
                             )}
                           </div>
-
                         </div>
                       )}
 
@@ -987,7 +948,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* D. BELİRSİZLİK ÇÖZÜM EKRANI (DISAMBIGUATE) */}
+              {/* D. BELİRSİZLİK ÇÖZÜM EKRANI */}
               {step === 'DISAMBIGUATE' && disambiguationData && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
                   <div className="text-center">
@@ -998,10 +959,7 @@ export default function App() {
                     {disambiguationData.options.map((option) => (
                       <button 
                         key={option.id} 
-                        onClick={() => { 
-                          setSelectedDisambiguation(option.text); 
-                          submitFinalRequest(option.text); 
-                        }} 
+                        onClick={() => { setSelectedDisambiguation(option.text); submitFinalRequest(option.text); }} 
                         disabled={loading}
                         className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold flex items-center justify-between transition"
                       >
@@ -1023,23 +981,11 @@ export default function App() {
                   </div>
                   {isCustomerHistoryOpen && (
                     <div className="p-4 pt-0 border-t border-neutral-100">
-                      
                       <div className="relative mb-3 mt-3">
                         <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                        <input 
-                          type="text" 
-                          value={searchCustomerHistoryText} 
-                          onChange={(e) => setSearchCustomerHistoryText(e.target.value)}
-                          placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." 
-                          className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium"
-                        />
-                        {searchCustomerHistoryText && (
-                          <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700">
-                            <X size={13} />
-                          </button>
-                        )}
+                        <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
+                        {searchCustomerHistoryText && <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
                       </div>
-
                       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                         {filteredPastCustomerRequests.length === 0 ? (
                           <div className="p-4 text-center text-xs text-neutral-400 font-mono">Aramanıza uygun geçmiş talep bulunamadı.</div>
@@ -1293,7 +1239,11 @@ export default function App() {
               {/* Ekle ve Liste (Menü) Butonları */}
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button 
-                   onClick={() => setIsTrackerAddModalOpen(true)}
+                   onClick={() => {
+                     setCoordinates(trackerMapSelectedPos ? `${trackerMapSelectedPos.lat.toFixed(6)}, ${trackerMapSelectedPos.lng.toFixed(6)}` : '');
+                     setLocationValue(trackerMapSelectedAddress);
+                     setIsTrackerAddModalOpen(true);
+                   }}
                    className="flex items-center space-x-2 bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 rounded-xl shadow-lg transition"
                  >
                    <Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span>
@@ -1312,7 +1262,7 @@ export default function App() {
                 {/* TRACKER HARİTA ARAMA ÇUBUĞU */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-80 sm:w-96">
                   <div className="relative">
-                    <Search size={16} className="absolute left-3 top-3 text-neutral-400" />
+                    <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
                     <input 
                       type="text" 
                       value={trackerMapSearchText} 
@@ -1336,8 +1286,7 @@ export default function App() {
                             const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) };
                             setTrackerMapCenter([newPos.lat, newPos.lng]); 
                             setTrackerMapSelectedPos(newPos); 
-                            setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`);
-                            setLocationValue(sug.display_name);
+                            setTrackerMapSelectedAddress(sug.display_name);
                             setTrackerMapSearchText(sug.display_name);
                             setIsTrackerSuggestionsVisible(false);
                           }}
@@ -1432,7 +1381,7 @@ export default function App() {
                                <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                                
                                {coords ? (
-                                 <p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Navigation size={10}/> <span>Haritaya Git</span></p>
+                                 <p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>
                                ) : (
                                  <p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>
                                )}
@@ -1445,7 +1394,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* YENİ TALEP EKLEME MODALI (Takip Ekranı İçin Müşteri Formu Re-use) */}
+              {/* YENİ TALEP EKLEME MODALI */}
               {isTrackerAddModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
                   <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -2100,8 +2049,7 @@ export default function App() {
                 </div>
               )}
 
-            </div>
-          )
+          </div>
         )}
       </main>
 
