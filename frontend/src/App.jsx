@@ -511,7 +511,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.2 (Map Fix)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.3 (Full Admin)</span>
             </div>
           </div>
 
@@ -831,8 +831,8 @@ export default function App() {
               </div>
           </div>
         ) : session.role === 'TRACKER' ? (
-          /* ---------------- 🗺️ 5. TRACKER (TAKİP) EKRANI (BOŞLUK DÜZELTİLDİ) ---------------- */
-          <div className="absolute inset-0 top-0.5 bg-neutral-100 overflow-hidden flex">
+          /* ---------------- 🗺️ 5. TRACKER (TAKİP) EKRANI ---------------- */
+          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -868,7 +868,7 @@ export default function App() {
                         <Marker position={coords} icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} key={req.id}>
                           <Popup className="custom-popup">
                             <div className="w-48 p-1">
-                               <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">{req.status}</span></div>
+                               <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
                                <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
                             </div>
@@ -893,7 +893,7 @@ export default function App() {
                       const coords = extractGPS(req.location);
                       return (
                         <div key={req.id} onClick={() => { if(coords) setTrackerMapCenter(coords); }} className={`p-3 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}>
-                          <div className="flex items-start justify-between mb-1"><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-100">{req.status}</span></div>
+                          <div className="flex items-start justify-between mb-1"><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
                           <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           <div className="space-y-1 text-[10px] font-mono text-neutral-500">
                              <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
@@ -934,144 +934,6 @@ export default function App() {
                 </div>
               )}
 
-          </div>
-        ) : session.role === 'ADMIN' ? (
-          /* ---------------- ⚙️ 4. ADMİN EKRANI ---------------- */
-          <div className="w-full mx-auto space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
-                <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
-
-                <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
-                  <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
-                  <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
-                  <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Layers size={13} /><span>Tüm Talepler & Kuyruk ({filteredMatchedRequests.length})</span></button>
-                  <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
-                  <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Settings size={13} /><span>Sistem Ayarları</span></button>
-                </div>
-              </div>
-
-              {/* SİSTEM AYARLARI */}
-              {adminTab === 'SETTINGS' && (
-                <div className="space-y-4">
-                  <div className="bg-white p-5 rounded-2xl border shadow-sm">
-                    <h3 className="font-bold text-neutral-950 mb-4">Sistem Ayarları ve Parametreler</h3>
-                    <div className="overflow-x-auto w-full border rounded-xl">
-                      <table className="w-full text-left text-xs table-auto">
-                        <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
-                          <tr><th className="px-4 py-3 w-1/4">Ayar Adı</th><th className="px-4 py-3 w-2/4">Açıklama</th><th className="px-4 py-3 w-32 text-center">Değer</th><th className="px-4 py-3 w-24 text-right">İşlem</th></tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-100 bg-white">
-                          <tr className="hover:bg-neutral-50">
-                            <td className="px-4 py-3 font-bold text-neutral-900">Varsayılan Bitiş Süresi</td>
-                            <td className="px-4 py-3 text-neutral-500">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</td>
-                            <td className="px-4 py-3 text-center"><input type="number" min="1" value={systemSettings.default_deadline_days || ''} onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none" /></td>
-                            <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold">Kaydet</button></td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* WOZ HAVUZU */}
-              {adminTab === 'WOZ' && (
-                <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3">
-                  {pendingRequests.map((req) => (
-                    <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
-                      <div className="space-y-1">
-                        <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
-                        <span className="text-[11px] text-neutral-500">👤 {req.contact_value} | 📍 {extractAddress(req.location)}</span>
-                      </div>
-                      <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Sağlayıcı Seç & Ata</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* SAĞLAYICILAR */}
-              {adminTab === 'PROVIDERS' && (
-                <div className="space-y-3">
-                  <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {filteredProviders.map((prov) => (
-                          <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
-                            <h3 className="font-bold text-neutral-900">{prov.name}</h3>
-                            <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
-                            <div className="mt-2 pt-2 border-t"><button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 text-xs font-semibold">Sil</button></div>
-                          </div>
-                        ))}
-                      </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TÜM EŞLEŞMELER & KUYRUK EKRANI */}
-              {adminTab === 'ALL_MATCHED' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm max-h-[650px] overflow-y-auto">
-                    <table className="w-full text-left text-xs table-auto">
-                      <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm">
-                        <tr>
-                          <SortableHeader label="ID / Tarih" sortKey="id" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                          <SortableHeader label="Durum" sortKey="status" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                          <SortableHeader label="Talep Metni" sortKey="raw_text" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                          <SortableHeader label="Müşteri" sortKey="contact_value" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                          <SortableHeader label="Sağlayıcı" sortKey="provider_name" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                          <SortableHeader label="Konum / Aciliyet" sortKey="location" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                          <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">İşlem</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-100">
-                        {sortedMatchedRequests.map((req) => (
-                          <tr key={req.id} className="hover:bg-neutral-50 transition">
-                            <td className="px-4 py-3 font-mono font-bold text-neutral-900">#REQ-{req.id}</td>
-                            <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
-                            <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
-                            <td className="px-4 py-3 font-mono text-neutral-800">{req.contact_value}</td>
-                            <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
-                            <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
-                            <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                </div>
-              )}
-
-              {/* SMS LOGLARI */}
-              {adminTab === 'SMS_LOGS' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
-                  {filteredSmsLogs.map((log) => (
-                    <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
-                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
-                        <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
-                        <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span>
-                      </div>
-                      <p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed text-neutral-800">{log.message_body}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* WOZ ATAMA MODAL */}
-              {wozAssignModalReq && (
-                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
-                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
-                    <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
-                      <div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div>
-                      <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
-                    </div>
-                    <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 flex-1">
-                      {filteredWozProviders.map((prov) => (
-                        <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs">
-                          <div><h4 className="font-bold text-neutral-900">{prov.name}</h4><p className="text-[11px] text-blue-700 font-mono">📞 {prov.phone}</p></div>
-                          <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-3 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold">Ata</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
           </div>
         ) : null}
       </main>
