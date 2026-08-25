@@ -12,7 +12,7 @@ import {
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
   ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
-  Settings, Timer, AlertTriangle, Link2, Map as MapIcon
+  Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -20,24 +20,26 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-// Harita İkonu
+// Harita İkonları (Siyah: Normal, Kırmızı: Acil, Mavi: Seçim)
 const customMarkerIcon = new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
          </div>`,
-  className: '',
-  iconSize: [0, 0],
-  iconAnchor: [0, 0]
+  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// Kırmızı İşaret İkonu (Acil Talepler İçin)
 const urgentMarkerIcon = new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
          </div>`,
-  className: '',
-  iconSize: [0, 0],
-  iconAnchor: [0, 0]
+  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+});
+
+const trackerSelectionIcon = new L.DivIcon({
+  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+         </div>`,
+  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
 // Harita FlyTo Yöneticisi (Takip Ekranı İçin)
@@ -51,33 +53,7 @@ function TrackerMapController({ center }) {
   return null;
 }
 
-// Müşteri Ekranı GPS Yöneticisi
-function MapClickHandler({ position, setPosition, setLocationValue, setCoordinates }) {
-  const map = useMapEvents({
-    click(e) {
-      const { lat, lng } = e.latlng;
-      setPosition({ lat, lng });
-      setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-      
-      axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
-        .then(res => {
-           const addr = res.data.address;
-           const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-           setLocationValue(str || 'Haritadan İşaretlendi');
-        }).catch(() => setLocationValue('Haritadan İşaretlendi'));
-    }
-  });
-  
-  useEffect(() => {
-    if (position) {
-      map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 16);
-    }
-  }, [position, map]);
-
-  return position ? <Marker position={position} icon={customMarkerIcon} /> : null;
-}
-
-// Ortak GPS Çıkarıcılar (Güvenlik Kontrollü)
+// Ortak GPS Çıkarıcılar
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -110,9 +86,7 @@ export default function App() {
 
       const saved = localStorage.getItem('sc_session');
       return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   });
 
   const [authStep, setAuthStep] = useState('PHONE');
@@ -146,7 +120,26 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // Harita Arama Efekti
+  // Müşteri Harita Tıklama Yöneticisi
+  function MapClickHandler() {
+    const map = useMapEvents({
+      click(e) {
+        const { lat, lng } = e.latlng;
+        setMapPosition({ lat, lng });
+        setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+        
+        axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+          .then(res => {
+             const addr = res.data.address;
+             const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
+             setLocationValue(str || 'Haritadan İşaretlendi');
+          }).catch(() => setLocationValue('Haritadan İşaretlendi'));
+      }
+    });
+    useEffect(() => { if (mapPosition) map.flyTo(mapPosition, map.getZoom() > 14 ? map.getZoom() : 16); }, [mapPosition, map]);
+    return mapPosition ? <Marker position={mapPosition} icon={customMarkerIcon} /> : null;
+  }
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
@@ -155,17 +148,12 @@ export default function App() {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
           setMapSuggestions(res.data);
           setIsSuggestionsVisible(true);
-        } catch (err) {
-          console.error('Harita arama hatası:', err);
-        } finally {
-          setIsMapSearching(false);
-        }
+        } catch (err) {} finally { setIsMapSearching(false); }
       } else {
         setMapSuggestions([]);
         setIsSuggestionsVisible(false);
       }
     }, 400);
-
     return () => clearTimeout(delayDebounceFn);
   }, [mapSearchText]);
 
@@ -174,7 +162,6 @@ export default function App() {
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
-
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
   // Sağlayıcı State
@@ -185,9 +172,7 @@ export default function App() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
-  const [providerFormData, setProviderFormData] = useState({
-    name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100
-  });
+  const [providerFormData, setProviderFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
 
   // Admin State
   const [adminTab, setAdminTab] = useState('WOZ');
@@ -196,38 +181,26 @@ export default function App() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
-  
-  const [systemSettings, setSystemSettings] = useState({ 
-    default_deadline_days: 10,
-    timeout_matched_mins: 15,
-    timeout_accepted_hours: 24
-  });
+  const [systemSettings, setSystemSettings] = useState({ default_deadline_days: 10, timeout_matched_mins: 15, timeout_accepted_hours: 24 });
   const [settingsTab, setSettingsTab] = useState('GENERAL');
-
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
-
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
-
   const [searchProviderText, setSearchProviderText] = useState('');
   const [searchMatchText, setSearchMatchText] = useState('');
   const [matchStatusFilter, setMatchStatusFilter] = useState('ALL');
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
-
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
-
   const [tests, setTests] = useState([]);
   const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' });
-
   const [reviewRatingMap, setReviewRatingMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
@@ -238,6 +211,50 @@ export default function App() {
   const [trackerMapCenter, setTrackerMapCenter] = useState([41.0082, 28.9784]); // İstanbul
   const [isTrackerListOpen, setIsTrackerListOpen] = useState(true);
   const [isTrackerAddModalOpen, setIsTrackerAddModalOpen] = useState(false);
+  
+  // Tracker Harita İşaretleme ve Arama
+  const [trackerMapSelectedPos, setTrackerMapSelectedPos] = useState(null);
+  const [trackerMapSelectedAddress, setTrackerMapSelectedAddress] = useState('');
+  const [trackerMapSearchText, setTrackerMapSearchText] = useState('');
+  const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
+  const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
+  const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
+
+  // Tracker Harita Arama Efekti
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (trackerMapSearchText.length > 2) {
+        setIsTrackerMapSearching(true);
+        try {
+          const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5`);
+          setTrackerMapSuggestions(res.data);
+          setIsTrackerSuggestionsVisible(true);
+        } catch (err) {} finally { setIsTrackerMapSearching(false); }
+      } else {
+        setTrackerMapSuggestions([]);
+        setIsTrackerSuggestionsVisible(false);
+      }
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [trackerMapSearchText]);
+
+  // Tracker Harita Tıklama Yöneticisi
+  function TrackerMapClickHandler() {
+    const map = useMapEvents({
+      click(e) {
+        const { lat, lng } = e.latlng;
+        setTrackerMapSelectedPos({ lat, lng });
+        
+        axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+          .then(res => {
+             const addr = res.data.address;
+             const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
+             setTrackerMapSelectedAddress(str || 'Haritadan İşaretlendi');
+          }).catch(() => setTrackerMapSelectedAddress('Haritadan İşaretlendi'));
+      }
+    });
+    return trackerMapSelectedPos ? <Marker position={trackerMapSelectedPos} icon={trackerSelectionIcon} /> : null;
+  }
 
   const togglePreferredChannel = (channel) => {
     setPreferredChannels((prev) => {
@@ -285,9 +302,7 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
       setMyCustomerRequests(res.data.requests || []);
-    } catch (err) {
-      console.error('Müşteri talepleri çekilemedi:', err);
-    }
+    } catch (err) {}
   };
 
   const fetchProviderData = async (shouldUpdateForm = false) => {
@@ -311,78 +326,40 @@ export default function App() {
 
       const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
       setPoolRequests(poolRes.data.poolRequests || []);
-
     } catch (err) {
-      if (err.response?.status === 404) {
-        setProviderProfile(null);
-        setProviderRequests([]);
-        setPoolRequests([]);
-      }
+      if (err.response?.status === 404) { setProviderProfile(null); setProviderRequests([]); setPoolRequests([]); }
     }
   };
 
-  const fetchFeatures = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/features`);
-      setFeatures(res.data.features || []);
-    } catch (err) { console.error('Özellikler yüklenemedi:', err); }
-  };
-
-  const fetchTests = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/tests`);
-      setTests(res.data.tests || []);
-    } catch (err) { console.error('Testler yüklenemedi:', err); }
-  };
-
+  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
+  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
         axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`),
         axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`)
       ]);
-      setPendingRequests(reqRes.data.requests || []);
-      setProviders(provRes.data.providers || []);
-      setMatchedRequests(matchRes.data.requests || []);
-      setSmsLogs(logRes.data.notifications || []);
+      setPendingRequests(reqRes.data.requests || []); setProviders(provRes.data.providers || []);
+      setMatchedRequests(matchRes.data.requests || []); setSmsLogs(logRes.data.notifications || []);
       await fetchFeatures(); await fetchTests();
-
-      try {
-        const setRes = await axios.get(`${API_BASE}/settings`);
-        if (setRes.data.settings) setSystemSettings(setRes.data.settings);
-      } catch (e) {
-        console.warn('Sistem ayarları API bağlantısı henüz aktif olmayabilir.');
-      }
-    } catch (err) { console.error('Admin verileri çekilemedi:', err); }
+      try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes.data.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
+    } catch (err) {}
   };
 
   // 🌟 YENİ: Takip (Tracker) Ekranı Veri Çekme Fonksiyonu
   const fetchTrackerData = async () => {
     try {
-      let pending = [];
-      let matched = [];
-      try {
-        const reqRes = await axios.get(`${API_BASE}/requests/pending`);
-        pending = reqRes.data.requests || [];
-      } catch (e) {}
-      try {
-        const matchRes = await axios.get(`${API_BASE}/requests/matched`);
-        matched = matchRes.data.requests || [];
-      } catch (e) {}
-
-      const allReqs = [...pending, ...matched];
+      let pending = []; let matched = [];
+      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = reqRes.data.requests || []; } catch (e) {}
+      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = matchRes.data.requests || []; } catch (e) {}
       
-      // Tekrar edenleri temizle (ID'ye göre)
+      const allReqs = [...pending, ...matched];
       const uniqueReqsMap = new Map();
       allReqs.forEach(item => uniqueReqsMap.set(item.id, item));
       const uniqueReqs = Array.from(uniqueReqsMap.values());
-      
-      // Sonuca göre sırala (En yeni en üstte)
       uniqueReqs.sort((a, b) => b.id - a.id);
       setTrackerRequests(uniqueReqs);
-    } catch (err) {
-      console.error('Takip verileri çekilemedi:', err);
-    }
+    } catch (err) {}
   };
 
   useEffect(() => {
@@ -403,28 +380,9 @@ export default function App() {
     }
   }, [session, adminTab]);
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage('');
-    try {
-      const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() });
-      setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP');
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } finally { setAuthLoading(false); }
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage('');
-    try {
-      await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() });
-      const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() };
-      setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession));
-      setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp('');
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } finally { setAuthLoading(false); }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('sc_session');
-    setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT');
-  };
+  const handleSendOtp = async (e) => { e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); try { const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP'); } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } finally { setAuthLoading(false); } };
+  const handleVerifyOtp = async (e) => { e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage(''); try { await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() }); const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() }; setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession)); setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp(''); } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } finally { setAuthLoading(false); } };
+  const handleLogout = () => { localStorage.removeItem('sc_session'); setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); };
 
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
@@ -439,231 +397,72 @@ export default function App() {
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
     const channelString = preferredChannels.join(', ');
 
-    // Konum ve Koordinatları birleştir
     const backendLocation = coordinates ? `${locationValue || 'Belirtilmedi'} [GPS: ${coordinates}]` : (locationValue || 'Belirtilmedi');
 
     try {
       await axios.post(`${API_BASE}/requests`, {
-        rawText: queryText, 
-        disambiguationChoice: disambiguationChoice, 
-        contactValue: finalContactValue,
-        preferredChannel: channelString, 
-        location: backendLocation, 
-        isUrgent: isUrgent, 
-        deadlineDatetime: deadlineDatetimeISO
+        rawText: queryText, disambiguationChoice: disambiguationChoice, contactValue: finalContactValue,
+        preferredChannel: channelString, location: backendLocation, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
       });
-      setQueryText(''); 
-      setSelectedDisambiguation(null); 
-      setDeadlineDate(''); 
-      setDeadlineTime(''); 
-      setContactEmail(''); 
-      setLocationValue('');
-      setCoordinates('');
-      setPreferredChannels(['PHONE']); 
-      setStep('INPUT'); 
-      setIsDetailsCollapsed(true); 
-      setShowMap(false); 
-      setMapPosition(null);
-      setMapSearchText('');
-      setIsUrgent(false); 
-      setErrorMessage('');
+      setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime(''); setContactEmail(''); 
+      setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE']); setStep('INPUT'); setIsDetailsCollapsed(true); 
+      setShowMap(false); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage('');
       
       if (fromTracker) {
         setIsTrackerAddModalOpen(false);
+        setTrackerMapSelectedPos(null);
+        setTrackerMapSelectedAddress('');
+        setTrackerMapSearchText('');
         fetchTrackerData();
         alert("Talep başarıyla oluşturuldu ve haritaya eklendi.");
       } else {
         await fetchCustomerData();
       }
-    } catch (err) { 
-      setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
 
   const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
-    e?.preventDefault();
-    if (!queryText.trim()) return;
-    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) {
-      setIsDetailsCollapsed(false); 
-      setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100);
-      return;
-    }
-    
-    setLoading(true);
-    setErrorMessage('');
-
+    e?.preventDefault(); if (!queryText.trim()) return;
+    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) { setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100); return; }
+    setLoading(true); setErrorMessage('');
     try {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
-      if (response.data.status === 'ambiguous') {
-        setDisambiguationData(response.data);
-        setStep('DISAMBIGUATE');
-        setLoading(false);
-      } else {
-        await submitFinalRequest(null, fromTracker);
-      }
-    } catch { 
-      await submitFinalRequest(null, fromTracker); 
-    }
+      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } else { await submitFinalRequest(null, fromTracker); }
+    } catch { await submitFinalRequest(null, fromTracker); }
   };
 
-  const handleRepeatRequest = (req) => {
-    setQueryText(req.raw_text);
-    if (req.location) setLocationValue(extractAddress(req.location));
-    setIsUrgent(req.is_urgent || false);
-    setStep('INPUT');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleJoinPool = async (requestId) => {
-    if (!providerProfile) {
-      alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return;
-    }
-    try {
-      await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id });
-      await fetchProviderData(false); setProviderTab('ACTIVE'); 
-    } catch (err) { console.error('Havuza katılma hatası:', err); alert('Havuza katılırken bir hata oluştu.'); }
-  };
-
-  const handleCustomerNextProvider = async (requestId) => {
-    try {
-      await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`);
-      await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData(false);
-    } catch (err) { console.error('İşlem başarısız:', err); }
-  };
-
-  const handleCustomerSelectCandidate = async (requestId, providerId) => {
-    try {
-      await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) });
-      setExpandedCustomerQueueReqId(null);
-      await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData(false);
-    } catch (err) { console.error('Seçim başarısız:', err); }
-  };
-
-  const handleStatusChange = async (requestId, newStatus) => {
-    try {
-      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus });
-      if (session.role === 'CUSTOMER') await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData(false);
-      if (session.role === 'ADMIN') await fetchAdminData();
-    } catch (err) { console.error('Durum güncellenemedi:', err); }
-  };
-
+  const handleRepeatRequest = (req) => { setQueryText(req.raw_text); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { console.error('Havuza katılma hatası:', err); alert('Havuza katılırken bir hata oluştu.'); } };
+  const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  const handleStatusChange = async (requestId, newStatus) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); } catch (err) {} };
+  
   const handleDeleteRequest = async (requestId) => {
     if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return;
-    try {
-      await axios.delete(`${API_BASE}/requests/${Number(requestId)}`);
-      if (session.role === 'CUSTOMER') await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData(false);
-      if (session.role === 'ADMIN') await fetchAdminData();
-      if (session.role === 'TRACKER') await fetchTrackerData();
-    } catch { console.error('Silme başarısız.'); }
+    try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {}
   };
 
-  const handleSendReview = async (requestId, reviewerType, isSkip = false) => {
-    try {
-      const rating = isSkip ? null : (reviewRatingMap[requestId] || 5);
-      const comment = isSkip ? null : (reviewCommentMap[requestId] || '');
-      await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment });
-      setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true }));
-      if (session.role === 'CUSTOMER') await fetchCustomerData();
-      if (session.role === 'PROVIDER') await fetchProviderData(false);
-    } catch (err) { console.error('Değerlendirme kaydedilemedi:', err); }
-  };
-
-  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) { alert('Hata'); } };
-  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) { alert('Hata'); } };
-  const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch { alert('Silme başarısız.'); } };
-  
-  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) { alert('Hata'); } };
-  const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) { alert('Hata'); } };
-  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch { alert('Silme başarısız.'); } };
-
-  const handleSaveProviderProfile = async (e) => {
-    e.preventDefault();
-    const keywordsArray = providerFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-    const payload = {
-      name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null,
-      serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100
-    };
-    try {
-      if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload);
-      else await axios.post(`${API_BASE}/providers`, payload);
-      setIsProfileOpen(false); await fetchProviderData(true);
-    } catch (err) { console.error('Kaydedilemedi:', err); }
-  };
-
-  const handleAdminAssign = async (requestId, providerId) => {
-    const pId = providerId || selectedProviderMap[requestId];
-    if (!pId) return;
-    try {
-      await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) });
-      setWozAssignModalReq(null); await fetchAdminData();
-    } catch { console.error('Atama başarısız.'); }
-  };
-
-  const handleAdminSaveProvider = async (e) => {
-    e.preventDefault();
-    const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-    const payload = {
-      name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null,
-      serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels, priorityScore: parseInt(modalFormData.priorityScore, 10) || 100
-    };
-    try {
-      if (editingProviderId) await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload);
-      else await axios.post(`${API_BASE}/providers`, payload);
-      setIsModalOpen(false); await fetchAdminData();
-    } catch { console.error('Kayıt başarısız.'); }
-  };
-
-  const handleAdminDeleteProvider = async (id) => {
-    if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return;
-    try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); } catch { console.error('Silinemedi.'); }
-  };
-
-  const handleSaveSystemSetting = async (key, value) => {
-    try {
-      await axios.put(`${API_BASE}/settings`, { key, value });
-      alert('Sistem parametresi başarıyla güncellendi!');
-    } catch (err) {
-      console.error('Ayar güncellenirken hata:', err);
-      alert('Hata: Yaptığınız ayar kaydedilemedi.');
-    }
-  };
+  const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
+  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
+  const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
+  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) {} };
+  const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) {} };
+  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch {} };
+  const handleSaveProviderProfile = async (e) => { e.preventDefault(); const keywordsArray = providerFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); const payload = { name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100 }; try { if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload); else await axios.post(`${API_BASE}/providers`, payload); setIsProfileOpen(false); await fetchProviderData(true); } catch (err) {} };
+  const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
+  const handleAdminSaveProvider = async (e) => { e.preventDefault(); const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels, priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; try { if (editingProviderId) await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); else await axios.post(`${API_BASE}/providers`, payload); setIsModalOpen(false); await fetchAdminData(); } catch {} };
+  const handleAdminDeleteProvider = async (id) => { if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); } catch {} };
+  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
-
-  const filteredPastCustomerRequests = pastCustomerRequests.filter(req => {
-    const q = searchCustomerHistoryText.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      (req.raw_text || '').toLowerCase().includes(q) ||
-      (req.provider_name || '').toLowerCase().includes(q) ||
-      (req.status || '').toLowerCase().includes(q)
-    );
-  });
-
+  const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = searchCustomerHistoryText.toLowerCase().trim(); if (!q) return true; return (req.raw_text || '').toLowerCase().includes(q) || (req.provider_name || '').toLowerCase().includes(q) || (req.status || '').toLowerCase().includes(q); });
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
-
-  const filteredProviders = providers.filter(p => {
-    const q = searchProviderText.toLowerCase().trim();
-    if (!q) return true;
-    return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q));
-  });
-
-  const filteredMatchedRequests = matchedRequests.filter(r => {
-    const q = searchMatchText.toLowerCase().trim();
-    const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter;
-    if (!statusMatch) return false;
-    if (!q) return true;
-    return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q);
-  });
+  const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
+  const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
   // 🌟 YENİ: TRACKER LİSTESİ FİLTRELEME
   const filteredTrackerRequests = trackerRequests.filter(r => {
@@ -675,100 +474,29 @@ export default function App() {
            String(r.id).includes(q);
   });
 
-  const handleRequestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-    setSortConfig({ key, direction });
-  };
+  const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
+  const sortedMatchedRequests = useMemo(() => { let sortableItems = [...filteredMatchedRequests]; if (sortConfig !== null) { sortableItems.sort((a, b) => { let valA = a[sortConfig.key]; let valB = b[sortConfig.key]; if (sortConfig.key === 'queue') { valA = a.queueList ? a.queueList.length : 0; valB = b.queueList ? b.queueList.length : 0; } else if (sortConfig.key === 'provider_name') { valA = a.provider_name || ''; valB = b.provider_name || ''; } else if (sortConfig.key === 'location') { valA = a.location || ''; valB = b.location || ''; } else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; return 0; }); } return sortableItems; }, [filteredMatchedRequests, sortConfig]);
+  const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
+  const filteredWozProviders = providers.filter(p => { const q = wozProviderSearch.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
 
-  const sortedMatchedRequests = useMemo(() => {
-    let sortableItems = [...filteredMatchedRequests];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        let valA = a[sortConfig.key];
-        let valB = b[sortConfig.key];
-
-        if (sortConfig.key === 'queue') {
-          valA = a.queueList ? a.queueList.length : 0;
-          valB = b.queueList ? b.queueList.length : 0;
-        } else if (sortConfig.key === 'provider_name') {
-          valA = a.provider_name || ''; valB = b.provider_name || '';
-        } else if (sortConfig.key === 'location') {
-          valA = a.location || ''; valB = b.location || '';
-        } else if (sortConfig.key === 'raw_text') {
-          valA = a.raw_text || ''; valB = b.raw_text || '';
-        } else if (sortConfig.key === 'contact_value') {
-          valA = a.contact_value || ''; valB = b.contact_value || '';
-        } else if (sortConfig.key === 'status') {
-          valA = a.status || ''; valB = b.status || '';
-        }
-
-        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [filteredMatchedRequests, sortConfig]);
-
-  const filteredSmsLogs = smsLogs.filter(log => {
-    const q = searchSmsText.toLowerCase().trim();
-    const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter;
-    if (!recipientMatch) return false;
-    if (!q) return true;
-    return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q);
-  });
-
-  const filteredWozProviders = providers.filter(p => {
-    const q = wozProviderSearch.toLowerCase().trim();
-    if (!q) return true;
-    return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q));
-  });
-
-  const extractEmail = (text) => {
-    if (!text) return null;
-    const match = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
-  };
-
-  const extractPhone = (str) => {
-    if (!str) return '';
-    const match = str.match(/(\+?\d[\d\s-]{8,})/);
-    return match ? match[1].replace(/[^\d+]/g, '') : '';
-  };
-
-  const getKeywordMetrics = (text) => {
-    const str = text || '';
-    return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length };
-  };
-
+  const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
+  const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
+  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
   const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  const SortableHeader = ({ label, sortKey, align = "left" }) => {
-    const isActive = sortConfig.key === sortKey;
-    return (
-      <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`} onClick={() => handleRequestSort(sortKey)}>
-        <div className={`flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}>
-          <span>{label}</span>
-          <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
-            {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
-          </span>
-        </div>
-      </th>
-    );
-  };
+  const SortableHeader = ({ label, sortKey, align = "left" }) => { const isActive = sortConfig.key === sortKey; return ( <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap text-${align}`} onClick={() => handleRequestSort(sortKey)}> <div className={`flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}> <span>{label}</span> <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}> {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)} </span> </div> </th> ); };
 
   // Dinamik Main Class'ı (Takip ekranında absolute yerleşim ile %100 yükseklik sağlamalı)
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
-  if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 relative flex-1 flex flex-col bg-neutral-100";
+  if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 relative flex-1 flex flex-col bg-neutral-100 overflow-hidden";
 
   return (
-    <div className="min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white">
+    <div className={`min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col justify-between font-sans selection:bg-neutral-900 selection:text-white ${session?.role === 'TRACKER' ? 'overflow-hidden' : ''}`}>
       
       {/* 🧭 NAVIGATION */}
-      <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30">
+      <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-[500]">
         <div className={`${session?.role === 'ADMIN' || session?.role === 'TRACKER' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setStep('INPUT')}>
             <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">
@@ -776,7 +504,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium">Protocol 9.9 (Control Tower)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 9.9 (Control Tower)</span>
             </div>
           </div>
 
@@ -801,7 +529,7 @@ export default function App() {
       <main className={mainContainerClass}>
         
         {errorMessage && session?.role !== 'TRACKER' && (
-          <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between">
+          <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
             <button onClick={() => setErrorMessage('')} className="text-rose-400 hover:text-rose-700 ml-4"><X size={14} /></button>
           </div>
@@ -1054,7 +782,7 @@ export default function App() {
                     <p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p>
                   </div>
                   
-                  <form onSubmit={handleCustomerCombinedSubmit} className="space-y-3">
+                  <form onSubmit={(e) => handleCustomerCombinedSubmit(e, false)} className="space-y-3">
                     <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
                       
                       <div className="flex gap-2">
@@ -1062,7 +790,7 @@ export default function App() {
                           rows={2} 
                           value={queryText} 
                           onChange={(e) => setQueryText(e.target.value)} 
-                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(); } }} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, false); } }} 
                           placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." 
                           className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
                           required 
@@ -1566,183 +1294,6 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                </div>
-              )}
-
-            </div>
-          ) :
-
-          /* ---------------- 🗺️ 5. YENİ: TRACKER (TAKİP) EKRANI ---------------- */
-          session.role === 'TRACKER' ? (
-            <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex">
-              
-              {/* Ekle ve Liste (Menü) Butonları */}
-              <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
-                 <button 
-                   onClick={() => setIsTrackerAddModalOpen(true)}
-                   className="flex items-center space-x-2 bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 rounded-xl shadow-lg transition"
-                 >
-                   <Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span>
-                 </button>
-                 <button 
-                   onClick={() => setIsTrackerListOpen(!isTrackerListOpen)}
-                   className="flex items-center space-x-2 bg-white hover:bg-neutral-50 text-neutral-900 border border-neutral-200 px-4 py-2.5 rounded-xl shadow-md transition"
-                 >
-                   <Layers size={16} className="text-neutral-500" /> <span className="font-semibold text-sm">Görev Listesi</span>
-                 </button>
-              </div>
-
-              {/* HARİTA ALANI */}
-              <div className="flex-1 w-full h-full relative z-0">
-                <MapContainer center={trackerMapCenter} zoom={12} className="absolute inset-0 w-full h-full">
-                  <TileLayer 
-                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" 
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' 
-                  />
-                  <TrackerMapController center={trackerMapCenter} />
-                  
-                  {trackerRequests.map(req => {
-                    const coords = extractGPS(req.location);
-                    if (coords) {
-                      return (
-                        <Marker 
-                          position={coords} 
-                          icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} 
-                          key={req.id}
-                        >
-                          <Popup className="custom-popup">
-                            <div className="w-48 p-1">
-                               <div className="flex justify-between items-center mb-1">
-                                 <span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span>
-                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span>
-                               </div>
-                               <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
-                                  <p>👤 {req.contact_value}</p>
-                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
-                               </div>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      );
-                    }
-                    return null;
-                  })}
-                </MapContainer>
-              </div>
-
-              {/* SAĞ LİSTE PANELİ */}
-              {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
-                  <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
-                    <div className="flex items-center justify-between">
-                       <h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3>
-                       <button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={16}/></button>
-                    </div>
-                    <div className="relative">
-                       <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                       <input 
-                         type="text" 
-                         value={trackerSearch} 
-                         onChange={(e) => setTrackerSearch(e.target.value)}
-                         placeholder="Talep, adres veya tel ara..." 
-                         className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200"
-                       />
-                       {trackerSearch && <button onClick={() => setTrackerSearch('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50">
-                    {filteredTrackerRequests.length === 0 ? (
-                      <div className="text-center text-xs text-neutral-400 mt-10 font-mono">Listelenecek operasyon bulunamadı.</div>
-                    ) : (
-                      filteredTrackerRequests.map(req => {
-                        const coords = extractGPS(req.location);
-                        return (
-                          <div 
-                            key={req.id} 
-                            onClick={() => { if(coords) setTrackerMapCenter(coords); }}
-                            className={`p-3 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}
-                          >
-                            <div className="flex items-start justify-between mb-1">
-                              <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
-                            </div>
-                            <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
-                            
-                            <div className="space-y-1 text-[10px] font-mono text-neutral-500">
-                               <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
-                               <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{extractAddress(req.location)}</span></p>
-                               
-                               {coords ? (
-                                 <p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Navigation size={10}/> <span>Haritaya Git</span></p>
-                               ) : (
-                                 <p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>
-                               )}
-                            </div>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* YENİ TALEP EKLEME MODALI (Takip Ekranı İçin Müşteri Formu Re-use) */}
-              {isTrackerAddModalOpen && (
-                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
-                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
-                       <div>
-                         <h3 className="font-bold text-sm text-neutral-950">Manuel Operasyon Ekle</h3>
-                         <p className="text-[10px] text-neutral-500 font-mono">Merkezden havuza yeni talep bırakın.</p>
-                       </div>
-                       <button onClick={() => setIsTrackerAddModalOpen(false)} className="p-1 text-neutral-400 hover:text-neutral-900 bg-neutral-100 rounded-md transition"><X size={16}/></button>
-                    </div>
-
-                    <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-3">
-                      <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
-                        
-                        <div className="flex gap-2">
-                          <textarea 
-                            rows={2} 
-                            value={queryText} 
-                            onChange={(e) => setQueryText(e.target.value)} 
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, true); } }} 
-                            placeholder="Müşterinin talebini girin..." 
-                            className="w-full p-2 text-sm font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" 
-                            required 
-                          />
-                        </div>
-
-                        <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
-                                <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
-                                <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="flex items-center space-x-2 w-full p-2 rounded-lg border cursor-pointer hover:bg-neutral-50">
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="rounded" />
-                                <span className="text-xs font-bold text-rose-600">ACİL TALEP</span>
-                              </label>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
-                          <button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
-                            {loading ? <span>Gönderiliyor...</span> : <><span>Operasyonu Başlat</span><ArrowRight size={14} /></>}
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
                 </div>
               )}
 
@@ -2347,6 +1898,119 @@ export default function App() {
 
             </div>
           )
+        )}
+
+        {/* 5. WoZ SAĞLAYICI ATAMA FİLTRELİ POPUP MODAL */}
+        {wozAssignModalReq && (
+          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000] animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl space-y-4 max-h-[90vh] flex flex-col justify-between">
+              
+              <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                      #REQ-{wozAssignModalReq.id}
+                    </span>
+                    <h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3>
+                  </div>
+                  <p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p>
+                  <p className="text-[11px] text-neutral-400 font-mono">Müşteri: {wozAssignModalReq.contact_value} • Konum: {extractAddress(wozAssignModalReq.location)}</p>
+                </div>
+                <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition"><X size={18} /></button>
+              </div>
+
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-3 text-neutral-400" />
+                <input type="text" autoFocus value={wozProviderSearch} onChange={(e) => setWozProviderSearch(e.target.value)} placeholder="Firma adı, telefon veya hizmet ara..." className="w-full pl-9 pr-8 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:border-neutral-950 focus:bg-white transition font-medium" />
+                {wozProviderSearch && <button onClick={() => setWozProviderSearch('')} className="absolute right-3 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={14} /></button>}
+              </div>
+
+              <div className="overflow-y-auto space-y-2 max-h-[350px] pr-1 flex-1">
+                {filteredWozProviders.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-neutral-400 font-mono">Arama kriterinize uygun sağlayıcı bulunamadı.</div>
+                ) : (
+                  filteredWozProviders.map((prov) => (
+                    <div key={prov.id} className="p-3 bg-neutral-50 hover:bg-neutral-100/80 rounded-xl border border-neutral-200 flex items-center justify-between gap-3 text-xs transition group">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-neutral-900 truncate">{prov.name}</h4>
+                          <span className="text-[9px] font-mono bg-neutral-200 px-1.5 py-0.2 rounded font-bold text-neutral-700">Skor: {prov.priority_score}</span>
+                        </div>
+                        <p className="text-[11px] text-blue-700 font-mono font-semibold">📞 {prov.phone}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(prov.service_keywords || []).slice(0, 4).map((kw, i) => (<span key={i} className="text-[9px] font-mono px-1.5 py-0.5 bg-white border border-neutral-200 rounded text-neutral-600">{kw}</span>))}
+                          {(prov.service_keywords || []).length > 4 && (<span className="text-[9px] font-mono text-neutral-400">+{(prov.service_keywords || []).length - 4}</span>)}
+                        </div>
+                      </div>
+                      <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shrink-0 shadow-xs flex items-center space-x-1 transition">
+                        <Check size={12} /><span>Ata</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-[11px] text-neutral-400 font-mono">
+                <span>{filteredWozProviders.length} Sağlayıcı Listelendi</span>
+                <button type="button" onClick={() => setWozAssignModalReq(null)} className="px-3 py-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold">Vazgeç</button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* 6. ADMIN SAĞLAYICI DÜZENLEME / EKLEME MODAL */}
+        {isModalOpen && (
+          <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between pb-2 border-b">
+                <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+              </div>
+
+              <form onSubmit={handleAdminSaveProvider} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label>
+                    <input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label>
+                    <input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
+                    <input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} placeholder="info@firma.com" className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label>
+                    <input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
+                      <Tag size={12} className="text-neutral-700" /><span>Anahtar Kelimeler (Virgülle Ayırın) *</span>
+                    </label>
+                    <div className="flex items-center space-x-2 text-[10px] font-mono font-bold">
+                      <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span><span className="text-neutral-300">•</span>
+                      <span className={modalKwMetrics.charCount > MAX_KEYWORD_CHARS ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.charCount} / {MAX_KEYWORD_CHARS} Karakter</span>
+                    </div>
+                  </div>
+                  <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="su, damacana, kadıköy, erikli, tesisat..." className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-2 border-t">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-neutral-700">Vazgeç</button>
+                  <button type="submit" disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:bg-neutral-300 text-white rounded-lg text-xs font-semibold shadow-sm">Kaydet</button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
 
       </main>
