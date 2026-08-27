@@ -566,7 +566,15 @@ export default function App() {
   }, [filteredMatchedRequests, sortConfig]);
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
-  const filteredWozProviders = providers.filter(p => { const q = wozProviderSearch.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
+  
+  // 🌟 DÜZELTME: WOZ Arama Filtrelemesi
+  const filteredWozProviders = providers.filter(p => { 
+    const q = wozProviderSearch.toLowerCase().trim(); 
+    if (!q) return true; 
+    return (p.name || '').toLowerCase().includes(q) || 
+           (p.phone || '').toLowerCase().includes(q) || 
+           (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
+  });
   
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
@@ -587,7 +595,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.2 (Fluid UI Match)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.3 (Woz Menu)</span>
             </div>
           </div>
 
@@ -611,6 +619,7 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
+        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -784,7 +793,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YENİ TALEP FORMU (GRID LAYOUT) */}
+              {/* YENİ TALEP FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -799,7 +808,6 @@ export default function App() {
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
-                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                         <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
@@ -833,7 +841,7 @@ export default function App() {
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
-                          {/* SOL: 2/5 (Zamanlama ve Kanallar) */}
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -866,13 +874,14 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
-                          <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 h-full">
+                          {/* SAĞ: 3/5 */}
+                          <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
                             </div>
                             
+                            {/* 🌟 SABİT YÜKSEKLİK: Mobilde çökmemesi için h-[300px] */}
                             <div className="relative w-full h-[300px] md:h-[400px] flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                                <div className="absolute top-2 left-2 right-2 z-[1000]">
                                   <div className="relative">
@@ -1020,7 +1029,7 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-80 sm:w-96">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
                     <input 
@@ -1233,18 +1242,29 @@ export default function App() {
                 </div>
               )}
 
-              {/* WOZ HAVUZU */}
+              {/* 🌟 DÜZELTME: WOZ HAVUZU VE YENİ EKLE BUTONU */}
               {adminTab === 'WOZ' && (
-                <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3">
-                  {pendingRequests.map((req) => (
-                    <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
-                      <div className="space-y-1">
-                        <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
-                        <span className="text-[11px] text-neutral-500">👤 {req.contact_value} | 📍 {extractAddress(req.location)}</span>
-                      </div>
-                      <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Sağlayıcı Seç & Ata</button>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shadow-sm transition hover:bg-neutral-800">
+                      <Plus size={13} /><span>Yeni Sağlayıcı Ekle</span>
+                    </button>
+                  </div>
+                  <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3">
+                    {pendingRequests.length === 0 ? (
+                       <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
+                    ) : (
+                      pendingRequests.map((req) => (
+                        <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                          <div className="space-y-1">
+                            <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
+                            <span className="text-[11px] text-neutral-500">👤 {req.contact_value} | 📍 {extractAddress(req.location)}</span>
+                          </div>
+                          <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800">Sağlayıcı Seç & Ata</button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1463,6 +1483,83 @@ export default function App() {
                 </div>
               )}
 
+              {/* 🌟 DÜZELTME: WOZ ATAMA MODALI İÇİNDE ARAMA VE EKLEME */}
+              {wozAssignModalReq && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
+                    <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+                      <div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div>
+                      <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700 transition"><X size={18} /></button>
+                    </div>
+                    
+                    <div className="mt-4 flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                        <input 
+                           type="text" 
+                           value={wozProviderSearch} 
+                           onChange={(e) => setWozProviderSearch(e.target.value)} 
+                           onDoubleClick={() => setWozProviderSearch('')} 
+                           placeholder="Sağlayıcı ara..." 
+                           className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950 bg-neutral-50 transition" 
+                        />
+                      </div>
+                      <button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white text-xs font-semibold rounded-lg flex items-center space-x-1 shrink-0 shadow-sm transition">
+                        <Plus size={13} /><span>Yeni Ekle</span>
+                      </button>
+                    </div>
+                    
+                    <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 pt-1 flex-1">
+                      {filteredWozProviders.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Eşleşen sağlayıcı bulunamadı.</div>}
+                      {filteredWozProviders.map((prov) => (
+                        <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs transition hover:bg-blue-50/50 hover:border-blue-200">
+                          <div><h4 className="font-bold text-neutral-900">{prov.name}</h4><p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p></div>
+                          <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Ata</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* SAĞLAYICI EKLE/DÜZENLE MODAL */}
+              {isModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl">
+                    <div className="flex items-center justify-between pb-2 border-b">
+                      <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
+                      <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+                    </div>
+
+                    <form onSubmit={handleAdminSaveProvider} className="space-y-3 mt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none font-medium" /></div>
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" /></div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none" /></div>
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" /></div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label>
+                          <div className="flex space-x-2 text-[10px] font-mono font-bold">
+                            <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span>
+                          </div>
+                        </div>
+                        <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
+                      </div>
+
+                      <div className="flex justify-end space-x-2 pt-2 border-t">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-neutral-700">Vazgeç</button>
+                        <button type="submit" disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-4 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold shadow-sm">Kaydet</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
           </div>
         )}
       </main>
