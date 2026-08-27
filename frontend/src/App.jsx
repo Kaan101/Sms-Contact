@@ -566,7 +566,6 @@ export default function App() {
   }, [filteredMatchedRequests, sortConfig]);
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
-  
   const filteredWozProviders = providers.filter(p => { 
     const q = wozProviderSearch.toLowerCase().trim(); 
     if (!q) return true; 
@@ -594,7 +593,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.4 (Impersonation Restored)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.5 (Provider UI)</span>
             </div>
           </div>
 
@@ -618,7 +617,6 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
-        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -792,7 +790,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YENİ TALEP FORMU */}
+              {/* YENİ TALEP FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -841,7 +839,7 @@ export default function App() {
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
-                          {/* SOL: 2/5 (Zamanlama ve Kanallar) */}
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -881,7 +879,6 @@ export default function App() {
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
                             </div>
                             
-                            {/* 🌟 SABİT YÜKSEKLİK: Mobilde çökmemesi için h-[300px] */}
                             <div className="relative w-full h-[300px] md:h-[400px] flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                                <div className="absolute top-2 left-2 right-2 z-[1000]">
                                   <div className="relative">
@@ -914,14 +911,7 @@ export default function App() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 
-                                 <SharedMapClickHandler 
-                                   position={mapPosition} 
-                                   setPosition={setMapPosition} 
-                                   setLocationValue={setLocationValue} 
-                                   setCoordinates={setCoordinates} 
-                                   icon={customMarkerIcon} 
-                                 />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                </MapContainer>
                             </div>
                           </div>
@@ -977,10 +967,20 @@ export default function App() {
         {/* ---------------- 3. SERVİS SAĞLAYICI EKRANI ---------------- */}
         {session?.role === 'PROVIDER' && (
           <div className="max-w-3xl mx-auto w-full space-y-5">
-              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
-                 <h2 className="text-sm font-bold text-neutral-950">Sağlayıcı Paneli</h2>
-                 <p className="text-xs text-neutral-500">Mevcut telefon: {session.phone}</p>
-                 <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="mt-2 text-xs text-blue-600 underline">Profili Düzenle</button>
+              
+              {/* 🌟 DÜZELTME: Sağlayıcı Paneli Başlığı */}
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 flex items-start justify-between">
+                 <div>
+                   <h2 className="text-xl font-extrabold text-neutral-950 tracking-tight">
+                     {providerProfile?.name ? providerProfile.name : 'Sağlayıcı Paneli'}
+                   </h2>
+                   <div className="flex items-center space-x-1.5 text-xs text-neutral-500 font-mono mt-1">
+                     <Phone size={12} /><span>{session.phone}</span>
+                   </div>
+                 </div>
+                 <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="px-3.5 py-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                   <Edit3 size={13} /><span>Profili Düzenle</span>
+                 </button>
               </div>
 
               {isProfileOpen && (
@@ -1287,7 +1287,6 @@ export default function App() {
                             <h3 className="font-bold text-neutral-900">{prov.name}</h3>
                             <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
                             
-                            {/* 🌟 DÜZELTME: Düzenle/Sil yanına "Bağlan" eklendi */}
                             <div className="mt-2 pt-2 border-t flex items-center justify-between">
                                <div className="flex space-x-2">
                                  <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
@@ -1448,7 +1447,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
@@ -1489,7 +1488,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 DÜZELTME: WOZ ATAMA MODALI İÇİNDE ARAMA VE EKLEME */}
+              {/* WOZ ATAMA MODALI İÇİNDE ARAMA VE EKLEME */}
               {wozAssignModalReq && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
                   <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
