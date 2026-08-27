@@ -141,7 +141,9 @@ export default function App() {
   });
 
   const [authStep, setAuthStep] = useState('PHONE');
-  const [inputPhone, setInputPhone] = useState('');
+  
+  // 🌟 DÜZELTME: Telefon numarasını localStorage'dan (varsa) otomatik getir
+  const [inputPhone, setInputPhone] = useState(() => localStorage.getItem('sc_last_phone') || '');
   const [inputOtp, setInputOtp] = useState('');
   const [simulatedCode, setSimulatedCode] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -406,8 +408,12 @@ export default function App() {
 
   const handleSendOtp = async (e) => { 
     e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); 
-    try { const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP'); } 
-    catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
+    try { 
+      const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); 
+      setSimulatedCode(res.data.simulatedOtp); 
+      setAuthStep('OTP'); 
+      localStorage.setItem('sc_last_phone', inputPhone.trim()); // 🌟 Yeni Eklenen Telefon Hafızası
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
     finally { setAuthLoading(false); } 
   };
   
@@ -567,7 +573,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.4 (Map UI Updated)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.5 (Fast Auth)</span>
             </div>
           </div>
 
@@ -591,6 +597,7 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
+        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -632,8 +639,21 @@ export default function App() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">4 Haneli Kod</label>
-                  <input type="tel" inputMode="numeric" pattern="[0-9]*" required maxLength={4} value={inputOtp} onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))} placeholder="1234" className="w-full p-3 text-center text-2xl tracking-[0.4em] font-mono font-bold rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none" />
+                  {/* 🌟 YENİ: Çift Tıklama Uyarı Etiketi */}
+                  <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">4 Haneli Kod (Çift tıkla yapıştır)</label>
+                  <input 
+                    type="tel" 
+                    inputMode="numeric" 
+                    pattern="[0-9]*" 
+                    required 
+                    maxLength={4} 
+                    value={inputOtp} 
+                    onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))} 
+                    onDoubleClick={() => { if(simulatedCode) setInputOtp(String(simulatedCode)); }} // 🌟 YENİ: Çift Tıklama Özelliği
+                    placeholder="1234" 
+                    className="w-full p-3 text-center text-2xl tracking-[0.4em] font-mono font-bold rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none cursor-pointer" 
+                    title="Simüle edilen kodu yapıştırmak için çift tıklayın"
+                  />
                 </div>
                 <div className="flex items-center space-x-2">
                   <button type="button" onClick={() => setAuthStep('PHONE')} className="w-1/3 py-2.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold rounded-xl">Değiştir</button>
@@ -646,7 +666,7 @@ export default function App() {
 
         {/* ---------------- 2. MÜŞTERİ EKRANI ---------------- */}
         {session?.role === 'CUSTOMER' && (
-          <div className="max-w-3xl mx-auto w-full space-y-6">
+          <div className="max-w-2xl mx-auto w-full space-y-6">
               
               {/* Aktif Talepler */}
               {activeCustomerRequests.length > 0 && (
@@ -860,7 +880,6 @@ export default function App() {
                                   </div>
                                </div>
                                
-                               {/* 🌟 DÜZELTME: Zoom Control Kapatıldı ve Özel Konuma (Sol Alta) Yerleştirildi */}
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
@@ -964,7 +983,7 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-0.5 bg-neutral-100 overflow-hidden flex z-0">
+          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1010,7 +1029,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* 🌟 DÜZELTME: Zoom Control Kapatıldı ve Özel Konuma (Sol Alta) Yerleştirildi */}
                 <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
                   <ZoomControl position="bottomleft" />
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
