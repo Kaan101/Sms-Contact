@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 
 // Harita Kütüphaneleri
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -567,7 +567,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.2 (Grid Layout)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.4 (Map UI Updated)</span>
             </div>
           </div>
 
@@ -591,7 +591,6 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
-        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -753,7 +752,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 GÜNCELLENMİŞ YENİ TALEP FORMU (GRID LAYOUT: 2/5 ve 3/5) */}
+              {/* Yeni Talep Ekleme Formu (GRID LAYOUT: 2/5 ve 3/5) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -768,7 +767,7 @@ export default function App() {
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
-                      {/* Özet Satırı (Inputlar Yok, Sadece Metin) */}
+                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                         <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
@@ -798,7 +797,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Gelişmiş Seçenekler Izgarası (Grid Layout) */}
+                      {/* Gelişmiş Seçenekler Izgarası */}
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
@@ -835,7 +834,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ: 3/5 (Konum ve Harita) */}
+                          {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[320px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -846,7 +845,7 @@ export default function App() {
                                <div className="absolute top-2 left-2 right-2 z-[1000]">
                                   <div className="relative">
                                     <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                    <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Adres veya mekan ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" />
+                                    <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" />
                                     {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
                                     
                                     {isSuggestionsVisible && mapSuggestions.length > 0 && (
@@ -861,7 +860,9 @@ export default function App() {
                                   </div>
                                </div>
                                
-                               <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
+                               {/* 🌟 DÜZELTME: Zoom Control Kapatıldı ve Özel Konuma (Sol Alta) Yerleştirildi */}
+                               <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                                 <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                                  <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={(val) => { setLocationValue(val); setMapSearchText(val); }} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                </MapContainer>
@@ -963,7 +964,7 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
+          <div className="absolute inset-0 top-0.5 bg-neutral-100 overflow-hidden flex z-0">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1009,7 +1010,9 @@ export default function App() {
                   )}
                 </div>
 
-                <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0">
+                {/* 🌟 DÜZELTME: Zoom Control Kapatıldı ve Özel Konuma (Sol Alta) Yerleştirildi */}
+                <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
+                  <ZoomControl position="bottomleft" />
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                   <TrackerMapController center={trackerMapCenter} />
                   
@@ -1033,11 +1036,7 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
-                                  <p>👤 {req.contact_value}</p>
-                                  <p>📍 {extractAddress(req.location)}</p>
-                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
-                               </div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
                             </div>
                           </Popup>
                         </Marker>
@@ -1096,7 +1095,7 @@ export default function App() {
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Operasyon Zamanlaması</span></label>
                                 <div className="flex items-center gap-2">
                                   <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
-                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" />
+                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
                                 </div>
                             </div>
                             
@@ -1365,7 +1364,6 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                {/* 🌟 TAMAMLANDI için Yeşil Renk */}
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
