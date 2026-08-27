@@ -534,7 +534,6 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
-  // TRACKER LİSTESİ FİLTRELEME
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -588,7 +587,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.1 (Fluid List)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.2 (Fluid UI Match)</span>
             </div>
           </div>
 
@@ -612,7 +611,6 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
-        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -786,7 +784,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YENİ TALEP FORMU */}
+              {/* 🌟 YENİ TALEP FORMU (GRID LAYOUT) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -875,7 +873,7 @@ export default function App() {
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
                             </div>
                             
-                            <div className="relative w-full h-[300px] md:h-[400px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
+                            <div className="relative w-full h-[300px] md:h-[400px] flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                                <div className="absolute top-2 left-2 right-2 z-[1000]">
                                   <div className="relative">
                                     <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
@@ -907,6 +905,7 @@ export default function App() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                 
                                  <SharedMapClickHandler 
                                    position={mapPosition} 
                                    setPosition={setMapPosition} 
@@ -1021,7 +1020,7 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-80 sm:w-96">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
                     <input 
@@ -1095,9 +1094,9 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ - ESNEK GENİŞLİK (w-[80vw] sm:w-80) */}
+              {/* SAĞ LİSTE PANELİ - ESNEK GENİŞLİK (w-[85vw] sm:w-[35vw]) */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-[80vw] min-w-[240px] max-w-[320px] sm:w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                <div className="absolute top-0 right-0 w-[85vw] sm:w-[35vw] md:w-[30vw] min-w-[220px] max-w-[360px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
                     <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900 truncate">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={16}/></button></div>
                     <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" /></div>
