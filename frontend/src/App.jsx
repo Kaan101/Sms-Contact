@@ -42,7 +42,7 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// İzole Edilmiş Güvenli Harita Bileşenleri
+// HARİTA YÖNETİCİSİ
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -53,6 +53,7 @@ function TrackerMapController({ center }) {
   return null;
 }
 
+// HARİTA TIKLAMA YÖNETİCİSİ
 function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
   const map = useMapEvents({
     click(e) {
@@ -81,7 +82,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   return position ? <Marker position={position} icon={icon || customMarkerIcon} /> : null;
 }
 
-// İzole Edilmiş Admin Tablo Başlığı
+// ADMİN TABLO BAŞLIĞI
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -100,7 +101,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// Güvenli GPS Çıkarıcılar
+// GPS ÇIKARICI FONKSİYONLAR
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -148,8 +149,6 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const emailInputRef = useRef(null);
-  const mapSearchInputRef = useRef(null);
-  const trackerSearchInputRef = useRef(null);
 
   // Müşteri State
   const [queryText, setQueryText] = useState('');
@@ -180,9 +179,7 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
           setMapSuggestions(res.data);
-          if (mapSearchInputRef.current === document.activeElement) {
-            setIsSuggestionsVisible(true);
-          }
+          setIsSuggestionsVisible(true);
         } catch (err) {} finally { setIsMapSearching(false); }
       } else {
         setMapSuggestions([]);
@@ -265,9 +262,7 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
           setTrackerMapSuggestions(res.data);
-          if (trackerSearchInputRef.current === document.activeElement) {
-            setIsTrackerSuggestionsVisible(true);
-          }
+          setIsTrackerSuggestionsVisible(true);
         } catch (err) {} finally { setIsTrackerMapSearching(false); }
       } else {
         setTrackerMapSuggestions([]);
@@ -513,7 +508,7 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
-  // 🌟 DÜZELTME: TRACKER LİSTESİ FİLTRELEME (Harita ile Eşzamanlı)
+  // 🌟 TRACKER LİSTESİ FİLTRELEME (Harita ile Eşzamanlı)
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -557,8 +552,6 @@ export default function App() {
   // CSS Layout Kontrolü
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
-  
-  // 🌟 DÜZELTME: Tracker Ekranı İçin Container padding/margin sıfırlandı ve %100 yükseklik verildi
   if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 relative flex-1 flex flex-col bg-neutral-100 overflow-hidden";
 
   return (
@@ -573,7 +566,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.8 (Final Sync)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.9 (UX Perfected)</span>
             </div>
           </div>
 
@@ -803,7 +796,7 @@ export default function App() {
                               <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 flex flex-col">
                                 <div className="relative w-full z-[1000]">
                                    <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                   <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Sokak, mahalle veya mekan arayın..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border outline-none focus:border-neutral-950 shadow-sm" />
+                                   <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Sokak, mahalle veya mekan arayın..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border outline-none focus:border-neutral-950 shadow-sm" />
                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
                                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
                                        {mapSuggestions.map((sug, idx) => (
@@ -817,7 +810,7 @@ export default function App() {
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0">
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
                                     <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                    <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
+                                    <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={(val) => { setLocationValue(val); setMapSearchText(val); }} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                   </MapContainer>
                                 </div>
                               </div>
@@ -849,7 +842,7 @@ export default function App() {
                     <div className="p-4 pt-0 border-t border-neutral-100">
                       <div className="relative mb-3 mt-3">
                         <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                        <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
+                        <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} onDoubleClick={() => setSearchCustomerHistoryText('')} placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950 font-medium" />
                         {searchCustomerHistoryText && <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
                       </div>
                       <div className="space-y-3 mt-3 max-h-[350px] overflow-y-auto">
@@ -929,6 +922,7 @@ export default function App() {
                       type="text" 
                       value={trackerMapSearchText} 
                       onChange={(e) => setTrackerMapSearchText(e.target.value)} 
+                      onDoubleClick={() => setTrackerMapSearchText('')}
                       onFocus={() => setIsTrackerSuggestionsVisible(true)} 
                       onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} 
                       placeholder="Haritada adres ara ve git..." 
@@ -947,8 +941,8 @@ export default function App() {
                              setTrackerMapCenter([newPos.lat, newPos.lng]); 
                              setTrackerMapSelectedPos(newPos); 
                              setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
-                             setTrackerMapSearchText(sug.display_name); 
-                             setTrackerMapSelectedAddress(sug.display_name); 
+                             setLocationValue(sug.display_name); // Form Location State
+                             setTrackerMapSearchText(sug.display_name); // Harita Search
                              setIsTrackerSuggestionsVisible(false); 
                            }}
                         >
@@ -968,7 +962,7 @@ export default function App() {
                      position={trackerMapSelectedPos} 
                      setPosition={setTrackerMapSelectedPos} 
                      setLocationValue={(val) => {
-                        setTrackerMapSelectedAddress(val);
+                        setLocationValue(val); // Form Modal'ının Location Value State'i
                         setTrackerMapSearchText(val); // Arama kutusunu anında günceller
                      }} 
                      setCoordinates={setCoordinates} 
@@ -1004,7 +998,7 @@ export default function App() {
                 <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200">
                   <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
                     <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={16}/></button></div>
-                    <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200" /></div>
+                    <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200" /></div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50 pb-20">
                     {filteredTrackerRequests.map(req => {
@@ -1025,7 +1019,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YENİ TALEP EKLEME MODALI (Değerler Anlık Taşınır) */}
+              {/* YENİ TALEP EKLEME MODALI */}
               {isTrackerAddModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
                   <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -1039,14 +1033,8 @@ export default function App() {
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin..." className="w-full p-2 text-sm font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                         <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
-                                 <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
-                              </div>
-                              <div>
-                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
-                                 <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
-                              </div>
+                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
+                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label><input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" /></div>
                             </div>
                         </div>
                         <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
@@ -1126,7 +1114,7 @@ export default function App() {
                   <div className="bg-white rounded-xl border p-3 flex justify-between">
                      <div className="relative w-full sm:w-96">
                         <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                        <input type="text" value={searchProviderText} onChange={(e) => setSearchProviderText(e.target.value)} placeholder="Firma ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50" />
+                        <input type="text" value={searchProviderText} onChange={(e) => setSearchProviderText(e.target.value)} onDoubleClick={() => setSearchProviderText('')} placeholder="Firma ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50" />
                      </div>
                      <button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5">
                        <Plus size={13} /><span>Yeni Ekle</span>
