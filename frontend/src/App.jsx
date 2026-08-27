@@ -160,7 +160,7 @@ export default function App() {
   const [coordinates, setCoordinates] = useState(''); 
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
-  const [deadlineTime, setDeadlineTime] = useState('23:59'); // Default 24:00 (23:59)
+  const [deadlineTime, setDeadlineTime] = useState('23:59'); 
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   
@@ -198,7 +198,7 @@ export default function App() {
     );
   };
 
-  // Müşteri Detaylar Açıldığında Otomatik Konum Bul
+  // Müşteri Paneli: Form Detayı Açıldığında Harita Otomatik Mevcut Konuma Gider
   useEffect(() => {
     if (!isDetailsCollapsed && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -206,7 +206,6 @@ export default function App() {
     // eslint-disable-next-line
   }, [isDetailsCollapsed]);
 
-  // Müşteri Harita Arama
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
@@ -568,7 +567,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.0 (UX Refined)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.2 (Grid Layout)</span>
             </div>
           </div>
 
@@ -648,7 +647,7 @@ export default function App() {
 
         {/* ---------------- 2. MÜŞTERİ EKRANI ---------------- */}
         {session?.role === 'CUSTOMER' && (
-          <div className="max-w-2xl mx-auto w-full space-y-6">
+          <div className="max-w-3xl mx-auto w-full space-y-6">
               
               {/* Aktif Talepler */}
               {activeCustomerRequests.length > 0 && (
@@ -754,52 +753,79 @@ export default function App() {
                 </div>
               )}
 
-              {/* Yeni Talep Ekleme Formu (IZGARA TASARIMI 2/5 - 3/5) */}
+              {/* 🌟 GÜNCELLENMİŞ YENİ TALEP FORMU (GRID LAYOUT: 2/5 ve 3/5) */}
               {step === 'INPUT' && (
-                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
-                  <div className="text-center space-y-1"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
-                  <form onSubmit={(e) => handleCustomerCombinedSubmit(e, false)} className="space-y-3">
-                    <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
+                  <div className="text-center space-y-1 mb-2">
+                    <h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2>
+                    <p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p>
+                  </div>
+                  
+                  <form onSubmit={(e) => handleCustomerCombinedSubmit(e, false)} className="space-y-4">
+                    <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
                       <div className="flex gap-2">
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, false); } }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" required />
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
-                      {/* Özet Satırı */}
-                      <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
-                        <span className="flex items-center space-x-1"><MapPin size={12}/><span className="truncate max-w-[200px]">{locationValue || 'Konum Yok'}</span></span>
-                        {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
-                        {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
+                      {/* Özet Satırı (Inputlar Yok, Sadece Metin) */}
+                      <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
+                        <div className="flex flex-col leading-tight">
+                          <span className="flex items-center space-x-1">
+                            <MapPin size={12} className="text-neutral-700"/>
+                            <span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span>
+                          </span>
+                          {coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
+                          {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
+                          {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
+                          <div className="flex items-center space-x-2 border-l border-neutral-200 pl-2">
+                            {preferredChannels.map((c, idx) => (
+                              <React.Fragment key={c}>
+                                <span className="flex items-center space-x-1">
+                                  {c === 'PHONE' && <Phone size={11} />}
+                                  {c === 'SMS' && <MessageSquare size={11} />}
+                                  {c === 'EMAIL' && <Mail size={11} />}
+                                  {c === 'WHATSAPP' && <MessageCircle size={11} />}
+                                  <span>{c === 'PHONE' ? 'Telefon' : c === 'SMS' ? 'SMS' : c === 'EMAIL' ? 'E-posta' : 'WhatsApp'}</span>
+                                </span>
+                                {idx < preferredChannels.length - 1 && <span className="text-neutral-300">•</span>}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* 🌟 YENİ 2 PARÇALI DETAY ALANI (2/5 SOL - 3/5 SAĞ) */}
+                      {/* Gelişmiş Seçenekler Izgarası (Grid Layout) */}
                       {!isDetailsCollapsed && (
-                        <div className="mt-4 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
+                        <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
-                          {/* SOL PARÇA: 2/5 (Zamanlama, Acil ve Kanallar) */}
+                          {/* SOL: 2/5 (Zamanlama ve Kanallar) */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>Zamanlama</span></label>
-                                {deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950 transition" />
-                                <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
-                                <label className={`flex items-center justify-center px-3 h-[34px] rounded-lg border cursor-pointer select-none transition shrink-0 ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                                  <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                  <span className={`text-xs font-bold ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL</span>
+                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
+                                  <span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>
+                                  {deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase">temizle</button>}
                                 </label>
-                              </div>
+                                <div className="flex items-center gap-2">
+                                  <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
+                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" />
+                                  <label className={`flex items-center justify-center px-2.5 h-[34px] rounded-lg border cursor-pointer select-none transition shrink-0 ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                    <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                    <span className={`text-xs font-bold ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL</span>
+                                  </label>
+                                </div>
                             </div>
                             
                             <div className="space-y-2">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihleri</label>
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
                               <div className="grid grid-cols-2 gap-2">
-                                <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><Phone size={13} /><span>Telefon</span></button>
-                                <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><MessageSquare size={13} /><span>SMS</span></button>
-                                <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><Mail size={13} /><span>E-posta</span></button>
-                                <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Phone size={13} /><span>Telefon</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageSquare size={13} /><span>SMS</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span>E-posta</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
                               </div>
                               {preferredChannels.includes('EMAIL') && (
                                 <div className="animate-in fade-in duration-150 pt-1">
@@ -809,43 +835,46 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
-                          <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 flex flex-col">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Seçimi</span></label>
+                          {/* SAĞ: 3/5 (Konum ve Harita) */}
+                          <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[320px]">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
                             </div>
-                            <div className="flex gap-2">
-                              <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres veya konum adı..." className="flex-1 min-w-0 p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium transition" />
-                              <input type="text" value={coordinates} readOnly placeholder="Koordinat" className="w-28 sm:w-32 p-2 text-[10px] sm:text-[11px] rounded-lg border outline-none bg-neutral-100 font-mono text-neutral-500 cursor-not-allowed shrink-0 transition" />
-                            </div>
                             
-                            <div className="relative w-full h-48 sm:h-56 lg:h-64 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 flex-1">
-                              <div className="absolute top-2 left-2 right-2 z-[1000]">
-                                 <div className="relative">
-                                   <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                   <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border outline-none focus:border-neutral-950 shadow-sm bg-white/90 backdrop-blur-sm transition" />
-                                   {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
-                                   {isSuggestionsVisible && mapSuggestions.length > 0 && (
-                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
-                                       {mapSuggestions.map((sug, idx) => (
-                                         <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(sug.display_name); setIsSuggestionsVisible(false); }}>
-                                           <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
-                                         </div>
-                                       ))}
-                                     </div>
-                                   )}
-                                 </div>
-                              </div>
-                              <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
-                                <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={(val) => { setLocationValue(val); setMapSearchText(val); }} setCoordinates={setCoordinates} icon={customMarkerIcon} />
-                              </MapContainer>
+                            <div className="relative w-full flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner">
+                               <div className="absolute top-2 left-2 right-2 z-[1000]">
+                                  <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                                    <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Adres veya mekan ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" />
+                                    {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
+                                    
+                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
+                                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
+                                        {mapSuggestions.map((sug, idx) => (
+                                          <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(sug.display_name); setIsSuggestionsVisible(false); }}>
+                                            <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                               </div>
+                               
+                               <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
+                                 <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={(val) => { setLocationValue(val); setMapSearchText(val); }} setCoordinates={setCoordinates} icon={customMarkerIcon} />
+                               </MapContainer>
                             </div>
                           </div>
+
                         </div>
                       )}
-                      <div className="flex items-center justify-end pt-3 mt-1 border-t border-neutral-200/60 px-1"><button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm transition">Gönder</button></div>
+                      <div className="flex items-center justify-end pt-4 mt-2 border-t border-neutral-200/60 px-1">
+                        <button type="submit" disabled={loading || !queryText.trim()} className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
+                           {loading ? <span>Gönderiliyor...</span> : <><span>Talebi Gönder</span><ArrowRight size={14} /></>}
+                        </button>
+                      </div>
                     </div>
                   </form>
                 </div>
@@ -1056,20 +1085,18 @@ export default function App() {
 
                     <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-4">
                       
-                      {/* Üst Alan: Sadece Talep Metni */}
                       <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin (Örn: Çekiciye ihtiyacım var)..." className="w-full p-2 text-base font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                       </div>
 
-                      {/* Alt Izgara: 2/5 - 3/5 Layout (Müşteri ekranındaki gibi) */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                          {/* SOL: 2/5 (Zamanlama ve Aciliyet) */}
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-4">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Operasyon Zamanlaması</span></label>
                                 <div className="flex items-center gap-2">
                                   <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
-                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
+                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" />
                                 </div>
                             </div>
                             
@@ -1079,7 +1106,7 @@ export default function App() {
                             </label>
                           </div>
 
-                          {/* SAĞ: 3/5 (Konum Bilgileri) */}
+                          {/* SAĞ: 3/5 */}
                           <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6">
                             <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span>Konum Verisi</span></label>
                             <div className="space-y-2">
@@ -1338,8 +1365,8 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                {/* 🌟 DÜZELTME: Tamamlandı için yeşil renk */}
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
+                                {/* 🌟 TAMAMLANDI için Yeşil Renk */}
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
