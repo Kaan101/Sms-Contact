@@ -160,17 +160,53 @@ export default function App() {
   const [coordinates, setCoordinates] = useState(''); 
   const [isUrgent, setIsUrgent] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState('');
-  const [deadlineTime, setDeadlineTime] = useState('');
+  const [deadlineTime, setDeadlineTime] = useState('23:59'); // Default 24:00 (23:59)
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   
-  const [showMap, setShowMap] = useState(false);
   const [mapPosition, setMapPosition] = useState(null);
   const [mapSearchText, setMapSearchText] = useState('');
   const [isMapSearching, setIsMapSearching] = useState(false);
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setMapPosition({ lat: latitude, lng: longitude });
+        setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        try {
+          const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
+          const addr = geoRes.data.address;
+          const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
+          const city = addr.city || addr.province || '';
+          setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
+        } catch {
+          setLocationValue(`Haritadan İşaretlendi`);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        console.warn('Konum alınamadı:', err.message);
+        setIsLocating(false);
+      },
+      { timeout: 8000 }
+    );
+  };
+
+  // Müşteri Detaylar Açıldığında Otomatik Konum Bul
+  useEffect(() => {
+    if (!isDetailsCollapsed && !mapPosition && !isLocating) {
+      fetchCurrentLocation();
+    }
+    // eslint-disable-next-line
+  }, [isDetailsCollapsed]);
+
+  // Müşteri Harita Arama
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
@@ -281,35 +317,6 @@ export default function App() {
       }
     });
     setErrorMessage('');
-  };
-
-  const fetchCurrentLocation = () => {
-    if (!navigator.geolocation) return;
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setMapPosition({ lat: latitude, lng: longitude });
-        setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-        setShowMap(true);
-        try {
-          const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
-          const addr = geoRes.data.address;
-          const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
-          const city = addr.city || addr.province || '';
-          setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
-        } catch {
-          setLocationValue(`Haritadan İşaretlendi`);
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      (err) => {
-        console.warn('Konum alınamadı:', err.message);
-        setIsLocating(false);
-      },
-      { timeout: 8000 }
-    );
   };
 
   const fetchCustomerData = async () => {
@@ -442,9 +449,9 @@ export default function App() {
         rawText: queryText, disambiguationChoice: disambiguationChoice, contactValue: finalContactValue,
         preferredChannel: channelString, location: backendLocation, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
       });
-      setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime(''); setContactEmail(''); 
+      setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); 
       setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE']); setStep('INPUT'); setIsDetailsCollapsed(true); 
-      setShowMap(false); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage('');
+      setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage('');
       
       if (fromTracker) {
         setIsTrackerAddModalOpen(false);
@@ -544,9 +551,6 @@ export default function App() {
   
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
-  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
-  const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
-  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
@@ -564,7 +568,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.9 (Settings Restored)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.0 (UX Refined)</span>
             </div>
           </div>
 
@@ -588,6 +592,7 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
+        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -693,7 +698,6 @@ export default function App() {
                               <div className="px-3 pb-3">
                                  <div className={`p-2 rounded text-[11px] flex items-center space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
                                    {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce" />}
-                                   {/* 🌟 METİN DÜZELTMESİ: "Sağlayıcı talebi aldı" */}
                                    <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi aldı. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
                                  </div>
                               </div>
@@ -750,7 +754,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Yeni Talep Ekleme Formu */}
+              {/* Yeni Talep Ekleme Formu (IZGARA TASARIMI 2/5 - 3/5) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
                   <div className="text-center space-y-1"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
@@ -760,59 +764,84 @@ export default function App() {
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustomerCombinedSubmit(e, false); } }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal bg-transparent border-none outline-none resize-none" required />
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
+                      
+                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-center gap-2.5 px-2 pb-3 text-[11px] font-mono text-neutral-500">
                         <span className="flex items-center space-x-1"><MapPin size={12}/><span className="truncate max-w-[200px]">{locationValue || 'Konum Yok'}</span></span>
                         {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
                         {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
                       </div>
+
+                      {/* 🌟 YENİ 2 PARÇALI DETAY ALANI (2/5 SOL - 3/5 SAĞ) */}
                       {!isDetailsCollapsed && (
-                        <div className="mt-4 pt-5 border-t border-neutral-200/70 space-y-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div><div className="flex items-center justify-between mb-1"><label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>En Son Tarih</span></label></div><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
-                            <div><div className="flex items-center justify-between mb-1"><label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Clock size={12} className="text-neutral-700" /><span>En Son Saat</span></label></div><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-full p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
-                            <div className="flex items-end"><label className={`flex items-center justify-center space-x-2 w-full p-2 h-[34px] rounded-lg border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}><input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" /><div className="flex items-center space-x-1.5 text-xs font-bold"><Flame size={14} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL</span></div></label></div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white'}`}><Phone size={13} /><span>Telefon</span></button>
-                              <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white'}`}><MessageSquare size={13} /><span>SMS</span></button>
-                            </div>
-                          </div>
-                          <div className="pt-3 border-t border-neutral-100">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Seçimi</span></label>
-                              <div className="flex items-center space-x-2">
-                                <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 font-semibold"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> GPS Kullan</button>
-                                <button type="button" onClick={() => setShowMap(!showMap)} className="text-[10px] font-mono text-emerald-600 font-semibold"><MapPin size={10} /> {showMap ? 'Haritayı Kapat' : 'Haritada Göster'}</button>
+                        <div className="mt-4 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
+                          
+                          {/* SOL PARÇA: 2/5 (Zamanlama, Acil ve Kanallar) */}
+                          <div className="md:col-span-2 space-y-5">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700" /><span>Zamanlama</span></label>
+                                {deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline">Temizle</button>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950 transition" />
+                                <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none bg-white focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
+                                <label className={`flex items-center justify-center px-3 h-[34px] rounded-lg border cursor-pointer select-none transition shrink-0 ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                  <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                  <span className={`text-xs font-bold ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL</span>
+                                </label>
                               </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div className="sm:col-span-2"><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
-                              <div className="sm:col-span-1"><input type="text" value={coordinates} readOnly placeholder="Koordinat" className="w-full p-2.5 text-[11px] rounded-lg border outline-none bg-neutral-100 font-mono text-neutral-500 cursor-not-allowed" /></div>
+                            
+                            <div className="space-y-2">
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihleri</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><Phone size={13} /><span>Telefon</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><MessageSquare size={13} /><span>SMS</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><Mail size={13} /><span>E-posta</span></button>
+                                <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white text-neutral-700 hover:bg-neutral-50'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
+                              </div>
+                              {preferredChannels.includes('EMAIL') && (
+                                <div className="animate-in fade-in duration-150 pt-1">
+                                  <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
+                                </div>
+                              )}
                             </div>
-                            {showMap && (
-                              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 flex flex-col">
-                                <div className="relative w-full z-[1000]">
+                          </div>
+
+                          {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
+                          <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 flex flex-col">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Konum Seçimi</span></label>
+                              <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
+                            </div>
+                            <div className="flex gap-2">
+                              <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres veya konum adı..." className="flex-1 min-w-0 p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium transition" />
+                              <input type="text" value={coordinates} readOnly placeholder="Koordinat" className="w-28 sm:w-32 p-2 text-[10px] sm:text-[11px] rounded-lg border outline-none bg-neutral-100 font-mono text-neutral-500 cursor-not-allowed shrink-0 transition" />
+                            </div>
+                            
+                            <div className="relative w-full h-48 sm:h-56 lg:h-64 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 flex-1">
+                              <div className="absolute top-2 left-2 right-2 z-[1000]">
+                                 <div className="relative">
                                    <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                   <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Sokak, mahalle veya mekan arayın..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border outline-none focus:border-neutral-950 shadow-sm" />
+                                   <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border outline-none focus:border-neutral-950 shadow-sm bg-white/90 backdrop-blur-sm transition" />
+                                   {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
                                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
                                        {mapSuggestions.map((sug, idx) => (
-                                         <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(sug.display_name); setIsSuggestionsVisible(false); }}>
+                                         <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(sug.display_name); setIsSuggestionsVisible(false); }}>
                                            <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
                                          </div>
                                        ))}
                                      </div>
                                    )}
-                                </div>
-                                <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0">
-                                  <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
-                                    <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                    <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
-                                  </MapContainer>
-                                </div>
+                                 </div>
                               </div>
-                            )}
+                              <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
+                                <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={(val) => { setLocationValue(val); setMapSearchText(val); }} setCoordinates={setCoordinates} icon={customMarkerIcon} />
+                              </MapContainer>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -907,8 +936,8 @@ export default function App() {
         {session?.role === 'TRACKER' && (
           <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
-                 <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
-                 <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
+                 <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
+                 <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
               </div>
 
               {/* HARİTA ALANI */}
@@ -924,7 +953,7 @@ export default function App() {
                       onFocus={() => setIsTrackerSuggestionsVisible(true)} 
                       onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} 
                       placeholder="Haritada adres ara ve git..." 
-                      className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm" 
+                      className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition" 
                     />
                   </div>
                   {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
@@ -932,7 +961,7 @@ export default function App() {
                       {trackerMapSuggestions.map((sug, idx) => (
                         <div 
                            key={idx} 
-                           className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" 
+                           className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
                            onMouseDown={(e) => { 
                              e.preventDefault(); 
                              const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; 
@@ -975,7 +1004,11 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
+                                  <p>👤 {req.contact_value}</p>
+                                  <p>📍 {extractAddress(req.location)}</p>
+                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
+                               </div>
                             </div>
                           </Popup>
                         </Marker>
@@ -988,10 +1021,10 @@ export default function App() {
 
               {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
-                    <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={16}/></button></div>
-                    <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200" /></div>
+                    <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition"><X size={16}/></button></div>
+                    <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" /></div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50 pb-20">
                     {filteredTrackerRequests.map(req => {
@@ -1015,31 +1048,55 @@ export default function App() {
               {/* YENİ TALEP EKLEME MODALI */}
               {isTrackerAddModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
-                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
-                       <div><h3 className="font-bold text-sm text-neutral-950">Manuel Operasyon Ekle</h3><p className="text-[10px] text-neutral-500 font-mono">Merkezden havuza yeni talep bırakın.</p></div>
-                       <button onClick={() => setIsTrackerAddModalOpen(false)} className="p-1 text-neutral-400 hover:text-neutral-900 bg-neutral-100 rounded-md transition"><X size={16}/></button>
+                  <div className="bg-white rounded-2xl max-w-4xl w-full p-6 border border-neutral-200 shadow-xl max-h-[95vh] overflow-y-auto">
+                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-neutral-100">
+                       <div><h3 className="font-bold text-lg text-neutral-950">Manuel Operasyon Ekle</h3><p className="text-xs text-neutral-500 font-mono mt-0.5">Merkezden havuza yeni talep bırakın.</p></div>
+                       <button onClick={() => setIsTrackerAddModalOpen(false)} className="p-1.5 text-neutral-400 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition"><X size={18}/></button>
                     </div>
 
-                    <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-3">
-                      <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-2.5 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
-                        <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin..." className="w-full p-2 text-sm font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
-                        <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
-                                 <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
-                              </div>
-                              <div>
-                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
-                                 <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} onDoubleClick={() => setCoordinates('')} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
-                              </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
-                          <button type="submit" disabled={loading || !queryText.trim()} className="px-5 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold">Operasyonu Başlat</button>
-                        </div>
+                    <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-4">
+                      
+                      {/* Üst Alan: Sadece Talep Metni */}
+                      <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
+                        <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin (Örn: Çekiciye ihtiyacım var)..." className="w-full p-2 text-base font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                       </div>
+
+                      {/* Alt Izgara: 2/5 - 3/5 Layout (Müşteri ekranındaki gibi) */}
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                          {/* SOL: 2/5 (Zamanlama ve Aciliyet) */}
+                          <div className="md:col-span-2 space-y-4">
+                            <div>
+                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Operasyon Zamanlaması</span></label>
+                                <div className="flex items-center gap-2">
+                                  <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
+                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
+                                </div>
+                            </div>
+                            
+                            <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span></div>
+                            </label>
+                          </div>
+
+                          {/* SAĞ: 3/5 (Konum Bilgileri) */}
+                          <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6">
+                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span>Konum Verisi</span></label>
+                            <div className="space-y-2">
+                               <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-sm rounded-xl border outline-none bg-white focus:border-neutral-950 font-medium transition" />
+                               <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} onDoubleClick={() => setCoordinates('')} placeholder="Koordinat (Örn: 40.123, 29.123)" className="w-full p-2.5 text-xs rounded-xl border outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 font-mono transition" />
+                            </div>
+                            <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">Haritadan veya arama çubuğundan seçtiğiniz konum bilgileri buraya otomatik olarak yansıtılmıştır. Dilerseniz manuel düzeltebilirsiniz.</p>
+                          </div>
+                      </div>
+
+                      <div className="flex items-center justify-end pt-4 mt-4 border-t border-neutral-200/60">
+                        <button type="button" onClick={() => setIsTrackerAddModalOpen(false)} className="px-4 py-2 border rounded-xl text-xs font-semibold text-neutral-600 mr-2 hover:bg-neutral-50 transition">Vazgeç</button>
+                        <button type="submit" disabled={loading || !queryText.trim()} className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center space-x-2">
+                           {loading ? <span>Başlatılıyor...</span> : <><span>Operasyonu Başlat</span><ArrowRight size={16} /></>}
+                        </button>
+                      </div>
+
                     </form>
                   </div>
                 </div>
@@ -1068,164 +1125,25 @@ export default function App() {
               {/* SİSTEM AYARLARI */}
               {adminTab === 'SETTINGS' && (
                 <div className="space-y-4">
-                  <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+                  <div className="bg-white p-5 rounded-2xl border shadow-sm">
                     <div className="flex items-center space-x-2 mb-4">
                       <Settings className="text-neutral-700" size={18} />
                       <h3 className="font-bold text-neutral-950">Sistem Ayarları ve Parametreler</h3>
                     </div>
-
-                    {/* Alt Sekmeler (Tabs) */}
-                    <div className="flex items-center space-x-6 border-b border-neutral-200 mb-5">
-                      <button onClick={() => setSettingsTab('GENERAL')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'GENERAL' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
-                        Genel Kurallar
-                      </button>
-                      <button onClick={() => setSettingsTab('TIMEOUTS')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'TIMEOUTS' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
-                        Zaman Aşımları (Timeout)
-                      </button>
-                      <button onClick={() => setSettingsTab('INTEGRATIONS')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'INTEGRATIONS' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
-                        API & Entegrasyon
-                      </button>
-                    </div>
-
-                    {/* Sekme İçerikleri */}
-                    <div className="min-h-[250px]">
-                      
-                      {/* --- GENEL AYARLAR TABLOSU --- */}
-                      {settingsTab === 'GENERAL' && (
-                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
-                          <table className="w-full text-left text-xs table-auto">
-                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
-                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
-                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
-                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 bg-white">
-                              <tr className="hover:bg-neutral-50 transition">
-                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
-                                  <div className="flex items-center space-x-1.5">
-                                    <Clock size={14} className="text-blue-600"/>
-                                    <span>Varsayılan Bitiş Süresi</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 align-middle text-neutral-500">
-                                  Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?
-                                </td>
-                                <td className="px-4 py-3 align-middle text-center">
-                                  <input 
-                                    type="number" min="1" 
-                                    value={systemSettings.default_deadline_days || ''} 
-                                    onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} 
-                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 align-middle text-right">
-                                  <button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
-                                    <Save size={12} /><span>Kaydet</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {/* --- ZAMAN AŞIMLARI TABLOSU --- */}
-                      {settingsTab === 'TIMEOUTS' && (
-                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
-                          <table className="w-full text-left text-xs table-auto">
-                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
-                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
-                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
-                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 bg-white">
-                              {/* Timeout Onay Bekleme */}
-                              <tr className="hover:bg-neutral-50 transition">
-                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
-                                  <div className="flex items-center space-x-1.5">
-                                    <Timer size={14} className="text-rose-500"/>
-                                    <span>Onay Bekleme (Dk)</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 align-middle text-neutral-500">
-                                  Eşleşen sağlayıcı bu süre içinde işi <b>kabul etmezse</b>, sistem otomatik sıradakine geçer.
-                                </td>
-                                <td className="px-4 py-3 align-middle text-center">
-                                  <input 
-                                    type="number" min="1" 
-                                    value={systemSettings.timeout_matched_mins || ''} 
-                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_matched_mins: e.target.value})} 
-                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 align-middle text-right">
-                                  <button onClick={() => handleSaveSystemSetting('timeout_matched_mins', systemSettings.timeout_matched_mins)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
-                                    <Save size={12} /><span>Kaydet</span>
-                                  </button>
-                                </td>
-                              </tr>
-                              
-                              {/* Timeout Teslim Etmeme */}
-                              <tr className="hover:bg-rose-50/30 transition">
-                                <td className="px-4 py-3 align-middle font-bold text-rose-950">
-                                  <div className="flex items-center space-x-1.5">
-                                    <AlertTriangle size={14} className="text-rose-600"/>
-                                    <span>Teslim Etmeme (Saat)</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 align-middle text-rose-700/80">
-                                  Kabul edilen iş bu sürede <b>tamamlanmazsa</b> sıradakine geçer (Sahada kargaşa yaratabilir).
-                                </td>
-                                <td className="px-4 py-3 align-middle text-center">
-                                  <input 
-                                    type="number" min="1" 
-                                    value={systemSettings.timeout_accepted_hours || ''} 
-                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_accepted_hours: e.target.value})} 
-                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-rose-300 outline-none focus:border-rose-950 text-rose-950" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 align-middle text-right">
-                                  <button onClick={() => handleSaveSystemSetting('timeout_accepted_hours', systemSettings.timeout_accepted_hours)} className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
-                                    <Save size={12} /><span>Kaydet</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {/* --- API & ENTEGRASYON TABLOSU --- */}
-                      {settingsTab === 'INTEGRATIONS' && (
-                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
-                          <table className="w-full text-left text-xs table-auto">
-                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3 font-semibold w-1/4">Entegrasyon Adı</th>
-                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
-                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
-                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 bg-white">
-                              <tr>
-                                <td colSpan="4" className="px-4 py-12 text-center text-neutral-400">
-                                  <Link2 size={24} className="mx-auto mb-2 text-neutral-300" />
-                                  <span className="font-semibold text-neutral-600 block">WhatsApp & SMS API Değişkenleri</span>
-                                  <span className="text-[10px]">Twilio ve Meta (WhatsApp Cloud API) webhook key ve token ayarları yakında buraya eklenecektir.</span>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      
+                    <div className="overflow-x-auto w-full border rounded-xl">
+                      <table className="w-full text-left text-xs table-auto">
+                        <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
+                          <tr><th className="px-4 py-3 w-1/4">Ayar Adı</th><th className="px-4 py-3 w-2/4">Açıklama</th><th className="px-4 py-3 w-32 text-center">Değer</th><th className="px-4 py-3 w-24 text-right">İşlem</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 bg-white">
+                          <tr className="hover:bg-neutral-50">
+                            <td className="px-4 py-3 font-bold text-neutral-900">Varsayılan Bitiş Süresi</td>
+                            <td className="px-4 py-3 text-neutral-500">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</td>
+                            <td className="px-4 py-3 text-center"><input type="number" min="1" value={systemSettings.default_deadline_days || ''} onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none" /></td>
+                            <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold">Kaydet</button></td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
@@ -1311,7 +1229,7 @@ export default function App() {
               {adminTab === 'SMS_LOGS' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
                   {filteredSmsLogs.map((log) => (
-                     <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
+                    <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
                         <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
                         <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span>
@@ -1420,7 +1338,8 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
+                                {/* 🌟 DÜZELTME: Tamamlandı için yeşil renk */}
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
