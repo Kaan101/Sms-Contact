@@ -78,7 +78,6 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
     }
   }, [position, map]);
 
-  // 🌟 DÜZELTME: Pin üzerine tıklandığında seçimi temizler (Müşteri & Tracker)
   return position ? (
     <Marker 
       position={position} 
@@ -220,7 +219,6 @@ export default function App() {
     // eslint-disable-next-line
   }, [isDetailsCollapsed]);
 
-  // 🌟 DÜZELTME: Müşteri Paneli Otomatik Tamamlama (Ref eklendi)
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (mapSearchText.length > 2) {
@@ -591,7 +589,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 12.2 (Solid UX)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.0 (Map Bulletproof)</span>
             </div>
           </div>
 
@@ -615,6 +613,7 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
+        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -788,7 +787,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YENİ TALEP FORMU (GRID LAYOUT) */}
+              {/* 🌟 YENİ TALEP FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -837,7 +836,7 @@ export default function App() {
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
-                          {/* SOL: 2/5 */}
+                          {/* SOL: 2/5 (Zamanlama ve Kanallar) */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -870,14 +869,15 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ: 3/5 */}
+                          {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
                             </div>
                             
-                            <div className="relative w-full h-[350px] md:h-full flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
+                            {/* 🌟 DÜZELTME: MOBİL HARİTA ÇÖKMESİNİ ÖNLEYEN SABİT YÜKSEKLİKLER */}
+                            <div className="relative w-full h-[300px] sm:h-[350px] md:h-full rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                                <div className="absolute top-2 left-2 right-2 z-[1000]">
                                   <div className="relative">
                                     <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
@@ -897,7 +897,7 @@ export default function App() {
                                     {isSuggestionsVisible && mapSuggestions.length > 0 && (
                                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
                                         {mapSuggestions.map((sug, idx) => (
-                                          <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(sug.display_name); setIsSuggestionsVisible(false); }}>
+                                          <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); setIsSuggestionsVisible(false); }}>
                                             <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
                                           </div>
                                         ))}
@@ -910,7 +910,6 @@ export default function App() {
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                                  
-                                 {/* 🌟 DÜZELTME: Müşteri Paneli Search Kutusuna Dokunmaz */}
                                  <SharedMapClickHandler 
                                    position={mapPosition} 
                                    setPosition={setMapPosition} 
@@ -1053,7 +1052,7 @@ export default function App() {
                              setTrackerMapSelectedPos(newPos); 
                              setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
                              setLocationValue(sug.display_name); // Form Location State
-                             setTrackerMapSearchText(sug.display_name); // Harita Search
+                             setTrackerMapSearchText(''); // Harita Search Temizlenir
                              setIsTrackerSuggestionsVisible(false); 
                            }}
                         >
@@ -1074,7 +1073,6 @@ export default function App() {
                      setPosition={setTrackerMapSelectedPos} 
                      setLocationValue={(val) => {
                         setLocationValue(val); 
-                        setTrackerMapSearchText(val); 
                      }} 
                      setCoordinates={setCoordinates} 
                      icon={trackerSelectionIcon} 
@@ -1116,7 +1114,7 @@ export default function App() {
                            onClick={() => { 
                              if(coords) {
                                setTrackerMapCenter(coords); 
-                               setTrackerMapSelectedPos(null); // 🌟 Tıklananı sil
+                               setTrackerMapSelectedPos(null); // 🌟 Seçimi Temizle
                                setTrackerMapSelectedAddress('');
                                setCoordinates('');
                              } 
@@ -1428,7 +1426,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
