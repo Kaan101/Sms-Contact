@@ -141,8 +141,6 @@ export default function App() {
   });
 
   const [authStep, setAuthStep] = useState('PHONE');
-  
-  // 🌟 DÜZELTME: Telefon numarasını localStorage'dan (varsa) otomatik getir
   const [inputPhone, setInputPhone] = useState(() => localStorage.getItem('sc_last_phone') || '');
   const [inputOtp, setInputOtp] = useState('');
   const [simulatedCode, setSimulatedCode] = useState(null);
@@ -150,6 +148,8 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const emailInputRef = useRef(null);
+  const mapSearchInputRef = useRef(null);
+  const trackerSearchInputRef = useRef(null);
 
   // Müşteri State
   const [queryText, setQueryText] = useState('');
@@ -200,7 +200,6 @@ export default function App() {
     );
   };
 
-  // Müşteri Paneli: Form Detayı Açıldığında Harita Otomatik Mevcut Konuma Gider
   useEffect(() => {
     if (!isDetailsCollapsed && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -215,7 +214,9 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
           setMapSuggestions(res.data);
-          setIsSuggestionsVisible(true);
+          if (mapSearchInputRef.current === document.activeElement) {
+            setIsSuggestionsVisible(true);
+          }
         } catch (err) {} finally { setIsMapSearching(false); }
       } else {
         setMapSuggestions([]);
@@ -298,7 +299,9 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
           setTrackerMapSuggestions(res.data);
-          setIsTrackerSuggestionsVisible(true);
+          if (trackerSearchInputRef.current === document.activeElement) {
+            setIsTrackerSuggestionsVisible(true);
+          }
         } catch (err) {} finally { setIsTrackerMapSearching(false); }
       } else {
         setTrackerMapSuggestions([]);
@@ -412,7 +415,7 @@ export default function App() {
       const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); 
       setSimulatedCode(res.data.simulatedOtp); 
       setAuthStep('OTP'); 
-      localStorage.setItem('sc_last_phone', inputPhone.trim()); // 🌟 Yeni Eklenen Telefon Hafızası
+      localStorage.setItem('sc_last_phone', inputPhone.trim());
     } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
     finally { setAuthLoading(false); } 
   };
@@ -519,7 +522,6 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
-  // TRACKER LİSTESİ FİLTRELEME
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -573,7 +575,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.5 (Fast Auth)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.6 (Robust Layout)</span>
             </div>
           </div>
 
@@ -597,7 +599,6 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
-        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -639,7 +640,6 @@ export default function App() {
                   </div>
                 )}
                 <div>
-                  {/* 🌟 YENİ: Çift Tıklama Uyarı Etiketi */}
                   <label className="block text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">4 Haneli Kod (Çift tıkla yapıştır)</label>
                   <input 
                     type="tel" 
@@ -649,7 +649,7 @@ export default function App() {
                     maxLength={4} 
                     value={inputOtp} 
                     onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))} 
-                    onDoubleClick={() => { if(simulatedCode) setInputOtp(String(simulatedCode)); }} // 🌟 YENİ: Çift Tıklama Özelliği
+                    onDoubleClick={() => { if(simulatedCode) setInputOtp(String(simulatedCode)); }}
                     placeholder="1234" 
                     className="w-full p-3 text-center text-2xl tracking-[0.4em] font-mono font-bold rounded-xl border border-neutral-200 focus:border-neutral-950 outline-none cursor-pointer" 
                     title="Simüle edilen kodu yapıştırmak için çift tıklayın"
@@ -666,7 +666,7 @@ export default function App() {
 
         {/* ---------------- 2. MÜŞTERİ EKRANI ---------------- */}
         {session?.role === 'CUSTOMER' && (
-          <div className="max-w-2xl mx-auto w-full space-y-6">
+          <div className="max-w-3xl mx-auto w-full space-y-6">
               
               {/* Aktif Talepler */}
               {activeCustomerRequests.length > 0 && (
@@ -789,7 +789,7 @@ export default function App() {
                       
                       {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
-                        <div className="flex flex-col leading-tight">
+                        <div className="flex flex-col leading-none">
                           <span className="flex items-center space-x-1">
                             <MapPin size={12} className="text-neutral-700"/>
                             <span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span>
@@ -855,17 +855,26 @@ export default function App() {
                           </div>
 
                           {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
-                          <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[320px]">
+                          <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
                               <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
                             </div>
                             
-                            <div className="relative w-full flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner">
+                            <div className="relative w-full flex-1 min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                                <div className="absolute top-2 left-2 right-2 z-[1000]">
                                   <div className="relative">
                                     <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                                    <input type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onDoubleClick={() => setMapSearchText('')} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" />
+                                    <input 
+                                      type="text" 
+                                      value={mapSearchText} 
+                                      onChange={(e) => setMapSearchText(e.target.value)} 
+                                      onDoubleClick={() => setMapSearchText('')} 
+                                      onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} 
+                                      onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} 
+                                      placeholder="Haritada mekan veya adres ara..." 
+                                      className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" 
+                                    />
                                     {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
                                     
                                     {isSuggestionsVisible && mapSuggestions.length > 0 && (
@@ -1102,12 +1111,14 @@ export default function App() {
 
                     <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-4">
                       
+                      {/* Üst Alan: Sadece Talep Metni */}
                       <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin (Örn: Çekiciye ihtiyacım var)..." className="w-full p-2 text-base font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                       </div>
 
+                      {/* Alt Izgara: 2/5 - 3/5 Layout (Müşteri ekranındaki gibi inputsuz/özet tasarımlı) */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                          {/* SOL: 2/5 */}
+                          {/* SOL: 2/5 (Zamanlama ve Aciliyet) */}
                           <div className="md:col-span-2 space-y-4">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Operasyon Zamanlaması</span></label>
@@ -1123,14 +1134,19 @@ export default function App() {
                             </label>
                           </div>
 
-                          {/* SAĞ: 3/5 */}
+                          {/* SAĞ: 3/5 (Konum Bilgileri ÖZET METNİ) */}
                           <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6">
-                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span>Konum Verisi</span></label>
-                            <div className="space-y-2">
-                               <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-sm rounded-xl border outline-none bg-white focus:border-neutral-950 font-medium transition" />
-                               <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} onDoubleClick={() => setCoordinates('')} placeholder="Koordinat (Örn: 40.123, 29.123)" className="w-full p-2.5 text-xs rounded-xl border outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 font-mono transition" />
+                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span>Seçilen Konum</span></label>
+                            
+                            <div className="flex flex-col leading-none p-3 bg-neutral-50 rounded-xl border border-neutral-200 shadow-inner">
+                              <span className="flex items-start space-x-2">
+                                <MapPin size={16} className="text-blue-600 shrink-0"/>
+                                <span className="font-semibold text-sm text-neutral-900 leading-snug">{locationValue || 'Konum Seçilmedi'}</span>
+                              </span>
+                              {coordinates && <span className="pl-6 text-[11px] mt-1 text-neutral-500 font-mono tracking-wide">{coordinates}</span>}
                             </div>
-                            <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">Haritadan veya arama çubuğundan seçtiğiniz konum bilgileri buraya otomatik olarak yansıtılmıştır. Dilerseniz manuel düzeltebilirsiniz.</p>
+                            
+                            <p className="text-[10px] text-neutral-400 font-mono leading-relaxed mt-2">Bu konum bilgisi az önce arka plandaki haritadan seçtiğiniz noktadan otomatik olarak alınmıştır.</p>
                           </div>
                       </div>
 
