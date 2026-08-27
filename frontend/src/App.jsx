@@ -567,7 +567,6 @@ export default function App() {
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
   
-  // 🌟 DÜZELTME: WOZ Arama Filtrelemesi
   const filteredWozProviders = providers.filter(p => { 
     const q = wozProviderSearch.toLowerCase().trim(); 
     if (!q) return true; 
@@ -595,7 +594,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.3 (Woz Menu)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.4 (Impersonation Restored)</span>
             </div>
           </div>
 
@@ -793,7 +792,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* YENİ TALEP FORMU */}
+              {/* 🌟 YENİ TALEP FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -808,6 +807,7 @@ export default function App() {
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
+                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                         <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
@@ -841,7 +841,7 @@ export default function App() {
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
-                          {/* SOL: 2/5 */}
+                          {/* SOL: 2/5 (Zamanlama ve Kanallar) */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -874,7 +874,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ: 3/5 */}
+                          {/* SAĞ PARÇA: 3/5 (Konum ve Harita) */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -1242,7 +1242,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 DÜZELTME: WOZ HAVUZU VE YENİ EKLE BUTONU */}
+              {/* WOZ HAVUZU */}
               {adminTab === 'WOZ' && (
                 <div className="space-y-3">
                   <div className="flex justify-end">
@@ -1286,10 +1286,16 @@ export default function App() {
                           <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
                             <h3 className="font-bold text-neutral-900">{prov.name}</h3>
                             <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
-                            <div className="mt-2 pt-2 border-t flex justify-between">
-                              <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 text-xs font-semibold">Düzenle</button>
-                              <button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 text-xs font-semibold">Sil</button>
+                            
+                            {/* 🌟 DÜZELTME: Düzenle/Sil yanına "Bağlan" eklendi */}
+                            <div className="mt-2 pt-2 border-t flex items-center justify-between">
+                               <div className="flex space-x-2">
+                                 <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
+                                 <button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button>
+                               </div>
+                               <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap"><ExternalLink size={12} /><span>Bağlan</span></button>
                             </div>
+                            
                           </div>
                         ))}
                       </div>
@@ -1442,7 +1448,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
