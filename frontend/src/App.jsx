@@ -59,6 +59,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
       const { lat, lng } = e.latlng;
       if (setPosition) setPosition({ lat, lng });
       if (setCoordinates) setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      if (setLocationValue) setLocationValue('Adres aranıyor...');
       
       axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
         .then(res => {
@@ -147,6 +148,8 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const emailInputRef = useRef(null);
+  const mapSearchInputRef = useRef(null);
+  const trackerSearchInputRef = useRef(null);
 
   // Müşteri State
   const [queryText, setQueryText] = useState('');
@@ -177,7 +180,9 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
           setMapSuggestions(res.data);
-          setIsSuggestionsVisible(true);
+          if (mapSearchInputRef.current === document.activeElement) {
+            setIsSuggestionsVisible(true);
+          }
         } catch (err) {} finally { setIsMapSearching(false); }
       } else {
         setMapSuggestions([]);
@@ -202,7 +207,9 @@ export default function App() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
-  const [providerFormData, setProviderFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
+  const [providerFormData, setProviderFormData] = useState({ 
+    name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 
+  });
 
   // Admin State
   const [adminTab, setAdminTab] = useState('WOZ');
@@ -258,7 +265,9 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
           setTrackerMapSuggestions(res.data);
-          setIsTrackerSuggestionsVisible(true);
+          if (trackerSearchInputRef.current === document.activeElement) {
+            setIsTrackerSuggestionsVisible(true);
+          }
         } catch (err) {} finally { setIsTrackerMapSearching(false); }
       } else {
         setTrackerMapSuggestions([]);
@@ -504,7 +513,7 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
-  // 🌟 TRACKER LİSTESİ FİLTRELEME (Harita ile Eşzamanlı)
+  // 🌟 DÜZELTME: TRACKER LİSTESİ FİLTRELEME (Harita ile Eşzamanlı)
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -564,7 +573,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.6 (Flush Tracker Map)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.8 (Final Sync)</span>
             </div>
           </div>
 
@@ -905,7 +914,7 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-0.5 bg-neutral-100 overflow-hidden flex z-0">
+          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
               <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -916,12 +925,33 @@ export default function App() {
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-80 sm:w-96">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
-                    <input type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm" />
+                    <input 
+                      type="text" 
+                      value={trackerMapSearchText} 
+                      onChange={(e) => setTrackerMapSearchText(e.target.value)} 
+                      onFocus={() => setIsTrackerSuggestionsVisible(true)} 
+                      onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} 
+                      placeholder="Haritada adres ara ve git..." 
+                      className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm" 
+                    />
                   </div>
                   {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
                       {trackerMapSuggestions.map((sug, idx) => (
-                        <div key={idx} className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setTrackerMapCenter([newPos.lat, newPos.lng]); setTrackerMapSelectedPos(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setTrackerMapSearchText(sug.display_name); setTrackerMapSelectedAddress(sug.display_name); setIsTrackerSuggestionsVisible(false); }}>
+                        <div 
+                           key={idx} 
+                           className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" 
+                           onMouseDown={(e) => { 
+                             e.preventDefault(); 
+                             const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; 
+                             setTrackerMapCenter([newPos.lat, newPos.lng]); 
+                             setTrackerMapSelectedPos(newPos); 
+                             setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
+                             setTrackerMapSearchText(sug.display_name); 
+                             setTrackerMapSelectedAddress(sug.display_name); 
+                             setIsTrackerSuggestionsVisible(false); 
+                           }}
+                        >
                           <MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
                         </div>
                       ))}
@@ -932,7 +962,18 @@ export default function App() {
                 <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0">
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                   <TrackerMapController center={trackerMapCenter} />
-                  <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setTrackerMapSelectedAddress} setCoordinates={setCoordinates} icon={trackerSelectionIcon} />
+                  
+                  {/* 🌟 DÜZELTME: Anlık Güncellenen Ortak Harita Tıklama Fonksiyonu */}
+                  <SharedMapClickHandler 
+                     position={trackerMapSelectedPos} 
+                     setPosition={setTrackerMapSelectedPos} 
+                     setLocationValue={(val) => {
+                        setTrackerMapSelectedAddress(val);
+                        setTrackerMapSearchText(val); // Arama kutusunu anında günceller
+                     }} 
+                     setCoordinates={setCoordinates} 
+                     icon={trackerSelectionIcon} 
+                  />
                   
                   {filteredTrackerRequests.map(req => {
                     const coords = extractGPS(req.location);
@@ -943,7 +984,11 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
+                                  <p>👤 {req.contact_value}</p>
+                                  <p>📍 {extractAddress(req.location)}</p>
+                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
+                               </div>
                             </div>
                           </Popup>
                         </Marker>
@@ -980,7 +1025,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* YENİ TALEP EKLEME MODALI */}
+              {/* 🌟 YENİ TALEP EKLEME MODALI (Değerler Anlık Taşınır) */}
               {isTrackerAddModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
                   <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-neutral-200 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -994,8 +1039,14 @@ export default function App() {
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin..." className="w-full p-2 text-sm font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                         <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
-                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label><input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" /></div>
+                              <div>
+                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
+                                 <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
+                              </div>
+                              <div>
+                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
+                                 <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
+                              </div>
                             </div>
                         </div>
                         <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
@@ -1284,67 +1335,19 @@ export default function App() {
                 </div>
               )}
 
-              {/* WOZ ATAMA MODAL */}
-              {wozAssignModalReq && (
-                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
-                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
-                    <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
-                      <div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div>
-                      <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
-                    </div>
-                    <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 flex-1">
-                      {filteredWozProviders.map((prov) => (
-                        <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs">
-                          <div><h4 className="font-bold text-neutral-900">{prov.name}</h4><p className="text-[11px] text-blue-700 font-mono">📞 {prov.phone}</p></div>
-                          <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-3 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold">Ata</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* SAĞLAYICI EKLE/DÜZENLE MODAL */}
-              {isModalOpen && (
-                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
-                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl">
-                    <div className="flex items-center justify-between pb-2 border-b">
-                      <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
-                      <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
-                    </div>
-
-                    <form onSubmit={handleAdminSaveProvider} className="space-y-3 mt-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" required value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none font-medium" /></div>
-                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" required value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" /></div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none" /></div>
-                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none" /></div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label>
-                          <div className="flex space-x-2 text-[10px] font-mono font-bold">
-                            <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span>
-                          </div>
-                        </div>
-                        <textarea rows={3} required maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" />
-                      </div>
-
-                      <div className="flex justify-end space-x-2 pt-2 border-t">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold text-neutral-700">Vazgeç</button>
-                        <button type="submit" disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-4 py-1.5 bg-neutral-950 text-white rounded-lg text-xs font-semibold shadow-sm">Kaydet</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
           </div>
         )}
       </main>
+
+      {/* 🇨🇭 FOOTER */}
+      {session?.role !== 'TRACKER' && (
+        <footer className="border-t border-neutral-200/80 bg-white py-4 z-10">
+          <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
+            <div><span>Mobool</span> • <span>Multi-Tenant Servis Platformu</span></div>
+            <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
