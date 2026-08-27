@@ -507,6 +507,7 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
+  // TRACKER LİSTESİ FİLTRELEME
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -543,6 +544,9 @@ export default function App() {
   
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
+  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
+  const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
+  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
@@ -560,7 +564,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.9 (UX Perfected)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 10.9 (Settings Restored)</span>
             </div>
           </div>
 
@@ -689,6 +693,7 @@ export default function App() {
                               <div className="px-3 pb-3">
                                  <div className={`p-2 rounded text-[11px] flex items-center space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
                                    {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce" />}
+                                   {/* 🌟 METİN DÜZELTMESİ: "Sağlayıcı talebi aldı" */}
                                    <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi aldı. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
                                  </div>
                               </div>
@@ -950,13 +955,12 @@ export default function App() {
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
                   <TrackerMapController center={trackerMapCenter} />
                   
-                  {/* 🌟 DÜZELTME: Anlık Güncellenen Ortak Harita Tıklama Fonksiyonu */}
                   <SharedMapClickHandler 
                      position={trackerMapSelectedPos} 
                      setPosition={setTrackerMapSelectedPos} 
                      setLocationValue={(val) => {
-                        setLocationValue(val); // Form Modal'ının Location Value State'i
-                        setTrackerMapSearchText(val); // Arama kutusunu anında günceller
+                        setLocationValue(val); 
+                        setTrackerMapSearchText(val); 
                      }} 
                      setCoordinates={setCoordinates} 
                      icon={trackerSelectionIcon} 
@@ -971,11 +975,7 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
-                                  <p>👤 {req.contact_value}</p>
-                                  <p>📍 {extractAddress(req.location)}</p>
-                                  {req.provider_name && <p>🏢 {req.provider_name}</p>}
-                               </div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
                             </div>
                           </Popup>
                         </Marker>
@@ -1032,7 +1032,7 @@ export default function App() {
                               </div>
                               <div>
                                  <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
-                                 <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
+                                 <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} onDoubleClick={() => setCoordinates('')} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
                               </div>
                             </div>
                         </div>
@@ -1068,25 +1068,164 @@ export default function App() {
               {/* SİSTEM AYARLARI */}
               {adminTab === 'SETTINGS' && (
                 <div className="space-y-4">
-                  <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                  <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
                     <div className="flex items-center space-x-2 mb-4">
                       <Settings className="text-neutral-700" size={18} />
                       <h3 className="font-bold text-neutral-950">Sistem Ayarları ve Parametreler</h3>
                     </div>
-                    <div className="overflow-x-auto w-full border rounded-xl">
-                      <table className="w-full text-left text-xs table-auto">
-                        <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
-                          <tr><th className="px-4 py-3 w-1/4">Ayar Adı</th><th className="px-4 py-3 w-2/4">Açıklama</th><th className="px-4 py-3 w-32 text-center">Değer</th><th className="px-4 py-3 w-24 text-right">İşlem</th></tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-100 bg-white">
-                          <tr className="hover:bg-neutral-50">
-                            <td className="px-4 py-3 font-bold text-neutral-900">Varsayılan Bitiş Süresi</td>
-                            <td className="px-4 py-3 text-neutral-500">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</td>
-                            <td className="px-4 py-3 text-center"><input type="number" min="1" value={systemSettings.default_deadline_days || ''} onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none" /></td>
-                            <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold">Kaydet</button></td>
-                          </tr>
-                        </tbody>
-                      </table>
+
+                    {/* Alt Sekmeler (Tabs) */}
+                    <div className="flex items-center space-x-6 border-b border-neutral-200 mb-5">
+                      <button onClick={() => setSettingsTab('GENERAL')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'GENERAL' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
+                        Genel Kurallar
+                      </button>
+                      <button onClick={() => setSettingsTab('TIMEOUTS')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'TIMEOUTS' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
+                        Zaman Aşımları (Timeout)
+                      </button>
+                      <button onClick={() => setSettingsTab('INTEGRATIONS')} className={`pb-2.5 text-[11px] font-bold uppercase tracking-wider border-b-2 transition ${settingsTab === 'INTEGRATIONS' ? 'border-neutral-950 text-neutral-950' : 'border-transparent text-neutral-400 hover:text-neutral-700'}`}>
+                        API & Entegrasyon
+                      </button>
+                    </div>
+
+                    {/* Sekme İçerikleri */}
+                    <div className="min-h-[250px]">
+                      
+                      {/* --- GENEL AYARLAR TABLOSU --- */}
+                      {settingsTab === 'GENERAL' && (
+                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
+                          <table className="w-full text-left text-xs table-auto">
+                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
+                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
+                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
+                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 bg-white">
+                              <tr className="hover:bg-neutral-50 transition">
+                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
+                                  <div className="flex items-center space-x-1.5">
+                                    <Clock size={14} className="text-blue-600"/>
+                                    <span>Varsayılan Bitiş Süresi</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 align-middle text-neutral-500">
+                                  Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?
+                                </td>
+                                <td className="px-4 py-3 align-middle text-center">
+                                  <input 
+                                    type="number" min="1" 
+                                    value={systemSettings.default_deadline_days || ''} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} 
+                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 align-middle text-right">
+                                  <button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
+                                    <Save size={12} /><span>Kaydet</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* --- ZAMAN AŞIMLARI TABLOSU --- */}
+                      {settingsTab === 'TIMEOUTS' && (
+                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
+                          <table className="w-full text-left text-xs table-auto">
+                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3 font-semibold w-1/4">Ayar Adı</th>
+                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
+                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
+                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 bg-white">
+                              {/* Timeout Onay Bekleme */}
+                              <tr className="hover:bg-neutral-50 transition">
+                                <td className="px-4 py-3 align-middle font-bold text-neutral-900">
+                                  <div className="flex items-center space-x-1.5">
+                                    <Timer size={14} className="text-rose-500"/>
+                                    <span>Onay Bekleme (Dk)</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 align-middle text-neutral-500">
+                                  Eşleşen sağlayıcı bu süre içinde işi <b>kabul etmezse</b>, sistem otomatik sıradakine geçer.
+                                </td>
+                                <td className="px-4 py-3 align-middle text-center">
+                                  <input 
+                                    type="number" min="1" 
+                                    value={systemSettings.timeout_matched_mins || ''} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_matched_mins: e.target.value})} 
+                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-neutral-300 outline-none focus:border-neutral-950" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 align-middle text-right">
+                                  <button onClick={() => handleSaveSystemSetting('timeout_matched_mins', systemSettings.timeout_matched_mins)} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
+                                    <Save size={12} /><span>Kaydet</span>
+                                  </button>
+                                </td>
+                              </tr>
+                              
+                              {/* Timeout Teslim Etmeme */}
+                              <tr className="hover:bg-rose-50/30 transition">
+                                <td className="px-4 py-3 align-middle font-bold text-rose-950">
+                                  <div className="flex items-center space-x-1.5">
+                                    <AlertTriangle size={14} className="text-rose-600"/>
+                                    <span>Teslim Etmeme (Saat)</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 align-middle text-rose-700/80">
+                                  Kabul edilen iş bu sürede <b>tamamlanmazsa</b> sıradakine geçer (Sahada kargaşa yaratabilir).
+                                </td>
+                                <td className="px-4 py-3 align-middle text-center">
+                                  <input 
+                                    type="number" min="1" 
+                                    value={systemSettings.timeout_accepted_hours || ''} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, timeout_accepted_hours: e.target.value})} 
+                                    className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border border-rose-300 outline-none focus:border-rose-950 text-rose-950" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 align-middle text-right">
+                                  <button onClick={() => handleSaveSystemSetting('timeout_accepted_hours', systemSettings.timeout_accepted_hours)} className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded text-xs font-semibold shadow-sm transition inline-flex items-center space-x-1">
+                                    <Save size={12} /><span>Kaydet</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* --- API & ENTEGRASYON TABLOSU --- */}
+                      {settingsTab === 'INTEGRATIONS' && (
+                        <div className="overflow-x-auto w-full border border-neutral-200 rounded-xl animate-in fade-in duration-200">
+                          <table className="w-full text-left text-xs table-auto">
+                            <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3 font-semibold w-1/4">Entegrasyon Adı</th>
+                                <th className="px-4 py-3 font-semibold w-2/4">Açıklama</th>
+                                <th className="px-4 py-3 font-semibold w-32 text-center">Değer</th>
+                                <th className="px-4 py-3 font-semibold w-24 text-right">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 bg-white">
+                              <tr>
+                                <td colSpan="4" className="px-4 py-12 text-center text-neutral-400">
+                                  <Link2 size={24} className="mx-auto mb-2 text-neutral-300" />
+                                  <span className="font-semibold text-neutral-600 block">WhatsApp & SMS API Değişkenleri</span>
+                                  <span className="text-[10px]">Twilio ve Meta (WhatsApp Cloud API) webhook key ve token ayarları yakında buraya eklenecektir.</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      
                     </div>
                   </div>
                 </div>
@@ -1172,7 +1311,7 @@ export default function App() {
               {adminTab === 'SMS_LOGS' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
                   {filteredSmsLogs.map((log) => (
-                    <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
+                     <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
                         <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
                         <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span>
