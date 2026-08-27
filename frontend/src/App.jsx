@@ -42,7 +42,7 @@ const trackerSelectionIcon = new L.DivIcon({
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-// HARİTA YÖNETİCİSİ
+// İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -53,7 +53,6 @@ function TrackerMapController({ center }) {
   return null;
 }
 
-// HARİTA TIKLAMA YÖNETİCİSİ
 function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
   const map = useMapEvents({
     click(e) {
@@ -82,7 +81,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   return position ? <Marker position={position} icon={icon || customMarkerIcon} /> : null;
 }
 
-// ADMİN TABLO BAŞLIĞI
+// İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -101,7 +100,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// GPS ÇIKARICI FONKSİYONLAR
+// Güvenli GPS Çıkarıcılar
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -508,7 +507,6 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
-  // 🌟 TRACKER LİSTESİ FİLTRELEME (Harita ile Eşzamanlı)
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -545,11 +543,7 @@ export default function App() {
   
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
-  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
-  const providerKwMetrics = getKeywordMetrics(providerFormData.serviceKeywords);
-  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  // CSS Layout Kontrolü
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
   if (session?.role === 'TRACKER') mainContainerClass = "w-full max-w-full p-0 m-0 relative flex-1 flex flex-col bg-neutral-100 overflow-hidden";
@@ -590,7 +584,6 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
-        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -696,7 +689,7 @@ export default function App() {
                               <div className="px-3 pb-3">
                                  <div className={`p-2 rounded text-[11px] flex items-center space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
                                    {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce" />}
-                                   <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi kabul etti. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
+                                   <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi aldı. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
                                  </div>
                               </div>
                             )}
@@ -789,7 +782,7 @@ export default function App() {
                               </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div className="sm:col-span-2"><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
+                              <div className="sm:col-span-2"><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres veya konum adı..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
                               <div className="sm:col-span-1"><input type="text" value={coordinates} readOnly placeholder="Koordinat" className="w-full p-2.5 text-[11px] rounded-lg border outline-none bg-neutral-100 font-mono text-neutral-500 cursor-not-allowed" /></div>
                             </div>
                             {showMap && (
@@ -810,7 +803,7 @@ export default function App() {
                                 <div className="w-full h-80 rounded-lg overflow-hidden border border-neutral-300 relative z-0">
                                   <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }}>
                                     <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                    <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={(val) => { setLocationValue(val); setMapSearchText(val); }} setCoordinates={setCoordinates} icon={customMarkerIcon} />
+                                    <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                   </MapContainer>
                                 </div>
                               </div>
@@ -1033,8 +1026,14 @@ export default function App() {
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin..." className="w-full p-2 text-sm font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                         <div className="mt-2 pt-3 border-t border-neutral-200/70 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label><input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" /></div>
-                              <div><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label><input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" /></div>
+                              <div>
+                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Konum</label>
+                                 <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} onDoubleClick={() => setLocationValue('')} placeholder="Açık adres..." className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950" />
+                              </div>
+                              <div>
+                                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1 block">Koordinat</label>
+                                 <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Örn: 40.123, 29.123" className="w-full p-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-mono" />
+                              </div>
                             </div>
                         </div>
                         <div className="flex items-center justify-end pt-3 mt-3 border-t border-neutral-200/60">
@@ -1282,7 +1281,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 bg-neutral-100 text-neutral-700">{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
