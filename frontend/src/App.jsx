@@ -148,7 +148,6 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const emailInputRef = useRef(null);
-  const mapSearchInputRef = useRef(null);
   const trackerSearchInputRef = useRef(null);
 
   // Müşteri State
@@ -200,6 +199,7 @@ export default function App() {
     );
   };
 
+  // Müşteri Paneli: Form Detayı Açıldığında Harita Otomatik Mevcut Konuma Gider
   useEffect(() => {
     if (!isDetailsCollapsed && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -214,9 +214,7 @@ export default function App() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
           setMapSuggestions(res.data);
-          if (mapSearchInputRef.current === document.activeElement) {
-            setIsSuggestionsVisible(true);
-          }
+          setIsSuggestionsVisible(true);
         } catch (err) {} finally { setIsMapSearching(false); }
       } else {
         setMapSuggestions([]);
@@ -522,6 +520,7 @@ export default function App() {
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
+  // TRACKER LİSTESİ FİLTRELEME
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     if (!q) return true;
@@ -575,7 +574,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 11.6 (Robust Layout)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 12.0 (Grid Rebuilt)</span>
             </div>
           </div>
 
@@ -599,6 +598,7 @@ export default function App() {
       {/* 🏛️ MAIN CONTENT */}
       <main className={mainContainerClass}>
         
+        {/* Hata Mesajı */}
         {errorMessage && session?.role !== 'TRACKER' && (
           <div className="w-full mb-4 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
             <span>{errorMessage}</span>
@@ -772,7 +772,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Yeni Talep Ekleme Formu (GRID LAYOUT: 2/5 ve 3/5) */}
+              {/* 🌟 YENİ TALEP FORMU (GRID LAYOUT: 2/5 ve 3/5) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -789,7 +789,7 @@ export default function App() {
                       
                       {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
-                        <div className="flex flex-col leading-none">
+                        <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
                             <MapPin size={12} className="text-neutral-700"/>
                             <span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span>
@@ -830,7 +830,7 @@ export default function App() {
                                 </label>
                                 <div className="flex items-center gap-2">
                                   <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
-                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" />
+                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
                                   <label className={`flex items-center justify-center px-2.5 h-[34px] rounded-lg border cursor-pointer select-none transition shrink-0 ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
                                     <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
                                     <span className={`text-xs font-bold ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL</span>
@@ -1116,8 +1116,9 @@ export default function App() {
                         <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin (Örn: Çekiciye ihtiyacım var)..." className="w-full p-2 text-base font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
                       </div>
 
-                      {/* Alt Izgara: 2/5 - 3/5 Layout (Müşteri ekranındaki gibi inputsuz/özet tasarımlı) */}
+                      {/* 🌟 2/5 - 3/5 Layout (Tamamen Inputsuz Özetli Tasarım) */}
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                          
                           {/* SOL: 2/5 (Zamanlama ve Aciliyet) */}
                           <div className="md:col-span-2 space-y-4">
                             <div>
@@ -1146,7 +1147,7 @@ export default function App() {
                               {coordinates && <span className="pl-6 text-[11px] mt-1 text-neutral-500 font-mono tracking-wide">{coordinates}</span>}
                             </div>
                             
-                            <p className="text-[10px] text-neutral-400 font-mono leading-relaxed mt-2">Bu konum bilgisi az önce arka plandaki haritadan seçtiğiniz noktadan otomatik olarak alınmıştır.</p>
+                            <p className="text-[10px] text-neutral-400 font-mono leading-relaxed mt-2">Bu konum bilgisi az önce arka plandaki haritadan seçtiğiniz noktadan otomatik olarak alınmıştır. Değiştirmek için haritaya dönüp yeni bir nokta seçebilirsiniz.</p>
                           </div>
                       </div>
 
@@ -1398,7 +1399,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
