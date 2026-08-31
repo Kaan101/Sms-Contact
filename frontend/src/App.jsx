@@ -532,7 +532,6 @@ export default function App() {
   
   const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
   
-  // 🌟 DÜZELTME: Sessiz form hatalarını çözen explicit manuel validation
   const handleAdminSaveProvider = async (e) => { 
     if (e && e.preventDefault) e.preventDefault(); 
     
@@ -622,6 +621,7 @@ export default function App() {
   }, [filteredMatchedRequests, sortConfig]);
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
+  
   const filteredWozProviders = providers.filter(p => { 
     const q = wozProviderSearch.toLowerCase().trim(); 
     if (!q) return true; 
@@ -652,7 +652,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.6 (Forms Unlocked)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.0 (Tracker Refinement)</span>
             </div>
           </div>
 
@@ -932,7 +932,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ: 3/5 */}
+                          {/* SAĞ PARÇA: 3/5 */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -1080,14 +1080,18 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
-              <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2">
+          <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
+              
+              {/* 🌟 DÜZELTME: Butonlar kalıcı olarak aşağıya (top-20) taşındı */}
+              <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
               </div>
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
+                
+                {/* 🌟 DÜZELTME: Arama kutusu mobilde %90 (w-[90vw]) genişlik alır */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1115,8 +1119,8 @@ export default function App() {
                              setTrackerMapCenter([newPos.lat, newPos.lng]); 
                              setTrackerMapSelectedPos(newPos); 
                              setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
-                             setLocationValue(sug.display_name); // Form Location State
-                             setTrackerMapSearchText(''); // Harita Search Temizlenir
+                             setLocationValue(sug.display_name); 
+                             setTrackerMapSearchText(''); 
                              setIsTrackerSuggestionsVisible(false); 
                            }}
                         >
@@ -1162,11 +1166,11 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ */}
+              {/* 🌟 DÜZELTME: SAĞ LİSTE PANELİ - SABİT/KONTROLLÜ GENİŞLİK */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-[85vw] sm:w-[35vw] md:w-[30vw] min-w-[220px] max-w-[360px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                <div className="absolute top-0 right-0 w-[280px] sm:w-[320px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
-                    <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900 truncate">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={16}/></button></div>
+                    <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={16}/></button></div>
                     <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" /></div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50 pb-20">
@@ -1345,6 +1349,7 @@ export default function App() {
                           <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
                             <h3 className="font-bold text-neutral-900">{prov.name}</h3>
                             <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+                            
                             <div className="mt-2 pt-2 border-t flex items-center justify-between">
                                <div className="flex space-x-2">
                                  <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
@@ -1504,7 +1509,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
@@ -1584,7 +1589,7 @@ export default function App() {
                 </div>
               )}
               
-              {/* 🌟 DÜZELTME: SAĞLAYICI EKLE/DÜZENLE MODALI (Sessiz hatalara karşı form kısıtları manuel hale getirildi) */}
+              {/* SAĞLAYICI EKLE/DÜZENLE MODAL */}
               {isModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
                   <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
