@@ -532,14 +532,31 @@ export default function App() {
   
   const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
   
-  // 🌟 DÜZELTME: Sessiz hata (silent error) yakalama eklendi
+  // 🌟 DÜZELTME: Sessiz form hatalarını çözen explicit manuel validation
   const handleAdminSaveProvider = async (e) => { 
-    e.preventDefault(); 
+    if (e && e.preventDefault) e.preventDefault(); 
+    
+    if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) {
+       alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun.");
+       return;
+    }
+
     const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
-    const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels, priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; 
+    const payload = { 
+       name: modalFormData.name.trim(), 
+       phone: modalFormData.phone.trim(), 
+       email: modalFormData.email ? modalFormData.email.trim() : null, 
+       serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), 
+       communicationChannels: modalFormData.communicationChannels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], 
+       priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 
+    }; 
+    
     try { 
-      if (editingProviderId) await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); 
-      else await axios.post(`${API_BASE}/providers`, payload); 
+      if (editingProviderId) {
+         await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); 
+      } else {
+         await axios.post(`${API_BASE}/providers`, payload); 
+      }
       setIsModalOpen(false); 
       await fetchAdminData(); 
       alert("Sağlayıcı başarıyla kaydedildi!");
@@ -605,7 +622,6 @@ export default function App() {
   }, [filteredMatchedRequests, sortConfig]);
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
-  
   const filteredWozProviders = providers.filter(p => { 
     const q = wozProviderSearch.toLowerCase().trim(); 
     if (!q) return true; 
@@ -616,6 +632,9 @@ export default function App() {
   
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
+
+  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
+  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
@@ -633,7 +652,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.5 (Error Fallback)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 13.6 (Forms Unlocked)</span>
             </div>
           </div>
 
@@ -913,7 +932,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ PARÇA: 3/5 */}
+                          {/* SAĞ: 3/5 */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -952,13 +971,7 @@ export default function App() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 <SharedMapClickHandler 
-                                   position={mapPosition} 
-                                   setPosition={setMapPosition} 
-                                   setLocationValue={setLocationValue} 
-                                   setCoordinates={setCoordinates} 
-                                   icon={customMarkerIcon} 
-                                 />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                </MapContainer>
                             </div>
                           </div>
@@ -1014,6 +1027,7 @@ export default function App() {
         {/* ---------------- 3. SERVİS SAĞLAYICI EKRANI ---------------- */}
         {session?.role === 'PROVIDER' && (
           <div className="max-w-3xl mx-auto w-full space-y-5">
+              
               <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 flex items-start justify-between">
                  <div>
                    <h2 className="text-xl font-extrabold text-neutral-950 tracking-tight">
@@ -1164,7 +1178,7 @@ export default function App() {
                            onClick={() => { 
                              if(coords) {
                                setTrackerMapCenter(coords); 
-                               setTrackerMapSelectedPos(null); // 🌟 Seçimi Temizle
+                               setTrackerMapSelectedPos(null); 
                                setTrackerMapSelectedAddress('');
                                setCoordinates('');
                              } 
@@ -1331,7 +1345,6 @@ export default function App() {
                           <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
                             <h3 className="font-bold text-neutral-900">{prov.name}</h3>
                             <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
-                            
                             <div className="mt-2 pt-2 border-t flex items-center justify-between">
                                <div className="flex space-x-2">
                                  <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
@@ -1339,7 +1352,6 @@ export default function App() {
                                </div>
                                <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap"><ExternalLink size={12} /><span>Bağlan</span></button>
                             </div>
-                            
                           </div>
                         ))}
                       </div>
@@ -1533,6 +1545,83 @@ export default function App() {
                 </div>
               )}
 
+              {/* WOZ ATAMA MODALI İÇİNDE ARAMA VE EKLEME */}
+              {wozAssignModalReq && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
+                    <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+                      <div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div>
+                      <button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700 transition"><X size={18} /></button>
+                    </div>
+                    
+                    <div className="mt-4 flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                        <input 
+                           type="text" 
+                           value={wozProviderSearch} 
+                           onChange={(e) => setWozProviderSearch(e.target.value)} 
+                           onDoubleClick={() => setWozProviderSearch('')} 
+                           placeholder="Sağlayıcı ara..." 
+                           className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-950 bg-neutral-50 transition" 
+                        />
+                      </div>
+                      <button type="button" onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white text-xs font-semibold rounded-lg flex items-center space-x-1 shrink-0 shadow-sm transition">
+                        <Plus size={13} /><span>Yeni Ekle</span>
+                      </button>
+                    </div>
+                    
+                    <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 pt-1 flex-1">
+                      {filteredWozProviders.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Eşleşen sağlayıcı bulunamadı.</div>}
+                      {filteredWozProviders.map((prov) => (
+                        <div key={prov.id} className="p-3 bg-neutral-50 rounded-xl border flex items-center justify-between text-xs transition hover:bg-blue-50/50 hover:border-blue-200">
+                          <div><h4 className="font-bold text-neutral-900">{prov.name}</h4><p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p></div>
+                          <button onClick={() => handleAdminAssign(wozAssignModalReq.id, prov.id)} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Ata</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* 🌟 DÜZELTME: SAĞLAYICI EKLE/DÜZENLE MODALI (Sessiz hatalara karşı form kısıtları manuel hale getirildi) */}
+              {isModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
+                    <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                      <h3 className="font-bold text-sm text-neutral-950">{editingProviderId ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı Tanımla'}</h3>
+                      <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+                    </div>
+
+                    <div className="space-y-4 mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} placeholder="Firma Adı" className="w-full p-2.5 text-xs rounded-xl border border-neutral-200 outline-none focus:border-neutral-950 font-medium transition" /></div>
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} placeholder="+905..." className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none focus:border-neutral-950 transition" /></div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} placeholder="İletişim e-postası (Opsiyonel)" className="w-full p-2.5 text-xs rounded-xl border border-neutral-200 outline-none focus:border-neutral-950 transition" /></div>
+                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru (Varsayılan 100)</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} placeholder="100" className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none focus:border-neutral-950 transition" /></div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label>
+                          <div className="flex space-x-2 text-[10px] font-mono font-bold">
+                            <span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span>
+                          </div>
+                        </div>
+                        <textarea rows={3} maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="virgülle ayırarak yazın (Örn: tesisatçı, su kaçağı, tamir)" className="w-full p-2.5 text-xs font-mono rounded-xl border border-neutral-200 outline-none focus:border-neutral-950 resize-none bg-neutral-50 transition" />
+                      </div>
+
+                      <div className="flex justify-end space-x-2 pt-3 border-t border-neutral-100">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition">Vazgeç</button>
+                        <button type="button" onClick={handleAdminSaveProvider} disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm transition">Kaydet</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
           </div>
         )}
       </main>
