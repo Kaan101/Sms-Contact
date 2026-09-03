@@ -621,7 +621,6 @@ export default function App() {
   }, [filteredMatchedRequests, sortConfig]);
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
-  
   const filteredWozProviders = providers.filter(p => { 
     const q = wozProviderSearch.toLowerCase().trim(); 
     if (!q) return true; 
@@ -632,6 +631,15 @@ export default function App() {
   
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
+
+  // 🌟 DÜZELTME: WhatsApp için numarayı uluslararası standarta (905XXX) çevirir
+  const extractPhoneForWa = (str) => {
+    if (!str) return '';
+    let cleaned = str.replace(/\D/g, '');
+    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+    if (!cleaned.startsWith('90')) cleaned = '90' + cleaned;
+    return cleaned;
+  };
 
   const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
@@ -652,7 +660,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.0 (Tracker Refinement)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.1 (WhatsApp DeepLink)</span>
             </div>
           </div>
 
@@ -792,9 +800,17 @@ export default function App() {
                             </div>
                             {(req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED') && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
-                                 <div className={`p-2 rounded text-[11px] flex items-center space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
-                                   {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce" />}
-                                   <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi aldı. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
+                                 {/* 🌟 DÜZELTME: Müşteriye Özel WhatsApp Butonu (Eğer WhatsApp Tercih Edilmişse) */}
+                                 <div className={`p-2 rounded text-[11px] flex items-center justify-between space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
+                                   <div className="flex items-center space-x-1.5">
+                                      {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700 shrink-0" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce shrink-0" />}
+                                      <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Sağlayıcı talebi aldı. İletişime geçiliyor: <strong>{req.provider_phone}</strong></>}</span>
+                                   </div>
+                                   {req.preferred_channel?.includes('WHATSAPP') && req.provider_phone && (
+                                      <a href={`https://wa.me/${extractPhoneForWa(req.provider_phone)}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
+                                        <MessageCircle size={12} /><span>WhatsApp'tan Yaz</span>
+                                      </a>
+                                   )}
                                  </div>
                               </div>
                             )}
@@ -932,7 +948,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ PARÇA: 3/5 */}
+                          {/* SAĞ: 3/5 */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -1057,8 +1073,21 @@ export default function App() {
                     <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border space-y-3">
                        <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}" - <span className="text-[10px] bg-blue-100 text-blue-800 px-2 rounded">{req.status}</span></p>
                        <p className="text-xs text-neutral-700">Müşteri: {req.contact_value}</p>
-                       {req.status === 'MATCHED' && <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-semibold">Kabul Et</button>}
-                       {req.status === 'ACCEPTED' && <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1 bg-neutral-950 text-white rounded text-xs font-semibold">Teslim Et</button>}
+                       
+                       <div className="flex flex-wrap items-center gap-2 mt-2">
+                         {req.status === 'MATCHED' && <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">Kabul Et</button>}
+                         {req.status === 'ACCEPTED' && (
+                           <>
+                             <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
+                             {/* 🌟 DÜZELTME: Sağlayıcıya Özel Müşteri WhatsApp Butonu */}
+                             {req.preferred_channel?.includes('WHATSAPP') && req.contact_value && (
+                               <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+                                 <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
+                               </a>
+                             )}
+                           </>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1080,9 +1109,7 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
-              
-              {/* 🌟 DÜZELTME: Butonlar kalıcı olarak aşağıya (top-20) taşındı */}
+          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1090,8 +1117,6 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
-                
-                {/* 🌟 DÜZELTME: Arama kutusu mobilde %90 (w-[90vw]) genişlik alır */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1119,8 +1144,8 @@ export default function App() {
                              setTrackerMapCenter([newPos.lat, newPos.lng]); 
                              setTrackerMapSelectedPos(newPos); 
                              setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
-                             setLocationValue(sug.display_name); 
-                             setTrackerMapSearchText(''); 
+                             setLocationValue(sug.display_name); // Form Location State
+                             setTrackerMapSearchText(''); // Harita Search Temizlenir
                              setIsTrackerSuggestionsVisible(false); 
                            }}
                         >
@@ -1166,7 +1191,7 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* 🌟 DÜZELTME: SAĞ LİSTE PANELİ - SABİT/KONTROLLÜ GENİŞLİK */}
+              {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
                 <div className="absolute top-0 right-0 w-[280px] sm:w-[320px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
@@ -1349,7 +1374,6 @@ export default function App() {
                           <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
                             <h3 className="font-bold text-neutral-900">{prov.name}</h3>
                             <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
-                            
                             <div className="mt-2 pt-2 border-t flex items-center justify-between">
                                <div className="flex space-x-2">
                                  <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
@@ -1509,7 +1533,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
