@@ -632,7 +632,6 @@ export default function App() {
   const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
   const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
 
-  // 🌟 DÜZELTME: WhatsApp için numarayı uluslararası standarta (905XXX) çevirir
   const extractPhoneForWa = (str) => {
     if (!str) return '';
     let cleaned = str.replace(/\D/g, '');
@@ -660,7 +659,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.1 (WhatsApp DeepLink)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.2 (Slim Tracker UI)</span>
             </div>
           </div>
 
@@ -800,7 +799,6 @@ export default function App() {
                             </div>
                             {(req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED') && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
-                                 {/* 🌟 DÜZELTME: Müşteriye Özel WhatsApp Butonu (Eğer WhatsApp Tercih Edilmişse) */}
                                  <div className={`p-2 rounded text-[11px] flex items-center justify-between space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
                                    <div className="flex items-center space-x-1.5">
                                       {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700 shrink-0" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce shrink-0" />}
@@ -866,7 +864,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🌟 YENİ TALEP FORMU */}
+              {/* YENİ TALEP FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -1079,7 +1077,6 @@ export default function App() {
                          {req.status === 'ACCEPTED' && (
                            <>
                              <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
-                             {/* 🌟 DÜZELTME: Sağlayıcıya Özel Müşteri WhatsApp Butonu */}
                              {req.preferred_channel?.includes('WHATSAPP') && req.contact_value && (
                                <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
                                  <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
@@ -1109,7 +1106,8 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
+          <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
+              
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1117,6 +1115,7 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
+                
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1191,14 +1190,14 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ */}
+              {/* 🌟 DÜZELTME: SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-[280px] sm:w-[320px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
-                  <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
-                    <div className="flex items-center justify-between"><h3 className="font-bold text-sm text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={16}/></button></div>
-                    <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" /></div>
+                <div className="absolute top-0 right-0 w-[75vw] sm:w-[260px] min-w-[200px] max-w-[300px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                  <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
+                    <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button></div>
+                    <div className="relative"><Search size={14} className="absolute left-2.5 top-2 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-3 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" /></div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-neutral-50 pb-20">
+                  <div className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-neutral-50 pb-20">
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
                       return (
@@ -1210,16 +1209,20 @@ export default function App() {
                                setTrackerMapSelectedPos(null); 
                                setTrackerMapSelectedAddress('');
                                setCoordinates('');
+                               // 🌟 Mobilde ise listeyi kapat
+                               if (window.innerWidth < 640) {
+                                 setIsTrackerListOpen(false);
+                               }
                              } 
                            }} 
-                           className={`p-3 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}
+                           className={`p-2.5 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}
                         >
-                          <div className="flex items-start justify-between mb-1"><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
-                          <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
-                          <div className="space-y-1 text-[10px] font-mono text-neutral-500">
+                          <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
+                          <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
+                          <div className="space-y-1 text-[9px] font-mono text-neutral-500">
                              <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
-                             {coords ? (<p className="flex items-center space-x-1.5 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>) : (<p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>)}
+                             {coords ? (<p className="flex items-center space-x-1 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>) : (<p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>)}
                           </div>
                         </div>
                       )
@@ -1374,6 +1377,7 @@ export default function App() {
                           <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
                             <h3 className="font-bold text-neutral-900">{prov.name}</h3>
                             <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+                            
                             <div className="mt-2 pt-2 border-t flex items-center justify-between">
                                <div className="flex space-x-2">
                                  <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
