@@ -112,7 +112,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 VERİ ÇIKARICILAR (GPS ve Yeni KOD Ayıklayıcılar)
+// 🌟 VERİ ÇIKARICILAR
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -173,7 +173,6 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🌟 DÜZELTME: İletişim Tercihleri Varsayılan Olarak Dolu Geliyor
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
@@ -220,7 +219,6 @@ export default function App() {
     );
   };
 
-  // 🌟 DÜZELTME: Konum müşteri ilk girdiğinde otomatik olarak bulunuyor
   useEffect(() => {
     if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -699,7 +697,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.0 (Defaults & Flow Fix)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.1 (List Approval)</span>
             </div>
           </div>
 
@@ -858,6 +856,7 @@ export default function App() {
                               </div>
                             )}
 
+                            {/* Gizlilik Onay Butonu (Liste Kapalıyken) */}
                             {req.status === 'MATCHED' && !expandedCustomerQueueReqId && (
                               req.contact_value?.includes('|HIDDEN') ? (
                                 <div className="px-3 pb-3">
@@ -891,6 +890,8 @@ export default function App() {
                                  </div>
                               </div>
                             )}
+                            
+                            {/* LİSTE AÇIKKEN GÖRÜNEN ADAYLAR */}
                             {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 0 && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
@@ -910,7 +911,20 @@ export default function App() {
                                           </p>
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
                                         </div>
-                                        {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
+                                        
+                                        {/* 🌟 YENİ: Liste içindeki aksiyon butonları */}
+                                        <div className="flex items-center space-x-2">
+                                            {isCurrent && !isSkippedByThis && req.status === 'MATCHED' && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
+                                                  <ShieldCheck size={10} /><span>Onayla</span>
+                                                </button>
+                                            )}
+                                            {!isCurrent && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
+                                                  <Check size={10} /><span>Bunu Seç</span>
+                                                </button>
+                                            )}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -966,6 +980,7 @@ export default function App() {
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
+                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                         <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
@@ -999,10 +1014,8 @@ export default function App() {
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
-                          {/* 🌟 DÜZELTME: Sıralama: Zamanlama -> İletişim -> Gizlilik -> Kurum Kodu -> Acil (En Son) */}
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-5">
-                            
-                            {/* 1. ZAMANLAMA */}
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
                                   <span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>
@@ -1014,7 +1027,6 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            {/* 2. İLETİŞİM */}
                             <div className="space-y-2">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
                               <div className="grid grid-cols-2 gap-2">
@@ -1028,11 +1040,8 @@ export default function App() {
                                   <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
                                 </div>
                               )}
-                            </div>
-                            
-                            {/* 3. GİZLİLİK (OTOMATİK PAYLAŞIM) */}
-                            <div className="pt-1">
-                              <label className={`flex items-start p-3 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                              
+                              <label className={`flex items-start p-3 rounded-xl border cursor-pointer select-none transition mt-3 ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
                                 <div className="flex items-start space-x-2">
                                   <Shield size={16} className={`shrink-0 mt-0.5 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
@@ -1044,7 +1053,6 @@ export default function App() {
                               </label>
                             </div>
                             
-                            {/* 4. GRUP / KURUM KODU */}
                             <div className="pt-1">
                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 block">Grup / Kurum Kodu (Opsiyonel)</label>
                                <div className="relative">
@@ -1053,7 +1061,6 @@ export default function App() {
                                </div>
                             </div>
                             
-                            {/* 5. ACİL MÜDAHALE (EN SON) */}
                             <div className="pt-2">
                               <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
                                 <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
