@@ -93,6 +93,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   ) : null;
 }
 
+// İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -111,7 +112,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 GLOBAL VERİ ÇIKARICILAR & FORMATLAYICILAR (Çakışmayı önlemek için sadece burada tanımlandılar)
+// 🌟 GLOBAL YARDIMCI FONKSİYONLAR (Tek Bir Yerde Tanımlandı)
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -122,11 +123,13 @@ const extractGPS = (loc) => {
   }
   return null;
 };
+
 const extractCode = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[CODE:\s*(.*?)\]/);
   return match ? match[1].trim() : null;
 };
+
 const extractAddress = (loc) => {
   if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
   return loc.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
@@ -165,6 +168,8 @@ const getKeywordMetrics = (text) => {
   return { charCount: String(str).length, wordCount: String(str).split(',').map(k => k.trim()).filter(Boolean).length }; 
 };
 
+
+// 🚀 ANA UYGULAMA BİLEŞENİ
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
@@ -681,7 +686,7 @@ export default function App() {
     if (!q) return true; 
     return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
   });
-  
+
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
@@ -1362,7 +1367,7 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
+              {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
                 <div className="absolute top-0 right-0 w-[70vw] sm:w-[220px] md:w-[240px] min-w-[180px] max-w-[260px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
