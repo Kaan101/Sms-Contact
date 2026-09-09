@@ -15,34 +15,35 @@ import {
   Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
 } from 'lucide-react';
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) 
-  ? import.meta.env.VITE_API_BASE_URL 
-  : 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-// Harita İkonları
-const customMarkerIcon = new L.DivIcon({
+// =====================================================================
+// 🌟 HARİTA İKONLARI (Derleme hatasını önlemek için fonksiyon yapıldı)
+// =====================================================================
+const getCustomMarkerIcon = () => new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
          </div>`,
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-const urgentMarkerIcon = new L.DivIcon({
+const getUrgentMarkerIcon = () => new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
          </div>`,
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
 
-const trackerSelectionIcon = new L.DivIcon({
+const getTrackerSelectionIcon = () => new L.DivIcon({
   html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
          </div>`,
   className: '', iconSize: [0, 0], iconAnchor: [0, 0]
 });
+
 
 // İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
@@ -81,7 +82,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   }, [position, map]);
 
   return position ? (
-    <Marker position={position} icon={icon || customMarkerIcon} eventHandlers={{ click: () => { if (setPosition) setPosition(null); if (setCoordinates) setCoordinates(''); if (setLocationValue) setLocationValue(''); } }} />
+    <Marker position={position} icon={icon} eventHandlers={{ click: () => { if (setPosition) setPosition(null); if (setCoordinates) setCoordinates(''); if (setLocationValue) setLocationValue(''); } }} />
   ) : null;
 }
 
@@ -167,10 +168,16 @@ const safeDateTime = (dateString) => {
 };
 
 // =====================================================================
-// 🚀 ANA UYGULAMA MANTIĞI (İSİM ÇAKIŞMASI ÇÖZÜLDÜ)
+// 🚀 ANA UYGULAMA
 // =====================================================================
 
-function MainApp() {
+export default function App() {
+  
+  // Harita ikonlarının güvenli başlatılması (Sadece sayfa yüklendiğinde)
+  const defaultMapIcon = useMemo(() => getCustomMarkerIcon(), []);
+  const urgentMapIcon = useMemo(() => getUrgentMarkerIcon(), []);
+  const trackerMapIcon = useMemo(() => getTrackerSelectionIcon(), []);
+
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
   const [session, setSession] = useState(() => {
@@ -475,15 +482,12 @@ function MainApp() {
     const q = safeString(trackerSearch).toLowerCase().trim();
     const matchesSearch = !q || safeString(r.raw_text).toLowerCase().includes(q) || safeString(r.contact_value).toLowerCase().includes(q) || safeString(r.location).toLowerCase().includes(q) || String(r.id).includes(q);
     if (!matchesSearch) return false;
-
     const locLow = safeString(r.location).toLowerCase();
     const reqCode = safeString(extractCode(r.location)).toLowerCase();
-
     if (trackerFilter.city && !locLow.includes(safeString(trackerFilter.city).toLowerCase().trim())) return false;
     if (trackerFilter.district && !locLow.includes(safeString(trackerFilter.district).toLowerCase().trim())) return false;
     if (trackerFilter.zip && !locLow.includes(safeString(trackerFilter.zip).toLowerCase().trim())) return false;
     if (trackerFilter.code && reqCode !== safeString(trackerFilter.code).toLowerCase().trim()) return false;
-
     return true;
   });
 
@@ -500,7 +504,6 @@ function MainApp() {
         else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } 
         else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } 
         else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } 
-        
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; 
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; 
         return 0; 
@@ -511,11 +514,7 @@ function MainApp() {
   
   const filteredSmsLogs = (smsLogs || []).filter(log => { const q = safeString(searchSmsText).toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return safeString(log.recipient_phone).toLowerCase().includes(q) || safeString(log.message_body).toLowerCase().includes(q); });
   
-  const filteredWozProviders = (providers || []).filter(p => { 
-    const q = safeString(wozProviderSearch).toLowerCase().trim(); 
-    if (!q) return true; 
-    return safeString(p.name).toLowerCase().includes(q) || safeString(p.phone).toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => safeString(k).toLowerCase().includes(q))); 
-  });
+  const filteredWozProviders = (providers || []).filter(p => { const q = safeString(wozProviderSearch).toLowerCase().trim(); if (!q) return true; return safeString(p.name).toLowerCase().includes(q) || safeString(p.phone).toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => safeString(k).toLowerCase().includes(q))); });
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
@@ -949,7 +948,7 @@ function MainApp() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={defaultMapIcon} />
                                </MapContainer>
                             </div>
                           </div>
@@ -1174,14 +1173,14 @@ function MainApp() {
                         setLocationValue(val); 
                      }} 
                      setCoordinates={setCoordinates} 
-                     icon={trackerSelectionIcon} 
+                     icon={trackerMapIcon} 
                   />
                   
                   {filteredTrackerRequests.map(req => {
                     const coords = extractGPS(req.location);
                     if (coords) {
                       return (
-                        <Marker position={coords} icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} key={req.id}>
+                        <Marker position={coords} icon={req.is_urgent ? urgentMapIcon : defaultMapIcon} key={req.id}>
                           <Popup className="custom-popup">
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
@@ -1304,7 +1303,7 @@ function MainApp() {
                             
                             <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span></div>
+                                <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMI বহুম KURUM KODU (Opsiyonel)</span></div>
                             </label>
                             
                             {/* Tracker için Havuz Gizliliği Kutusu */}
@@ -1730,43 +1729,5 @@ function MainApp() {
         </footer>
       )}
     </div>
-  );
-}
-
-// =====================================================================
-// 🛡️ ERROR BOUNDARY (HATA YAKALAYICI ZIRH)
-// =====================================================================
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, errorInfo) { this.setState({ errorInfo }); console.error("HATA YAKALANDI:", error); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '2rem', backgroundColor: '#fef2f2', color: '#991b1b', minHeight: '100vh', fontFamily: 'monospace' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>Sistem Çöktü (React Hatası)</h1>
-          <p style={{ fontWeight: 'bold', marginBottom: '1rem' }}>Lütfen aşağıdaki hata mesajını kopyalayıp bana (yapay zekaya) gönderin:</p>
-          <div style={{ backgroundColor: '#fee2e2', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem', whiteSpace: 'pre-wrap', border: '1px solid #fca5a5' }}>
-            {this.state.error && this.state.error.toString()}
-          </div>
-          <details style={{ backgroundColor: '#fee2e2', padding: '1rem', borderRadius: '0.5rem', whiteSpace: 'pre-wrap', border: '1px solid #fca5a5' }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: '0.5rem' }}>Hata Detayları (Stack Trace)</summary>
-            {this.state.errorInfo && this.state.errorInfo.componentStack}
-          </details>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-export function App() {
-  return (
-    <ErrorBoundary>
-      <MainApp />
-    </ErrorBoundary>
   );
 }
