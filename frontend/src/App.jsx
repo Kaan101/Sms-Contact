@@ -93,7 +93,6 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   ) : null;
 }
 
-// İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -112,7 +111,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 GLOBAL VERİ ÇIKARICILAR & FORMATLAYICILAR (Hataları önlemek için dışarı taşındı)
+// 🌟 GLOBAL VERİ ÇIKARICILAR & FORMATLAYICILAR (Çakışmayı önlemek için sadece burada tanımlandılar)
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -165,7 +164,6 @@ const getKeywordMetrics = (text) => {
   const str = text || ''; 
   return { charCount: String(str).length, wordCount: String(str).split(',').map(k => k.trim()).filter(Boolean).length }; 
 };
-
 
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
@@ -984,6 +982,7 @@ export default function App() {
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
+                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                         <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
