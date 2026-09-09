@@ -167,7 +167,7 @@ const safeDateTime = (dateString) => {
 };
 
 // =====================================================================
-// 🚀 ANA UYGULAMA (GİZLİ)
+// 🚀 ANA UYGULAMA MANTIĞI (İSİM ÇAKIŞMASI ÇÖZÜLDÜ)
 // =====================================================================
 
 function MainApp() {
@@ -444,6 +444,7 @@ function MainApp() {
   const handleProviderSkip = async (requestId) => { if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return; try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' }); await fetchProviderData(false); } catch (err) { alert('İşlem başarısız oldu.'); } };
   const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {} };
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  
   const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
   const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
   const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
@@ -474,12 +475,15 @@ function MainApp() {
     const q = safeString(trackerSearch).toLowerCase().trim();
     const matchesSearch = !q || safeString(r.raw_text).toLowerCase().includes(q) || safeString(r.contact_value).toLowerCase().includes(q) || safeString(r.location).toLowerCase().includes(q) || String(r.id).includes(q);
     if (!matchesSearch) return false;
+
     const locLow = safeString(r.location).toLowerCase();
     const reqCode = safeString(extractCode(r.location)).toLowerCase();
+
     if (trackerFilter.city && !locLow.includes(safeString(trackerFilter.city).toLowerCase().trim())) return false;
     if (trackerFilter.district && !locLow.includes(safeString(trackerFilter.district).toLowerCase().trim())) return false;
     if (trackerFilter.zip && !locLow.includes(safeString(trackerFilter.zip).toLowerCase().trim())) return false;
     if (trackerFilter.code && reqCode !== safeString(trackerFilter.code).toLowerCase().trim()) return false;
+
     return true;
   });
 
@@ -496,6 +500,7 @@ function MainApp() {
         else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } 
         else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } 
         else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } 
+        
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; 
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; 
         return 0; 
@@ -506,7 +511,11 @@ function MainApp() {
   
   const filteredSmsLogs = (smsLogs || []).filter(log => { const q = safeString(searchSmsText).toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return safeString(log.recipient_phone).toLowerCase().includes(q) || safeString(log.message_body).toLowerCase().includes(q); });
   
-  const filteredWozProviders = (providers || []).filter(p => { const q = safeString(wozProviderSearch).toLowerCase().trim(); if (!q) return true; return safeString(p.name).toLowerCase().includes(q) || safeString(p.phone).toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => safeString(k).toLowerCase().includes(q))); });
+  const filteredWozProviders = (providers || []).filter(p => { 
+    const q = safeString(wozProviderSearch).toLowerCase().trim(); 
+    if (!q) return true; 
+    return safeString(p.name).toLowerCase().includes(q) || safeString(p.phone).toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => safeString(k).toLowerCase().includes(q))); 
+  });
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
@@ -526,7 +535,7 @@ function MainApp() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.5 (Fully Rebuilt)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.6 (Zero-TDZ Secured)</span>
             </div>
           </div>
 
