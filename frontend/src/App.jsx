@@ -63,7 +63,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
       
       axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
         .then(res => {
-           const addr = res.data.address;
+           const addr = res?.data?.address || {};
            const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
            if (setLocationValue) setLocationValue(str || 'Haritadan İşaretlendi');
         }).catch(() => {
@@ -112,12 +112,15 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
 }
 
 // =====================================================================
-// 🌟 GÜVENLİ GLOBAL FORMATLAYICILAR (TEK BİR KERE TANIMLANDILAR)
+// 🌟 GÜVENLİ GLOBAL FORMATLAYICILAR (ÇÖKMELERİ ÖNLER)
 // =====================================================================
 
+const safeString = (val) => (val ? String(val) : '');
+
 const extractGPS = (loc) => {
-  if(!loc || typeof loc !== 'string') return null;
-  const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
+  const str = safeString(loc);
+  if(!str) return null;
+  const match = str.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
   if (match && match.length >= 3) {
     const lat = parseFloat(match[1]);
     const lng = parseFloat(match[2]);
@@ -127,25 +130,26 @@ const extractGPS = (loc) => {
 };
 
 const extractCode = (loc) => {
-  if(!loc || typeof loc !== 'string') return null;
-  const match = loc.match(/\[CODE:\s*(.*?)\]/);
+  const str = safeString(loc);
+  if(!str) return null;
+  const match = str.match(/\[CODE:\s*(.*?)\]/);
   return match ? match[1].trim() : null;
 };
 
 const extractAddress = (loc) => {
-  if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
-  return loc.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
+  const str = safeString(loc);
+  if(!str) return 'Bilinmiyor';
+  return str.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
 };
 
 const cleanContact = (str) => {
-  if (!str) return '';
-  return String(str).replace(/\|(SHARED|HIDDEN)/g, '');
+  return safeString(str).replace(/\|(SHARED|HIDDEN)/g, '');
 };
 
 const getProviderContactDisplay = (req) => {
   if (!req) return '🔒 Gizli';
-  const raw = req.contact_value || '';
-  const isShared = String(raw).includes('|SHARED');
+  const raw = safeString(req.contact_value);
+  const isShared = raw.includes('|SHARED');
   const isAccepted = req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED';
   
   if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
@@ -159,7 +163,6 @@ const getProviderContactDisplay = (req) => {
 };
 
 const extractPhoneForWa = (str) => {
-  if (!str) return '';
   let cleaned = cleanContact(str).replace(/\D/g, '');
   if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
   if (!cleaned.startsWith('90') && cleaned.length > 0) cleaned = '90' + cleaned;
@@ -167,11 +170,33 @@ const extractPhoneForWa = (str) => {
 };
 
 const getKeywordMetrics = (text) => { 
-  const str = typeof text === 'string' ? text : ''; 
+  const str = safeString(text); 
   return { 
     charCount: str.length, 
     wordCount: str ? str.split(',').map(k => k.trim()).filter(Boolean).length : 0 
   }; 
+};
+
+const safeDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('tr-TR');
+  } catch {
+    return '';
+  }
+};
+
+const safeDateTime = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return '';
+  }
 };
 
 // =====================================================================
@@ -204,7 +229,9 @@ export default function App() {
   });
 
   const [authStep, setAuthStep] = useState('PHONE');
-  const [inputPhone, setInputPhone] = useState(() => localStorage.getItem('sc_last_phone') || '');
+  const [inputPhone, setInputPhone] = useState(() => {
+    try { return localStorage.getItem('sc_last_phone') || ''; } catch { return ''; }
+  });
   const [inputOtp, setInputOtp] = useState('');
   const [simulatedCode, setSimulatedCode] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -242,12 +269,12 @@ export default function App() {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setMapPosition({ lat: latitude, lng: longitude });
-        setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
         try {
+          const { latitude, longitude } = pos.coords;
+          setMapPosition({ lat: latitude, lng: longitude });
+          setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
           const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
-          const addr = geoRes.data.address;
+          const addr = geoRes?.data?.address || {};
           const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
           const city = addr.city || addr.province || '';
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
@@ -278,7 +305,7 @@ export default function App() {
         setIsMapSearching(true);
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
-          setMapSuggestions(res.data || []);
+          setMapSuggestions(Array.isArray(res.data) ? res.data : []);
           if (mapSearchInputRef.current === document.activeElement) {
             setIsSuggestionsVisible(true);
           }
@@ -367,7 +394,7 @@ export default function App() {
         setIsTrackerMapSearching(true);
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
-          setTrackerMapSuggestions(res.data || []);
+          setTrackerMapSuggestions(Array.isArray(res.data) ? res.data : []);
           if (trackerSearchInputRef.current === document.activeElement) {
             setIsTrackerSuggestionsVisible(true);
           }
@@ -396,7 +423,7 @@ export default function App() {
     if (!session?.phone) return;
     try {
       const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
-      setMyCustomerRequests(res.data?.requests || []);
+      setMyCustomerRequests(Array.isArray(res.data?.requests) ? res.data.requests : []);
     } catch (err) {}
   };
 
@@ -413,23 +440,23 @@ export default function App() {
         setProviderFormData({
           name: prov.name || '', phone: prov.phone || '', email: prov.email || '',
           serviceKeywords: Array.isArray(prov.service_keywords) ? prov.service_keywords.join(', ') : '',
-          communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
+          communicationChannels: Array.isArray(prov.communication_channels) ? prov.communication_channels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
           priorityScore: prov.priority_score || 100
         });
       }
 
       const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
-      setProviderRequests(rRes.data?.requests || []);
+      setProviderRequests(Array.isArray(rRes.data?.requests) ? rRes.data.requests : []);
 
       const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
-      setPoolRequests(poolRes.data?.poolRequests || []);
+      setPoolRequests(Array.isArray(poolRes.data?.poolRequests) ? poolRes.data.poolRequests : []);
     } catch (err) {
       if (err.response?.status === 404) { setProviderProfile(null); setProviderRequests([]); setPoolRequests([]); }
     }
   };
 
-  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data?.features || []); } catch (err) {} };
-  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data?.tests || []); } catch (err) {} };
+  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(Array.isArray(res.data?.features) ? res.data.features : []); } catch (err) {} };
+  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(Array.isArray(res.data?.tests) ? res.data.tests : []); } catch (err) {} };
   
   const fetchAdminData = async () => {
     try {
@@ -437,10 +464,10 @@ export default function App() {
         axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`),
         axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`)
       ]);
-      setPendingRequests(reqRes.data?.requests || []); 
-      setProviders(provRes.data?.providers || []);
-      setMatchedRequests(matchRes.data?.requests || []); 
-      setSmsLogs(logRes.data?.notifications || []);
+      setPendingRequests(Array.isArray(reqRes.data?.requests) ? reqRes.data.requests : []); 
+      setProviders(Array.isArray(provRes.data?.providers) ? provRes.data.providers : []);
+      setMatchedRequests(Array.isArray(matchRes.data?.requests) ? matchRes.data.requests : []); 
+      setSmsLogs(Array.isArray(logRes.data?.notifications) ? logRes.data.notifications : []);
       await fetchFeatures(); 
       await fetchTests();
       try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes.data?.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
@@ -450,12 +477,12 @@ export default function App() {
   const fetchTrackerData = async () => {
     try {
       let pending = []; let matched = [];
-      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = reqRes.data?.requests || []; } catch (e) {}
-      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = matchRes.data?.requests || []; } catch (e) {}
+      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = Array.isArray(reqRes.data?.requests) ? reqRes.data.requests : []; } catch (e) {}
+      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = Array.isArray(matchRes.data?.requests) ? matchRes.data.requests : []; } catch (e) {}
       
       const allReqs = [...pending, ...matched];
       const uniqueReqsMap = new Map();
-      allReqs.forEach(item => uniqueReqsMap.set(item.id, item));
+      allReqs.forEach(item => { if(item && item.id) uniqueReqsMap.set(item.id, item); });
       const uniqueReqs = Array.from(uniqueReqsMap.values());
       uniqueReqs.sort((a, b) => b.id - a.id);
       setTrackerRequests(uniqueReqs);
@@ -485,7 +512,7 @@ export default function App() {
     e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); 
     try { 
       const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); 
-      setSimulatedCode(res.data.simulatedOtp); 
+      setSimulatedCode(res.data?.simulatedOtp); 
       setAuthStep('OTP'); 
       localStorage.setItem('sc_last_phone', inputPhone.trim());
     } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
@@ -511,9 +538,8 @@ export default function App() {
 
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
-    const cleanPhone = encodeURIComponent(provPhone.trim());
-    const directUrl = `${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`;
-    window.open(directUrl, '_blank');
+    const cleanPhone = encodeURIComponent(String(provPhone).trim());
+    window.open(`${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`, '_blank');
   };
 
   const submitFinalRequest = async (disambiguationChoice, fromTracker = false) => {
@@ -552,12 +578,13 @@ export default function App() {
   };
 
   const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
-    e?.preventDefault(); if (!queryText.trim()) return;
+    if (e && e.preventDefault) e.preventDefault(); 
+    if (!queryText.trim()) return;
     if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) { setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100); return; }
     setLoading(true); setErrorMessage('');
     try {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
-      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } 
+      if (response.data?.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } 
       else { await submitFinalRequest(null, fromTracker); }
     } catch { await submitFinalRequest(null, fromTracker); }
   };
@@ -600,7 +627,7 @@ export default function App() {
   
   const handleSaveProviderProfile = async (e) => { 
     e.preventDefault(); 
-    const keywordsArray = (providerFormData.serviceKeywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
+    const keywordsArray = safeString(providerFormData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
     const payload = { name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100 }; 
     try { 
       if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload); 
@@ -620,7 +647,7 @@ export default function App() {
     if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) {
        alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun."); return;
     }
-    const keywordsArray = (modalFormData.serviceKeywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
+    const keywordsArray = safeString(modalFormData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
     const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; 
     try { 
       if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } 
@@ -638,34 +665,34 @@ export default function App() {
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
   // =====================================================================
-  // 7. GÜVENLİ FİLTRELEMELER VE LİSTELER
+  // GÜVENLİ FİLTRELEMELER VE LİSTELER (Hataya karşı zırhlı)
   // =====================================================================
 
-  const activeCustomerRequests = (myCustomerRequests || []).filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes((r.status || '').toUpperCase()));
-  const pendingReviewCustomerRequests = (myCustomerRequests || []).filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
-  const pastCustomerRequests = (myCustomerRequests || []).filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
-  const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = String(searchCustomerHistoryText || '').toLowerCase().trim(); if (!q) return true; return String(req.raw_text || '').toLowerCase().includes(q) || String(req.provider_name || '').toLowerCase().includes(q) || String(req.status || '').toLowerCase().includes(q); });
+  const activeCustomerRequests = (myCustomerRequests || []).filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeString(r.status).toUpperCase()));
+  const pendingReviewCustomerRequests = (myCustomerRequests || []).filter(r => safeString(r.status).toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
+  const pastCustomerRequests = (myCustomerRequests || []).filter(r => safeString(r.status).toUpperCase() === 'CANCELLED' || (safeString(r.status).toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
+  const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = safeString(searchCustomerHistoryText).toLowerCase().trim(); if (!q) return true; return safeString(req.raw_text).toLowerCase().includes(q) || safeString(req.provider_name).toLowerCase().includes(q) || safeString(req.status).toLowerCase().includes(q); });
   
-  const activeProviderRequests = (providerRequests || []).filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
-  const pastProviderRequests = (providerRequests || []).filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
+  const activeProviderRequests = (providerRequests || []).filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeString(r.status).toUpperCase()));
+  const pastProviderRequests = (providerRequests || []).filter(r => ['COMPLETED', 'CANCELLED'].includes(safeString(r.status).toUpperCase()));
   
   const visiblePoolRequests = (poolRequests || []).filter(req => !hiddenPoolRequests.includes(req.id));
   
-  const filteredProviders = (providers || []).filter(p => { const q = String(searchProviderText || '').toLowerCase().trim(); if (!q) return true; return String(p.name || '').toLowerCase().includes(q) || String(p.phone || '').toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => String(k || '').toLowerCase().includes(q))); });
-  const filteredMatchedRequests = (matchedRequests || []).filter(r => { const q = String(searchMatchText || '').toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return String(r.raw_text || '').toLowerCase().includes(q) || String(r.contact_value || '').toLowerCase().includes(q) || String(r.provider_name || '').toLowerCase().includes(q) || String(r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
+  const filteredProviders = (providers || []).filter(p => { const q = safeString(searchProviderText).toLowerCase().trim(); if (!q) return true; return safeString(p.name).toLowerCase().includes(q) || safeString(p.phone).toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => safeString(k).toLowerCase().includes(q))); });
+  const filteredMatchedRequests = (matchedRequests || []).filter(r => { const q = safeString(searchMatchText).toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeString(r.raw_text).toLowerCase().includes(q) || safeString(r.contact_value).toLowerCase().includes(q) || safeString(r.provider_name).toLowerCase().includes(q) || safeString(r.provider_phone).toLowerCase().includes(q) || String(r.id).includes(q); });
   
   const filteredTrackerRequests = (trackerRequests || []).filter(r => {
-    const q = String(trackerSearch || '').toLowerCase().trim();
-    const matchesSearch = !q || String(r.raw_text || '').toLowerCase().includes(q) || String(r.contact_value || '').toLowerCase().includes(q) || String(r.location || '').toLowerCase().includes(q) || String(r.id).includes(q);
+    const q = safeString(trackerSearch).toLowerCase().trim();
+    const matchesSearch = !q || safeString(r.raw_text).toLowerCase().includes(q) || safeString(r.contact_value).toLowerCase().includes(q) || safeString(r.location).toLowerCase().includes(q) || String(r.id).includes(q);
     if (!matchesSearch) return false;
 
-    const locLow = String(r.location || '').toLowerCase();
-    const reqCode = String(extractCode(r.location) || '').toLowerCase();
+    const locLow = safeString(r.location).toLowerCase();
+    const reqCode = safeString(extractCode(r.location)).toLowerCase();
 
-    if (trackerFilter.city && !locLow.includes(String(trackerFilter.city || '').toLowerCase().trim())) return false;
-    if (trackerFilter.district && !locLow.includes(String(trackerFilter.district || '').toLowerCase().trim())) return false;
-    if (trackerFilter.zip && !locLow.includes(String(trackerFilter.zip || '').toLowerCase().trim())) return false;
-    if (trackerFilter.code && reqCode !== String(trackerFilter.code || '').toLowerCase().trim()) return false;
+    if (trackerFilter.city && !locLow.includes(safeString(trackerFilter.city).toLowerCase().trim())) return false;
+    if (trackerFilter.district && !locLow.includes(safeString(trackerFilter.district).toLowerCase().trim())) return false;
+    if (trackerFilter.zip && !locLow.includes(safeString(trackerFilter.zip).toLowerCase().trim())) return false;
+    if (trackerFilter.code && reqCode !== safeString(trackerFilter.code).toLowerCase().trim()) return false;
 
     return true;
   });
@@ -692,15 +719,13 @@ export default function App() {
     return sortableItems; 
   }, [filteredMatchedRequests, sortConfig]);
   
-  const filteredSmsLogs = (smsLogs || []).filter(log => { const q = String(searchSmsText || '').toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return String(log.recipient_phone || '').toLowerCase().includes(q) || String(log.message_body || '').toLowerCase().includes(q); });
+  const filteredSmsLogs = (smsLogs || []).filter(log => { const q = safeString(searchSmsText).toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return safeString(log.recipient_phone).toLowerCase().includes(q) || safeString(log.message_body).toLowerCase().includes(q); });
   
   const filteredWozProviders = (providers || []).filter(p => { 
-    const q = String(wozProviderSearch || '').toLowerCase().trim(); 
+    const q = safeString(wozProviderSearch).toLowerCase().trim(); 
     if (!q) return true; 
-    return String(p.name || '').toLowerCase().includes(q) || String(p.phone || '').toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => String(k || '').toLowerCase().includes(q))); 
+    return safeString(p.name).toLowerCase().includes(q) || safeString(p.phone).toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => safeString(k).toLowerCase().includes(q))); 
   });
-  
-  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
@@ -879,7 +904,7 @@ export default function App() {
 
                             {/* Gizlilik Onay Butonu (Liste Kapalıyken) */}
                             {req.status === 'MATCHED' && !expandedCustomerQueueReqId && (
-                              String(req.contact_value || '').includes('|HIDDEN') ? (
+                              safeString(req.contact_value).includes('|HIDDEN') ? (
                                 <div className="px-3 pb-3">
                                    <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm transition">
                                      <ShieldCheck size={14} />
@@ -903,7 +928,7 @@ export default function App() {
                                       {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700 shrink-0" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce shrink-0" />}
                                       <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Görüşme aktif. Sağlayıcı iletişim numarası: <strong>{req.provider_phone}</strong></>}</span>
                                    </div>
-                                   {String(req.preferred_channel || '').includes('WHATSAPP') && req.provider_phone && (
+                                   {safeString(req.preferred_channel).includes('WHATSAPP') && req.provider_phone && (
                                       <a href={`https://wa.me/${extractPhoneForWa(req.provider_phone)}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
                                         <MessageCircle size={12} /><span>WhatsApp'tan Yaz</span>
                                       </a>
@@ -954,7 +979,7 @@ export default function App() {
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
+                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && Array.isArray(req.queuedProviders) && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
@@ -1173,7 +1198,7 @@ export default function App() {
                       <div className="space-y-3 mt-3 max-h-[350px] overflow-y-auto">
                         {filteredPastCustomerRequests.map((req) => (
                            <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
-                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{req.created_at ? new Date(req.created_at).toLocaleDateString('tr-TR') : ''}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
+                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDate(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
                            </div>
                         ))}
                       </div>
@@ -1224,13 +1249,13 @@ export default function App() {
                        </p>
                        
                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-neutral-100">
-                         {req.status === 'MATCHED' && String(req.contact_value || '').includes('|SHARED') && (
+                         {req.status === 'MATCHED' && safeString(req.contact_value).includes('|SHARED') && (
                             <div className="flex space-x-2 w-full sm:w-auto">
                                <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
                                <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
                             </div>
                          )}
-                         {req.status === 'MATCHED' && String(req.contact_value || '').includes('|HIDDEN') && (
+                         {req.status === 'MATCHED' && safeString(req.contact_value).includes('|HIDDEN') && (
                             <div className="flex items-center space-x-2 w-full sm:w-auto">
                                <span className="px-3 py-1.5 bg-neutral-100 text-neutral-500 rounded-lg text-xs font-semibold border border-neutral-200">Müşteri Onayı Bekleniyor</span>
                                <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
@@ -1240,7 +1265,7 @@ export default function App() {
                          {req.status === 'ACCEPTED' && (
                            <>
                              <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
-                             {String(req.preferred_channel || '').includes('WHATSAPP') && req.contact_value && (
+                             {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
                                <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
                                  <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
                                </a>
@@ -1275,7 +1300,7 @@ export default function App() {
                             <p className="text-sm font-semibold text-neutral-900 leading-snug">"{req.raw_text}"</p>
                             
                             <div className="space-y-1.5 mt-2.5 mb-3 text-[10px] text-neutral-500 font-mono">
-                               <p className="flex items-center space-x-1.5 text-blue-600 font-semibold"><Clock size={11}/><span>{req.created_at ? new Date(req.created_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Bilinmiyor'}</span></p>
+                               <p className="flex items-center space-x-1.5 text-blue-600 font-semibold"><Clock size={11}/><span>{safeDateTime(req.created_at)}</span></p>
                                <p className="flex items-center space-x-1.5"><User size={11}/><span>{getProviderContactDisplay(req)}</span></p>
                                {req.location && <p className="flex items-center space-x-1.5"><MapPin size={11}/><span>{extractAddress(req.location)}</span></p>}
                             </div>
@@ -1323,7 +1348,7 @@ export default function App() {
                   </div>
                   {isTrackerSuggestionsVisible && mapSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
-                      {mapSuggestions.map((sug, idx) => (
+                      {trackerMapSuggestions.map((sug, idx) => (
                         <div 
                            key={idx} 
                            className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
@@ -1717,7 +1742,7 @@ export default function App() {
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
                                 <span className="font-mono text-[11px] hidden sm:inline">👤 {testItem.tester_name || 'Tester'}</span>
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{(testItem.test_date || '').split('T')[0]}</span></span>
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{safeDate(testItem.test_date)}</span></span>
                                 {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                               </div>
                             </div>
@@ -1733,7 +1758,7 @@ export default function App() {
                                     </select>
                                   </div>
                                   <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label><input type="text" defaultValue={testItem.tester_name || ''} onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs" /></div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={(testItem.test_date || '').split('T')[0]} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={(testItem.test_date || '').split('T')[0] || ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
                                   <span className="font-mono">Senaryo ID: #{testItem.id}</span>
@@ -1785,7 +1810,7 @@ export default function App() {
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{(feat.target_date || '').split('T')[0]}</span></span>
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{safeDate(feat.target_date)}</span></span>
                                 {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                               </div>
                             </div>
@@ -1806,7 +1831,7 @@ export default function App() {
                                       <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
                                     </select>
                                   </div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={(feat.target_date || '').split('T')[0]} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={(feat.target_date || '').split('T')[0] || ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
                                   <span className="font-mono">Kayıt ID: #{feat.id}</span>
