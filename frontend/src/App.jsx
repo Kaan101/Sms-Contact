@@ -93,7 +93,6 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
   ) : null;
 }
 
-// İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -112,7 +111,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 GLOBAL YARDIMCI FONKSİYONLAR (Tek Bir Yerde Tanımlandı)
+// 🌟 GLOBAL VERİ ÇIKARICILAR & FORMATLAYICILAR
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -123,23 +122,19 @@ const extractGPS = (loc) => {
   }
   return null;
 };
-
 const extractCode = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[CODE:\s*(.*?)\]/);
   return match ? match[1].trim() : null;
 };
-
 const extractAddress = (loc) => {
   if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
   return loc.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
 };
-
 const cleanContact = (str) => {
   if (!str) return '';
   return String(str).replace(/\|(SHARED|HIDDEN)/g, '');
 };
-
 const getProviderContactDisplay = (req) => {
   const raw = req.contact_value || '';
   const isShared = String(raw).includes('|SHARED');
@@ -154,7 +149,6 @@ const getProviderContactDisplay = (req) => {
   
   return '🔒 Gizli';
 };
-
 const extractPhoneForWa = (str) => {
   if (!str) return '';
   let cleaned = cleanContact(str).replace(/\D/g, '');
@@ -162,29 +156,26 @@ const extractPhoneForWa = (str) => {
   if (!cleaned.startsWith('90')) cleaned = '90' + cleaned;
   return cleaned;
 };
-
 const getKeywordMetrics = (text) => { 
   const str = text || ''; 
   return { charCount: String(str).length, wordCount: String(str).split(',').map(k => k.trim()).filter(Boolean).length }; 
 };
 
-
 // 🚀 ANA UYGULAMA BİLEŞENİ
 export default function App() {
-  const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
+  // =====================================================================
+  // 1. TÜM HOOK'LAR (useState, useRef, useMemo) EN TEPEDE TANIMLANDI
+  // =====================================================================
+  
+  const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   const [session, setSession] = useState(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const urlRole = urlParams.get('role');
       const urlPhone = urlParams.get('phone');
-
       if (urlRole && urlPhone) {
-        const directSession = {
-          role: urlRole.toUpperCase(),
-          phone: decodeURIComponent(urlPhone),
-          authenticatedAt: new Date().toISOString()
-        };
+        const directSession = { role: urlRole.toUpperCase(), phone: decodeURIComponent(urlPhone), authenticatedAt: new Date().toISOString() };
         localStorage.setItem('sc_session', JSON.stringify(directSession));
         window.history.replaceState({}, document.title, window.location.pathname);
         return directSession;
@@ -205,11 +196,11 @@ export default function App() {
   const mapSearchInputRef = useRef(null);
   const trackerSearchInputRef = useRef(null);
 
-  // Müşteri State
+  const [step, setStep] = useState('INPUT');
+  const [loading, setLoading] = useState(false);
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
-  
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
@@ -221,75 +212,16 @@ export default function App() {
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   const [isContactShared, setIsContactShared] = useState(false); 
-  
   const [mapPosition, setMapPosition] = useState(null);
   const [mapSearchText, setMapSearchText] = useState('');
   const [isMapSearching, setIsMapSearching] = useState(false);
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
-
-  const fetchCurrentLocation = () => {
-    if (!navigator.geolocation) return;
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setMapPosition({ lat: latitude, lng: longitude });
-        setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-        try {
-          const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
-          const addr = geoRes.data.address;
-          const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
-          const city = addr.city || addr.province || '';
-          setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
-        } catch {
-          setLocationValue(`Haritadan İşaretlendi`);
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      (err) => {
-        console.warn('Konum alınamadı:', err.message);
-        setIsLocating(false);
-      },
-      { timeout: 8000 }
-    );
-  };
-
-  useEffect(() => {
-    if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) {
-      fetchCurrentLocation();
-    }
-    // eslint-disable-next-line
-  }, [session?.role, step]);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (mapSearchText.length > 2) {
-        setIsMapSearching(true);
-        try {
-          const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
-          setMapSuggestions(res.data);
-          if (mapSearchInputRef.current === document.activeElement) {
-            setIsSuggestionsVisible(true);
-          }
-        } catch (err) {} finally { setIsMapSearching(false); }
-      } else {
-        setMapSuggestions([]);
-        setIsSuggestionsVisible(false);
-      }
-    }, 400);
-    return () => clearTimeout(delayDebounceFn);
-  }, [mapSearchText]);
-
-  const [step, setStep] = useState('INPUT');
-  const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
-  // Sağlayıcı State
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
@@ -298,11 +230,8 @@ export default function App() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
-  const [providerFormData, setProviderFormData] = useState({ 
-    name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 
-  });
+  const [providerFormData, setProviderFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
 
-  // Admin State
   const [adminTab, setAdminTab] = useState('WOZ');
   const [matchedRequests, setMatchedRequests] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
@@ -324,11 +253,9 @@ export default function App() {
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
-  
   const [tests, setTests] = useState([]);
   const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' });
-  
   const [reviewRatingMap, setReviewRatingMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
@@ -336,7 +263,6 @@ export default function App() {
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
 
-  // TRACKER State
   const [trackerRequests, setTrackerRequests] = useState([]);
   const [trackerSearch, setTrackerSearch] = useState('');
   const [trackerMapCenter, setTrackerMapCenter] = useState([41.0082, 28.9784]); 
@@ -348,297 +274,25 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
-
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (trackerMapSearchText.length > 2) {
-        setIsTrackerMapSearching(true);
-        try {
-          const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
-          setTrackerMapSuggestions(res.data);
-          if (trackerSearchInputRef.current === document.activeElement) {
-            setIsTrackerSuggestionsVisible(true);
-          }
-        } catch (err) {} finally { setIsTrackerMapSearching(false); }
-      } else {
-        setTrackerMapSuggestions([]);
-        setIsTrackerSuggestionsVisible(false);
-      }
-    }, 400);
-    return () => clearTimeout(delayDebounceFn);
-  }, [trackerMapSearchText]);
+  // =====================================================================
+  // 2. TÜM HESAPLAMALAR VE FİLTRELEMELER (useMemo)
+  // =====================================================================
 
-  const togglePreferredChannel = (channel) => {
-    setPreferredChannels((prev) => {
-      if (prev.includes(channel)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((c) => c !== channel);
-      } else {
-        return [...prev, channel];
-      }
-    });
-    setErrorMessage('');
-  };
-
-  const fetchCustomerData = async () => {
-    if (!session?.phone) return;
-    try {
-      const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
-      setMyCustomerRequests(res.data.requests || []);
-    } catch (err) {}
-  };
-
-  const fetchProviderData = async (shouldUpdateForm = false) => {
-    if (!session?.phone) return;
-    try {
-      const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
-      const prov = pRes.data.provider;
-      setProviderProfile(prov);
-
-      if (shouldUpdateForm) {
-        setProviderFormData({
-          name: prov.name || '', phone: prov.phone || '', email: prov.email || '',
-          serviceKeywords: (prov.service_keywords || []).join(', '),
-          communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
-          priorityScore: prov.priority_score || 100
-        });
-      }
-
-      const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
-      setProviderRequests(rRes.data.requests || []);
-
-      const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
-      setPoolRequests(poolRes.data.poolRequests || []);
-    } catch (err) {
-      if (err.response?.status === 404) { setProviderProfile(null); setProviderRequests([]); setPoolRequests([]); }
-    }
-  };
-
-  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
-  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
-  
-  const fetchAdminData = async () => {
-    try {
-      const [reqRes, provRes, matchRes, logRes] = await Promise.all([
-        axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`),
-        axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`)
-      ]);
-      setPendingRequests(reqRes.data.requests || []); 
-      setProviders(provRes.data.providers || []);
-      setMatchedRequests(matchRes.data.requests || []); 
-      setSmsLogs(logRes.data.notifications || []);
-      await fetchFeatures(); 
-      await fetchTests();
-      try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes.data.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
-    } catch (err) {}
-  };
-
-  const fetchTrackerData = async () => {
-    try {
-      let pending = []; let matched = [];
-      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = reqRes.data.requests || []; } catch (e) {}
-      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = matchRes.data.requests || []; } catch (e) {}
-      
-      const allReqs = [...pending, ...matched];
-      const uniqueReqsMap = new Map();
-      allReqs.forEach(item => uniqueReqsMap.set(item.id, item));
-      const uniqueReqs = Array.from(uniqueReqsMap.values());
-      uniqueReqs.sort((a, b) => b.id - a.id);
-      setTrackerRequests(uniqueReqs);
-    } catch (err) {}
-  };
-
-  useEffect(() => {
-    if (session) {
-      if (session.role === 'CUSTOMER') fetchCustomerData();
-      if (session.role === 'PROVIDER') fetchProviderData(true);
-      if (session.role === 'ADMIN') fetchAdminData();
-      if (session.role === 'TRACKER') fetchTrackerData();
-
-      const interval = setInterval(() => {
-        if (session.role === 'PROVIDER') fetchProviderData(false);
-        if (session.role === 'CUSTOMER') fetchCustomerData();
-        if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
-        if (session.role === 'TRACKER') fetchTrackerData();
-      }, 5000);
-
-      return () => clearInterval(interval);
-    }
-  }, [session, adminTab]);
-
-  const handleSendOtp = async (e) => { 
-    e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); 
-    try { 
-      const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); 
-      setSimulatedCode(res.data.simulatedOtp); 
-      setAuthStep('OTP'); 
-      localStorage.setItem('sc_last_phone', inputPhone.trim());
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
-    finally { setAuthLoading(false); } 
-  };
-  
-  const handleVerifyOtp = async (e) => { 
-    e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage(''); 
-    try { 
-      await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() }); 
-      const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() }; 
-      setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession)); 
-      setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp(''); 
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } 
-    finally { setAuthLoading(false); } 
-  };
-  
-  const handleLogout = () => { 
-    localStorage.removeItem('sc_session'); 
-    setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
-    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
-  };
-
-  const handleOpenProviderDirectSession = (provPhone) => {
-    if (!provPhone) return;
-    const cleanPhone = encodeURIComponent(provPhone.trim());
-    const directUrl = `${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`;
-    window.open(directUrl, '_blank');
-  };
-
-  const submitFinalRequest = async (disambiguationChoice, fromTracker = false) => {
-    setLoading(true);
-    const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
-    const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
-    
-    const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
-    const channelString = preferredChannels.join(', ');
-
-    let backendLocation = locationValue || 'Belirtilmedi';
-    if (coordinates) backendLocation += ` [GPS: ${coordinates}]`;
-    if (companyCode.trim()) backendLocation += ` [CODE: ${companyCode.trim()}]`;
-
-    try {
-      await axios.post(`${API_BASE}/requests`, {
-        rawText: queryText, disambiguationChoice: disambiguationChoice, contactValue: flaggedContactValue,
-        preferredChannel: channelString, location: backendLocation, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
-      });
-      setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); 
-      setLocationValue(''); setCoordinates(''); setCompanyCode(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); 
-      setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false);
-      
-      if (fromTracker) {
-        setIsTrackerAddModalOpen(false);
-        setTrackerMapSelectedPos(null);
-        setTrackerMapSelectedAddress('');
-        setTrackerMapSearchText('');
-        fetchTrackerData();
-        alert("Talep başarıyla oluşturuldu ve haritaya eklendi.");
-      } else {
-        await fetchCustomerData();
-      }
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } 
-    finally { setLoading(false); }
-  };
-
-  const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
-    e?.preventDefault(); if (!queryText.trim()) return;
-    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) { setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100); return; }
-    setLoading(true); setErrorMessage('');
-    try {
-      const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
-      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } 
-      else { await submitFinalRequest(null, fromTracker); }
-    } catch { await submitFinalRequest(null, fromTracker); }
-  };
-
-  const handleRepeatRequest = (req) => { setQueryText(req.raw_text); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
-  const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
-  const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
-  
-  const handleStatusChange = async (requestId, newStatus) => { 
-    try { 
-      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
-      if (session.role === 'CUSTOMER') await fetchCustomerData(); 
-      if (session.role === 'PROVIDER') await fetchProviderData(false); 
-      if (session.role === 'ADMIN') await fetchAdminData(); 
-    } catch (err) {} 
-  };
-  
-  const handleProviderSkip = async (requestId) => {
-    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return;
-    try {
-      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
-      await fetchProviderData(false);
-    } catch (err) {
-      alert('İşlem başarısız oldu.');
-    }
-  };
-
-  const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {} };
-
-  const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
-  
-  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
-  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
-  const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
-  
-  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) {} };
-  const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) {} };
-  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch {} };
-  
-  const handleSaveProviderProfile = async (e) => { 
-    e.preventDefault(); 
-    const keywordsArray = providerFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
-    const payload = { name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100 }; 
-    try { 
-      if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload); 
-      else await axios.post(`${API_BASE}/providers`, payload); 
-      setIsProfileOpen(false); 
-      await fetchProviderData(true); 
-      alert("Profil başarıyla kaydedildi!");
-    } catch (err) {
-      alert(err.response?.data?.message || "Profil güncellenirken hata oluştu.");
-    } 
-  };
-  
-  const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
-  
-  const handleAdminSaveProvider = async (e) => { 
-    if (e && e.preventDefault) e.preventDefault(); 
-    if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) {
-       alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun."); return;
-    }
-    const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
-    const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; 
-    try { 
-      if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } 
-      else { await axios.post(`${API_BASE}/providers`, payload); }
-      setIsModalOpen(false); await fetchAdminData(); alert("Sağlayıcı başarıyla kaydedildi!");
-    } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi. Telefon numarası zaten mevcut olabilir."); } 
-  };
-  
-  const handleAdminDeleteProvider = async (id) => { 
-    if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return; 
-    try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); alert("Sağlayıcı başarıyla silindi."); } 
-    catch (err) { alert("Silme işlemi başarısız oldu."); } 
-  };
-  
-  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
-
-  // Filtrelemeler
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
   const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = searchCustomerHistoryText.toLowerCase().trim(); if (!q) return true; return (req.raw_text || '').toLowerCase().includes(q) || (req.provider_name || '').toLowerCase().includes(q) || (req.status || '').toLowerCase().includes(q); });
-  
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
-  
   const visiblePoolRequests = poolRequests.filter(req => !hiddenPoolRequests.includes(req.id));
-  
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
-  
+  const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
+  const filteredWozProviders = providers.filter(p => { const q = wozProviderSearch.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
+
   const filteredTrackerRequests = trackerRequests.filter(r => {
     const q = trackerSearch.toLowerCase().trim();
     const matchesSearch = !q || (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.location || '').toLowerCase().includes(q) || String(r.id).includes(q);
@@ -656,9 +310,8 @@ export default function App() {
   });
 
   const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code;
+  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
-  
   const sortedMatchedRequests = useMemo(() => { 
     let sortableItems = [...filteredMatchedRequests]; 
     if (sortConfig !== null) { 
@@ -678,16 +331,168 @@ export default function App() {
     } 
     return sortableItems; 
   }, [filteredMatchedRequests, sortConfig]);
-  
-  const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
-  
-  const filteredWozProviders = providers.filter(p => { 
-    const q = wozProviderSearch.toLowerCase().trim(); 
-    if (!q) return true; 
-    return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
-  });
 
-  const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
+  // =====================================================================
+  // 3. TÜM YAN ETKİLER (useEffect)
+  // =====================================================================
+
+  const fetchCustomerData = async () => {
+    if (!session?.phone) return;
+    try { const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`); setMyCustomerRequests(res.data.requests || []); } catch (err) {}
+  };
+
+  const fetchProviderData = async (shouldUpdateForm = false) => {
+    if (!session?.phone) return;
+    try {
+      const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
+      const prov = pRes.data.provider;
+      setProviderProfile(prov);
+      if (shouldUpdateForm) {
+        setProviderFormData({ name: prov.name || '', phone: prov.phone || '', email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 });
+      }
+      const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
+      setProviderRequests(rRes.data.requests || []);
+      const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
+      setPoolRequests(poolRes.data.poolRequests || []);
+    } catch (err) { if (err.response?.status === 404) { setProviderProfile(null); setProviderRequests([]); setPoolRequests([]); } }
+  };
+
+  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
+  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
+  
+  const fetchAdminData = async () => {
+    try {
+      const [reqRes, provRes, matchRes, logRes] = await Promise.all([ axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`), axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`) ]);
+      setPendingRequests(reqRes.data.requests || []); setProviders(provRes.data.providers || []); setMatchedRequests(matchRes.data.requests || []); setSmsLogs(logRes.data.notifications || []);
+      await fetchFeatures(); await fetchTests();
+      try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes.data.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
+    } catch (err) {}
+  };
+
+  const fetchTrackerData = async () => {
+    try {
+      let pending = []; let matched = [];
+      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = reqRes.data.requests || []; } catch (e) {}
+      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = matchRes.data.requests || []; } catch (e) {}
+      const allReqs = [...pending, ...matched]; const uniqueReqsMap = new Map(); allReqs.forEach(item => uniqueReqsMap.set(item.id, item));
+      const uniqueReqs = Array.from(uniqueReqsMap.values()); uniqueReqs.sort((a, b) => b.id - a.id);
+      setTrackerRequests(uniqueReqs);
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) { fetchCurrentLocation(); }
+  }, [session?.role, step]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (mapSearchText.length > 2) {
+        setIsMapSearching(true);
+        try { const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`); setMapSuggestions(res.data); if (mapSearchInputRef.current === document.activeElement) { setIsSuggestionsVisible(true); } } 
+        catch (err) {} finally { setIsMapSearching(false); }
+      } else { setMapSuggestions([]); setIsSuggestionsVisible(false); }
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [mapSearchText]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (trackerMapSearchText.length > 2) {
+        setIsTrackerMapSearching(true);
+        try { const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`); setTrackerMapSuggestions(res.data); if (trackerSearchInputRef.current === document.activeElement) { setIsTrackerSuggestionsVisible(true); } } 
+        catch (err) {} finally { setIsTrackerMapSearching(false); }
+      } else { setTrackerMapSuggestions([]); setIsTrackerSuggestionsVisible(false); }
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [trackerMapSearchText]);
+
+  useEffect(() => {
+    if (session) {
+      if (session.role === 'CUSTOMER') fetchCustomerData();
+      if (session.role === 'PROVIDER') fetchProviderData(true);
+      if (session.role === 'ADMIN') fetchAdminData();
+      if (session.role === 'TRACKER') fetchTrackerData();
+
+      const interval = setInterval(() => {
+        if (session.role === 'PROVIDER') fetchProviderData(false);
+        if (session.role === 'CUSTOMER') fetchCustomerData();
+        if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
+        if (session.role === 'TRACKER') fetchTrackerData();
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [session, adminTab]);
+
+  // =====================================================================
+  // 4. TÜM KULLANICI ETKİLEŞİM FONKSİYONLARI (Handler'lar)
+  // =====================================================================
+
+  const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
+  const togglePreferredChannel = (channel) => { setPreferredChannels((prev) => { if (prev.includes(channel)) { if (prev.length === 1) return prev; return prev.filter((c) => c !== channel); } else { return [...prev, channel]; } }); setErrorMessage(''); };
+
+  const handleSendOtp = async (e) => { e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); try { const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); setSimulatedCode(res.data.simulatedOtp); setAuthStep('OTP'); localStorage.setItem('sc_last_phone', inputPhone.trim()); } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } finally { setAuthLoading(false); } };
+  const handleVerifyOtp = async (e) => { e.preventDefault(); if (!inputOtp.trim()) return; setAuthLoading(true); setErrorMessage(''); try { await axios.post(`${API_BASE}/auth/verify-otp`, { phone: inputPhone.trim(), otpCode: inputOtp.trim() }); const newSession = { role: selectedRole, phone: inputPhone.trim(), authenticatedAt: new Date().toISOString() }; setSession(newSession); localStorage.setItem('sc_session', JSON.stringify(newSession)); setIsProfileOpen(false); setAuthStep('PHONE'); setInputOtp(''); } catch (err) { setErrorMessage(err.response?.data?.message || 'Doğrulama kodu hatalı.'); } finally { setAuthLoading(false); } };
+  const handleLogout = () => { localStorage.removeItem('sc_session'); setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ'); };
+  const handleOpenProviderDirectSession = (provPhone) => { if (!provPhone) return; const cleanPhone = encodeURIComponent(provPhone.trim()); window.open(`${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`, '_blank'); };
+
+  const submitFinalRequest = async (disambiguationChoice, fromTracker = false) => {
+    setLoading(true);
+    const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
+    const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
+    const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
+    const channelString = preferredChannels.join(', ');
+
+    let backendLocation = locationValue || 'Belirtilmedi';
+    if (coordinates) backendLocation += ` [GPS: ${coordinates}]`;
+    if (companyCode.trim()) backendLocation += ` [CODE: ${companyCode.trim()}]`;
+
+    try {
+      await axios.post(`${API_BASE}/requests`, { rawText: queryText, disambiguationChoice: disambiguationChoice, contactValue: flaggedContactValue, preferredChannel: channelString, location: backendLocation, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO });
+      setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setCompanyCode(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false);
+      if (fromTracker) { setIsTrackerAddModalOpen(false); setTrackerMapSelectedPos(null); setTrackerMapSelectedAddress(''); setTrackerMapSearchText(''); fetchTrackerData(); alert("Talep başarıyla oluşturuldu ve haritaya eklendi."); } else { await fetchCustomerData(); }
+    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
+  };
+
+  const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
+    e?.preventDefault(); if (!queryText.trim()) return;
+    if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) { setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100); return; }
+    setLoading(true); setErrorMessage('');
+    try {
+      const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
+      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } else { await submitFinalRequest(null, fromTracker); }
+    } catch { await submitFinalRequest(null, fromTracker); }
+  };
+
+  const handleRepeatRequest = (req) => { setQueryText(req.raw_text); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
+  const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  
+  const handleStatusChange = async (requestId, newStatus) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); } catch (err) {} };
+  const handleProviderSkip = async (requestId) => { if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return; try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' }); await fetchProviderData(false); } catch (err) { alert('İşlem başarısız oldu.'); } };
+  const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {} };
+  const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
+  
+  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
+  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
+  const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
+  
+  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) {} };
+  const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) {} };
+  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch {} };
+  
+  const handleSaveProviderProfile = async (e) => { e.preventDefault(); const keywordsArray = providerFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); const payload = { name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100 }; try { if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload); else await axios.post(`${API_BASE}/providers`, payload); setIsProfileOpen(false); await fetchProviderData(true); alert("Profil başarıyla kaydedildi!"); } catch (err) { alert(err.response?.data?.message || "Profil güncellenirken hata oluştu."); } };
+  
+  const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
+  
+  const handleAdminSaveProvider = async (e) => { if (e && e.preventDefault) e.preventDefault(); if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) { alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun."); return; } const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; try { if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } else { await axios.post(`${API_BASE}/providers`, payload); } setIsModalOpen(false); await fetchAdminData(); alert("Sağlayıcı başarıyla kaydedildi!"); } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi. Telefon numarası zaten mevcut olabilir."); } };
+  const handleAdminDeleteProvider = async (id) => { if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); alert("Sağlayıcı başarıyla silindi."); } catch (err) { alert("Silme işlemi başarısız oldu."); } };
+  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
+
+  // =====================================================================
+  // 5. GÖRSEL RENDER VE RETURN
+  // =====================================================================
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
   if (session?.role === 'ADMIN') mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-[100%]";
@@ -705,7 +510,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.2 (Stable Global Functions)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.3 (Fully Stabilized)</span>
             </div>
           </div>
 
@@ -1367,7 +1172,7 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ */}
+              {/* SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
               {isTrackerListOpen && (
                 <div className="absolute top-0 right-0 w-[70vw] sm:w-[220px] md:w-[240px] min-w-[180px] max-w-[260px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
