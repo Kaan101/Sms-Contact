@@ -112,7 +112,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 VERİ ÇIKARICILAR
+// 🌟 GLOBAL VERİ ÇIKARICILAR & FORMATLAYICILAR (Hataları önlemek için dışarı taşındı)
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -132,6 +132,40 @@ const extractAddress = (loc) => {
   if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
   return loc.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
 };
+
+const cleanContact = (str) => {
+  if (!str) return '';
+  return String(str).replace(/\|(SHARED|HIDDEN)/g, '');
+};
+
+const getProviderContactDisplay = (req) => {
+  const raw = req.contact_value || '';
+  const isShared = String(raw).includes('|SHARED');
+  const isAccepted = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(req.status);
+  
+  if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
+  if (req.status === 'MATCHED') {
+    if (isShared) return cleanContact(raw);
+    return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
+  }
+  if (isAccepted) return cleanContact(raw);
+  
+  return '🔒 Gizli';
+};
+
+const extractPhoneForWa = (str) => {
+  if (!str) return '';
+  let cleaned = cleanContact(str).replace(/\D/g, '');
+  if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+  if (!cleaned.startsWith('90')) cleaned = '90' + cleaned;
+  return cleaned;
+};
+
+const getKeywordMetrics = (text) => { 
+  const str = text || ''; 
+  return { charCount: String(str).length, wordCount: String(str).split(',').map(k => k.trim()).filter(Boolean).length }; 
+};
+
 
 export default function App() {
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
@@ -650,35 +684,6 @@ export default function App() {
     return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
   });
   
-  const cleanContact = (str) => {
-    if (!str) return '';
-    return str.replace(/\|(SHARED|HIDDEN)/g, '');
-  };
-
-  const getProviderContactDisplay = (req) => {
-    const raw = req.contact_value || '';
-    const isShared = raw.includes('|SHARED');
-    const isAccepted = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(req.status);
-    
-    if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
-    if (req.status === 'MATCHED') {
-      if (isShared) return cleanContact(raw);
-      return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
-    }
-    if (isAccepted) return cleanContact(raw);
-    
-    return '🔒 Gizli';
-  };
-
-  const extractPhoneForWa = (str) => {
-    if (!str) return '';
-    let cleaned = cleanContact(str).replace(/\D/g, '');
-    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
-    if (!cleaned.startsWith('90')) cleaned = '90' + cleaned;
-    return cleaned;
-  };
-
-  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
@@ -697,7 +702,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.1 (List Approval)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.2 (Stable Global Functions)</span>
             </div>
           </div>
 
@@ -912,7 +917,6 @@ export default function App() {
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
                                         </div>
                                         
-                                        {/* 🌟 YENİ: Liste içindeki aksiyon butonları */}
                                         <div className="flex items-center space-x-2">
                                             {isCurrent && !isSkippedByThis && req.status === 'MATCHED' && (
                                                 <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
@@ -980,7 +984,6 @@ export default function App() {
                         <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit transition"><ChevronDown size={16} /></button>
                       </div>
                       
-                      {/* Özet Satırı */}
                       <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                         <div className="flex flex-col leading-tight">
                           <span className="flex items-center space-x-1">
