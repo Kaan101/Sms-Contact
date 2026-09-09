@@ -15,9 +15,7 @@ import {
   Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
 } from 'lucide-react';
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) 
-  ? import.meta.env.VITE_API_BASE_URL 
-  : 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
@@ -113,7 +111,10 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 %100 ZIRHLI GLOBAL VERİ ÇIKARICILAR & FORMATLAYICILAR
+// =====================================================================
+// 🌟 GÜVENLİ GLOBAL FORMATLAYICILAR (TEK BİR KERE TANIMLANDILAR)
+// =====================================================================
+
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -173,7 +174,10 @@ const getKeywordMetrics = (text) => {
   }; 
 };
 
+// =====================================================================
 // 🚀 ANA UYGULAMA BİLEŞENİ
+// =====================================================================
+
 export default function App() {
   
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
@@ -402,13 +406,13 @@ export default function App() {
       const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
       const prov = pRes.data?.provider;
       if (!prov) return;
-      
+
       setProviderProfile(prov);
 
       if (shouldUpdateForm) {
         setProviderFormData({
           name: prov.name || '', phone: prov.phone || '', email: prov.email || '',
-          serviceKeywords: (prov.service_keywords || []).join(', '),
+          serviceKeywords: Array.isArray(prov.service_keywords) ? prov.service_keywords.join(', ') : '',
           communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
           priorityScore: prov.priority_score || 100
         });
@@ -634,7 +638,7 @@ export default function App() {
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
   // =====================================================================
-  // 6. RENDER ÖNCESİ FİLTRELEMELER VE GÜVENLİ DEĞER ATAMALARI
+  // 7. GÜVENLİ FİLTRELEMELER VE LİSTELER
   // =====================================================================
 
   const activeCustomerRequests = (myCustomerRequests || []).filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes((r.status || '').toUpperCase()));
@@ -647,7 +651,7 @@ export default function App() {
   
   const visiblePoolRequests = (poolRequests || []).filter(req => !hiddenPoolRequests.includes(req.id));
   
-  const filteredProviders = (providers || []).filter(p => { const q = String(searchProviderText || '').toLowerCase().trim(); if (!q) return true; return String(p.name || '').toLowerCase().includes(q) || String(p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => String(k || '').toLowerCase().includes(q)); });
+  const filteredProviders = (providers || []).filter(p => { const q = String(searchProviderText || '').toLowerCase().trim(); if (!q) return true; return String(p.name || '').toLowerCase().includes(q) || String(p.phone || '').toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => String(k || '').toLowerCase().includes(q))); });
   const filteredMatchedRequests = (matchedRequests || []).filter(r => { const q = String(searchMatchText || '').toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return String(r.raw_text || '').toLowerCase().includes(q) || String(r.contact_value || '').toLowerCase().includes(q) || String(r.provider_name || '').toLowerCase().includes(q) || String(r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
   const filteredTrackerRequests = (trackerRequests || []).filter(r => {
@@ -666,14 +670,36 @@ export default function App() {
     return true;
   });
 
+  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code;
+
+  const sortedMatchedRequests = useMemo(() => { 
+    let sortableItems = [...filteredMatchedRequests]; 
+    if (sortConfig !== null) { 
+      sortableItems.sort((a, b) => { 
+        let valA = a[sortConfig.key]; let valB = b[sortConfig.key]; 
+        if (sortConfig.key === 'queue') { valA = Array.isArray(a.queueList) ? a.queueList.length : 0; valB = Array.isArray(b.queueList) ? b.queueList.length : 0; } 
+        else if (sortConfig.key === 'provider_name') { valA = a.provider_name || ''; valB = b.provider_name || ''; } 
+        else if (sortConfig.key === 'location') { valA = a.location || ''; valB = b.location || ''; } 
+        else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } 
+        else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } 
+        else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } 
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; 
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; 
+        return 0; 
+      }); 
+    } 
+    return sortableItems; 
+  }, [filteredMatchedRequests, sortConfig]);
+  
   const filteredSmsLogs = (smsLogs || []).filter(log => { const q = String(searchSmsText || '').toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return String(log.recipient_phone || '').toLowerCase().includes(q) || String(log.message_body || '').toLowerCase().includes(q); });
   
   const filteredWozProviders = (providers || []).filter(p => { 
     const q = String(wozProviderSearch || '').toLowerCase().trim(); 
     if (!q) return true; 
-    return String(p.name || '').toLowerCase().includes(q) || String(p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => String(k || '').toLowerCase().includes(q)); 
+    return String(p.name || '').toLowerCase().includes(q) || String(p.phone || '').toLowerCase().includes(q) || (Array.isArray(p.service_keywords) && p.service_keywords.some(k => String(k || '').toLowerCase().includes(q))); 
   });
-
+  
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
@@ -692,7 +718,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.3 (Fully Stabilized)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.5 (Fully Rebuilt)</span>
             </div>
           </div>
 
@@ -816,9 +842,9 @@ export default function App() {
                         </div>
 
                         {/* Kuyruk Kontrolü */}
-                        {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) && (
+                        {(req.provider_name || (Array.isArray(req.queuedProviders) && req.queuedProviders.length > 0)) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
-                            <div onClick={() => { if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
+                            <div onClick={() => { if (Array.isArray(req.queuedProviders) && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(Array.isArray(req.queuedProviders) && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
                               <div className="space-y-1.5 w-full">
                                 
                                 <div className="text-[10px] font-mono font-bold text-emerald-700">
@@ -830,7 +856,7 @@ export default function App() {
                                     <Building2 size={14} className="text-neutral-700" />
                                     {req.provider_name ? (<><span className={`font-bold ${req.status === 'PROVIDER_SKIPPED' ? 'text-neutral-400 line-through' : 'text-neutral-950'}`}>{req.provider_name}</span><span className={`font-mono font-semibold px-1.5 py-0.5 rounded border ${req.status === 'PROVIDER_SKIPPED' ? 'bg-neutral-100 text-neutral-400 border-neutral-200' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
                                   </div>
-                                  {req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1) && (
+                                  {Array.isArray(req.queuedProviders) && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1) && (
                                     <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${req.queuedProviders.length - 1})` : `Tüm Adaylar (${req.queuedProviders.length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
                                   )}
                                 </div>
@@ -887,7 +913,7 @@ export default function App() {
                             )}
                             
                             {/* LİSTE AÇIKKEN GÖRÜNEN ADAYLAR */}
-                            {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 0 && (
+                            {expandedCustomerQueueReqId === req.id && Array.isArray(req.queuedProviders) && req.queuedProviders.length > 0 && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
                                   {req.queuedProviders.map((qProv, idx) => {
@@ -928,10 +954,10 @@ export default function App() {
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{(req.deadline_datetime) && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
+                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && req.queuedProviders && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
+                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && Array.isArray(req.queuedProviders) && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
                           <div className="flex items-center space-x-1.5 ml-auto">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED') && (<button onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"><ShieldCheck size={12} /><span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span></button>)}<button onClick={() => handleStatusChange(req.id, 'CANCELLED')} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px]" title="Talebi İptal Et"><Ban size={12} /> İptal</button></div>
                         </div>
                       </div>
@@ -1147,7 +1173,7 @@ export default function App() {
                       <div className="space-y-3 mt-3 max-h-[350px] overflow-y-auto">
                         {filteredPastCustomerRequests.map((req) => (
                            <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
-                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{(req.created_at) ? new Date(req.created_at).toLocaleDateString('tr-TR') : ''}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
+                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{req.created_at ? new Date(req.created_at).toLocaleDateString('tr-TR') : ''}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
                            </div>
                         ))}
                       </div>
@@ -1295,9 +1321,9 @@ export default function App() {
                       className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition" 
                     />
                   </div>
-                  {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
+                  {isTrackerSuggestionsVisible && mapSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
-                      {trackerMapSuggestions.map((sug, idx) => (
+                      {mapSuggestions.map((sug, idx) => (
                         <div 
                            key={idx} 
                            className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
