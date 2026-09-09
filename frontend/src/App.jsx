@@ -249,6 +249,7 @@ export default function App() {
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
+  const [hiddenPoolRequests, setHiddenPoolRequests] = useState([]); // 🌟 YENİ: Havuzdan gizlenenler
   const [providerTab, setProviderTab] = useState('ACTIVE');
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -586,6 +587,9 @@ export default function App() {
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
   
+  // 🌟 DÜZELTME: Görünür Havuz Talepleri Filtresi
+  const visiblePoolRequests = poolRequests.filter(req => !hiddenPoolRequests.includes(req.id));
+  
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
   const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
   
@@ -621,6 +625,7 @@ export default function App() {
   }, [filteredMatchedRequests, sortConfig]);
   
   const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
+  
   const filteredWozProviders = providers.filter(p => { 
     const q = wozProviderSearch.toLowerCase().trim(); 
     if (!q) return true; 
@@ -659,7 +664,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.2 (Slim Tracker UI)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.4 (Pool UX)</span>
             </div>
           </div>
 
@@ -864,7 +869,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* YENİ TALEP FORMU */}
+              {/* 🌟 YENİ TALEP FORMU */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -946,7 +951,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* SAĞ: 3/5 */}
+                          {/* SAĞ PARÇA: 3/5 */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -1090,24 +1095,45 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
-                <h3 className="text-xs font-mono uppercase font-bold text-neutral-700">Açık Talep Havuzu ({poolRequests.length})</h3>
-                <div className="space-y-3">
-                  {poolRequests.map((req) => (
-                    <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3">
-                      <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}"</p>
-                      <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">Sıraya Gir</button>
-                    </div>
-                  ))}
+              {/* 🌟 DÜZELTME: Açılır/Kapanır, Kaldırılabilir Açık Talep Havuzu */}
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
+                <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
+                  <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
+                     <Layers size={14} className="text-blue-500" />
+                     <span>Açık Talep Havuzu ({visiblePoolRequests.length})</span>
+                  </h3>
+                  <div className="text-neutral-400">
+                     {isPoolOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
                 </div>
+                
+                {isPoolOpen && (
+                  <div className="p-4 pt-0 border-t border-neutral-100 bg-neutral-50/30">
+                    <div className="space-y-3 mt-3 max-h-[400px] overflow-y-auto pr-1">
+                      {visiblePoolRequests.length === 0 ? (
+                        <div className="text-center text-xs text-neutral-400 py-6">Havuzda size uygun yeni talep bulunmuyor.</div>
+                      ) : (
+                        visiblePoolRequests.map((req) => (
+                          <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm transition hover:shadow-md">
+                            <p className="text-sm font-semibold text-neutral-900 leading-snug">"{req.raw_text}"</p>
+                            {req.location && <p className="text-[10px] text-neutral-500 font-mono mt-1.5 flex items-center space-x-1"><MapPin size={10}/><span>{extractAddress(req.location)}</span></p>}
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
+                              <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Sıraya Gir</button>
+                              <button onClick={() => setHiddenPoolRequests(prev => [...prev, req.id])} className="px-3 py-1.5 border hover:bg-neutral-100 text-neutral-600 rounded-lg text-xs font-semibold transition flex items-center space-x-1"><Trash2 size={12}/><span>Kaldır</span></button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
           </div>
         )}
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
-              
+          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1115,7 +1141,6 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
-                
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1190,9 +1215,9 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* 🌟 DÜZELTME: SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
+              {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-[75vw] sm:w-[260px] min-w-[200px] max-w-[300px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                <div className="absolute top-0 right-0 w-[75vw] sm:w-[260px] md:w-[280px] min-w-[200px] max-w-[300px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
                     <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button></div>
                     <div className="relative"><Search size={14} className="absolute left-2.5 top-2 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-3 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" /></div>
