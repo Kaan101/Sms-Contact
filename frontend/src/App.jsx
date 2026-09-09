@@ -112,7 +112,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 VERİ ÇIKARICILAR (GPS ve Yeni KOD Ayıklayıcılar)
+// Güvenli GPS Çıkarıcılar
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -472,10 +472,9 @@ export default function App() {
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
     
-    // 🌟 GİZLİLİK ZIRHI EKLENDİ
     const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
-    
     const channelString = preferredChannels.join(', ');
+
     let backendLocation = locationValue || 'Belirtilmedi';
     if (coordinates) backendLocation += ` [GPS: ${coordinates}]`;
     if (companyCode.trim()) backendLocation += ` [CODE: ${companyCode.trim()}]`;
@@ -518,7 +517,27 @@ export default function App() {
   const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
   const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
-  const handleStatusChange = async (requestId, newStatus) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); } catch (err) {} };
+  
+  const handleStatusChange = async (requestId, newStatus) => { 
+    try { 
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
+      if (session.role === 'CUSTOMER') await fetchCustomerData(); 
+      if (session.role === 'PROVIDER') await fetchProviderData(false); 
+      if (session.role === 'ADMIN') await fetchAdminData(); 
+    } catch (err) {} 
+  };
+  
+  // 🌟 YENİ DÜZELTME: Sağlayıcı "Pas Geç" İşlemi
+  const handleProviderSkip = async (requestId) => {
+    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return;
+    try {
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
+      await fetchProviderData(false);
+    } catch (err) {
+      alert('İşlem başarısız oldu.');
+    }
+  };
+
   const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {} };
 
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
@@ -571,7 +590,8 @@ export default function App() {
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
   // Filtrelemeler
-  const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING'].includes((r.status || '').toUpperCase()));
+  // 🌟 DÜZELTME: Müşteri PROVIDER_SKIPPED durumunu görsün
+  const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
   const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = searchCustomerHistoryText.toLowerCase().trim(); if (!q) return true; return (req.raw_text || '').toLowerCase().includes(q) || (req.provider_name || '').toLowerCase().includes(q) || (req.status || '').toLowerCase().includes(q); });
@@ -637,7 +657,6 @@ export default function App() {
     return str.replace(/\|(SHARED|HIDDEN)/g, '');
   };
 
-  // 🌟 GİZLİLİK ZIRHI MANTIĞI: Numarayı duruma göre maskeler
   const getProviderContactDisplay = (req) => {
     const raw = req.contact_value || '';
     const isShared = raw.includes('|SHARED');
@@ -680,7 +699,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 15.2 (Privacy Core)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 16.0 (Skip & Alert UX)</span>
             </div>
           </div>
 
@@ -796,6 +815,9 @@ export default function App() {
                           <div>
                             {req.status === 'POOL' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">Açık Havuzda (Bekleniyor)</span>}
                             {req.status === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Sağlayıcı Bulundu</span>}
+                            {/* 🌟 YENİ: Sağlayıcı Pas Geçti Etiketi */}
+                            {req.status === 'PROVIDER_SKIPPED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">Sağlayıcı Pas Geçti</span>}
+                            
                             {req.status === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">Kabul Edildi</span>}
                             {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Sağlayıcı Teslim Etti</span>}
                           </div>
@@ -806,11 +828,15 @@ export default function App() {
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             <div onClick={() => { if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
                               <div className="space-y-1.5 w-full">
-                                <div className="text-[10px] font-mono font-bold text-emerald-700">{req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)'}</div>
+                                
+                                <div className="text-[10px] font-mono font-bold text-emerald-700">
+                                   {req.status === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)')}
+                                </div>
+
                                 <div className="flex items-center justify-between w-full">
                                   <div className="flex items-center space-x-1.5">
                                     <Building2 size={14} className="text-neutral-700" />
-                                    {req.provider_name ? (<><span className="font-bold text-neutral-950">{req.provider_name}</span><span className="font-mono text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
+                                    {req.provider_name ? (<><span className={`font-bold ${req.status === 'PROVIDER_SKIPPED' ? 'text-neutral-400 line-through' : 'text-neutral-950'}`}>{req.provider_name}</span><span className={`font-mono font-semibold px-1.5 py-0.5 rounded border ${req.status === 'PROVIDER_SKIPPED' ? 'bg-neutral-100 text-neutral-400 border-neutral-200' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
                                   </div>
                                   {req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1) && (
                                     <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${req.queuedProviders.length - 1})` : `Tüm Adaylar (${req.queuedProviders.length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
@@ -819,7 +845,22 @@ export default function App() {
                               </div>
                             </div>
                             
-                            {/* 🌟 YENİ GİZLİLİK ONAY BUTONU: Eğer gizli tutulduysa ve henüz kabul edilmediyse */}
+                            {/* 🌟 YENİ: Sağlayıcı Pas Geçtiğinde Kırmızı Uyarı Kutusu */}
+                            {req.status === 'PROVIDER_SKIPPED' && !expandedCustomerQueueReqId && (
+                              <div className="px-3 pb-3">
+                                 <div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 bg-rose-50 border border-rose-200 text-rose-950">
+                                   <div className="flex items-center space-x-1.5">
+                                      <AlertTriangle size={13} className="text-rose-700 shrink-0" />
+                                      <span>Bu sağlayıcı talebinizi <strong>pas geçti</strong>. Lütfen listeden başka birini seçin.</span>
+                                   </div>
+                                   <button onClick={() => setExpandedCustomerQueueReqId(req.id)} className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold shadow-sm transition shrink-0">
+                                     Seçenekleri Gör
+                                   </button>
+                                 </div>
+                              </div>
+                            )}
+
+                            {/* Gizlilik Onay Butonu */}
                             {req.status === 'MATCHED' && !expandedCustomerQueueReqId && (
                               req.contact_value?.includes('|HIDDEN') ? (
                                 <div className="px-3 pb-3">
@@ -858,10 +899,18 @@ export default function App() {
                                 <div className="space-y-2">
                                   {req.queuedProviders.map((qProv, idx) => {
                                     const isCurrent = req.matched_provider_id === qProv.id;
+                                    const isSkippedByThis = isCurrent && req.status === 'PROVIDER_SKIPPED';
+
                                     return (
-                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
+                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? (isSkippedByThis ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm') : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
                                         <div>
-                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5"><span>#{idx + 1} {qProv.name}</span>{isCurrent && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}{qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}{qProv.interest_status === 'WAITING' && !isCurrent && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">BEKLİYOR</span>}</p>
+                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
+                                            <span>#{idx + 1} {qProv.name}</span>
+                                            {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
+                                            {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
+                                            {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                            {qProv.interest_status === 'WAITING' && !isCurrent && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">BEKLİYOR</span>}
+                                          </p>
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
                                         </div>
                                         {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
@@ -877,7 +926,7 @@ export default function App() {
                           <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED' || req.status === 'ACCEPTED') && req.queuedProviders && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
+                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && req.queuedProviders && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
                           <div className="flex items-center space-x-1.5 ml-auto">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED') && (<button onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"><ShieldCheck size={12} /><span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span></button>)}<button onClick={() => handleStatusChange(req.id, 'CANCELLED')} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px]" title="Talebi İptal Et"><Ban size={12} /> İptal</button></div>
                         </div>
                       </div>
@@ -1138,11 +1187,18 @@ export default function App() {
                        </p>
                        
                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-neutral-100">
+                         {/* 🌟 YENİ: PAS GEÇ BUTONU (Eğer eşleşmişse ve henüz kabul edilmediyse) */}
                          {req.status === 'MATCHED' && req.contact_value?.includes('|SHARED') && (
-                            <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
+                            <div className="flex space-x-2 w-full sm:w-auto">
+                               <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
+                               <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                            </div>
                          )}
                          {req.status === 'MATCHED' && req.contact_value?.includes('|HIDDEN') && (
-                            <span className="px-3 py-1.5 bg-neutral-100 text-neutral-500 rounded-lg text-xs font-semibold border border-neutral-200">Müşteri Onayı Bekleniyor</span>
+                            <div className="flex items-center space-x-2 w-full sm:w-auto">
+                               <span className="px-3 py-1.5 bg-neutral-100 text-neutral-500 rounded-lg text-xs font-semibold border border-neutral-200">Müşteri Onayı Bekleniyor</span>
+                               <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                            </div>
                          )}
 
                          {req.status === 'ACCEPTED' && (
@@ -1241,8 +1297,8 @@ export default function App() {
                              setTrackerMapCenter([newPos.lat, newPos.lng]); 
                              setTrackerMapSelectedPos(newPos); 
                              setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
-                             setLocationValue(sug.display_name); 
-                             setTrackerMapSearchText(''); 
+                             setLocationValue(sug.display_name); // Form Location State
+                             setTrackerMapSearchText(''); // Harita Search Temizlenir
                              setIsTrackerSuggestionsVisible(false); 
                            }}
                         >
@@ -1309,7 +1365,7 @@ export default function App() {
                     {filteredTrackerRequests.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Kriterlere uygun talep bulunamadı.</div>}
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
-                      const reqCode = extractCode(req.location);
+                      const reqCode = extractCode(req.location); // 🌟 YENİ: Kart üzerinde Kurum Kodu okuma
                       
                       return (
                         <div 
@@ -1331,6 +1387,7 @@ export default function App() {
                           <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           <div className="space-y-1 text-[9px] font-mono text-neutral-500">
+                             {/* 🌟 YENİ: Kurumsal Kod Gösterimi */}
                              {reqCode && <p className="mb-1"><span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold border border-indigo-100">KOD: {reqCode}</span></p>}
                              <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{cleanContact(req.contact_value)}</span></p>
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
@@ -1689,7 +1746,7 @@ export default function App() {
                             <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs">
                               <div className="flex items-center space-x-3 flex-1 min-w-0 pr-2">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200'}`}>{feat.status}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span>
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
