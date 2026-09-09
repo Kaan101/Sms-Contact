@@ -177,6 +177,7 @@ export default function App() {
   const [deadlineTime, setDeadlineTime] = useState('23:59'); 
   const [isLocating, setIsLocating] = useState(false);
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
+  const [isContactShared, setIsContactShared] = useState(false); // 🌟 YENİ: Havuz Gizlilik Seçeneği
   
   const [mapPosition, setMapPosition] = useState(null);
   const [mapSearchText, setMapSearchText] = useState('');
@@ -249,7 +250,7 @@ export default function App() {
   const [providerProfile, setProviderProfile] = useState(null);
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
-  const [hiddenPoolRequests, setHiddenPoolRequests] = useState([]); // 🌟 YENİ: Havuzdan gizlenenler
+  const [hiddenPoolRequests, setHiddenPoolRequests] = useState([]); 
   const [providerTab, setProviderTab] = useState('ACTIVE');
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -457,22 +458,26 @@ export default function App() {
     window.open(directUrl, '_blank');
   };
 
+  // 🌟 DÜZELTME: Veritabanına Contact Share durumunu ekleyerek yolluyoruz
   const submitFinalRequest = async (disambiguationChoice, fromTracker = false) => {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
+    
+    // GİZLİLİK ZIRHI: Telefon verisine flag ekleyip arka planda kaydediyoruz.
+    const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
+    
     const channelString = preferredChannels.join(', ');
-
     const backendLocation = coordinates ? `${locationValue || 'Belirtilmedi'} [GPS: ${coordinates}]` : (locationValue || 'Belirtilmedi');
 
     try {
       await axios.post(`${API_BASE}/requests`, {
-        rawText: queryText, disambiguationChoice: disambiguationChoice, contactValue: finalContactValue,
+        rawText: queryText, disambiguationChoice: disambiguationChoice, contactValue: flaggedContactValue,
         preferredChannel: channelString, location: backendLocation, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
       });
       setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); 
       setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE']); setStep('INPUT'); setIsDetailsCollapsed(true); 
-      setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage('');
+      setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false);
       
       if (fromTracker) {
         setIsTrackerAddModalOpen(false);
@@ -587,7 +592,6 @@ export default function App() {
   const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
   const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
   
-  // 🌟 DÜZELTME: Görünür Havuz Talepleri Filtresi
   const visiblePoolRequests = poolRequests.filter(req => !hiddenPoolRequests.includes(req.id));
   
   const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
@@ -634,12 +638,26 @@ export default function App() {
            (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
   });
   
-  const extractEmail = (text) => { const match = text?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/); return match ? match[1] : null; };
-  const extractPhone = (str) => { const match = str?.match(/(\+?\d[\d\s-]{8,})/); return match ? match[1].replace(/[^\d+]/g, '') : ''; };
+  // 🌟 DÜZELTME: Veriden "Güvenlik Flaglarını" ayıklayan temizleyici
+  const cleanContact = (str) => {
+    if (!str) return '';
+    return str.replace(/\|(SHARED|HIDDEN)/g, '');
+  };
+
+  const getProviderContactDisplay = (req) => {
+    const raw = req.contact_value || '';
+    const isShared = raw.includes('|SHARED');
+    const isMatched = ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(req.status);
+    
+    if (isShared || isMatched) {
+      return cleanContact(raw);
+    }
+    return '🔒 Gizli (Seçim Bekleniyor)';
+  };
 
   const extractPhoneForWa = (str) => {
     if (!str) return '';
-    let cleaned = str.replace(/\D/g, '');
+    let cleaned = cleanContact(str).replace(/\D/g, '');
     if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
     if (!cleaned.startsWith('90')) cleaned = '90' + cleaned;
     return cleaned;
@@ -664,7 +682,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 14.4 (Pool UX)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 15.0 (Privacy & Comm)</span>
             </div>
           </div>
 
@@ -948,6 +966,19 @@ export default function App() {
                                   <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
                                 </div>
                               )}
+                              
+                              {/* 🌟 GİZLİLİK MODU CHECKBOX'I */}
+                              <label className={`flex items-center p-3 rounded-xl border cursor-pointer select-none transition mt-3 ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                                <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2">
+                                  <Shield size={16} className={isContactShared ? 'text-blue-600' : 'text-neutral-400'} />
+                                  <div className="flex flex-col">
+                                    <span className={`text-[11px] font-bold ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>İletişim Bilgimi Havuzda Herkese Açık Paylaş</span>
+                                    <span className="text-[9px] text-neutral-500 font-mono mt-0.5">Seçilmezse sadece onayladığınız sağlayıcı görebilir (Güvenli Mod).</span>
+                                  </div>
+                                </div>
+                              </label>
+
                             </div>
                           </div>
 
@@ -1075,9 +1106,13 @@ export default function App() {
                   {activeProviderRequests.map((req) => (
                     <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border space-y-3">
                        <p className="text-sm font-semibold text-neutral-900">"{req.raw_text}" - <span className="text-[10px] bg-blue-100 text-blue-800 px-2 rounded">{req.status}</span></p>
-                       <p className="text-xs text-neutral-700">Müşteri: {req.contact_value}</p>
                        
-                       <div className="flex flex-wrap items-center gap-2 mt-2">
+                       <p className="text-xs text-neutral-700 mt-2 flex items-center space-x-1.5">
+                         <User size={13} className="text-neutral-400" />
+                         <span>Müşteri: <strong>{getProviderContactDisplay(req)}</strong></span>
+                       </p>
+                       
+                       <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-neutral-100">
                          {req.status === 'MATCHED' && <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">Kabul Et</button>}
                          {req.status === 'ACCEPTED' && (
                            <>
@@ -1095,7 +1130,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 DÜZELTME: Açılır/Kapanır, Kaldırılabilir Açık Talep Havuzu */}
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
                 <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
@@ -1116,10 +1150,16 @@ export default function App() {
                         visiblePoolRequests.map((req) => (
                           <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm transition hover:shadow-md">
                             <p className="text-sm font-semibold text-neutral-900 leading-snug">"{req.raw_text}"</p>
-                            {req.location && <p className="text-[10px] text-neutral-500 font-mono mt-1.5 flex items-center space-x-1"><MapPin size={10}/><span>{extractAddress(req.location)}</span></p>}
+                            
+                            <div className="space-y-1.5 mt-2.5 mb-3 text-[10px] text-neutral-500 font-mono">
+                               <p className="flex items-center space-x-1.5 text-blue-600 font-semibold"><Clock size={11}/><span>{req.created_at ? new Date(req.created_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Bilinmiyor'}</span></p>
+                               <p className="flex items-center space-x-1.5"><User size={11}/><span>{getProviderContactDisplay(req)}</span></p>
+                               {req.location && <p className="flex items-center space-x-1.5"><MapPin size={11}/><span>{extractAddress(req.location)}</span></p>}
+                            </div>
+
                             <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
                               <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Sıraya Gir</button>
-                              <button onClick={() => setHiddenPoolRequests(prev => [...prev, req.id])} className="px-3 py-1.5 border hover:bg-neutral-100 text-neutral-600 rounded-lg text-xs font-semibold transition flex items-center space-x-1"><Trash2 size={12}/><span>Kaldır</span></button>
+                              <button onClick={() => setHiddenPoolRequests(prev => [...prev, req.id])} className="px-3 py-1.5 border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-neutral-500 rounded-lg text-xs font-semibold transition flex items-center space-x-1"><Trash2 size={12}/><span>Kaldır</span></button>
                             </div>
                           </div>
                         ))
@@ -1133,7 +1173,8 @@ export default function App() {
 
         {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
         {session?.role === 'TRACKER' && (
-          <div className="absolute inset-0 top-16 bg-neutral-100 overflow-hidden flex z-0">
+          <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
+              
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1141,6 +1182,7 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
+                
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1204,7 +1246,7 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {req.contact_value}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {cleanContact(req.contact_value)}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
                             </div>
                           </Popup>
                         </Marker>
@@ -1215,7 +1257,7 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ */}
+              {/* SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
               {isTrackerListOpen && (
                 <div className="absolute top-0 right-0 w-[75vw] sm:w-[260px] md:w-[280px] min-w-[200px] max-w-[300px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
@@ -1234,7 +1276,7 @@ export default function App() {
                                setTrackerMapSelectedPos(null); 
                                setTrackerMapSelectedAddress('');
                                setCoordinates('');
-                               // 🌟 Mobilde ise listeyi kapat
+                               // Mobilde ise listeyi kapat
                                if (window.innerWidth < 640) {
                                  setIsTrackerListOpen(false);
                                }
@@ -1245,7 +1287,7 @@ export default function App() {
                           <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           <div className="space-y-1 text-[9px] font-mono text-neutral-500">
-                             <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{req.contact_value}</span></p>
+                             <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{cleanContact(req.contact_value)}</span></p>
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                              {coords ? (<p className="flex items-center space-x-1 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>) : (<p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>)}
                           </div>
@@ -1286,6 +1328,13 @@ export default function App() {
                                 <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
                                 <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span></div>
                             </label>
+                            
+                            {/* Tracker için Havuz Gizliliği Kutusu */}
+                            <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                                <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 font-bold"><Shield size={16} className={isContactShared ? 'text-blue-600' : 'text-neutral-400'} /><span className={isContactShared ? 'text-blue-700' : 'text-neutral-700'}>İLETİŞİMİ HAVUZA AÇ</span></div>
+                            </label>
+
                           </div>
 
                           {/* SAĞ: 3/5 */}
@@ -1374,7 +1423,7 @@ export default function App() {
                         <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
                           <div className="space-y-1">
                             <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
-                            <span className="text-[11px] text-neutral-500">👤 {req.contact_value} | 📍 {extractAddress(req.location)}</span>
+                            <span className="text-[11px] text-neutral-500">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
                           </div>
                           <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800">Sağlayıcı Seç & Ata</button>
                         </div>
@@ -1438,7 +1487,7 @@ export default function App() {
                             <td className="px-4 py-3 font-mono font-bold text-neutral-900">#REQ-{req.id}</td>
                             <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
                             <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
-                            <td className="px-4 py-3 font-mono text-neutral-800">{req.contact_value}</td>
+                            <td className="px-4 py-3 font-mono text-neutral-800">{cleanContact(req.contact_value)}</td>
                             <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
                             <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
                             <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button></td>
