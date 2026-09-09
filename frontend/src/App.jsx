@@ -15,35 +15,114 @@ import {
   Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:5000/api';
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
 // =====================================================================
-// 🌟 HARİTA İKONLARI (Derleme hatasını önlemek için fonksiyon yapıldı)
+// 🌟 GÜVENLİ HARİTA İKON FONKSİYONLARI (TDZ Hatasını Önlemek İçin)
 // =====================================================================
-const getCustomMarkerIcon = () => new L.DivIcon({
-  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
-         </div>`,
-  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-});
 
-const getUrgentMarkerIcon = () => new L.DivIcon({
-  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
-         </div>`,
-  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-});
+function createCustomMarkerIcon() {
+  return new L.DivIcon({
+    html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+           </div>`,
+    className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+  });
+}
 
-const getTrackerSelectionIcon = () => new L.DivIcon({
-  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
-         </div>`,
-  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-});
+function createUrgentMarkerIcon() {
+  return new L.DivIcon({
+    html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+           </div>`,
+    className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+  });
+}
 
+function createTrackerSelectionIcon() {
+  return new L.DivIcon({
+    html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+           </div>`,
+    className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+  });
+}
+
+// =====================================================================
+// 🌟 GÜVENLİ YARDIMCI FONKSİYONLAR (Hoisting ile Derleme Çökmesini Önler)
+// =====================================================================
+
+function safeString(val) {
+  return val ? String(val) : '';
+}
+
+function extractGPS(loc) {
+  const str = safeString(loc);
+  if(!str) return null;
+  const match = str.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
+  if (match && match.length >= 3) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
+  }
+  return null;
+}
+
+function extractCode(loc) {
+  const str = safeString(loc);
+  if(!str) return null;
+  const match = str.match(/\[CODE:\s*(.*?)\]/);
+  return match ? match[1].trim() : null;
+}
+
+function extractAddress(loc) {
+  const str = safeString(loc);
+  if(!str) return 'Bilinmiyor';
+  return str.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
+}
+
+function cleanContact(str) {
+  return safeString(str).replace(/\|(SHARED|HIDDEN)/g, '');
+}
+
+function getProviderContactDisplay(req) {
+  if (!req) return '🔒 Gizli';
+  const raw = safeString(req.contact_value);
+  const isShared = raw.includes('|SHARED');
+  const isAccepted = req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED';
+  if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
+  if (req.status === 'MATCHED') {
+    if (isShared) return cleanContact(raw);
+    return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
+  }
+  if (isAccepted) return cleanContact(raw);
+  return '🔒 Gizli';
+}
+
+function extractPhoneForWa(str) {
+  let cleaned = cleanContact(str).replace(/\D/g, '');
+  if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+  if (!cleaned.startsWith('90') && cleaned.length > 0) cleaned = '90' + cleaned;
+  return cleaned;
+}
+
+function getKeywordMetrics(text) { 
+  const str = safeString(text); 
+  return { charCount: str.length, wordCount: str ? str.split(',').map(k => k.trim()).filter(Boolean).length : 0 }; 
+}
+
+function safeDate(dateString) {
+  if (!dateString) return '';
+  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleDateString('tr-TR'); } catch { return ''; }
+}
+
+function safeDateTime(dateString) {
+  if (!dateString) return '';
+  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return ''; }
+}
 
 // İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
@@ -104,79 +183,16 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 GÜVENLİ FORMATLAYICILAR
-const safeString = (val) => (val ? String(val) : '');
-
-const extractGPS = (loc) => {
-  const str = safeString(loc);
-  if(!str) return null;
-  const match = str.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
-  if (match && match.length >= 3) {
-    const lat = parseFloat(match[1]);
-    const lng = parseFloat(match[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
-  }
-  return null;
-};
-
-const extractCode = (loc) => {
-  const str = safeString(loc);
-  if(!str) return null;
-  const match = str.match(/\[CODE:\s*(.*?)\]/);
-  return match ? match[1].trim() : null;
-};
-
-const extractAddress = (loc) => {
-  const str = safeString(loc);
-  if(!str) return 'Bilinmiyor';
-  return str.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
-};
-
-const cleanContact = (str) => { return safeString(str).replace(/\|(SHARED|HIDDEN)/g, ''); };
-
-const getProviderContactDisplay = (req) => {
-  if (!req) return '🔒 Gizli';
-  const raw = safeString(req.contact_value);
-  const isShared = raw.includes('|SHARED');
-  const isAccepted = req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED';
-  if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
-  if (req.status === 'MATCHED') {
-    if (isShared) return cleanContact(raw);
-    return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
-  }
-  if (isAccepted) return cleanContact(raw);
-  return '🔒 Gizli';
-};
-
-const extractPhoneForWa = (str) => {
-  let cleaned = cleanContact(str).replace(/\D/g, '');
-  if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
-  if (!cleaned.startsWith('90') && cleaned.length > 0) cleaned = '90' + cleaned;
-  return cleaned;
-};
-
-const getKeywordMetrics = (text) => { const str = safeString(text); return { charCount: str.length, wordCount: str ? str.split(',').map(k => k.trim()).filter(Boolean).length : 0 }; };
-
-const safeDate = (dateString) => {
-  if (!dateString) return '';
-  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleDateString('tr-TR'); } catch { return ''; }
-};
-
-const safeDateTime = (dateString) => {
-  if (!dateString) return '';
-  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return ''; }
-};
-
 // =====================================================================
 // 🚀 ANA UYGULAMA
 // =====================================================================
 
 export default function App() {
   
-  // Harita ikonlarının güvenli başlatılması (Sadece sayfa yüklendiğinde)
-  const defaultMapIcon = useMemo(() => getCustomMarkerIcon(), []);
-  const urgentMapIcon = useMemo(() => getUrgentMarkerIcon(), []);
-  const trackerMapIcon = useMemo(() => getTrackerSelectionIcon(), []);
+  // 🌟 HARİTA İKONLARI GÜVENLE YÜKLENİYOR
+  const customMarkerIcon = useMemo(() => createCustomMarkerIcon(), []);
+  const urgentMarkerIcon = useMemo(() => createUrgentMarkerIcon(), []);
+  const trackerSelectionIcon = useMemo(() => createTrackerSelectionIcon(), []);
 
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
@@ -451,7 +467,6 @@ export default function App() {
   const handleProviderSkip = async (requestId) => { if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return; try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' }); await fetchProviderData(false); } catch (err) { alert('İşlem başarısız oldu.'); } };
   const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); if (session.role === 'ADMIN') await fetchAdminData(); if (session.role === 'TRACKER') await fetchTrackerData(); } catch {} };
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { try { const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); if (session.role === 'CUSTOMER') await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
-  
   const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
   const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
   const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
@@ -534,7 +549,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 17.6 (Zero-TDZ Secured)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.0 (TDZ Cleaned)</span>
             </div>
           </div>
 
@@ -948,7 +963,7 @@ export default function App() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={defaultMapIcon} />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
                                </MapContainer>
                             </div>
                           </div>
@@ -1169,18 +1184,16 @@ export default function App() {
                   <SharedMapClickHandler 
                      position={trackerMapSelectedPos} 
                      setPosition={setTrackerMapSelectedPos} 
-                     setLocationValue={(val) => {
-                        setLocationValue(val); 
-                     }} 
+                     setLocationValue={(val) => { setLocationValue(val); }} 
                      setCoordinates={setCoordinates} 
-                     icon={trackerMapIcon} 
+                     icon={trackerSelectionIcon} 
                   />
                   
                   {filteredTrackerRequests.map(req => {
                     const coords = extractGPS(req.location);
                     if (coords) {
                       return (
-                        <Marker position={coords} icon={req.is_urgent ? urgentMapIcon : defaultMapIcon} key={req.id}>
+                        <Marker position={coords} icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} key={req.id}>
                           <Popup className="custom-popup">
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
@@ -1303,7 +1316,7 @@ export default function App() {
                             
                             <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMI বহুম KURUM KODU (Opsiyonel)</span></div>
+                                <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span></div>
                             </label>
                             
                             {/* Tracker için Havuz Gizliliği Kutusu */}
