@@ -15,185 +15,160 @@ import {
   Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
 } from 'lucide-react';
 
-const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:5000/api';
-
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
 // =====================================================================
-// 🌟 GÜVENLİ HARİTA İKON FONKSİYONLARI (TDZ Hatasını Önlemek İçin)
+// 🚀 ANA UYGULAMA (TÜM FONKSİYONLAR GÜVENLİ ALANDA)
 // =====================================================================
 
-function createCustomMarkerIcon() {
-  return new L.DivIcon({
+export default function App() {
+
+  // 🌟 GÜVENLİ FORMATLAYICILAR (Bileşen içine alındı, TDZ çökmesi imkansızlaştırıldı)
+  const safeString = (val) => (val ? String(val) : '');
+
+  const extractGPS = (loc) => {
+    const str = safeString(loc);
+    if(!str) return null;
+    const match = str.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
+    if (match && match.length >= 3) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
+    }
+    return null;
+  };
+
+  const extractCode = (loc) => {
+    const str = safeString(loc);
+    if(!str) return null;
+    const match = str.match(/\[CODE:\s*(.*?)\]/);
+    return match ? match[1].trim() : null;
+  };
+
+  const extractAddress = (loc) => {
+    const str = safeString(loc);
+    if(!str) return 'Bilinmiyor';
+    return str.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
+  };
+
+  const cleanContact = (str) => { return safeString(str).replace(/\|(SHARED|HIDDEN)/g, ''); };
+
+  const getProviderContactDisplay = (req) => {
+    if (!req) return '🔒 Gizli';
+    const raw = safeString(req.contact_value);
+    const isShared = raw.includes('|SHARED');
+    const isAccepted = req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED';
+    if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
+    if (req.status === 'MATCHED') {
+      if (isShared) return cleanContact(raw);
+      return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
+    }
+    if (isAccepted) return cleanContact(raw);
+    return '🔒 Gizli';
+  };
+
+  const extractPhoneForWa = (str) => {
+    let cleaned = cleanContact(str).replace(/\D/g, '');
+    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+    if (!cleaned.startsWith('90') && cleaned.length > 0) cleaned = '90' + cleaned;
+    return cleaned;
+  };
+
+  const getKeywordMetrics = (text) => { const str = safeString(text); return { charCount: str.length, wordCount: str ? str.split(',').map(k => k.trim()).filter(Boolean).length : 0 }; };
+
+  const safeDate = (dateString) => {
+    if (!dateString) return '';
+    try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleDateString('tr-TR'); } catch { return ''; }
+  };
+
+  const safeDateTime = (dateString) => {
+    if (!dateString) return '';
+    try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return ''; }
+  };
+
+  // 🌟 HARİTA BİLEŞENLERİ VE İKONLARI (Leaflet yüklendikten sonra oluşturulur)
+  const customMarkerIcon = useMemo(() => new L.DivIcon({
     html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
            </div>`,
     className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-  });
-}
+  }), []);
 
-function createUrgentMarkerIcon() {
-  return new L.DivIcon({
+  const urgentMarkerIcon = useMemo(() => new L.DivIcon({
     html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
            </div>`,
     className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-  });
-}
+  }), []);
 
-function createTrackerSelectionIcon() {
-  return new L.DivIcon({
+  const trackerSelectionIcon = useMemo(() => new L.DivIcon({
     html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
            </div>`,
     className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-  });
-}
+  }), []);
 
-// =====================================================================
-// 🌟 GÜVENLİ YARDIMCI FONKSİYONLAR (Hoisting ile Derleme Çökmesini Önler)
-// =====================================================================
+  const TrackerMapController = ({ center }) => {
+    const map = useMap();
+    useEffect(() => {
+      if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
+        map.flyTo(center, 16, { duration: 1.5 });
+      }
+    }, [center, map]);
+    return null;
+  };
 
-function safeString(val) {
-  return val ? String(val) : '';
-}
-
-function extractGPS(loc) {
-  const str = safeString(loc);
-  if(!str) return null;
-  const match = str.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
-  if (match && match.length >= 3) {
-    const lat = parseFloat(match[1]);
-    const lng = parseFloat(match[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
-  }
-  return null;
-}
-
-function extractCode(loc) {
-  const str = safeString(loc);
-  if(!str) return null;
-  const match = str.match(/\[CODE:\s*(.*?)\]/);
-  return match ? match[1].trim() : null;
-}
-
-function extractAddress(loc) {
-  const str = safeString(loc);
-  if(!str) return 'Bilinmiyor';
-  return str.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
-}
-
-function cleanContact(str) {
-  return safeString(str).replace(/\|(SHARED|HIDDEN)/g, '');
-}
-
-function getProviderContactDisplay(req) {
-  if (!req) return '🔒 Gizli';
-  const raw = safeString(req.contact_value);
-  const isShared = raw.includes('|SHARED');
-  const isAccepted = req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED';
-  if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
-  if (req.status === 'MATCHED') {
-    if (isShared) return cleanContact(raw);
-    return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
-  }
-  if (isAccepted) return cleanContact(raw);
-  return '🔒 Gizli';
-}
-
-function extractPhoneForWa(str) {
-  let cleaned = cleanContact(str).replace(/\D/g, '');
-  if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
-  if (!cleaned.startsWith('90') && cleaned.length > 0) cleaned = '90' + cleaned;
-  return cleaned;
-}
-
-function getKeywordMetrics(text) { 
-  const str = safeString(text); 
-  return { charCount: str.length, wordCount: str ? str.split(',').map(k => k.trim()).filter(Boolean).length : 0 }; 
-}
-
-function safeDate(dateString) {
-  if (!dateString) return '';
-  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleDateString('tr-TR'); } catch { return ''; }
-}
-
-function safeDateTime(dateString) {
-  if (!dateString) return '';
-  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return ''; }
-}
-
-// İzole Edilmiş Güvenli Harita Bileşenleri
-function TrackerMapController({ center }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
-      map.flyTo(center, 16, { duration: 1.5 });
-    }
-  }, [center, map]);
-  return null;
-}
-
-function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoordinates, icon }) {
-  const map = useMapEvents({
-    click(e) {
-      const { lat, lng } = e.latlng;
-      if (setPosition) setPosition({ lat, lng });
-      if (setCoordinates) setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-      if (setLocationValue) setLocationValue('Adres aranıyor...');
-      
-      axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
-        .then(res => {
-           const addr = res?.data?.address || {};
-           const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
-           if (setLocationValue) setLocationValue(str || 'Haritadan İşaretlendi');
-        }).catch(() => {
-           if (setLocationValue) setLocationValue('Haritadan İşaretlendi');
-        });
-    }
-  });
+  const SharedMapClickHandler = ({ position, setPosition, setLocationValue, setCoordinates, icon }) => {
+    const map = useMapEvents({
+      click(e) {
+        const { lat, lng } = e.latlng;
+        if (setPosition) setPosition({ lat, lng });
+        if (setCoordinates) setCoordinates(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+        if (setLocationValue) setLocationValue('Adres aranıyor...');
+        
+        axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+          .then(res => {
+             const addr = res?.data?.address || {};
+             const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
+             if (setLocationValue) setLocationValue(str || 'Haritadan İşaretlendi');
+          }).catch(() => {
+             if (setLocationValue) setLocationValue('Haritadan İşaretlendi');
+          });
+      }
+    });
+    
+    useEffect(() => {
+      if (position && !isNaN(position.lat) && !isNaN(position.lng)) {
+        map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 16);
+      }
+    }, [position, map]);
   
-  useEffect(() => {
-    if (position && !isNaN(position.lat) && !isNaN(position.lng)) {
-      map.flyTo(position, map.getZoom() > 14 ? map.getZoom() : 16);
-    }
-  }, [position, map]);
+    return position ? (
+      <Marker position={position} icon={icon || customMarkerIcon} eventHandlers={{ click: () => { if (setPosition) setPosition(null); if (setCoordinates) setCoordinates(''); if (setLocationValue) setLocationValue(''); } }} />
+    ) : null;
+  };
 
-  return position ? (
-    <Marker position={position} icon={icon} eventHandlers={{ click: () => { if (setPosition) setPosition(null); if (setCoordinates) setCoordinates(''); if (setLocationValue) setLocationValue(''); } }} />
-  ) : null;
-}
+  const SortableHeader = ({ label, sortKey, align = "left", sortConfig, handleRequestSort }) => {
+    if (!sortConfig) return null;
+    const isActive = sortConfig.key === sortKey;
+    const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
+    const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+    
+    return (
+      <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap ${alignClass}`} onClick={() => handleRequestSort(sortKey)}>
+        <div className={`flex items-center space-x-1 ${justifyClass}`}>
+          <span>{label}</span>
+          <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
+            {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
+          </span>
+        </div>
+      </th>
+    );
+  };
 
-function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
-  if (!sortConfig) return null;
-  const isActive = sortConfig.key === sortKey;
-  const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
-  const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
-  
-  return (
-    <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap ${alignClass}`} onClick={() => handleRequestSort(sortKey)}>
-      <div className={`flex items-center space-x-1 ${justifyClass}`}>
-        <span>{label}</span>
-        <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
-          {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
-        </span>
-      </div>
-    </th>
-  );
-}
-
-// =====================================================================
-// 🚀 ANA UYGULAMA
-// =====================================================================
-
-export default function App() {
-  
-  // 🌟 HARİTA İKONLARI GÜVENLE YÜKLENİYOR
-  const customMarkerIcon = useMemo(() => createCustomMarkerIcon(), []);
-  const urgentMarkerIcon = useMemo(() => createUrgentMarkerIcon(), []);
-  const trackerSelectionIcon = useMemo(() => createTrackerSelectionIcon(), []);
-
+  // State Tanımlamaları
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
   const [session, setSession] = useState(() => {
@@ -549,7 +524,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.0 (TDZ Cleaned)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.0 (Bulletproof)</span>
             </div>
           </div>
 
