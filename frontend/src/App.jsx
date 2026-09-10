@@ -20,27 +20,76 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-// Harita İkonları
-const customMarkerIcon = new L.DivIcon({
-  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
-         </div>`,
-  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-});
+// =====================================================================
+// 🛡️ TİTANYUM ZIRH FONKSİYONLARI (Tanımsız verilerde çökmeyi önler)
+// =====================================================================
+const safeString = (val) => (val ? String(val) : '');
+const safeArray = (arr) => (Array.isArray(arr) ? arr : []);
+const safeLower = (str) => safeString(str).toLowerCase();
+const safeUpper = (str) => safeString(str).toUpperCase();
 
-const urgentMarkerIcon = new L.DivIcon({
-  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
-         </div>`,
-  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-});
+const extractGPS = (loc) => {
+  const str = safeString(loc);
+  if(!str) return null;
+  const match = str.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
+  if (match && match.length >= 3) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
+  }
+  return null;
+};
 
-const trackerSelectionIcon = new L.DivIcon({
-  html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
-         </div>`,
-  className: '', iconSize: [0, 0], iconAnchor: [0, 0]
-});
+const extractCode = (loc) => {
+  const str = safeString(loc);
+  if(!str) return null;
+  const match = str.match(/\[CODE:\s*(.*?)\]/);
+  return match ? match[1].trim() : null;
+};
+
+const extractAddress = (loc) => {
+  const str = safeString(loc);
+  if(!str) return 'Bilinmiyor';
+  return str.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
+};
+
+const cleanContact = (str) => safeString(str).replace(/\|(SHARED|HIDDEN)/g, '');
+
+const getProviderContactDisplay = (req) => {
+  if (!req) return '🔒 Gizli';
+  const raw = safeString(req.contact_value);
+  const isShared = raw.includes('|SHARED');
+  const isAccepted = req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED';
+  if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
+  if (req.status === 'MATCHED') {
+    if (isShared) return cleanContact(raw);
+    return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
+  }
+  if (isAccepted) return cleanContact(raw);
+  return '🔒 Gizli';
+};
+
+const extractPhoneForWa = (str) => {
+  let cleaned = cleanContact(str).replace(/\D/g, '');
+  if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+  if (!cleaned.startsWith('90') && cleaned.length > 0) cleaned = '90' + cleaned;
+  return cleaned;
+};
+
+const getKeywordMetrics = (text) => { 
+  const str = safeString(text); 
+  return { charCount: str.length, wordCount: str ? str.split(',').map(k => k.trim()).filter(Boolean).length : 0 }; 
+};
+
+const safeDate = (dateString) => {
+  if (!dateString) return '';
+  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleDateString('tr-TR'); } catch { return ''; }
+};
+
+const safeDateTime = (dateString) => {
+  if (!dateString) return '';
+  try { const d = new Date(dateString); if (isNaN(d.getTime())) return ''; return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }); } catch { return ''; }
+};
 
 // İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
@@ -63,7 +112,7 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
       
       axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
         .then(res => {
-           const addr = res.data.address;
+           const addr = res?.data?.address || {};
            const str = [addr.amenity, addr.road, addr.suburb, addr.city || addr.town || addr.province].filter(Boolean).join(', ');
            if (setLocationValue) setLocationValue(str || 'Haritadan İşaretlendi');
         }).catch(() => {
@@ -78,22 +127,11 @@ function SharedMapClickHandler({ position, setPosition, setLocationValue, setCoo
     }
   }, [position, map]);
 
-  return position ? (
-    <Marker 
-      position={position} 
-      icon={icon || customMarkerIcon} 
-      eventHandlers={{
-        click: () => {
-          if (setPosition) setPosition(null);
-          if (setCoordinates) setCoordinates('');
-          if (setLocationValue) setLocationValue('');
-        }
-      }}
-    />
+  return position && icon ? (
+    <Marker position={position} icon={icon} eventHandlers={{ click: () => { if (setPosition) setPosition(null); if (setCoordinates) setCoordinates(''); if (setLocationValue) setLocationValue(''); } }} />
   ) : null;
 }
 
-// İzole Edilmiş Admin Tablo Başlığı
 function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -112,28 +150,38 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// 🌟 VERİ ÇIKARICILAR (GPS ve Yeni KOD Ayıklayıcılar)
-const extractGPS = (loc) => {
-  if(!loc || typeof loc !== 'string') return null;
-  const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
-  if (match) {
-    const lat = parseFloat(match[1]);
-    const lng = parseFloat(match[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
-  }
-  return null;
-};
-const extractCode = (loc) => {
-  if(!loc || typeof loc !== 'string') return null;
-  const match = loc.match(/\[CODE:\s*(.*?)\]/);
-  return match ? match[1].trim() : null;
-};
-const extractAddress = (loc) => {
-  if(!loc || typeof loc !== 'string') return 'Bilinmiyor';
-  return loc.replace(/\[GPS:.*?\]/g, '').replace(/\[CODE:.*?\]/g, '').trim();
-};
+
+// =====================================================================
+// 🚀 ANA UYGULAMA BİLEŞENİ
+// =====================================================================
 
 export default function App() {
+
+  // 🌟 HARİTA İKONLARI GÜVENLİ OLUŞTURULUYOR
+  const mapIcons = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return {
+      custom: new L.DivIcon({
+        html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+               </div>`,
+        className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+      }),
+      urgent: new L.DivIcon({
+        html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="#e11d48" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+               </div>`,
+        className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+      }),
+      tracker: new L.DivIcon({
+        html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>
+               </div>`,
+        className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+      })
+    };
+  }, []);
+
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
   
   const [session, setSession] = useState(() => {
@@ -158,7 +206,7 @@ export default function App() {
   });
 
   const [authStep, setAuthStep] = useState('PHONE');
-  const [inputPhone, setInputPhone] = useState(() => localStorage.getItem('sc_last_phone') || '');
+  const [inputPhone, setInputPhone] = useState(() => { try { return localStorage.getItem('sc_last_phone') || ''; } catch { return ''; }});
   const [inputOtp, setInputOtp] = useState('');
   const [simulatedCode, setSimulatedCode] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -174,6 +222,7 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
+  // Varsayılan olarak 3 kanal seçili
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
@@ -192,17 +241,18 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
+  // Otomatik Konum Çekici
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) return;
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setMapPosition({ lat: latitude, lng: longitude });
-        setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
         try {
+          const { latitude, longitude } = pos.coords;
+          setMapPosition({ lat: latitude, lng: longitude });
+          setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
           const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
-          const addr = geoRes.data.address;
+          const addr = geoRes?.data?.address || {};
           const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
           const city = addr.city || addr.province || '';
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
@@ -212,14 +262,12 @@ export default function App() {
           setIsLocating(false);
         }
       },
-      (err) => {
-        console.warn('Konum alınamadı:', err.message);
-        setIsLocating(false);
-      },
+      (err) => { console.warn('Konum alınamadı:', err.message); setIsLocating(false); },
       { timeout: 8000 }
     );
   };
 
+  // Input ekranındaysa her halükarda konumu al
   useEffect(() => {
     if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -233,7 +281,7 @@ export default function App() {
         setIsMapSearching(true);
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchText)}&limit=5&countrycodes=tr`);
-          setMapSuggestions(res.data);
+          setMapSuggestions(safeArray(res?.data));
           if (mapSearchInputRef.current === document.activeElement) {
             setIsSuggestionsVisible(true);
           }
@@ -311,7 +359,6 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
-
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
 
@@ -321,7 +368,7 @@ export default function App() {
         setIsTrackerMapSearching(true);
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
-          setTrackerMapSuggestions(res.data);
+          setTrackerMapSuggestions(safeArray(res?.data));
           if (trackerSearchInputRef.current === document.activeElement) {
             setIsTrackerSuggestionsVisible(true);
           }
@@ -346,11 +393,12 @@ export default function App() {
     setErrorMessage('');
   };
 
+  // ZIRHLI VERİ ÇEKME FONKSİYONLARI
   const fetchCustomerData = async () => {
     if (!session?.phone) return;
     try {
       const res = await axios.get(`${API_BASE}/requests/my-requests?phone=${encodeURIComponent(session.phone)}`);
-      setMyCustomerRequests(res.data.requests || []);
+      setMyCustomerRequests(safeArray(res?.data?.requests));
     } catch (err) {}
   };
 
@@ -358,56 +406,65 @@ export default function App() {
     if (!session?.phone) return;
     try {
       const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
-      const prov = pRes.data.provider;
+      const prov = pRes?.data?.provider;
+      if (!prov) {
+         setProviderProfile(null);
+         setProviderRequests([]);
+         setPoolRequests([]);
+         return;
+      }
+      
       setProviderProfile(prov);
 
       if (shouldUpdateForm) {
         setProviderFormData({
           name: prov.name || '', phone: prov.phone || '', email: prov.email || '',
-          serviceKeywords: (prov.service_keywords || []).join(', '),
-          communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
+          serviceKeywords: safeArray(prov.service_keywords).join(', '),
+          communicationChannels: safeArray(prov.communication_channels).length ? prov.communication_channels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
           priorityScore: prov.priority_score || 100
         });
       }
 
       const rRes = await axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`);
-      setProviderRequests(rRes.data.requests || []);
+      setProviderRequests(safeArray(rRes?.data?.requests));
 
       const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
-      setPoolRequests(poolRes.data.poolRequests || []);
+      setPoolRequests(safeArray(poolRes?.data?.poolRequests));
     } catch (err) {
       if (err.response?.status === 404) { setProviderProfile(null); setProviderRequests([]); setPoolRequests([]); }
     }
   };
 
-  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(res.data.features || []); } catch (err) {} };
-  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(res.data.tests || []); } catch (err) {} };
+  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(safeArray(res?.data?.features)); } catch (err) {} };
+  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(safeArray(res?.data?.tests)); } catch (err) {} };
   
   const fetchAdminData = async () => {
     try {
       const [reqRes, provRes, matchRes, logRes] = await Promise.all([
-        axios.get(`${API_BASE}/requests/pending`), axios.get(`${API_BASE}/providers`),
-        axios.get(`${API_BASE}/requests/matched`), axios.get(`${API_BASE}/notifications`)
+        axios.get(`${API_BASE}/requests/pending`),
+        axios.get(`${API_BASE}/providers`),
+        axios.get(`${API_BASE}/requests/matched`),
+        axios.get(`${API_BASE}/notifications`)
       ]);
-      setPendingRequests(reqRes.data.requests || []); 
-      setProviders(provRes.data.providers || []);
-      setMatchedRequests(matchRes.data.requests || []); 
-      setSmsLogs(logRes.data.notifications || []);
+      setPendingRequests(safeArray(reqRes?.data?.requests)); 
+      setProviders(safeArray(provRes?.data?.providers));
+      setMatchedRequests(safeArray(matchRes?.data?.requests)); 
+      setSmsLogs(safeArray(logRes?.data?.notifications));
       await fetchFeatures(); 
       await fetchTests();
-      try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes.data.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
+      try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes?.data?.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
     } catch (err) {}
   };
 
   const fetchTrackerData = async () => {
     try {
       let pending = []; let matched = [];
-      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = reqRes.data.requests || []; } catch (e) {}
-      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = matchRes.data.requests || []; } catch (e) {}
+      try { const reqRes = await axios.get(`${API_BASE}/requests/pending`); pending = safeArray(reqRes?.data?.requests); } catch (e) {}
+      try { const matchRes = await axios.get(`${API_BASE}/requests/matched`); matched = safeArray(matchRes?.data?.requests); } catch (e) {}
       
       const allReqs = [...pending, ...matched];
       const uniqueReqsMap = new Map();
-      allReqs.forEach(item => uniqueReqsMap.set(item.id, item));
+      allReqs.forEach(item => { if(item && item.id) uniqueReqsMap.set(item.id, item); });
       const uniqueReqs = Array.from(uniqueReqsMap.values());
       uniqueReqs.sort((a, b) => b.id - a.id);
       setTrackerRequests(uniqueReqs);
@@ -430,13 +487,14 @@ export default function App() {
 
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line
   }, [session, adminTab]);
 
   const handleSendOtp = async (e) => { 
     e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); 
     try { 
       const res = await axios.post(`${API_BASE}/auth/send-otp`, { phone: inputPhone.trim() }); 
-      setSimulatedCode(res.data.simulatedOtp); 
+      setSimulatedCode(res.data?.simulatedOtp); 
       setAuthStep('OTP'); 
       localStorage.setItem('sc_last_phone', inputPhone.trim());
     } catch (err) { setErrorMessage(err.response?.data?.message || 'OTP gönderilemedi.'); } 
@@ -462,7 +520,7 @@ export default function App() {
 
   const handleOpenProviderDirectSession = (provPhone) => {
     if (!provPhone) return;
-    const cleanPhone = encodeURIComponent(provPhone.trim());
+    const cleanPhone = encodeURIComponent(safeString(provPhone).trim());
     const directUrl = `${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`;
     window.open(directUrl, '_blank');
   };
@@ -503,17 +561,18 @@ export default function App() {
   };
 
   const handleCustomerCombinedSubmit = async (e, fromTracker = false) => {
-    e?.preventDefault(); if (!queryText.trim()) return;
+    if (e && e.preventDefault) e.preventDefault(); 
+    if (!queryText.trim()) return;
     if (preferredChannels.includes('EMAIL') && !contactEmail.trim()) { setIsDetailsCollapsed(false); setTimeout(() => { if (emailInputRef.current) emailInputRef.current.focus(); }, 100); return; }
     setLoading(true); setErrorMessage('');
     try {
       const response = await axios.post(`${API_BASE}/disambiguate`, { queryText: queryText.trim() });
-      if (response.data.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } 
+      if (response?.data?.status === 'ambiguous') { setDisambiguationData(response.data); setStep('DISAMBIGUATE'); setLoading(false); } 
       else { await submitFinalRequest(null, fromTracker); }
     } catch { await submitFinalRequest(null, fromTracker); }
   };
 
-  const handleRepeatRequest = (req) => { setQueryText(req.raw_text); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const handleRepeatRequest = (req) => { setQueryText(req.raw_text || ''); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
   const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
@@ -551,7 +610,7 @@ export default function App() {
   
   const handleSaveProviderProfile = async (e) => { 
     e.preventDefault(); 
-    const keywordsArray = providerFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
+    const keywordsArray = safeString(providerFormData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
     const payload = { name: providerFormData.name.trim(), phone: session.phone, email: providerFormData.email ? providerFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: providerFormData.communicationChannels, priorityScore: parseInt(providerFormData.priorityScore, 10) || 100 }; 
     try { 
       if (providerProfile) await axios.put(`${API_BASE}/providers/${providerProfile.id}`, payload); 
@@ -571,8 +630,8 @@ export default function App() {
     if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) {
        alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun."); return;
     }
-    const keywordsArray = modalFormData.serviceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
-    const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: modalFormData.communicationChannels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; 
+    const keywordsArray = safeString(modalFormData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
+    const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: safeArray(modalFormData.communicationChannels).length ? modalFormData.communicationChannels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; 
     try { 
       if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } 
       else { await axios.post(`${API_BASE}/providers`, payload); }
@@ -588,32 +647,49 @@ export default function App() {
   
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
-  // Filtrelemeler
-  const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes((r.status || '').toUpperCase()));
-  const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
-  const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
-  const filteredPastCustomerRequests = pastCustomerRequests.filter(req => { const q = searchCustomerHistoryText.toLowerCase().trim(); if (!q) return true; return (req.raw_text || '').toLowerCase().includes(q) || (req.provider_name || '').toLowerCase().includes(q) || (req.status || '').toLowerCase().includes(q); });
+  // =====================================================================
+  // 🛡️ ZIRHLI LİSTELER VE FİLTRELEMELER
+  // =====================================================================
+
+  const activeCustomerRequests = safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status)));
+  const pendingReviewCustomerRequests = safeArray(myCustomerRequests).filter(r => r && safeUpper(r.status) === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
+  const pastCustomerRequests = safeArray(myCustomerRequests).filter(r => r && (safeUpper(r.status) === 'CANCELLED' || (safeUpper(r.status) === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]))));
+  const filteredPastCustomerRequests = safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req.raw_text).includes(q) || safeLower(req.provider_name).includes(q) || safeLower(req.status).includes(q); });
   
-  const activeProviderRequests = providerRequests.filter(r => ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes((r.status || '').toUpperCase()));
-  const pastProviderRequests = providerRequests.filter(r => ['COMPLETED', 'CANCELLED'].includes((r.status || '').toUpperCase()));
+  const activeProviderRequests = safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
+  const pastProviderRequests = safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status)));
   
-  const visiblePoolRequests = poolRequests.filter(req => !hiddenPoolRequests.includes(req.id));
+  const visiblePoolRequests = safeArray(poolRequests).filter(req => req && !hiddenPoolRequests.includes(req.id));
   
-  const filteredProviders = providers.filter(p => { const q = searchProviderText.toLowerCase().trim(); if (!q) return true; return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); });
-  const filteredMatchedRequests = matchedRequests.filter(r => { const q = searchMatchText.toLowerCase().trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.provider_name || '').toLowerCase().includes(q) || (r.provider_phone || '').toLowerCase().includes(q) || String(r.id).includes(q); });
+  const filteredProviders = safeArray(providers).filter(p => { 
+    if(!p) return false;
+    const q = safeLower(searchProviderText).trim(); 
+    if (!q) return true; 
+    return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); 
+  });
   
-  const filteredTrackerRequests = trackerRequests.filter(r => {
-    const q = trackerSearch.toLowerCase().trim();
-    const matchesSearch = !q || (r.raw_text || '').toLowerCase().includes(q) || (r.contact_value || '').toLowerCase().includes(q) || (r.location || '').toLowerCase().includes(q) || String(r.id).includes(q);
+  const filteredMatchedRequests = safeArray(matchedRequests).filter(r => { 
+    if(!r) return false;
+    const q = safeLower(searchMatchText).trim(); 
+    const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; 
+    if (!statusMatch) return false; 
+    if (!q) return true; 
+    return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
+  });
+  
+  const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
+    if(!r) return false;
+    const q = safeLower(trackerSearch).trim();
+    const matchesSearch = !q || safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.location).includes(q) || String(r.id).includes(q);
     if (!matchesSearch) return false;
 
-    const locLow = (r.location || '').toLowerCase();
-    const reqCode = extractCode(r.location)?.toLowerCase() || '';
+    const locLow = safeLower(r.location);
+    const reqCode = safeLower(extractCode(r.location));
 
-    if (trackerFilter.city && !locLow.includes(trackerFilter.city.toLowerCase().trim())) return false;
-    if (trackerFilter.district && !locLow.includes(trackerFilter.district.toLowerCase().trim())) return false;
-    if (trackerFilter.zip && !locLow.includes(trackerFilter.zip.toLowerCase().trim())) return false;
-    if (trackerFilter.code && reqCode !== trackerFilter.code.toLowerCase().trim()) return false;
+    if (trackerFilter.city && !locLow.includes(safeLower(trackerFilter.city).trim())) return false;
+    if (trackerFilter.district && !locLow.includes(safeLower(trackerFilter.district).trim())) return false;
+    if (trackerFilter.zip && !locLow.includes(safeLower(trackerFilter.zip).trim())) return false;
+    if (trackerFilter.code && reqCode !== safeLower(trackerFilter.code).trim()) return false;
 
     return true;
   });
@@ -627,7 +703,7 @@ export default function App() {
     if (sortConfig !== null) { 
       sortableItems.sort((a, b) => { 
         let valA = a[sortConfig.key]; let valB = b[sortConfig.key]; 
-        if (sortConfig.key === 'queue') { valA = a.queueList ? a.queueList.length : 0; valB = b.queueList ? b.queueList.length : 0; } 
+        if (sortConfig.key === 'queue') { valA = safeArray(a.queueList).length; valB = safeArray(b.queueList).length; } 
         else if (sortConfig.key === 'provider_name') { valA = a.provider_name || ''; valB = b.provider_name || ''; } 
         else if (sortConfig.key === 'location') { valA = a.location || ''; valB = b.location || ''; } 
         else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } 
@@ -642,15 +718,22 @@ export default function App() {
     return sortableItems; 
   }, [filteredMatchedRequests, sortConfig]);
   
-  const filteredSmsLogs = smsLogs.filter(log => { const q = searchSmsText.toLowerCase().trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return (log.recipient_phone || '').toLowerCase().includes(q) || (log.message_body || '').toLowerCase().includes(q); });
-  
-  const filteredWozProviders = providers.filter(p => { 
-    const q = wozProviderSearch.toLowerCase().trim(); 
+  const filteredSmsLogs = safeArray(smsLogs).filter(log => { 
+    if(!log) return false;
+    const q = safeLower(searchSmsText).trim(); 
+    const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; 
+    if (!recipientMatch) return false; 
     if (!q) return true; 
-    return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
+    return safeLower(log.recipient_phone).includes(q) || safeLower(log.message_body).includes(q); 
   });
   
-  const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
+  const filteredWozProviders = safeArray(providers).filter(p => { 
+    if(!p) return false;
+    const q = safeLower(wozProviderSearch).trim(); 
+    if (!q) return true; 
+    return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); 
+  });
+
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   let mainContainerClass = "w-full mx-auto px-6 py-8 flex-1 flex flex-col justify-start transition-all duration-300 max-w-5xl";
@@ -669,7 +752,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.2 (Inline Action Bar)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.2 (Bulletproof)</span>
             </div>
           </div>
 
@@ -793,9 +876,9 @@ export default function App() {
                         </div>
 
                         {/* Kuyruk Kontrolü */}
-                        {(req.provider_name || (req.queuedProviders && req.queuedProviders.length > 0)) && (
+                        {(req.provider_name || (safeArray(req.queuedProviders).length > 0)) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
-                            <div onClick={() => { if (req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
+                            <div onClick={() => { if (safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
                               <div className="space-y-1.5 w-full">
                                 
                                 <div className="text-[10px] font-mono font-bold text-emerald-700">
@@ -807,8 +890,8 @@ export default function App() {
                                     <Building2 size={14} className="text-neutral-700" />
                                     {req.provider_name ? (<><span className={`font-bold ${req.status === 'PROVIDER_SKIPPED' ? 'text-neutral-400 line-through' : 'text-neutral-950'}`}>{req.provider_name}</span><span className={`font-mono font-semibold px-1.5 py-0.5 rounded border ${req.status === 'PROVIDER_SKIPPED' ? 'bg-neutral-100 text-neutral-400 border-neutral-200' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
                                   </div>
-                                  {req.queuedProviders && req.queuedProviders.length > 0 && !(req.provider_name && req.queuedProviders.length === 1) && (
-                                    <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${req.queuedProviders.length - 1})` : `Tüm Adaylar (${req.queuedProviders.length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
+                                  {safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1) && (
+                                    <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${safeArray(req.queuedProviders).length - 1})` : `Tüm Adaylar (${safeArray(req.queuedProviders).length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
                                   )}
                                 </div>
                               </div>
@@ -830,7 +913,7 @@ export default function App() {
 
                             {/* Gizlilik Onay Butonu (Liste Kapalıyken) */}
                             {req.status === 'MATCHED' && !expandedCustomerQueueReqId && (
-                              req.contact_value?.includes('|HIDDEN') ? (
+                              safeString(req.contact_value).includes('|HIDDEN') ? (
                                 <div className="px-3 pb-3">
                                    <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm transition">
                                      <ShieldCheck size={14} />
@@ -854,7 +937,7 @@ export default function App() {
                                       {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700 shrink-0" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce shrink-0" />}
                                       <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Görüşme aktif. Sağlayıcı iletişim numarası: <strong>{req.provider_phone}</strong></>}</span>
                                    </div>
-                                   {req.preferred_channel?.includes('WHATSAPP') && req.provider_phone && (
+                                   {safeString(req.preferred_channel).includes('WHATSAPP') && req.provider_phone && (
                                       <a href={`https://wa.me/${extractPhoneForWa(req.provider_phone)}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
                                         <MessageCircle size={12} /><span>WhatsApp'tan Yaz</span>
                                       </a>
@@ -864,7 +947,7 @@ export default function App() {
                             )}
                             
                             {/* LİSTE AÇIKKEN GÖRÜNEN ADAYLAR */}
-                            {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 0 && (
+                            {expandedCustomerQueueReqId === req.id && safeArray(req.queuedProviders).length > 0 && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
                                   {req.queuedProviders.map((qProv, idx) => {
@@ -905,10 +988,10 @@ export default function App() {
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {new Date(req.deadline_datetime).toLocaleString('tr-TR')}</span>}
+                          <span>📍 {extractAddress(req.location)}</span>{req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200">ACİL</span>}{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && req.queuedProviders && req.queuedProviders.length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
+                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && safeArray(req.queuedProviders).length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
                           <div className="flex items-center space-x-1.5 ml-auto">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED') && (<button onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"><ShieldCheck size={12} /><span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span></button>)}<button onClick={() => handleStatusChange(req.id, 'CANCELLED')} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px]" title="Talebi İptal Et"><Ban size={12} /> İptal</button></div>
                         </div>
                       </div>
@@ -986,9 +1069,7 @@ export default function App() {
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
                           {/* SOL: 2/5 */}
-                          <div className="md:col-span-2 space-y-4">
-                            
-                            {/* ZAMANLAMA */}
+                          <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
                                   <span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>
@@ -1000,7 +1081,6 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            {/* İLETİŞİM TERCİHİ */}
                             <div className="space-y-2">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
                               <div className="grid grid-cols-2 gap-2">
@@ -1050,7 +1130,7 @@ export default function App() {
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
                             </div>
-                            
+
                           </div>
 
                           {/* SAĞ PARÇA: 3/5 */}
@@ -1092,7 +1172,7 @@ export default function App() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={customMarkerIcon} />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                                </MapContainer>
                             </div>
                           </div>
@@ -1113,7 +1193,7 @@ export default function App() {
               {step === 'DISAMBIGUATE' && disambiguationData && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
                   <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
-                  <div className="space-y-2">{disambiguationData.options.map((option) => (<button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); submitFinalRequest(option.text); }} className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold">{option.text}</button>))}</div>
+                  <div className="space-y-2">{safeArray(disambiguationData.options).map((option) => (<button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); submitFinalRequest(option.text); }} className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold">{option.text}</button>))}</div>
                 </div>
               )}
 
@@ -1133,7 +1213,7 @@ export default function App() {
                       <div className="space-y-3 mt-3 max-h-[350px] overflow-y-auto">
                         {filteredPastCustomerRequests.map((req) => (
                            <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 text-xs">
-                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{new Date(req.created_at).toLocaleDateString('tr-TR')}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
+                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDate(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-200">{req.status}</span></div>
                            </div>
                         ))}
                       </div>
@@ -1184,13 +1264,13 @@ export default function App() {
                        </p>
                        
                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-neutral-100">
-                         {req.status === 'MATCHED' && req.contact_value?.includes('|SHARED') && (
+                         {req.status === 'MATCHED' && safeString(req.contact_value).includes('|SHARED') && (
                             <div className="flex space-x-2 w-full sm:w-auto">
                                <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
                                <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
                             </div>
                          )}
-                         {req.status === 'MATCHED' && req.contact_value?.includes('|HIDDEN') && (
+                         {req.status === 'MATCHED' && safeString(req.contact_value).includes('|HIDDEN') && (
                             <div className="flex items-center space-x-2 w-full sm:w-auto">
                                <span className="px-3 py-1.5 bg-neutral-100 text-neutral-500 rounded-lg text-xs font-semibold border border-neutral-200">Müşteri Onayı Bekleniyor</span>
                                <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
@@ -1200,7 +1280,7 @@ export default function App() {
                          {req.status === 'ACCEPTED' && (
                            <>
                              <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
-                             {req.preferred_channel?.includes('WHATSAPP') && req.contact_value && (
+                             {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
                                <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
                                  <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
                                </a>
@@ -1235,7 +1315,7 @@ export default function App() {
                             <p className="text-sm font-semibold text-neutral-900 leading-snug">"{req.raw_text}"</p>
                             
                             <div className="space-y-1.5 mt-2.5 mb-3 text-[10px] text-neutral-500 font-mono">
-                               <p className="flex items-center space-x-1.5 text-blue-600 font-semibold"><Clock size={11}/><span>{req.created_at ? new Date(req.created_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Bilinmiyor'}</span></p>
+                               <p className="flex items-center space-x-1.5 text-blue-600 font-semibold"><Clock size={11}/><span>{safeDateTime(req.created_at)}</span></p>
                                <p className="flex items-center space-x-1.5"><User size={11}/><span>{getProviderContactDisplay(req)}</span></p>
                                {req.location && <p className="flex items-center space-x-1.5"><MapPin size={11}/><span>{extractAddress(req.location)}</span></p>}
                             </div>
@@ -1313,18 +1393,16 @@ export default function App() {
                   <SharedMapClickHandler 
                      position={trackerMapSelectedPos} 
                      setPosition={setTrackerMapSelectedPos} 
-                     setLocationValue={(val) => {
-                        setLocationValue(val); 
-                     }} 
+                     setLocationValue={(val) => { setLocationValue(val); }} 
                      setCoordinates={setCoordinates} 
-                     icon={trackerSelectionIcon} 
+                     icon={mapIcons?.tracker} 
                   />
                   
                   {filteredTrackerRequests.map(req => {
                     const coords = extractGPS(req.location);
-                    if (coords) {
+                    if (coords && mapIcons) {
                       return (
-                        <Marker position={coords} icon={req.is_urgent ? urgentMarkerIcon : customMarkerIcon} key={req.id}>
+                        <Marker position={coords} icon={req.is_urgent ? mapIcons.urgent : mapIcons.custom} key={req.id}>
                           <Popup className="custom-popup">
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
@@ -1597,7 +1675,7 @@ export default function App() {
                             
                             <div className="mt-2 pt-2 border-t flex items-center justify-between">
                                <div className="flex space-x-2">
-                                 <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: (prov.service_keywords || []).join(', '), communicationChannels: prov.communication_channels || ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
+                                 <button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: safeArray(prov.service_keywords).join(', '), communicationChannels: safeArray(prov.communication_channels).length ? prov.communication_channels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
                                  <button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button>
                                </div>
                                <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap"><ExternalLink size={12} /><span>Bağlan</span></button>
@@ -1690,7 +1768,7 @@ export default function App() {
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
                                 <span className="font-mono text-[11px] hidden sm:inline">👤 {testItem.tester_name || 'Tester'}</span>
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{testItem.test_date ? new Date(testItem.test_date).toLocaleDateString('tr-TR') : '-'}</span></span>
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{safeDate(testItem.test_date)}</span></span>
                                 {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                               </div>
                             </div>
@@ -1706,7 +1784,7 @@ export default function App() {
                                     </select>
                                   </div>
                                   <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Eden</label><input type="text" defaultValue={testItem.tester_name || ''} onBlur={(e) => handleUpdateTest(testItem.id, { testerName: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 text-xs" /></div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={testItem.test_date ? testItem.test_date.split('T')[0] : ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Test Tarihi</label><input type="date" defaultValue={(testItem.test_date || '').split('T')[0] || ''} onChange={(e) => handleUpdateTest(testItem.id, { testDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
                                   <span className="font-mono">Senaryo ID: #{testItem.id}</span>
@@ -1758,7 +1836,7 @@ export default function App() {
                                 <p className="font-semibold text-neutral-900 truncate">{feat.title}</p>
                               </div>
                               <div className="flex items-center space-x-3 text-neutral-400 shrink-0">
-                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{feat.target_date ? new Date(feat.target_date).toLocaleDateString('tr-TR') : '-'}</span></span>
+                                <span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Calendar size={12} /><span>{safeDate(feat.target_date)}</span></span>
                                 {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                               </div>
                             </div>
@@ -1779,7 +1857,7 @@ export default function App() {
                                       <option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option>
                                     </select>
                                   </div>
-                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={feat.target_date ? feat.target_date.split('T')[0] : ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
+                                  <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={(feat.target_date || '').split('T')[0] || ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400">
                                   <span className="font-mono">Kayıt ID: #{feat.id}</span>
@@ -1888,7 +1966,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.2.0 | 10.09.2026
+        v18.3.0 | 10.09.2026
       </div>
 
     </div>
