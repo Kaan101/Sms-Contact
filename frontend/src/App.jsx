@@ -174,7 +174,6 @@ export default function App() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  // 🔥 DEĞİŞİKLİK 1: Varsayılan olarak 3'ü seçili
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
@@ -221,7 +220,6 @@ export default function App() {
     );
   };
 
-  // 🔥 DEĞİŞİKLİK 2: Kullanıcı INPUT ekranındaysa detaylara bakılmaksızın otomatik konumu çek
   useEffect(() => {
     if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -671,9 +669,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">
-                Sürüm 18.1.0 <span className="opacity-50 ml-1">10 Eyl 2026</span>
-              </span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.2 (Inline Action Bar)</span>
             </div>
           </div>
 
@@ -990,7 +986,9 @@ export default function App() {
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
                           
                           {/* SOL: 2/5 */}
-                          <div className="md:col-span-2 space-y-5">
+                          <div className="md:col-span-2 space-y-4">
+                            
+                            {/* ZAMANLAMA */}
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
                                   <span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>
@@ -1002,6 +1000,7 @@ export default function App() {
                                 </div>
                             </div>
                             
+                            {/* İLETİŞİM TERCİHİ */}
                             <div className="space-y-2">
                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
                               <div className="grid grid-cols-2 gap-2">
@@ -1015,14 +1014,30 @@ export default function App() {
                                   <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
                                 </div>
                               )}
-                              
-                              <label className={`flex items-start p-3 rounded-xl border cursor-pointer select-none transition mt-3 ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                            </div>
+
+                            {/* 🌟 YENİ: HEMEN PAYLAŞ & ACİL (YAN YANA GRID) */}
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                              {/* Hemen Paylaş */}
+                              <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
-                                <div className="flex items-start space-x-2">
-                                  <Shield size={16} className={`shrink-0 mt-0.5 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
+                                <div className="flex items-center space-x-2">
+                                  <Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
                                   <div className="flex flex-col">
-                                    <span className={`text-[11px] font-bold ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Numaramı Eşleşen Sağlayıcıyla Hemen Paylaş</span>
-                                    <span className="text-[9px] text-neutral-500 font-mono mt-0.5 leading-relaxed">Seçilmezse eşleşme sonrasında sizden onay istenir (Gizli Mod).</span>
+                                    <span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span>
+                                    <span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span>
+                                  </div>
+                                </div>
+                              </label>
+
+                              {/* Acil Müdahale */}
+                              <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 w-full justify-center">
+                                  <Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} />
+                                  <div className="flex flex-col text-center">
+                                    <span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span>
+                                    <span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span>
                                   </div>
                                 </div>
                               </label>
@@ -1036,16 +1051,6 @@ export default function App() {
                                </div>
                             </div>
                             
-                            <div className="pt-2">
-                              <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-2 font-bold">
-                                  <Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} />
-                                  <span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span>
-                                </div>
-                              </label>
-                            </div>
-
                           </div>
 
                           {/* SAĞ PARÇA: 3/5 */}
@@ -1440,29 +1445,37 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            {/* Tracker için Havuz Gizliliği Kutusu */}
-                            <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                            {/* 🌟 YENİ: TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                              <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-2 font-bold"><Shield size={16} className={isContactShared ? 'text-blue-600' : 'text-neutral-400'} /><span className={isContactShared ? 'text-blue-700' : 'text-neutral-700'}>İLETİŞİMİ AKTİFE OTOMATİK AÇ</span></div>
-                            </label>
+                                <div className="flex items-center space-x-2">
+                                  <Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
+                                  <div className="flex flex-col">
+                                    <span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span>
+                                    <span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span>
+                                  </div>
+                                </div>
+                              </label>
 
-                            {/* 🌟 YENİ: TRACKER KOD GİRİŞİ */}
+                              <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 w-full justify-center">
+                                  <Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} />
+                                  <div className="flex flex-col text-center">
+                                    <span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span>
+                                    <span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span>
+                                  </div>
+                                </div>
+                              </label>
+                            </div>
+
                             <div className="pt-2">
                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 block">Grup / Kurum Kodu (Opsiyonel)</label>
                                <div className="relative">
                                   <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
-                            </div>
-
-                            <div className="pt-2">
-                              <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-2 font-bold">
-                                  <Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} />
-                                  <span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span>
-                                </div>
-                              </label>
                             </div>
 
                           </div>
@@ -1875,9 +1888,9 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.1.0 | 10.09.2026
+        v18.2.0 | 10.09.2026
       </div>
-      
+
     </div>
   );
 }
