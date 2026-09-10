@@ -112,7 +112,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-// Güvenli GPS Çıkarıcılar
+// 🌟 VERİ ÇIKARICILAR (GPS ve Yeni KOD Ayıklayıcılar)
 const extractGPS = (loc) => {
   if(!loc || typeof loc !== 'string') return null;
   const match = loc.match(/\[GPS:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
@@ -169,11 +169,13 @@ export default function App() {
   const trackerSearchInputRef = useRef(null);
 
   // Müşteri State
+  const [step, setStep] = useState('INPUT');
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   const [selectedDisambiguation, setSelectedDisambiguation] = useState(null);
   
-  const [preferredChannels, setPreferredChannels] = useState(['PHONE']);
+  // 🔥 DEĞİŞİKLİK 1: Varsayılan olarak 3'ü seçili
+  const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
   const [locationValue, setLocationValue] = useState('');
   const [coordinates, setCoordinates] = useState(''); 
@@ -219,12 +221,13 @@ export default function App() {
     );
   };
 
+  // 🔥 DEĞİŞİKLİK 2: Kullanıcı INPUT ekranındaysa detaylara bakılmaksızın otomatik konumu çek
   useEffect(() => {
-    if (!isDetailsCollapsed && !mapPosition && !isLocating) {
+    if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) {
       fetchCurrentLocation();
     }
     // eslint-disable-next-line
-  }, [isDetailsCollapsed]);
+  }, [session?.role, step]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -245,7 +248,6 @@ export default function App() {
     return () => clearTimeout(delayDebounceFn);
   }, [mapSearchText]);
 
-  const [step, setStep] = useState('INPUT');
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
@@ -485,7 +487,7 @@ export default function App() {
         preferredChannel: channelString, location: backendLocation, isUrgent: isUrgent, deadlineDatetime: deadlineDatetimeISO
       });
       setQueryText(''); setSelectedDisambiguation(null); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); 
-      setLocationValue(''); setCoordinates(''); setCompanyCode(''); setPreferredChannels(['PHONE']); setStep('INPUT'); setIsDetailsCollapsed(true); 
+      setLocationValue(''); setCoordinates(''); setCompanyCode(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); 
       setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false);
       
       if (fromTracker) {
@@ -527,7 +529,6 @@ export default function App() {
     } catch (err) {} 
   };
   
-  // 🌟 YENİ DÜZELTME: Sağlayıcı "Pas Geç" İşlemi
   const handleProviderSkip = async (requestId) => {
     if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return;
     try {
@@ -590,7 +591,6 @@ export default function App() {
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
   // Filtrelemeler
-  // 🌟 DÜZELTME: Müşteri PROVIDER_SKIPPED durumunu görsün
   const activeCustomerRequests = myCustomerRequests.filter(r => ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes((r.status || '').toUpperCase()));
   const pendingReviewCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
   const pastCustomerRequests = myCustomerRequests.filter(r => (r.status || '').toUpperCase() === 'CANCELLED' || ((r.status || '').toUpperCase() === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])));
@@ -652,34 +652,6 @@ export default function App() {
     return (p.name || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q) || (p.service_keywords || []).some(k => k.toLowerCase().includes(q)); 
   });
   
-  const cleanContact = (str) => {
-    if (!str) return '';
-    return str.replace(/\|(SHARED|HIDDEN)/g, '');
-  };
-
-  const getProviderContactDisplay = (req) => {
-    const raw = req.contact_value || '';
-    const isShared = raw.includes('|SHARED');
-    const isAccepted = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(req.status);
-    
-    if (req.status === 'POOL' || req.status === 'PENDING') return '🔒 Gizli (Havuzda)';
-    if (req.status === 'MATCHED') {
-      if (isShared) return cleanContact(raw);
-      return '🔒 Gizli (Müşteri Onayı Bekleniyor)';
-    }
-    if (isAccepted) return cleanContact(raw);
-    
-    return '🔒 Gizli';
-  };
-
-  const extractPhoneForWa = (str) => {
-    if (!str) return '';
-    let cleaned = cleanContact(str).replace(/\D/g, '');
-    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
-    if (!cleaned.startsWith('90')) cleaned = '90' + cleaned;
-    return cleaned;
-  };
-
   const getKeywordMetrics = (text) => { const str = text || ''; return { charCount: str.length, wordCount: str.split(',').map(k => k.trim()).filter(Boolean).length }; };
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
@@ -699,7 +671,9 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 16.0 (Skip & Alert UX)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">
+                Sürüm 18.1.0 <span className="opacity-50 ml-1">10 Eyl 2026</span>
+              </span>
             </div>
           </div>
 
@@ -815,7 +789,6 @@ export default function App() {
                           <div>
                             {req.status === 'POOL' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">Açık Havuzda (Bekleniyor)</span>}
                             {req.status === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Sağlayıcı Bulundu</span>}
-                            {/* 🌟 YENİ: Sağlayıcı Pas Geçti Etiketi */}
                             {req.status === 'PROVIDER_SKIPPED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">Sağlayıcı Pas Geçti</span>}
                             
                             {req.status === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">Kabul Edildi</span>}
@@ -845,7 +818,6 @@ export default function App() {
                               </div>
                             </div>
                             
-                            {/* 🌟 YENİ: Sağlayıcı Pas Geçtiğinde Kırmızı Uyarı Kutusu */}
                             {req.status === 'PROVIDER_SKIPPED' && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
                                  <div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 bg-rose-50 border border-rose-200 text-rose-950">
@@ -860,7 +832,7 @@ export default function App() {
                               </div>
                             )}
 
-                            {/* Gizlilik Onay Butonu */}
+                            {/* Gizlilik Onay Butonu (Liste Kapalıyken) */}
                             {req.status === 'MATCHED' && !expandedCustomerQueueReqId && (
                               req.contact_value?.includes('|HIDDEN') ? (
                                 <div className="px-3 pb-3">
@@ -894,6 +866,8 @@ export default function App() {
                                  </div>
                               </div>
                             )}
+                            
+                            {/* LİSTE AÇIKKEN GÖRÜNEN ADAYLAR */}
                             {expandedCustomerQueueReqId === req.id && req.queuedProviders && req.queuedProviders.length > 0 && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                 <div className="space-y-2">
@@ -913,7 +887,19 @@ export default function App() {
                                           </p>
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
                                         </div>
-                                        {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
+                                        
+                                        <div className="flex items-center space-x-2">
+                                            {isCurrent && !isSkippedByThis && req.status === 'MATCHED' && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
+                                                  <ShieldCheck size={10} /><span>Onayla</span>
+                                                </button>
+                                            )}
+                                            {!isCurrent && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
+                                                  <Check size={10} /><span>Bunu Seç</span>
+                                                </button>
+                                            )}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -1013,10 +999,6 @@ export default function App() {
                                 <div className="flex items-center gap-2">
                                   <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
                                   <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
-                                  <label className={`flex items-center justify-center px-2.5 h-[34px] rounded-lg border cursor-pointer select-none transition shrink-0 ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                                    <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                    <span className={`text-xs font-bold ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL</span>
-                                  </label>
                                 </div>
                             </div>
                             
@@ -1046,7 +1028,7 @@ export default function App() {
                               </label>
                             </div>
                             
-                            <div className="pt-2">
+                            <div className="pt-1">
                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 block">Grup / Kurum Kodu (Opsiyonel)</label>
                                <div className="relative">
                                   <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
@@ -1054,6 +1036,16 @@ export default function App() {
                                </div>
                             </div>
                             
+                            <div className="pt-2">
+                              <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 font-bold">
+                                  <Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} />
+                                  <span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span>
+                                </div>
+                              </label>
+                            </div>
+
                           </div>
 
                           {/* SAĞ PARÇA: 3/5 */}
@@ -1187,7 +1179,6 @@ export default function App() {
                        </p>
                        
                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-neutral-100">
-                         {/* 🌟 YENİ: PAS GEÇ BUTONU (Eğer eşleşmişse ve henüz kabul edilmediyse) */}
                          {req.status === 'MATCHED' && req.contact_value?.includes('|SHARED') && (
                             <div className="flex space-x-2 w-full sm:w-auto">
                                <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
@@ -1285,9 +1276,9 @@ export default function App() {
                       className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition" 
                     />
                   </div>
-                  {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
+                  {isTrackerSuggestionsVisible && mapSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
-                      {trackerMapSuggestions.map((sug, idx) => (
+                      {mapSuggestions.map((sug, idx) => (
                         <div 
                            key={idx} 
                            className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
@@ -1365,7 +1356,7 @@ export default function App() {
                     {filteredTrackerRequests.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Kriterlere uygun talep bulunamadı.</div>}
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
-                      const reqCode = extractCode(req.location); // 🌟 YENİ: Kart üzerinde Kurum Kodu okuma
+                      const reqCode = extractCode(req.location); 
                       
                       return (
                         <div 
@@ -1387,7 +1378,6 @@ export default function App() {
                           <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           <div className="space-y-1 text-[9px] font-mono text-neutral-500">
-                             {/* 🌟 YENİ: Kurumsal Kod Gösterimi */}
                              {reqCode && <p className="mb-1"><span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold border border-indigo-100">KOD: {reqCode}</span></p>}
                              <p className="flex items-start space-x-1.5"><User size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="truncate">{cleanContact(req.contact_value)}</span></p>
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
@@ -1450,11 +1440,6 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
-                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                                <div className="flex items-center space-x-2 font-bold"><Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} /><span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span></div>
-                            </label>
-                            
                             {/* Tracker için Havuz Gizliliği Kutusu */}
                             <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -1468,6 +1453,16 @@ export default function App() {
                                   <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                              <label className={`flex items-center justify-center p-3 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 font-bold">
+                                  <Flame size={16} className={isUrgent ? 'text-rose-600 animate-bounce' : 'text-neutral-400'} />
+                                  <span className={isUrgent ? 'text-rose-700' : 'text-neutral-700'}>ACİL MÜDAHALE (KIRMIZI KOD)</span>
+                                </div>
+                              </label>
                             </div>
 
                           </div>
@@ -1870,13 +1865,19 @@ export default function App() {
 
       {/* 🇨🇭 FOOTER */}
       {session?.role !== 'TRACKER' && (
-        <footer className="border-t border-neutral-200/80 bg-white py-4 z-10">
+        <footer className="border-t border-neutral-200/80 bg-white py-4 z-10 relative">
           <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-neutral-400 font-mono">
             <div><span>Mobool</span> • <span>Multi-Tenant Servis Platformu</span></div>
             <div><span>İTÜ Bilişim Enstitüsü © 2026</span></div>
           </div>
         </footer>
       )}
+
+      {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
+      <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
+        v18.1.0 | 10.09.2026
+      </div>
+      
     </div>
   );
 }
