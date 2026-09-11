@@ -408,11 +408,8 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
-  
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
-  
-  // 🔥 YENİ: TRACKER İÇİN HAVUZ FİLTRESİ
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
 
   useEffect(() => {
@@ -538,7 +535,7 @@ export default function App() {
       if (session.role === 'ADMIN') fetchAdminData();
       if (session.role === 'TRACKER') {
         fetchTrackerData();
-        fetchProviderData(false); // 🔥 Tracker'ın sağlayıcı profili olup olmadığını anla
+        fetchProviderData(false);
       }
 
       const interval = setInterval(() => {
@@ -671,7 +668,25 @@ export default function App() {
   };
 
   const handleRepeatRequest = (req) => { setQueryText(req.raw_text || ''); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
+  
+  // 🔥 YENİ GÜNCELLENEN POOL KATILMA FONKSİYONU (Tracker için anında refresh)
+  const handleJoinPool = async (requestId) => { 
+    if (!providerProfile) { 
+        alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
+        setIsProfileOpen(true); 
+        return; 
+    } 
+    try { 
+        await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); 
+        await fetchProviderData(false); 
+        if (session.role === 'TRACKER') await fetchTrackerData();
+        setProviderTab('ACTIVE'); 
+        alert('Başarıyla sıraya girdiniz!');
+    } catch (err) { 
+        alert('Hata oluştu veya zaten sıradaydınız.'); 
+    } 
+  };
+  
   const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   
@@ -757,7 +772,6 @@ export default function App() {
   const activeProviderRequests = safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
   const pastProviderRequests = safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status)));
   
-  // Havuz Filtrelemesi (Gizli Kodlu Talepler Sağlayıcıdan Gizlenir)
   const visiblePoolRequests = safeArray(poolRequests).filter(req => {
     if (!req || hiddenPoolRequests.includes(req.id)) return false;
     if (isCodeHiddenReq(req.location)) return false; 
@@ -780,7 +794,6 @@ export default function App() {
     return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
   });
   
-  // 🔥 TRACKER FİLTRELEMESİ VE TEMİZLİĞİ
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
@@ -803,7 +816,6 @@ export default function App() {
         }
     }
     
-    // 🔥 YENİ: TRACKER BANA UYGUN HAVUZ FİLTRESİ
     if (isTrackerPoolFilterActive && providerProfile) {
         if (status !== 'POOL' && status !== 'PENDING') return false;
         const textToMatch = safeLower(r.raw_text);
@@ -890,7 +902,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.13 (Tracker Dual-Role)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.14 (Join Pool Shortcut)</span>
             </div>
           </div>
 
@@ -1656,6 +1668,7 @@ export default function App() {
                     {filteredTrackerRequests.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Kriterlere uygun talep bulunamadı.</div>}
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
+                      const hasAlreadyJoined = poolRequests.some(pr => pr.id === req.id) || providerRequests.some(pr => pr.id === req.id);
                       
                       return (
                         <div 
@@ -1673,7 +1686,30 @@ export default function App() {
                            }} 
                            className={`p-2 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 hover:shadow-md`}
                         >
-                          <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
+                            </div>
+
+                            {/* 🔥 SİRAYA GİR BUTONU */}
+                            {providerProfile && req.status === 'POOL' && !hasAlreadyJoined && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); }}
+                                className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded flex items-center gap-1 text-[8px] font-bold transition shadow-sm"
+                                title="Sağlayıcı olarak bu işe talip ol"
+                              >
+                                <Plus size={9} /> Sıraya Gir
+                              </button>
+                            )}
+
+                            {providerProfile && req.status === 'POOL' && hasAlreadyJoined && (
+                              <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                Sıradayınız
+                              </span>
+                            )}
+                          </div>
+                          
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           
                           <div className="space-y-1 text-[9px] font-mono text-neutral-500">
@@ -1742,7 +1778,6 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
                             <div className="grid grid-cols-2 gap-3 pt-1">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -2203,7 +2238,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.13.0 | 11.09.2026
+        v18.14.0 | 11.09.2026
       </div>
 
     </div>
