@@ -261,7 +261,7 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // 📍 YEDEKLEME SİSTEMLİ OTOMATİK KONUM ÇEKİCİ
+  // Otomatik Konum Çekici
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
     if (validReq) {
@@ -342,7 +342,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   
-  // Katlanabilir listeler için state'ler
   const [isActiveCustomerRequestsOpen, setIsActiveCustomerRequestsOpen] = useState(true);
   const [isPendingReviewsOpen, setIsPendingReviewsOpen] = useState(true);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
@@ -409,8 +408,12 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
+  
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
+  
+  // 🔥 YENİ: TRACKER İÇİN HAVUZ FİLTRESİ
+  const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -533,13 +536,19 @@ export default function App() {
       if (session.role === 'CUSTOMER') fetchCustomerData();
       if (session.role === 'PROVIDER') fetchProviderData(true);
       if (session.role === 'ADMIN') fetchAdminData();
-      if (session.role === 'TRACKER') fetchTrackerData();
+      if (session.role === 'TRACKER') {
+        fetchTrackerData();
+        fetchProviderData(false); // 🔥 Tracker'ın sağlayıcı profili olup olmadığını anla
+      }
 
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData(false);
         if (session.role === 'CUSTOMER') fetchCustomerData();
         if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
-        if (session.role === 'TRACKER') fetchTrackerData();
+        if (session.role === 'TRACKER') {
+          fetchTrackerData();
+          fetchProviderData(false);
+        }
       }, 5000);
 
       return () => clearInterval(interval);
@@ -748,6 +757,7 @@ export default function App() {
   const activeProviderRequests = safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
   const pastProviderRequests = safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status)));
   
+  // Havuz Filtrelemesi (Gizli Kodlu Talepler Sağlayıcıdan Gizlenir)
   const visiblePoolRequests = safeArray(poolRequests).filter(req => {
     if (!req || hiddenPoolRequests.includes(req.id)) return false;
     if (isCodeHiddenReq(req.location)) return false; 
@@ -770,6 +780,7 @@ export default function App() {
     return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
   });
   
+  // 🔥 TRACKER FİLTRELEMESİ VE TEMİZLİĞİ
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
@@ -791,6 +802,14 @@ export default function App() {
             return false;
         }
     }
+    
+    // 🔥 YENİ: TRACKER BANA UYGUN HAVUZ FİLTRESİ
+    if (isTrackerPoolFilterActive && providerProfile) {
+        if (status !== 'POOL' && status !== 'PENDING') return false;
+        const textToMatch = safeLower(r.raw_text);
+        const hasMatch = safeArray(providerProfile.service_keywords).some(kw => textToMatch.includes(safeLower(kw)));
+        if (!hasMatch) return false;
+    }
 
     const q = safeLower(trackerSearch).trim();
     const matchesSearch = !q || safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.location).includes(q) || String(r.id).includes(q);
@@ -804,7 +823,7 @@ export default function App() {
     return true;
   });
 
-  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code;
+  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive;
 
   const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
   
@@ -871,7 +890,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.12 (Flat Lists)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.13 (Tracker Dual-Role)</span>
             </div>
           </div>
 
@@ -1609,14 +1628,27 @@ export default function App() {
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
                     <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button></div>
                     
-                    <div className="flex items-center space-x-2">
-                      <div className="relative flex-1">
-                        <Search size={14} className="absolute left-2.5 top-2 text-neutral-400" />
-                        <input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-2 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex-1">
+                          <Search size={14} className="absolute left-2.5 top-2 text-neutral-400" />
+                          <input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-2 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" />
+                        </div>
+                        <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-1.5 rounded-lg border transition ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`} title="Detaylı Filtrele">
+                          <Filter size={14} />
+                        </button>
                       </div>
-                      <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-1.5 rounded-lg border transition ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`} title="Detaylı Filtrele">
-                        <Filter size={14} />
-                      </button>
+                      
+                      {/* 🔥 BANA UYGUN HAVUZ TOGGLE BUTONU (Sadece Sağlayıcı Profili Varsa Çıkar) */}
+                      {providerProfile && (
+                        <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
+                          <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => setIsTrackerPoolFilterActive(e.target.checked)} className="hidden" />
+                          <span className="flex items-center gap-1.5">
+                            <Inbox size={12} className={isTrackerPoolFilterActive ? 'text-indigo-100' : 'text-neutral-400'}/>
+                            {isTrackerPoolFilterActive ? 'Sadece Bana Uygun Olanlar' : 'Bana Uygun Talepleri Göster'}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
 
@@ -1710,6 +1742,7 @@ export default function App() {
                                 </div>
                             </div>
                             
+                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
                             <div className="grid grid-cols-2 gap-3 pt-1">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -2170,7 +2203,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.12.0 | 11.09.2026
+        v18.13.0 | 11.09.2026
       </div>
 
     </div>
