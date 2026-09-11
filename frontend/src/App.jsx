@@ -260,10 +260,44 @@ export default function App() {
   const [isMapSearching, setIsMapSearching] = useState(false);
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
+  
+  const [loading, setLoading] = useState(false);
+  const [myCustomerRequests, setMyCustomerRequests] = useState([]);
+  const [isActiveCustomerRequestsOpen, setIsActiveCustomerRequestsOpen] = useState(true);
+  const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
+  const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
+  const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
-  // Otomatik Konum Çekici
+
+  // 📍 YEDEKLEME SİSTEMLİ OTOMATİK KONUM ÇEKİCİ
+  const applyFallbackLocation = (pastRequests) => {
+    // Geçmiş kayıtlardan 'Bilinmiyor' ve 'Belirtilmedi' olmayan en güncel konumu bul
+    const validReq = safeArray(pastRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
+    
+    if (validReq) {
+      setLocationValue(extractAddress(validReq.location) || 'İstanbul, Türkiye');
+      const coords = extractGPS(validReq.location);
+      if (coords) {
+        setMapPosition({ lat: coords[0], lng: coords[1] });
+        setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
+      } else {
+        setMapPosition({ lat: 41.0082, lng: 28.9784 });
+        setCoordinates('41.008200, 28.978400');
+      }
+    } else {
+      // Nihai Varsayılan Bağlam (İstanbul)
+      setLocationValue('İstanbul, Türkiye');
+      setMapPosition({ lat: 41.0082, lng: 28.9784 });
+      setCoordinates('41.008200, 28.978400');
+    }
+    setIsLocating(false);
+  };
+
   const fetchCurrentLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      applyFallbackLocation(myCustomerRequests);
+      return;
+    }
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -282,11 +316,15 @@ export default function App() {
           setIsLocating(false);
         }
       },
-      (err) => { console.warn('Konum alınamadı:', err.message); setIsLocating(false); },
-      { timeout: 8000 }
+      (err) => { 
+        console.warn('Konum alınamadı, yedek lokasyona geçiliyor:', err.message); 
+        applyFallbackLocation(myCustomerRequests);
+      },
+      { timeout: 6000 } // 6 saniyede bulamazsa direkt fallback
     );
   };
 
+  // Input ekranındaysa her halükarda konumu al
   useEffect(() => {
     if (session?.role === 'CUSTOMER' && step === 'INPUT' && !mapPosition && !isLocating) {
       fetchCurrentLocation();
@@ -312,13 +350,6 @@ export default function App() {
     }, 400);
     return () => clearTimeout(delayDebounceFn);
   }, [mapSearchText]);
-
-  const [loading, setLoading] = useState(false);
-  const [myCustomerRequests, setMyCustomerRequests] = useState([]);
-  const [isActiveCustomerRequestsOpen, setIsActiveCustomerRequestsOpen] = useState(true);
-  const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
-  const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
-  const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
   // Sağlayıcı State
   const [providerProfile, setProviderProfile] = useState(null);
@@ -379,8 +410,6 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
-  
-  // Tracker Filtresi (Sadece Kod Alanı İçerir, Checkbox Yoktur)
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
 
@@ -566,8 +595,34 @@ export default function App() {
     const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
     const channelString = preferredChannels.join(', ');
 
-    let backendLocation = locationValue || 'Belirtilmedi';
-    if (coordinates) backendLocation += ` [GPS: ${coordinates}]`;
+    // 🔥 HİÇBİR ZAMAN BOŞ KONUM KALMAMASI İÇİN KORUMA
+    let fallbackLoc = 'İstanbul, Türkiye';
+    let fallbackCoords = '41.008200, 28.978400';
+    
+    if (fromTracker && !locationValue) {
+       const lastReq = safeArray(trackerRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
+       if (lastReq) {
+         fallbackLoc = extractAddress(lastReq.location) || fallbackLoc;
+         const coords = extractGPS(lastReq.location);
+         if (coords) fallbackCoords = `${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
+       }
+    } else if (!fromTracker && !locationValue) {
+       const lastReq = safeArray(myCustomerRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
+       if (lastReq) {
+         fallbackLoc = extractAddress(lastReq.location) || fallbackLoc;
+         const coords = extractGPS(lastReq.location);
+         if (coords) fallbackCoords = `${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
+       }
+    }
+
+    let backendLocation = locationValue || fallbackLoc;
+    
+    if (coordinates) {
+       backendLocation += ` [GPS: ${coordinates}]`;
+    } else {
+       backendLocation += ` [GPS: ${fallbackCoords}]`;
+    }
+
     if (companyCode.trim()) {
        backendLocation += isCodeHidden ? ` [HIDDENCODE: ${companyCode.trim()}]` : ` [CODE: ${companyCode.trim()}]`;
     }
@@ -698,7 +753,7 @@ export default function App() {
   // Havuz Filtrelemesi (Gizli Kodlu Talepler Sağlayıcıdan Gizlenir)
   const visiblePoolRequests = safeArray(poolRequests).filter(req => {
     if (!req || hiddenPoolRequests.includes(req.id)) return false;
-    if (isCodeHiddenReq(req.location)) return false; // Sağlayıcılar gizli talepleri göremez
+    if (isCodeHiddenReq(req.location)) return false; 
     return true;
   });
   
@@ -718,21 +773,27 @@ export default function App() {
     return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
   });
   
-  // 🔥 TRACKER FİLTRELEMESİ (Gerçek Gizlilik Mantığı)
+  // 🔥 TRACKER FİLTRELEMESİ VE TEMİZLİĞİ
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
+    // 1. KURAL: İptal ve Tamamlananlar listede gösterilmesin
+    const status = safeUpper(r.status);
+    if (status === 'COMPLETED' || status === 'CANCELLED') {
+       return false;
+    }
+
     const reqCode = safeLower(extractCode(r.location));
     const isHiddenReq = isCodeHiddenReq(r.location);
     const filterCode = safeLower(trackerFilter.code).trim();
 
-    // Kural 1: Gizli talepler, sadece Tracker Filtresindeki Kod ile BİREBİR eşleşirse görünür.
+    // 2. Kural: Gizli talepler, sadece Tracker Filtresindeki Kod ile BİREBİR eşleşirse görünür.
     if (isHiddenReq) {
         if (!filterCode || reqCode !== filterCode) {
             return false;
         }
     } 
-    // Kural 2: Gizli OLMAYAN (Açık) talepler, her zaman görünür. ANCAK filtrede bir kod varsa eşleşmek zorundadır.
+    // 3. Kural: Gizli OLMAYAN (Açık) talepler, her zaman görünür. ANCAK filtrede bir kod varsa eşleşmek zorundadır.
     else {
         if (filterCode && reqCode !== filterCode) {
             return false;
@@ -819,7 +880,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.10 (Perfect Sync)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.11 (Location Safety)</span>
             </div>
           </div>
 
@@ -1532,7 +1593,7 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
+              {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
                 <div className="absolute top-0 right-0 w-[70vw] sm:w-[220px] md:w-[240px] min-w-[180px] max-w-[260px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
@@ -1563,7 +1624,6 @@ export default function App() {
                                setTrackerMapSelectedPos(null); 
                                setTrackerMapSelectedAddress('');
                                setCoordinates('');
-                               // Mobilde ise listeyi kapat
                                if (window.innerWidth < 640) {
                                  setIsTrackerListOpen(false);
                                }
@@ -1640,7 +1700,6 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
                             <div className="grid grid-cols-2 gap-3 pt-1">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -2101,7 +2160,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.10.0 | 11.09.2026
+        v18.11.0 | 11.09.2026
       </div>
 
     </div>
