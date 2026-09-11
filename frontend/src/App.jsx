@@ -40,6 +40,7 @@ const extractGPS = (loc) => {
   return null;
 };
 
+// KODLARI AYIKLAMA (Gizli veya Açık)
 const extractCode = (loc) => {
   const str = safeString(loc);
   if(!str) return null;
@@ -47,6 +48,7 @@ const extractCode = (loc) => {
   return match ? match[1].trim() : null;
 };
 
+// TALEBİN GİZLİ Mİ AÇIK MI OLDUĞUNU TESPİT ETME
 const isCodeHiddenReq = (loc) => {
   return safeString(loc).includes('[HIDDENCODE:');
 };
@@ -165,6 +167,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
 
 export default function App() {
 
+  // 🌟 HARİTA İKONLARI GÜVENLİ OLUŞTURULUYOR
   const mapIcons = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return {
@@ -240,7 +243,7 @@ export default function App() {
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   const [isContactShared, setIsContactShared] = useState(false); 
   
-  // Kalıcı Kod ve Gizlilik Yönetimi
+  // 🔥 KALICI KOD VE GİZLİLİK YÖNETİMİ
   const [companyCode, setCompanyCode] = useState(() => { try { return localStorage.getItem('sc_company_code') || ''; } catch { return ''; }}); 
   const [isCodeHidden, setIsCodeHidden] = useState(() => { try { return localStorage.getItem('sc_is_code_hidden') === 'true'; } catch { return false; }}); 
 
@@ -376,6 +379,8 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
+  
+  // Tracker Filtresi (Sadece Kod Alanı İçerir, Checkbox Yoktur)
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
 
@@ -690,9 +695,10 @@ export default function App() {
   const activeProviderRequests = safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
   const pastProviderRequests = safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status)));
   
+  // Havuz Filtrelemesi (Gizli Kodlu Talepler Sağlayıcıdan Gizlenir)
   const visiblePoolRequests = safeArray(poolRequests).filter(req => {
     if (!req || hiddenPoolRequests.includes(req.id)) return false;
-    if (isCodeHiddenReq(req.location)) return false;
+    if (isCodeHiddenReq(req.location)) return false; // Sağlayıcılar gizli talepleri göremez
     return true;
   });
   
@@ -712,7 +718,7 @@ export default function App() {
     return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
   });
   
-  // 🔥 TRACKER FİLTRELEMESİ VE GİZLİLİK MANTIĞI
+  // 🔥 TRACKER FİLTRELEMESİ (Gerçek Gizlilik Mantığı)
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
@@ -720,13 +726,13 @@ export default function App() {
     const isHiddenReq = isCodeHiddenReq(r.location);
     const filterCode = safeLower(trackerFilter.code).trim();
 
-    // 1. Kural: Talep GİZLİ kodla açılmışsa, filtremizde kod yazmıyorsa veya yazan kod eşleşmiyorsa GİZLE
+    // Kural 1: Gizli talepler, sadece Tracker Filtresindeki Kod ile BİREBİR eşleşirse görünür.
     if (isHiddenReq) {
         if (!filterCode || reqCode !== filterCode) {
             return false;
         }
     } 
-    // 2. Kural: Gizli değilse, filtrede aranan kod varsa eşleşmesini bekle
+    // Kural 2: Gizli OLMAYAN (Açık) talepler, her zaman görünür. ANCAK filtrede bir kod varsa eşleşmek zorundadır.
     else {
         if (filterCode && reqCode !== filterCode) {
             return false;
@@ -813,7 +819,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.9 (Perfect Logic)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.10 (Perfect Sync)</span>
             </div>
           </div>
 
@@ -1511,7 +1517,11 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {cleanContact(req.contact_value)}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
+                                 {req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}
+                                 <p>📍 {extractAddress(req.location)}</p>
+                                 {req.provider_name && <p>🏢 {req.provider_name}</p>}
+                               </div>
                             </div>
                           </Popup>
                         </Marker>
@@ -1522,7 +1532,7 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              {/* SAĞ LİSTE PANELİ */}
+              {/* SAĞ LİSTE PANELİ - İnce ve Mobilde Otomatik Kapanan Liste */}
               {isTrackerListOpen && (
                 <div className="absolute top-0 right-0 w-[70vw] sm:w-[220px] md:w-[240px] min-w-[180px] max-w-[260px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
@@ -1553,6 +1563,7 @@ export default function App() {
                                setTrackerMapSelectedPos(null); 
                                setTrackerMapSelectedAddress('');
                                setCoordinates('');
+                               // Mobilde ise listeyi kapat
                                if (window.innerWidth < 640) {
                                  setIsTrackerListOpen(false);
                                }
@@ -1629,6 +1640,7 @@ export default function App() {
                                 </div>
                             </div>
                             
+                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
                             <div className="grid grid-cols-2 gap-3 pt-1">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -2089,7 +2101,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.9.0 | 11.09.2026
+        v18.10.0 | 11.09.2026
       </div>
 
     </div>
