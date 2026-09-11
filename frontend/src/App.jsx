@@ -21,7 +21,7 @@ const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
 // =====================================================================
-// 🛡️ TİTANYUM ZIRH FONKSİYONLARI
+// 🛡️ TİTANYUM ZIRH FONKSİYONLARI (Tanımsız verilerde çökmeyi önler)
 // =====================================================================
 const safeString = (val) => (val ? String(val) : '');
 const safeArray = (arr) => (Array.isArray(arr) ? arr : []);
@@ -40,7 +40,6 @@ const extractGPS = (loc) => {
   return null;
 };
 
-// YENİ: Hem Gizli hem Normal kodu çözer
 const extractCode = (loc) => {
   const str = safeString(loc);
   if(!str) return null;
@@ -48,7 +47,6 @@ const extractCode = (loc) => {
   return match ? match[1].trim() : null;
 };
 
-// YENİ: Talebin gizli gönderilip gönderilmediğini anlar
 const isCodeHiddenReq = (loc) => {
   return safeString(loc).includes('[HIDDENCODE:');
 };
@@ -242,7 +240,7 @@ export default function App() {
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   const [isContactShared, setIsContactShared] = useState(false); 
   
-  // 🔥 KALICI KOD VE GİZLİLİK YÖNETİMİ
+  // Kalıcı Kod ve Gizlilik Yönetimi
   const [companyCode, setCompanyCode] = useState(() => { try { return localStorage.getItem('sc_company_code') || ''; } catch { return ''; }}); 
   const [isCodeHidden, setIsCodeHidden] = useState(() => { try { return localStorage.getItem('sc_is_code_hidden') === 'true'; } catch { return false; }}); 
 
@@ -378,8 +376,6 @@ export default function App() {
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
-  
-  // Tracker'ın filtresinde "Gizli" alanı yok, sadece kod var.
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
 
@@ -694,7 +690,6 @@ export default function App() {
   const activeProviderRequests = safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
   const pastProviderRequests = safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status)));
   
-  // Havuz Filtrelemesi (GİZLİ KODLU TALEPLER SAĞLAYICIDAN DA GİZLENİR)
   const visiblePoolRequests = safeArray(poolRequests).filter(req => {
     if (!req || hiddenPoolRequests.includes(req.id)) return false;
     if (isCodeHiddenReq(req.location)) return false;
@@ -726,15 +721,16 @@ export default function App() {
     const filterCode = safeLower(trackerFilter.code).trim();
 
     // 1. Kural: Talep GİZLİ kodla açılmışsa, filtremizde kod yazmıyorsa veya yazan kod eşleşmiyorsa GİZLE
-    if (isHiddenReq && reqCode) {
+    if (isHiddenReq) {
         if (!filterCode || reqCode !== filterCode) {
             return false;
         }
-    }
-
-    // 2. Kural: Filtrede kod yazıyorsa (talep gizli olsun olmasın), sadece kodla eşleşenleri GÖSTER
-    if (!isHiddenReq && filterCode && reqCode !== filterCode) {
-        return false;
+    } 
+    // 2. Kural: Gizli değilse, filtrede aranan kod varsa eşleşmesini bekle
+    else {
+        if (filterCode && reqCode !== filterCode) {
+            return false;
+        }
     }
 
     // Arama ve Lokasyon Filtreleri
@@ -817,7 +813,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.8 (Privacy & Code Engine)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.9 (Perfect Logic)</span>
             </div>
           </div>
 
@@ -1227,7 +1223,7 @@ export default function App() {
                                  <span>Grup / Kurum Kodu (Opsiyonel)</span>
                                  <label className="flex items-center space-x-1 cursor-pointer">
                                    <input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" />
-                                   <span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli</span>
+                                   <span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span>
                                  </label>
                                </label>
                                <div className="relative">
@@ -1515,11 +1511,7 @@ export default function App() {
                             <div className="w-48 p-1">
                                <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status}</span></div>
                                <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
-                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
-                                 {req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}
-                                 <p>📍 {extractAddress(req.location)}</p>
-                                 {req.provider_name && <p>🏢 {req.provider_name}</p>}
-                               </div>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5"><p>👤 {cleanContact(req.contact_value)}</p><p>📍 {extractAddress(req.location)}</p>{req.provider_name && <p>🏢 {req.provider_name}</p>}</div>
                             </div>
                           </Popup>
                         </Marker>
@@ -1566,7 +1558,7 @@ export default function App() {
                                }
                              } 
                            }} 
-                           className={`p-2 rounded-xl border bg-white shadow-sm transition group ${coords ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-70 cursor-not-allowed border-neutral-200'}`}
+                           className={`p-2 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 hover:shadow-md`}
                         >
                           <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
@@ -2097,7 +2089,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.8.0 | 11.09.2026
+        v18.9.0 | 11.09.2026
       </div>
 
     </div>
