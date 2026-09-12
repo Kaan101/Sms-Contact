@@ -12,7 +12,7 @@ import {
   User, Wrench, Shield, Save, ChevronDown, ChevronUp, FolderKanban, Calendar, Star, 
   Sparkles, MapPin, Flame, Sliders, CheckCircle2, Navigation, FileCheck2, Search, Filter,
   ExternalLink, LogIn, UserCheck, Tag, MessageCircle, Inbox, Users, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
-  Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair
+  Settings, Timer, AlertTriangle, Link2, Map as MapIcon, Crosshair, Briefcase
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -40,7 +40,6 @@ const extractGPS = (loc) => {
   return null;
 };
 
-// KODLARI AYIKLAMA (Gizli veya Açık)
 const extractCode = (loc) => {
   const str = safeString(loc);
   if(!str) return null;
@@ -48,7 +47,6 @@ const extractCode = (loc) => {
   return match ? match[1].trim() : null;
 };
 
-// TALEBİN GİZLİ Mİ AÇIK MI OLDUĞUNU TESPİT ETME
 const isCodeHiddenReq = (loc) => {
   return safeString(loc).includes('[HIDDENCODE:');
 };
@@ -167,7 +165,6 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
 
 export default function App() {
 
-  // 🌟 HARİTA İKONLARI GÜVENLİ OLUŞTURULUYOR
   const mapIcons = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return {
@@ -243,7 +240,6 @@ export default function App() {
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
   const [isContactShared, setIsContactShared] = useState(false); 
   
-  // Kalıcı Kod ve Gizlilik Yönetimi
   const [companyCode, setCompanyCode] = useState(() => { try { return localStorage.getItem('sc_company_code') || ''; } catch { return ''; }}); 
   const [isCodeHidden, setIsCodeHidden] = useState(() => { try { return localStorage.getItem('sc_is_code_hidden') === 'true'; } catch { return false; }}); 
 
@@ -411,6 +407,9 @@ export default function App() {
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
+  
+  // 🔥 YENİ: TRACKER İÇİNDEN SAĞLAYICI PANELİNİ AÇMA
+  const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -669,7 +668,6 @@ export default function App() {
 
   const handleRepeatRequest = (req) => { setQueryText(req.raw_text || ''); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   
-  // 🔥 YENİ GÜNCELLENEN POOL KATILMA FONKSİYONU (Tracker için anında refresh)
   const handleJoinPool = async (requestId) => { 
     if (!providerProfile) { 
         alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
@@ -694,8 +692,9 @@ export default function App() {
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
       if (session.role === 'CUSTOMER') await fetchCustomerData(); 
-      if (session.role === 'PROVIDER') await fetchProviderData(false); 
+      if (session.role === 'PROVIDER' || session.role === 'TRACKER') await fetchProviderData(false); 
       if (session.role === 'ADMIN') await fetchAdminData(); 
+      if (session.role === 'TRACKER') await fetchTrackerData();
     } catch (err) {} 
   };
   
@@ -704,6 +703,7 @@ export default function App() {
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
       await fetchProviderData(false);
+      if (session.role === 'TRACKER') await fetchTrackerData();
     } catch (err) {
       alert('İşlem başarısız oldu.');
     }
@@ -902,7 +902,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.14 (Join Pool Shortcut)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.15 (Dual Workspace)</span>
             </div>
           </div>
 
@@ -1025,7 +1025,6 @@ export default function App() {
                           {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
                           {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
                           
-                          {/* KOD ve GİZLİ Durumu Özette */}
                           {companyCode && (
                              <span className={`font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${isCodeHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
                                {isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {companyCode} {isCodeHidden ? '(Gizli)' : ''}
@@ -1083,7 +1082,6 @@ export default function App() {
 
                             {/* HEMEN PAYLAŞ & ACİL (YAN YANA GRID) */}
                             <div className="grid grid-cols-2 gap-3 pt-2">
-                              {/* Hemen Paylaş */}
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
                                 <div className="flex items-center space-x-2">
@@ -1095,7 +1093,6 @@ export default function App() {
                                 </div>
                               </label>
 
-                              {/* Acil Müdahale */}
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
                                 <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
                                 <div className="flex items-center space-x-2 w-full justify-center">
@@ -1188,7 +1185,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 2. SIRADA: AKTİF TALEPLER (Container Kaldırıldı, Aşağı Doğru Akan Liste) */}
+              {/* 2. SIRADA: AKTİF TALEPLER */}
               {activeCustomerRequests.length > 0 && (
                 <div className="mt-8 space-y-3 transition-all duration-300">
                   <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -1368,7 +1365,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 3. SIRADA: DEĞERLENDİRME BEKLEYENLER (Container Kaldırıldı, Collapsible) */}
+              {/* 3. SIRADA: DEĞERLENDİRME BEKLEYENLER */}
               {pendingReviewCustomerRequests.length > 0 && (
                 <div className="mt-8 space-y-3 transition-all duration-300">
                   <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none transition">
@@ -1398,7 +1395,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4. SIRADA: GEÇMİŞ TALEPLER (Container Kaldırıldı) */}
+              {/* 4. SIRADA: GEÇMİŞ TALEPLER */}
               {pastCustomerRequests.length > 0 && (
                 <div className="mt-8 space-y-3 transition-all duration-300">
                   <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none transition">
@@ -1553,6 +1550,14 @@ export default function App() {
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
+                 
+                 {/* 🔥 YENİ: TRACKER İÇİNDEN SAĞLAYICI İŞLERİM BUTONU */}
+                 {providerProfile && (
+                   <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-lg transition">
+                     <Briefcase size={16} /> 
+                     <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span>
+                   </button>
+                 )}
               </div>
 
               {/* HARİTA ALANI */}
@@ -1585,8 +1590,8 @@ export default function App() {
                              setTrackerMapCenter([newPos.lat, newPos.lng]); 
                              setTrackerMapSelectedPos(newPos); 
                              setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
-                             setLocationValue(sug.display_name); // Form Location State
-                             setTrackerMapSearchText(''); // Harita Search Temizlenir
+                             setLocationValue(sug.display_name);
+                             setTrackerMapSearchText('');
                              setIsTrackerSuggestionsVisible(false); 
                            }}
                         >
@@ -1651,7 +1656,6 @@ export default function App() {
                         </button>
                       </div>
                       
-                      {/* 🔥 BANA UYGUN HAVUZ TOGGLE BUTONU (Sadece Sağlayıcı Profili Varsa Çıkar) */}
                       {providerProfile && (
                         <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
                           <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => setIsTrackerPoolFilterActive(e.target.checked)} className="hidden" />
@@ -1692,7 +1696,6 @@ export default function App() {
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
                             </div>
 
-                            {/* 🔥 SİRAYA GİR BUTONU */}
                             {providerProfile && req.status === 'POOL' && !hasAlreadyJoined && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); }}
@@ -1720,6 +1723,77 @@ export default function App() {
                         </div>
                       )
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* 🔥 YENİ: TRACKER İÇİNDE SAĞLAYICI PANELİ MODALI */}
+              {isTrackerProviderModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-150">
+                  <div className="bg-white rounded-2xl w-full max-w-xl p-5 shadow-2xl border border-neutral-200 max-h-[85vh] flex flex-col">
+                    <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                      <div>
+                        <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-1.5">
+                          <Briefcase size={16} className="text-emerald-600"/>
+                          <span>Sağlayıcı İşlemlerim ({providerProfile?.name || 'Sağlayıcı'})</span>
+                        </h3>
+                        <p className="text-[11px] font-mono text-neutral-500 mt-0.5">Aktif ve eşleşen işlerinizi buradan anında yönetin.</p>
+                      </div>
+                      <button onClick={() => setIsTrackerProviderModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-3 mt-4 pr-1">
+                      {activeProviderRequests.length === 0 ? (
+                        <div className="text-center text-xs text-neutral-400 py-10">Şu anda üzerinizde aktif bir görev bulunmuyor.</div>
+                      ) : (
+                        activeProviderRequests.map((req) => (
+                          <div key={req.id} className="bg-[#FAFBFD] p-3.5 rounded-xl border border-neutral-200 space-y-2.5 text-xs">
+                             <div className="flex items-start justify-between gap-2">
+                               <div>
+                                 <div className="flex items-center gap-1.5 mb-1">
+                                   <span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                                   <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold border border-blue-100">{req.status}</span>
+                                 </div>
+                                 <p className="font-bold text-neutral-900 leading-snug">"{req.raw_text}"</p>
+                               </div>
+                               {req.created_at && <span className="text-[9px] font-mono text-neutral-400 shrink-0">{safeDateTime(req.created_at)}</span>}
+                             </div>
+                             
+                             <div className="space-y-1 text-[10px] font-mono text-neutral-600 bg-white p-2 rounded-lg border border-neutral-100">
+                               <p>👤 Müşteri: <strong>{getProviderContactDisplay(req)}</strong></p>
+                               <p>📍 {extractAddress(req.location)}</p>
+                             </div>
+                             
+                             <div className="flex flex-wrap items-center gap-2 pt-1">
+                               {req.status === 'MATCHED' && safeString(req.contact_value).includes('|SHARED') && (
+                                  <>
+                                    <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
+                                    <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                                  </>
+                               )}
+
+                               {req.status === 'MATCHED' && safeString(req.contact_value).includes('|HIDDEN') && (
+                                  <>
+                                    <span className="px-2.5 py-1 bg-neutral-100 text-neutral-500 rounded-lg text-[11px] font-semibold border">Müşteri Onayı Bekleniyor</span>
+                                    <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                                  </>
+                               )}
+
+                               {req.status === 'ACCEPTED' && (
+                                 <>
+                                   <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
+                                   {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
+                                     <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+                                       <MessageCircle size={14} /><span>WhatsApp</span>
+                                     </a>
+                                   )}
+                                 </>
+                               )}
+                             </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1778,6 +1852,7 @@ export default function App() {
                                 </div>
                             </div>
                             
+                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
                             <div className="grid grid-cols-2 gap-3 pt-1">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -2238,7 +2313,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.14.0 | 11.09.2026
+        v18.15.0 | 12.09.2026
       </div>
 
     </div>
