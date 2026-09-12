@@ -405,8 +405,6 @@ export default function App() {
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
-  
-  // Tracker içindeki Sağlayıcı Paneli Modalı
   const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
   useEffect(() => {
@@ -795,7 +793,6 @@ export default function App() {
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
-    // Gizlenmiş geçici talepler
     if (hiddenPoolRequests.includes(r.id)) return false;
 
     const status = safeUpper(r.status);
@@ -903,7 +900,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.16 (Inline Operations)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.17 (Targeted Queueing)</span>
             </div>
           </div>
 
@@ -1419,7 +1416,7 @@ export default function App() {
                       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                         {filteredPastCustomerRequests.map((req) => (
                            <div key={req.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
-                             <div className="flex items-start justify-between"><div><p className="fontsemibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
+                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
                            </div>
                         ))}
                       </div>
@@ -1547,7 +1544,6 @@ export default function App() {
         {session?.role === 'TRACKER' && (
           <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
               
-              {/* Sol Üst Butonlar (İşlerim kaldırıldı, Talep Ekle ve Görev Listesi kaldı) */}
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
@@ -1640,7 +1636,6 @@ export default function App() {
                       <h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon ({filteredTrackerRequests.length})</h3>
                       
                       <div className="flex items-center space-x-1.5">
-                        {/* 🔥 SAĞLAYICILAR İÇİN LİSTE ÜSTÜ "AKTİF İŞLERİM" BUTONU */}
                         {providerProfile && (
                           <button 
                             onClick={() => setIsTrackerProviderModalOpen(true)}
@@ -1686,6 +1681,11 @@ export default function App() {
                       const hasAlreadyJoined = poolRequests.some(pr => pr.id === req.id) || providerRequests.some(pr => pr.id === req.id);
                       const isPoolState = req.status === 'POOL' || req.status === 'PENDING';
 
+                      // 🔥 SADECE BANA UYGUN (PROFİL KELİMELERİYLE UYUŞAN) TALEPLER İÇİN KONTROL
+                      const isEligibleForProvider = providerProfile && safeArray(providerProfile.service_keywords).some(kw => 
+                        safeLower(req.raw_text).includes(safeLower(kw))
+                      );
+
                       return (
                         <div 
                            key={req.id} 
@@ -1722,8 +1722,8 @@ export default function App() {
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                           </div>
 
-                          {/* 🔥 SAĞLAYICI İÇİN ALT AKSİYONLAR (AÇIK TALEP HAVUZU GİBİ SIRAYA GİR VE PAS GEÇ) */}
-                          {providerProfile && isPoolState && !hasAlreadyJoined && (
+                          {/* 🔥 YALNIZCA VE YALNIZCA BANA UYGUN OLAN TALEPLER İÇİN SIRAYA GİR / PAS GEÇ */}
+                          {providerProfile && isPoolState && !hasAlreadyJoined && isEligibleForProvider && (
                             <div className="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-neutral-100">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); }}
@@ -2333,7 +2333,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.16.0 | 12.09.2026
+        v18.17.0 | 12.09.2026
       </div>
 
     </div>
