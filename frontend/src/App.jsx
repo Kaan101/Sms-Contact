@@ -158,7 +158,6 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
   );
 }
 
-
 // =====================================================================
 // 🚀 ANA UYGULAMA BİLEŞENİ
 // =====================================================================
@@ -257,7 +256,6 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // Otomatik Konum Çekici
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
     if (validReq) {
@@ -408,7 +406,7 @@ export default function App() {
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   
-  // 🔥 YENİ: TRACKER İÇİNDEN SAĞLAYICI PANELİNİ AÇMA
+  // Tracker içindeki Sağlayıcı Paneli Modalı
   const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
   useEffect(() => {
@@ -797,6 +795,9 @@ export default function App() {
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
+    // Gizlenmiş geçici talepler
+    if (hiddenPoolRequests.includes(r.id)) return false;
+
     const status = safeUpper(r.status);
     if (status === 'COMPLETED' || status === 'CANCELLED') {
        return false;
@@ -902,7 +903,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.15 (Dual Workspace)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.16 (Inline Operations)</span>
             </div>
           </div>
 
@@ -1308,7 +1309,6 @@ export default function App() {
                                   </div>
                                 )}
                                 
-                                {/* LİSTE AÇIKKEN GÖRÜNEN ADAYLAR */}
                                 {expandedCustomerQueueReqId === req.id && safeArray(req.queuedProviders).length > 0 && (
                                   <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
                                     <div className="space-y-2">
@@ -1419,7 +1419,7 @@ export default function App() {
                       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                         {filteredPastCustomerRequests.map((req) => (
                            <div key={req.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
-                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
+                             <div className="flex items-start justify-between"><div><p className="fontsemibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
                            </div>
                         ))}
                       </div>
@@ -1547,17 +1547,10 @@ export default function App() {
         {session?.role === 'TRACKER' && (
           <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
               
+              {/* Sol Üst Butonlar (İşlerim kaldırıldı, Talep Ekle ve Görev Listesi kaldı) */}
               <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
                  <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
                  <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
-                 
-                 {/* 🔥 YENİ: TRACKER İÇİNDEN SAĞLAYICI İŞLERİM BUTONU */}
-                 {providerProfile && (
-                   <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-lg transition">
-                     <Briefcase size={16} /> 
-                     <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span>
-                   </button>
-                 )}
               </div>
 
               {/* HARİTA ALANI */}
@@ -1641,9 +1634,26 @@ export default function App() {
 
               {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-[70vw] sm:w-[220px] md:w-[240px] min-w-[180px] max-w-[260px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
-                  <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
-                    <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button></div>
+                <div className="absolute top-0 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                  <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon ({filteredTrackerRequests.length})</h3>
+                      
+                      <div className="flex items-center space-x-1.5">
+                        {/* 🔥 SAĞLAYICILAR İÇİN LİSTE ÜSTÜ "AKTİF İŞLERİM" BUTONU */}
+                        {providerProfile && (
+                          <button 
+                            onClick={() => setIsTrackerProviderModalOpen(true)}
+                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-bold flex items-center gap-1 shadow-xs transition"
+                            title="Üzerinizdeki aktif işleri aç"
+                          >
+                            <Briefcase size={11} />
+                            <span>İşlerim ({activeProviderRequests.length})</span>
+                          </button>
+                        )}
+                        <button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button>
+                      </div>
+                    </div>
                     
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center space-x-2">
@@ -1656,6 +1666,7 @@ export default function App() {
                         </button>
                       </div>
                       
+                      {/* BANA UYGUN HAVUZ TOGGLE BUTONU */}
                       {providerProfile && (
                         <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
                           <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => setIsTrackerPoolFilterActive(e.target.checked)} className="hidden" />
@@ -1668,12 +1679,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-neutral-50 pb-20">
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-neutral-50 pb-20">
                     {filteredTrackerRequests.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Kriterlere uygun talep bulunamadı.</div>}
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
                       const hasAlreadyJoined = poolRequests.some(pr => pr.id === req.id) || providerRequests.some(pr => pr.id === req.id);
-                      
+                      const isPoolState = req.status === 'POOL' || req.status === 'PENDING';
+
                       return (
                         <div 
                            key={req.id} 
@@ -1688,26 +1700,16 @@ export default function App() {
                                }
                              } 
                            }} 
-                           className={`p-2 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 hover:shadow-md`}
+                           className={`p-2.5 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 hover:shadow-md`}
                         >
                           <div className="flex items-start justify-between mb-1">
                             <div className="flex items-center gap-1">
-                              <span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                              <span className="text-[9px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
                             </div>
 
-                            {providerProfile && req.status === 'POOL' && !hasAlreadyJoined && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); }}
-                                className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded flex items-center gap-1 text-[8px] font-bold transition shadow-sm"
-                                title="Sağlayıcı olarak bu işe talip ol"
-                              >
-                                <Plus size={9} /> Sıraya Gir
-                              </button>
-                            )}
-
-                            {providerProfile && req.status === 'POOL' && hasAlreadyJoined && (
-                              <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            {providerProfile && hasAlreadyJoined && (
+                              <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 Sıradayınız
                               </span>
                             )}
@@ -1715,11 +1717,30 @@ export default function App() {
                           
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           
-                          <div className="space-y-1 text-[9px] font-mono text-neutral-500">
+                          <div className="space-y-0.5 text-[9px] font-mono text-neutral-500">
                              {req.created_at && <p className="text-neutral-400 flex items-center gap-1"><Clock size={9}/> {safeDateTime(req.created_at)}</p>}
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
-                             {coords ? (<p className="flex items-center space-x-1 text-blue-600 mt-1 font-semibold group-hover:text-blue-800 transition"><Crosshair size={10}/> <span>Haritada Göster</span></p>) : (<p className="text-rose-400 mt-1 italic">Koordinat bulunamadı</p>)}
                           </div>
+
+                          {/* 🔥 SAĞLAYICI İÇİN ALT AKSİYONLAR (AÇIK TALEP HAVUZU GİBİ SIRAYA GİR VE PAS GEÇ) */}
+                          {providerProfile && isPoolState && !hasAlreadyJoined && (
+                            <div className="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-neutral-100">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); }}
+                                className="flex-1 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold shadow-xs transition flex items-center justify-center gap-1"
+                              >
+                                <Plus size={11} /> Sıraya Gir
+                              </button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); }}
+                                className="px-2.5 py-1 border border-neutral-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-neutral-500 rounded-md text-[10px] font-semibold transition flex items-center gap-1"
+                                title="Bu talebi listeden geçici olarak kaldır"
+                              >
+                                <Trash2 size={10} /> Pas Geç
+                              </button>
+                            </div>
+                          )}
+
                         </div>
                       )
                     })}
@@ -1727,7 +1748,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 🔥 YENİ: TRACKER İÇİNDE SAĞLAYICI PANELİ MODALI */}
+              {/* TRACKER İÇİNDE SAĞLAYICI PANELİ MODALI */}
               {isTrackerProviderModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-150">
                   <div className="bg-white rounded-2xl w-full max-w-xl p-5 shadow-2xl border border-neutral-200 max-h-[85vh] flex flex-col">
@@ -1852,7 +1873,6 @@ export default function App() {
                                 </div>
                             </div>
                             
-                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
                             <div className="grid grid-cols-2 gap-3 pt-1">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -2313,7 +2333,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.15.0 | 12.09.2026
+        v18.16.0 | 12.09.2026
       </div>
 
     </div>
