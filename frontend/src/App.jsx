@@ -24,7 +24,18 @@ const MAX_KEYWORD_COUNT = 50;
 // 🛡️ TİTANYUM ZIRH FONKSİYONLARI (Tanımsız verilerde çökmeyi önler)
 // =====================================================================
 const safeString = (val) => (val ? String(val) : '');
-const safeArray = (arr) => (Array.isArray(arr) ? arr : []);
+const safeArray = (arr) => {
+  if (Array.isArray(arr)) return arr;
+  if (typeof arr === 'string') {
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return arr.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+};
 const safeLower = (str) => safeString(str).toLowerCase();
 const safeUpper = (str) => safeString(str).toUpperCase();
 
@@ -660,7 +671,6 @@ export default function App() {
 
   const handleRepeatRequest = (req) => { setQueryText(req.raw_text || ''); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   
-  // 🔥 BİREBİR SAĞLAYICI EKRANINDAKİ HAVUZ FONKSİYONU
   const handleJoinPool = async (requestId) => { 
     if (!providerProfile) { 
         alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
@@ -787,10 +797,20 @@ export default function App() {
     return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
   });
   
+  // Anahtar kelime eşleştirme yardımcı fonksiyonu (Dizi ya da Virgüllü String'i normalize eder)
+  const checkKeywordMatch = (text, keywords) => {
+    const raw = safeLower(text);
+    const kwList = safeArray(keywords);
+    if (kwList.length === 0) return false;
+    return kwList.some(kw => {
+      const cleanKw = safeLower(kw).trim();
+      return cleanKw.length > 1 && raw.includes(cleanKw);
+    });
+  };
+
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
-    // Sağlayıcı pas geçtiyse geçici listeden düşür
     if (hiddenPoolRequests.includes(r.id)) return false;
 
     const status = safeUpper(r.status);
@@ -812,11 +832,11 @@ export default function App() {
         }
     }
     
-    // Bana Uygun Filtresi devredeyse anahtar kelime eşleşmesi kontrolü
+    // Bana Uygun Filtresi devredeyse
     if (isTrackerPoolFilterActive && providerProfile) {
-        if (status !== 'POOL' && status !== 'PENDING') return false;
-        const textToMatch = safeLower(r.raw_text);
-        const hasMatch = safeArray(providerProfile.service_keywords).some(kw => textToMatch.includes(safeLower(kw)));
+        const isPoolStatus = status === 'POOL' || status === 'PENDING' || !r.status;
+        if (!isPoolStatus) return false;
+        const hasMatch = checkKeywordMatch(r.raw_text, providerProfile.service_keywords);
         if (!hasMatch) return false;
     }
 
@@ -899,7 +919,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.18 (Unified Pool Actions)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.19 (Reliable Matching)</span>
             </div>
           </div>
 
@@ -1046,7 +1066,6 @@ export default function App() {
 
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
-                          
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -1111,7 +1130,6 @@ export default function App() {
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
                             </div>
-                            
                           </div>
 
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
@@ -1156,7 +1174,6 @@ export default function App() {
                                </MapContainer>
                             </div>
                           </div>
-
                         </div>
                       )}
                       <div className="flex items-center justify-end pt-4 mt-2 border-t border-neutral-200/60 px-1">
@@ -1669,11 +1686,12 @@ export default function App() {
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
                       const hasAlreadyJoined = poolRequests.some(pr => pr.id === req.id) || providerRequests.some(pr => pr.id === req.id);
-                      const isPoolState = req.status === 'POOL' || req.status === 'PENDING';
+                      const isPoolState = req.status === 'POOL' || req.status === 'PENDING' || !req.status;
 
-                      // Sağlayıcı ile Anahtar Kelime Eşleşmesi
-                      const isEligibleForProvider = providerProfile && safeArray(providerProfile.service_keywords).some(kw => 
-                        safeLower(req.raw_text).includes(safeLower(kw))
+                      // Sağlayıcı Anahtar Kelime Eşleşmesi (Hem direkt string hem dizi kontrolü)
+                      const isEligibleForProvider = providerProfile && (
+                        isTrackerPoolFilterActive || 
+                        checkKeywordMatch(req.raw_text, providerProfile.service_keywords)
                       );
 
                       return (
@@ -1695,7 +1713,7 @@ export default function App() {
                           <div className="flex items-start justify-between mb-1">
                             <div className="flex items-center gap-1">
                               <span className="text-[9px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status || 'POOL'}</span>
                             </div>
 
                             {providerProfile && hasAlreadyJoined && (
@@ -1712,7 +1730,7 @@ export default function App() {
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                           </div>
 
-                          {/* 🔥 BANA UYGUN HAVUZ TALEPLERİ İÇİN SIRAYA GİR VE PAS GEÇ BUTONLARI */}
+                          {/* BANA UYGUN HAVUZ TALEPLERİ İÇİN SIRAYA GİR VE PAS GEÇ BUTONLARI */}
                           {providerProfile && isPoolState && !hasAlreadyJoined && isEligibleForProvider && (
                             <div className="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-neutral-100">
                               <button 
@@ -1899,7 +1917,6 @@ export default function App() {
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
                             </div>
-
                           </div>
 
                           <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6">
@@ -2321,7 +2338,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.18.0 | 12.09.2026
+        v18.19.0 | 12.09.2026
       </div>
 
     </div>
