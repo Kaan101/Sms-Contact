@@ -21,25 +21,12 @@ const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
 // =====================================================================
-// 🛡️ TİTANYUM ZIRH FONKSİYONLARI
+// 🛡️ TİTANYUM ZIRH FONKSİYONLARI (Tanımsız verilerde çökmeyi önler)
 // =====================================================================
 const safeString = (val) => (val ? String(val) : '');
-const safeArray = (arr) => {
-  if (Array.isArray(arr)) return arr;
-  if (typeof arr === 'string') {
-    try {
-      const parsed = JSON.parse(arr);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      return arr.split(',').map(s => s.trim()).filter(Boolean);
-    }
-  }
-  return [];
-};
+const safeArray = (arr) => (Array.isArray(arr) ? arr : []);
 const safeLower = (str) => safeString(str).toLowerCase();
 const safeUpper = (str) => safeString(str).toUpperCase();
-
-const cleanDigits = (str) => safeString(str).replace(/\D/g, '');
 
 const extractGPS = (loc) => {
   const str = safeString(loc);
@@ -112,16 +99,7 @@ const safeDateTime = (dateString) => {
   } catch { return ''; }
 };
 
-const checkKeywordMatch = (text, keywords) => {
-  const raw = safeLower(text);
-  const kwList = safeArray(keywords);
-  if (kwList.length === 0) return false;
-  return kwList.some(kw => {
-    const cleanKw = safeLower(kw).trim();
-    return cleanKw.length > 0 && raw.includes(cleanKw);
-  });
-};
-
+// İzole Edilmiş Güvenli Harita Bileşenleri
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -179,6 +157,7 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
     </th>
   );
 }
+
 
 // =====================================================================
 // 🚀 ANA UYGULAMA BİLEŞENİ
@@ -278,6 +257,7 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
+  // Otomatik Konum Çekici
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
     if (validReq) {
@@ -370,7 +350,10 @@ export default function App() {
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
   const [hiddenPoolRequests, setHiddenPoolRequests] = useState([]); 
+  const [providerTab, setProviderTab] = useState('ACTIVE');
+  const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({ 
     name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 
   });
@@ -383,7 +366,9 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
   const [systemSettings, setSystemSettings] = useState({ default_deadline_days: 10, timeout_matched_mins: 15, timeout_accepted_hours: 24 });
+  const [settingsTab, setSettingsTab] = useState('GENERAL');
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
+  const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
   const [searchProviderText, setSearchProviderText] = useState('');
@@ -393,9 +378,11 @@ export default function App() {
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   
   const [features, setFeatures] = useState([]);
+  const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
   
   const [tests, setTests] = useState([]);
+  const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' });
   
   const [reviewRatingMap, setReviewRatingMap] = useState({});
@@ -419,11 +406,10 @@ export default function App() {
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
-  
-  // 🔥 TRACKER LİSTESİ İÇİN INLINE STATE'LER
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
-  const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
-  const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
+  
+  // 🔥 DUAL WORKSPACE: TRACKER İÇİNDEN SAĞLAYICI PANELİNİ AÇMA (Modal)
+  const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -467,31 +453,12 @@ export default function App() {
   const fetchProviderData = async (shouldUpdateForm = false) => {
     if (!session?.phone) return;
     try {
-      let prov = null;
-      try {
-        const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
-        prov = pRes?.data?.provider;
-      } catch (e) {}
-
-      if (!prov) {
-        const cleanP = cleanDigits(session.phone);
-        try {
-          const pRes2 = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(cleanP)}`);
-          prov = pRes2?.data?.provider;
-        } catch (e) {}
-      }
-
-      if (!prov) {
-        try {
-          const allProvRes = await axios.get(`${API_BASE}/providers`);
-          const allList = safeArray(allProvRes?.data?.providers);
-          const currentClean = cleanDigits(session.phone);
-          prov = allList.find(p => cleanDigits(p.phone) === currentClean || currentClean.endsWith(cleanDigits(p.phone)) || cleanDigits(p.phone).endsWith(currentClean));
-        } catch (e) {}
-      }
-
+      const pRes = await axios.get(`${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}`);
+      const prov = pRes?.data?.provider;
       if (!prov) {
          setProviderProfile(null);
+         setProviderRequests([]);
+         setPoolRequests([]);
          return;
       }
       
@@ -614,7 +581,7 @@ export default function App() {
     setCompanyCode('');
     setIsCodeHidden(false);
     setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
-    setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
+    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
   };
 
   const handleOpenProviderDirectSession = (provPhone) => {
@@ -703,16 +670,18 @@ export default function App() {
   
   const handleJoinPool = async (requestId) => { 
     if (!providerProfile) { 
-        alert("Sağlayıcı profili bulunamadı!"); 
+        alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
+        setIsProfileOpen(true); 
         return; 
     } 
     try { 
         await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); 
         await fetchProviderData(false); 
         if (session.role === 'TRACKER') await fetchTrackerData();
+        setProviderTab('ACTIVE'); 
         alert('Başarıyla sıraya girdiniz!');
     } catch (err) { 
-        alert(err.response?.data?.message || 'İşlem başarısız veya zaten sıradaydınız.'); 
+        alert('Hata oluştu veya zaten sıradaydınız.'); 
     } 
   };
   
@@ -730,7 +699,7 @@ export default function App() {
   };
   
   const handleProviderSkip = async (requestId) => {
-    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz?')) return;
+    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return;
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
       await fetchProviderData(false);
@@ -780,7 +749,7 @@ export default function App() {
       if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } 
       else { await axios.post(`${API_BASE}/providers`, payload); }
       setIsModalOpen(false); await fetchAdminData(); alert("Sağlayıcı başarıyla kaydedildi!");
-    } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi."); } 
+    } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi. Telefon numarası zaten mevcut olabilir."); } 
   };
   
   const handleAdminDeleteProvider = async (id) => { 
@@ -789,10 +758,10 @@ export default function App() {
     catch (err) { alert("Silme işlemi başarısız oldu."); } 
   };
   
-  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
+  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata: Yaptığınız ayar kaydedilemedi.'); } };
 
   // =====================================================================
-  // 🛡️ LİSTE FİLTRELEMELERİ
+  // 🛡️ ZIRHLI LİSTELER VE GİZLİLİK FİLTRELEMELERİ
   // =====================================================================
 
   const activeCustomerRequests = safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status)));
@@ -824,13 +793,10 @@ export default function App() {
     if (!q) return true; 
     return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
   });
-
+  
   const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
     if(!r) return false;
     
-    // Geçici olarak listeden kaldırılan talepler
-    if (hiddenPoolRequests.includes(r.id)) return false;
-
     const status = safeUpper(r.status);
     if (status === 'COMPLETED' || status === 'CANCELLED') {
        return false;
@@ -850,14 +816,10 @@ export default function App() {
         }
     }
     
-    // İşlerim veya Bana Uygun Havuz Filtreleri
-    if (showMyTrackerTasks && providerProfile) {
-        const isMyTask = activeProviderRequests.some(pr => Number(pr.id) === Number(r.id));
-        if (!isMyTask) return false;
-    } else if (isTrackerPoolFilterActive && providerProfile) {
-        const isPoolStatus = status === 'POOL' || status === 'PENDING' || !r.status;
-        if (!isPoolStatus) return false;
-        const hasMatch = checkKeywordMatch(r.raw_text, providerProfile.service_keywords);
+    if (isTrackerPoolFilterActive && providerProfile) {
+        if (status !== 'POOL' && status !== 'PENDING') return false;
+        const textToMatch = safeLower(r.raw_text);
+        const hasMatch = safeArray(providerProfile.service_keywords).some(kw => textToMatch.includes(safeLower(kw)));
         if (!hasMatch) return false;
     }
 
@@ -873,7 +835,7 @@ export default function App() {
     return true;
   });
 
-  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive || showMyTrackerTasks;
+  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive;
 
   const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
   
@@ -940,7 +902,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.25.0 (Flawless Inline Actions)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.15.2 (Stable Revert)</span>
             </div>
           </div>
 
@@ -1034,7 +996,7 @@ export default function App() {
         {session?.role === 'CUSTOMER' && (
           <div className="max-w-3xl mx-auto w-full space-y-6">
               
-              {/* TALEP FORMU */}
+              {/* 🌟 YENİ TALEP FORMU (EN ÜSTTE) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -1086,8 +1048,11 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Gelişmiş Seçenekler Izgarası */}
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
+                          
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -1115,6 +1080,7 @@ export default function App() {
                               )}
                             </div>
 
+                            {/* HEMEN PAYLAŞ & ACİL (YAN YANA GRID) */}
                             <div className="grid grid-cols-2 gap-3 pt-2">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -1152,8 +1118,765 @@ export default function App() {
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
                             </div>
+                            
                           </div>
 
+                          {/* SAĞ PARÇA: 3/5 */}
+                          <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
+                              <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button>
+                            </div>
+                            
+                            <div className="relative w-full h-[300px] md:h-[400px] flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
+                               <div className="absolute top-2 left-2 right-2 z-[1000]">
+                                  <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                                    <input 
+                                      ref={mapSearchInputRef}
+                                      type="text" 
+                                      value={mapSearchText} 
+                                      onChange={(e) => setMapSearchText(e.target.value)} 
+                                      onDoubleClick={() => setMapSearchText('')} 
+                                      onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} 
+                                      onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} 
+                                      placeholder="Haritada mekan veya adres ara..." 
+                                      className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" 
+                                    />
+                                    {isMapSearching && <Navigation size={14} className="absolute right-3 top-2.5 animate-spin text-blue-500" />}
+                                    
+                                    {isSuggestionsVisible && mapSuggestions.length > 0 && (
+                                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
+                                        {mapSuggestions.map((sug, idx) => (
+                                          <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); setIsSuggestionsVisible(false); }}>
+                                            <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                               </div>
+                               
+                               <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                                 <ZoomControl position="bottomleft" />
+                                 <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
+                               </MapContainer>
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
+                      <div className="flex items-center justify-end pt-4 mt-2 border-t border-neutral-200/60 px-1">
+                        <button type="submit" disabled={loading || !queryText.trim()} className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
+                           {loading ? <span>Gönderiliyor...</span> : <><span>Talebi Gönder</span><ArrowRight size={14} /></>}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* D. BELİRSİZLİK ÇÖZÜM EKRANI */}
+              {step === 'DISAMBIGUATE' && disambiguationData && (
+                <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
+                  <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
+                  <div className="space-y-2">{safeArray(disambiguationData.options).map((option) => (<button key={option.id} onClick={() => { setSelectedDisambiguation(option.text); submitFinalRequest(option.text); }} className="w-full text-left p-3.5 rounded-xl border border-neutral-200 hover:border-neutral-950 hover:bg-neutral-50 text-xs font-semibold">{option.text}</button>))}</div>
+                </div>
+              )}
+
+              {/* 2. SIRADA: AKTİF TALEPLER */}
+              {activeCustomerRequests.length > 0 && (
+                <div className="mt-8 space-y-3 transition-all duration-300">
+                  <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
+                    <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5">
+                      <Radio size={16} className="text-emerald-500 animate-pulse" />
+                      <span>Aktif Talepleriniz ({activeCustomerRequests.length})</span>
+                    </h3>
+                    <div className="text-neutral-400">
+                       {isActiveCustomerRequestsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
+                  </div>
+
+                  {isActiveCustomerRequestsOpen && (
+                    <div className="space-y-3">
+                      {activeCustomerRequests.map((req) => {
+                        const reqCode = extractCode(req.location);
+                        const isHidden = isCodeHiddenReq(req.location);
+
+                        return (
+                          <div key={req.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 shadow-sm space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                  {req.created_at && (
+                                    <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                                      <Clock size={10} /> {safeDateTime(req.created_at)}
+                                    </span>
+                                  )}
+                                  {reqCode && (
+                                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                                      <Tag size={10}/> KOD: {reqCode} {isHidden ? '(Gizli)' : ''}
+                                    </span>
+                                  )}
+                                  {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
+                                </div>
+                                <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
+                                {req.disambiguation_choice && (
+                                  <span className="inline-block px-2 py-0.5 bg-neutral-200/70 text-neutral-700 text-[11px] rounded font-medium mt-1">Hedef: {req.disambiguation_choice}</span>
+                                )}
+                              </div>
+                              <div>
+                                {req.status === 'POOL' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">Açık Havuzda (Bekleniyor)</span>}
+                                {req.status === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Sağlayıcı Bulundu</span>}
+                                {req.status === 'PROVIDER_SKIPPED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">Sağlayıcı Pas Geçti</span>}
+                                
+                                {req.status === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">Kabul Edildi</span>}
+                                {req.status === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Sağlayıcı Teslim Etti</span>}
+                              </div>
+                            </div>
+
+                            {/* Kuyruk Kontrolü */}
+                            {(req.provider_name || (safeArray(req.queuedProviders).length > 0)) && (
+                              <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
+                                <div onClick={() => { if (safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
+                                  <div className="space-y-1.5 w-full">
+                                    
+                                    <div className="text-[10px] font-mono font-bold text-emerald-700">
+                                       {req.status === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)')}
+                                    </div>
+
+                                    <div className="flex items-center justify-between w-full">
+                                      <div className="flex items-center space-x-1.5">
+                                        <Building2 size={14} className="text-neutral-700" />
+                                        {req.provider_name ? (<><span className={`font-bold ${req.status === 'PROVIDER_SKIPPED' ? 'text-neutral-400 line-through' : 'text-neutral-950'}`}>{req.provider_name}</span><span className={`font-mono font-semibold px-1.5 py-0.5 rounded border ${req.status === 'PROVIDER_SKIPPED' ? 'bg-neutral-100 text-neutral-400 border-neutral-200' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
+                                      </div>
+                                      {safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1) && (
+                                        <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${safeArray(req.queuedProviders).length - 1})` : `Tüm Adaylar (${safeArray(req.queuedProviders).length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {req.status === 'PROVIDER_SKIPPED' && !expandedCustomerQueueReqId && (
+                                  <div className="px-3 pb-3">
+                                     <div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 bg-rose-50 border border-rose-200 text-rose-950">
+                                       <div className="flex items-center space-x-1.5">
+                                          <AlertTriangle size={13} className="text-rose-700 shrink-0" />
+                                          <span>Bu sağlayıcı talebinizi <strong>pas geçti</strong>. Lütfen listeden başka birini seçin.</span>
+                                       </div>
+                                       <button onClick={() => setExpandedCustomerQueueReqId(req.id)} className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold shadow-sm transition shrink-0">
+                                         Seçenekleri Gör
+                                       </button>
+                                     </div>
+                                  </div>
+                                )}
+
+                                {/* Gizlilik Onay Butonu */}
+                                {req.status === 'MATCHED' && !expandedCustomerQueueReqId && (
+                                  safeString(req.contact_value).includes('|HIDDEN') ? (
+                                    <div className="px-3 pb-3">
+                                       <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm transition">
+                                         <ShieldCheck size={14} />
+                                         <span>Sağlayıcıyı Onayla & İletişim Bilgimi Paylaş</span>
+                                       </button>
+                                    </div>
+                                  ) : (
+                                    <div className="px-3 pb-3">
+                                       <div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center space-x-1.5 bg-blue-50 border border-blue-200 text-blue-950">
+                                          <PhoneCall size={13} className="text-blue-700 animate-pulse shrink-0" />
+                                          <span>Sağlayıcı atandı ve numaranızı görebiliyor. Sizinle iletişime geçmesi bekleniyor...</span>
+                                       </div>
+                                    </div>
+                                  )
+                                )}
+
+                                {(req.status === 'ACCEPTED' || req.status === 'PROVIDER_COMPLETED') && !expandedCustomerQueueReqId && (
+                                  <div className="px-3 pb-3">
+                                     <div className={`p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 ${req.status === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
+                                       <div className="flex items-center space-x-1.5">
+                                          {req.status === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700 shrink-0" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce shrink-0" />}
+                                          <span>{req.status === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Görüşme aktif. Sağlayıcı iletişim numarası: <strong>{req.provider_phone}</strong></>}</span>
+                                       </div>
+                                       {safeString(req.preferred_channel).includes('WHATSAPP') && req.provider_phone && (
+                                          <a href={`https://wa.me/${extractPhoneForWa(req.provider_phone)}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
+                                            <MessageCircle size={12} /><span>WhatsApp'tan Yaz</span>
+                                          </a>
+                                       )}
+                                     </div>
+                                  </div>
+                                )}
+                                
+                                {/* LİSTE AÇIKKEN GÖRÜNEN ADAYLAR */}
+                                {expandedCustomerQueueReqId === req.id && safeArray(req.queuedProviders).length > 0 && (
+                                  <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
+                                    <div className="space-y-2">
+                                      {req.queuedProviders.map((qProv, idx) => {
+                                        const isCurrent = req.matched_provider_id === qProv.id;
+                                        const isSkippedByThis = isCurrent && req.status === 'PROVIDER_SKIPPED';
+
+                                        return (
+                                          <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? (isSkippedByThis ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm') : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
+                                            <div>
+                                              <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
+                                                <span>#{idx + 1} {qProv.name}</span>
+                                                {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
+                                                {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
+                                                {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                                {qProv.interest_status === 'WAITING' && !isCurrent && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">BEKLİYOR</span>}
+                                              </p>
+                                              <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
+                                            </div>
+                                            
+                                            <div className="flex items-center space-x-2">
+                                                {isCurrent && !isSkippedByThis && req.status === 'MATCHED' && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
+                                                      <ShieldCheck size={10} /><span>Onayla</span>
+                                                    </button>
+                                                )}
+                                                {!isCurrent && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold shadow-sm transition flex items-center space-x-1">
+                                                      <Check size={10} /><span>Bunu Seç</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
+                              <span>📍 {extractAddress(req.location)}</span>
+                              {req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
+                              <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(req.status)) && safeArray(req.queuedProviders).length > 1 && (<button onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700"><SkipForward size={11} /><span>Otomatik Sıradakine Geç</span></button>)}</div>
+                              <div className="flex items-center space-x-1.5 ml-auto">{(req.status === 'MATCHED' || req.status === 'PROVIDER_COMPLETED') && (<button onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm"><ShieldCheck size={12} /><span>{req.status === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span></button>)}<button onClick={() => handleStatusChange(req.id, 'CANCELLED')} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px]" title="Talebi İptal Et"><Ban size={12} /> İptal</button></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. SIRADA: DEĞERLENDİRME BEKLEYENLER */}
+              {pendingReviewCustomerRequests.length > 0 && (
+                <div className="mt-8 space-y-3 transition-all duration-300">
+                  <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none transition">
+                    <h3 className="text-sm font-bold text-emerald-700 flex items-center space-x-1.5">
+                      <Sparkles size={16} className="text-amber-500" />
+                      <span>Değerlendirme Bekleyenler ({pendingReviewCustomerRequests.length})</span>
+                    </h3>
+                    <div className="text-neutral-400">
+                       {isPendingReviewsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
+                  </div>
+
+                  {isPendingReviewsOpen && (
+                    <div className="space-y-3">
+                      {pendingReviewCustomerRequests.map((req) => (
+                        <div key={req.id} className="bg-emerald-50/40 rounded-xl border border-emerald-200 p-4 shadow-sm space-y-3">
+                          <div className="flex items-start justify-between"><div><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p><p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span></div>
+                          <div className="p-3 bg-white rounded-lg border border-neutral-200/90 space-y-2.5">
+                            <div className="flex items-center justify-between"><span className="font-bold text-neutral-800 text-xs">Hizmet Deneyiminizi Puanlayın:</span><div className="flex items-center space-x-1">{[1, 2, 3, 4, 5].map((star) => (<button key={star} type="button" onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })} className={`p-0.5 transition ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}><Star size={18} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} /></button>))}</div></div>
+                            <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Açıklama veya yorumunuzu yazın (opsiyonel)..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
+                            <div className="flex items-center justify-end space-x-2 pt-1"><button type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-1.5 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold">Yorum Yapmadan Geç</button><button type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm">Puanı Gönder</button></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 4. SIRADA: GEÇMİŞ TALEPLER */}
+              {pastCustomerRequests.length > 0 && (
+                <div className="mt-8 space-y-3 transition-all duration-300">
+                  <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none transition">
+                    <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5">
+                      <History size={16} className="text-neutral-500" />
+                      <span>Geçmiş Talepler ({pastCustomerRequests.length})</span>
+                    </h3>
+                    <div className="text-neutral-400">
+                       {isCustomerHistoryOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
+                  </div>
+
+                  {isCustomerHistoryOpen && (
+                    <div className="space-y-3">
+                      <div className="relative mb-3">
+                        <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                        <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} onDoubleClick={() => setSearchCustomerHistoryText('')} placeholder="Geçmiş taleplerde ara (talep, sağlayıcı vs.)..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium shadow-sm" />
+                        {searchCustomerHistoryText && <button onClick={() => setSearchCustomerHistoryText('')} className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-700"><X size={13} /></button>}
+                      </div>
+                      
+                      <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                        {filteredPastCustomerRequests.map((req) => (
+                           <div key={req.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
+                             <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
+                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+          </div>
+        )}
+
+        {/* ---------------- 3. SERVİS SAĞLAYICI EKRANI ---------------- */}
+        {session?.role === 'PROVIDER' && (
+          <div className="max-w-3xl mx-auto w-full space-y-5">
+              
+              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 flex items-start justify-between">
+                 <div>
+                   <h2 className="text-xl font-extrabold text-neutral-950 tracking-tight">
+                     {providerProfile?.name ? providerProfile.name : 'Sağlayıcı Paneli'}
+                   </h2>
+                   <div className="flex items-center space-x-1.5 text-xs text-neutral-500 font-mono mt-1">
+                     <Phone size={12} /><span>{session.phone}</span>
+                   </div>
+                 </div>
+                 <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="px-3.5 py-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                   <Edit3 size={13} /><span>Profili Düzenle</span>
+                 </button>
+              </div>
+
+              {isProfileOpen && (
+                <form onSubmit={handleSaveProviderProfile} className="bg-white p-5 rounded-2xl border shadow-sm space-y-3.5">
+                  <input type="text" required value={providerFormData.name} onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })} placeholder="İşletme Adı" className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  <textarea rows={3} required value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana..." className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Profili Kaydet</button>
+                </form>
+              )}
+
+              <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
+                <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
+                <div className="space-y-3">
+                  {activeProviderRequests.map((req) => (
+                    <div key={req.id} className="bg-[#FAFBFD] p-4 rounded-xl border space-y-3">
+                       <div className="flex items-center justify-between">
+                         <p className="text-sm font-semibold text-neutral-900 leading-snug">"{req.raw_text}" - <span className="text-[10px] bg-blue-100 text-blue-800 px-2 rounded">{req.status}</span></p>
+                         {req.created_at && <span className="text-[10px] font-mono text-neutral-400 shrink-0">{safeDateTime(req.created_at)}</span>}
+                       </div>
+                       
+                       <p className="text-xs text-neutral-700 mt-2 flex items-center space-x-1.5">
+                         <User size={13} className="text-neutral-400" />
+                         <span>Müşteri: <strong>{getProviderContactDisplay(req)}</strong></span>
+                       </p>
+                       
+                       <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-neutral-100">
+                         {req.status === 'MATCHED' && safeString(req.contact_value).includes('|SHARED') && (
+                            <div className="flex space-x-2 w-full sm:w-auto">
+                               <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
+                               <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                            </div>
+                         )}
+                         {req.status === 'MATCHED' && safeString(req.contact_value).includes('|HIDDEN') && (
+                            <div className="flex items-center space-x-2 w-full sm:w-auto">
+                               <span className="px-3 py-1.5 bg-neutral-100 text-neutral-500 rounded-lg text-xs font-semibold border border-neutral-200">Müşteri Onayı Bekleniyor</span>
+                               <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                            </div>
+                         )}
+
+                         {req.status === 'ACCEPTED' && (
+                           <>
+                             <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
+                             {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
+                               <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+                                 <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
+                               </a>
+                             )}
+                           </>
+                         )}
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
+                <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
+                  <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
+                     <Layers size={14} className="text-blue-500" />
+                     <span>Açık Talep Havuzu ({visiblePoolRequests.length})</span>
+                  </h3>
+                  <div className="text-neutral-400">
+                     {isPoolOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </div>
+                
+                {isPoolOpen && (
+                  <div className="p-4 pt-0 border-t border-neutral-100 bg-neutral-50/30">
+                    <div className="space-y-3 mt-3 max-h-[400px] overflow-y-auto pr-1">
+                      {visiblePoolRequests.length === 0 ? (
+                        <div className="text-center text-xs text-neutral-400 py-6">Havuzda size uygun yeni talep bulunmuyor.</div>
+                      ) : (
+                        visiblePoolRequests.map((req) => (
+                          <div key={req.id} className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm transition hover:shadow-md">
+                            <p className="text-sm font-semibold text-neutral-900 leading-snug">"{req.raw_text}"</p>
+                            
+                            <div className="space-y-1.5 mt-2.5 mb-3 text-[10px] text-neutral-500 font-mono">
+                               <p className="flex items-center space-x-1.5 text-blue-600 font-semibold"><Clock size={11}/><span>{safeDateTime(req.created_at)}</span></p>
+                               <p className="flex items-center space-x-1.5"><User size={11}/><span>{getProviderContactDisplay(req)}</span></p>
+                               {req.location && <p className="flex items-center space-x-1.5"><MapPin size={11}/><span>{extractAddress(req.location)}</span></p>}
+                            </div>
+
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
+                              <button onClick={() => handleJoinPool(req.id)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Sıraya Gir</button>
+                              <button onClick={() => setHiddenPoolRequests(prev => [...prev, req.id])} className="px-3 py-1.5 border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-neutral-500 rounded-lg text-xs font-semibold transition flex items-center space-x-1"><Trash2 size={12}/><span>Kaldır</span></button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+          </div>
+        )}
+
+        {/* ---------------- 4. TRACKER (TAKİP) EKRANI ---------------- */}
+        {session?.role === 'TRACKER' && (
+          <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
+              
+              <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
+                 <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
+                 <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
+                 
+                 {/* ÇİFT ROL: İŞLERİM MODALI BUTONU */}
+                 {providerProfile && (
+                   <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-lg transition">
+                     <Briefcase size={16} /> 
+                     <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span>
+                   </button>
+                 )}
+              </div>
+
+              {/* HARİTA ALANI */}
+              <div className="flex-1 w-full h-full relative z-0">
+                
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
+                    <input 
+                      ref={trackerSearchInputRef}
+                      type="text" 
+                      value={trackerMapSearchText} 
+                      onChange={(e) => setTrackerMapSearchText(e.target.value)} 
+                      onDoubleClick={() => setTrackerMapSearchText('')}
+                      onFocus={() => setIsTrackerSuggestionsVisible(true)} 
+                      onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} 
+                      placeholder="Haritada adres ara ve git..." 
+                      className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition" 
+                    />
+                  </div>
+                  {isTrackerSuggestionsVisible && mapSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
+                      {mapSuggestions.map((sug, idx) => (
+                        <div 
+                           key={idx} 
+                           className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
+                           onMouseDown={(e) => { 
+                             e.preventDefault(); 
+                             const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; 
+                             setTrackerMapCenter([newPos.lat, newPos.lng]); 
+                             setTrackerMapSelectedPos(newPos); 
+                             setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
+                             setLocationValue(sug.display_name);
+                             setTrackerMapSearchText('');
+                             setIsTrackerSuggestionsVisible(false); 
+                           }}
+                        >
+                          <MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
+                  <ZoomControl position="bottomleft" />
+                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                  <TrackerMapController center={trackerMapCenter} />
+                  
+                  <SharedMapClickHandler 
+                     position={trackerMapSelectedPos} 
+                     setPosition={setTrackerMapSelectedPos} 
+                     setLocationValue={(val) => { setLocationValue(val); }} 
+                     setCoordinates={setCoordinates} 
+                     icon={mapIcons?.tracker} 
+                  />
+                  
+                  {filteredTrackerRequests.map(req => {
+                    const coords = extractGPS(req.location);
+                    if (coords && mapIcons) {
+                      return (
+                        <Marker position={coords} icon={req.is_urgent ? mapIcons.urgent : mapIcons.custom} key={req.id}>
+                          <Popup className="custom-popup">
+                            <div className="w-48 p-1">
+                               <div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status || 'POOL'}</span></div>
+                               <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
+                               <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
+                                 {req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}
+                                 <p>📍 {extractAddress(req.location)}</p>
+                                 {req.provider_name && <p>🏢 {req.provider_name}</p>}
+                               </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    }
+                    return null;
+                  })}
+                </MapContainer>
+              </div>
+
+              {/* SAĞ LİSTE PANELİ */}
+              {isTrackerListOpen && (
+                <div className="absolute top-0 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                  <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
+                    <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button></div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex-1">
+                          <Search size={14} className="absolute left-2.5 top-2 text-neutral-400" />
+                          <input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-2 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" />
+                        </div>
+                        <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-1.5 rounded-lg border transition ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`} title="Detaylı Filtrele">
+                          <Filter size={14} />
+                        </button>
+                      </div>
+                      
+                      {providerProfile && (
+                        <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
+                          <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => setIsTrackerPoolFilterActive(e.target.checked)} className="hidden" />
+                          <span className="flex items-center gap-1.5">
+                            <Inbox size={12} className={isTrackerPoolFilterActive ? 'text-indigo-100' : 'text-neutral-400'}/>
+                            {isTrackerPoolFilterActive ? 'Sadece Bana Uygun Olanlar' : 'Bana Uygun Talepleri Göster'}
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-neutral-50 pb-20">
+                    {filteredTrackerRequests.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Kriterlere uygun talep bulunamadı.</div>}
+                    {filteredTrackerRequests.map(req => {
+                      const coords = extractGPS(req.location);
+                      const status = safeUpper(req.status || 'POOL');
+                      
+                      return (
+                        <div 
+                           key={req.id} 
+                           onClick={() => { 
+                             if(coords) {
+                               setTrackerMapCenter(coords); 
+                               setTrackerMapSelectedPos(null); 
+                               setTrackerMapSelectedAddress('');
+                               setCoordinates('');
+                               if (window.innerWidth < 640) {
+                                 setIsTrackerListOpen(false);
+                               }
+                             } 
+                           }} 
+                           className={`p-2.5 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 hover:shadow-md`}
+                        >
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{status}</span>
+                            </div>
+                          </div>
+                          
+                          <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
+                          
+                          <div className="space-y-1 text-[9px] font-mono text-neutral-500">
+                             {req.created_at && <p className="text-neutral-400 flex items-center gap-1"><Clock size={9}/> {safeDateTime(req.created_at)}</p>}
+                             <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* DUAL WORKSPACE: TRACKER İÇİNDE SAĞLAYICI PANELİ MODALI */}
+              {isTrackerProviderModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-150">
+                  <div className="bg-white rounded-2xl w-full max-w-xl p-5 shadow-2xl border border-neutral-200 max-h-[85vh] flex flex-col">
+                    <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                      <div>
+                        <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-1.5">
+                          <Briefcase size={16} className="text-emerald-600"/>
+                          <span>Sağlayıcı İşlemlerim ({providerProfile?.name || 'Sağlayıcı'})</span>
+                        </h3>
+                        <p className="text-[11px] font-mono text-neutral-500 mt-0.5">Aktif ve eşleşen işlerinizi buradan anında yönetin.</p>
+                      </div>
+                      <button onClick={() => setIsTrackerProviderModalOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-3 mt-4 pr-1">
+                      {activeProviderRequests.length === 0 ? (
+                        <div className="text-center text-xs text-neutral-400 py-10">Şu anda üzerinizde aktif bir görev bulunmuyor.</div>
+                      ) : (
+                        activeProviderRequests.map((req) => (
+                          <div key={req.id} className="bg-[#FAFBFD] p-3.5 rounded-xl border border-neutral-200 space-y-2.5 text-xs">
+                             <div className="flex items-start justify-between gap-2">
+                               <div>
+                                 <div className="flex items-center gap-1.5 mb-1">
+                                   <span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                                   <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold border border-blue-100">{req.status}</span>
+                                 </div>
+                                 <p className="font-bold text-neutral-900 leading-snug">"{req.raw_text}"</p>
+                               </div>
+                               {req.created_at && <span className="text-[9px] font-mono text-neutral-400 shrink-0">{safeDateTime(req.created_at)}</span>}
+                             </div>
+                             
+                             <div className="space-y-1 text-[10px] font-mono text-neutral-600 bg-white p-2 rounded-lg border border-neutral-100">
+                               <p>👤 Müşteri: <strong>{getProviderContactDisplay(req)}</strong></p>
+                               <p>📍 {extractAddress(req.location)}</p>
+                             </div>
+                             
+                             <div className="flex flex-wrap items-center gap-2 pt-1">
+                               {req.status === 'MATCHED' && safeString(req.contact_value).includes('|SHARED') && (
+                                  <>
+                                    <button onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">İşi Kabul Et</button>
+                                    <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                                  </>
+                               )}
+
+                               {req.status === 'MATCHED' && safeString(req.contact_value).includes('|HIDDEN') && (
+                                  <>
+                                    <span className="px-2.5 py-1 bg-neutral-100 text-neutral-500 rounded-lg text-[11px] font-semibold border">Müşteri Onayı Bekleniyor</span>
+                                    <button onClick={() => handleProviderSkip(req.id)} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold shadow-sm transition">Pas Geç</button>
+                                  </>
+                               )}
+
+                               {req.status === 'ACCEPTED' && (
+                                 <>
+                                   <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
+                                   {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
+                                     <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+                                       <MessageCircle size={14} /><span>WhatsApp</span>
+                                     </a>
+                                   )}
+                                 </>
+                               )}
+                             </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tracker Detaylı Filtreleme Popup Modalı */}
+              {isTrackerFilterOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-150">
+                  <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border border-neutral-200">
+                    <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                      <h3 className="font-bold text-sm text-neutral-900 flex items-center gap-1.5"><Filter size={14}/><span>Gelişmiş Filtreleme</span></h3>
+                      <button onClick={() => setIsTrackerFilterOpen(false)} className="text-neutral-400 hover:text-neutral-700"><X size={16} /></button>
+                    </div>
+
+                    <div className="space-y-3 mt-4">
+                      <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İl (Şehir)</label><input type="text" value={trackerFilter.city} onChange={(e) => setTrackerFilter({...trackerFilter, city: e.target.value})} placeholder="Örn: İstanbul" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 transition" /></div>
+                      <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İlçe</label><input type="text" value={trackerFilter.district} onChange={(e) => setTrackerFilter({...trackerFilter, district: e.target.value})} placeholder="Örn: Kadıköy" className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 transition" /></div>
+                      <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Posta Kodu</label><input type="text" value={trackerFilter.zip} onChange={(e) => setTrackerFilter({...trackerFilter, zip: e.target.value})} placeholder="Örn: 34744" className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" /></div>
+                      
+                      <div className="pt-2 border-t border-neutral-100 mt-2">
+                        <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">Kurum / Grup Kodu</label>
+                        <input type="text" value={trackerFilter.code} onChange={(e) => setTrackerFilter({...trackerFilter, code: e.target.value.toUpperCase()})} placeholder="Örn: MOB-2026" className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition uppercase" />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center space-x-2 pt-4 mt-4 border-t border-neutral-100">
+                      <button onClick={() => { setTrackerFilter({city:'', district:'', zip:'', code:''}); setIsTrackerFilterOpen(false); }} className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition">Filtreyi Temizle</button>
+                      <button onClick={() => setIsTrackerFilterOpen(false)} className="px-5 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm transition">Uygula</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* YENİ TALEP EKLEME MODALI */}
+              {isTrackerAddModalOpen && (
+                <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
+                  <div className="bg-white rounded-2xl max-w-4xl w-full p-6 border border-neutral-200 shadow-xl max-h-[95vh] overflow-y-auto">
+                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-neutral-100">
+                       <div><h3 className="font-bold text-lg text-neutral-950">Manuel Operasyon Ekle</h3><p className="text-xs text-neutral-500 font-mono mt-0.5">Merkezden havuza yeni talep bırakın.</p></div>
+                       <button onClick={() => setIsTrackerAddModalOpen(false)} className="p-1.5 text-neutral-400 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition"><X size={18}/></button>
+                    </div>
+
+                    <form onSubmit={(e) => handleCustomerCombinedSubmit(e, true)} className="space-y-4">
+                      
+                      <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
+                        <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Müşterinin talebini girin (Örn: Çekiciye ihtiyacım var)..." className="w-full p-2 text-base font-bold text-neutral-900 bg-transparent border-none outline-none resize-none" required />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                          {/* SOL: 2/5 */}
+                          <div className="md:col-span-2 space-y-4">
+                            <div>
+                                <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Operasyon Zamanlaması</span></label>
+                                <div className="flex items-center gap-2">
+                                  <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
+                                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
+                                </div>
+                            </div>
+                            
+                            {/* TRACKER İÇİN HEMEN PAYLAŞ VE ACİL (YAN YANA) */}
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                              <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                                <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2">
+                                  <Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
+                                  <div className="flex flex-col">
+                                    <span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span>
+                                    <span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span>
+                                  </div>
+                                </div>
+                              </label>
+
+                              <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                                <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                                <div className="flex items-center space-x-2 w-full justify-center">
+                                  <Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} />
+                                  <div className="flex flex-col text-center">
+                                    <span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span>
+                                    <span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span>
+                                  </div>
+                                </div>
+                              </label>
+                            </div>
+
+                            <div className="pt-2">
+                               <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
+                                 <span>Grup / Kurum Kodu (Opsiyonel)</span>
+                                 <label className="flex items-center space-x-1 cursor-pointer">
+                                   <input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" />
+                                   <span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span>
+                                 </label>
+                               </label>
+                               <div className="relative">
+                                  <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                                  <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
+                               </div>
+                            </div>
+
+                          </div>
+
+                          {/* SAĞ: 3/5 */}
                           <div className="md:col-span-3 space-y-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6">
                             <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span>Konum Verisi</span></label>
                             <div className="space-y-2">
@@ -1184,6 +1907,7 @@ export default function App() {
           <div className="w-full mx-auto space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
                 <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
+
                 <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
                   <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
                   <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
@@ -1572,7 +2296,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.25.0 (Flawless Inline Actions) | 14.09.2026
+        v18.15.2 (Stable Revert) | 14.09.2026
       </div>
 
     </div>
