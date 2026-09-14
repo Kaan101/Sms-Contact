@@ -112,16 +112,6 @@ const safeDateTime = (dateString) => {
   } catch { return ''; }
 };
 
-const checkKeywordMatch = (text, keywords) => {
-  const raw = safeLower(text);
-  const kwList = safeArray(keywords);
-  if (kwList.length === 0) return false;
-  return kwList.some(kw => {
-    const cleanKw = safeLower(kw).trim();
-    return cleanKw.length > 0 && raw.includes(cleanKw);
-  });
-};
-
 function TrackerMapController({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -373,7 +363,6 @@ export default function App() {
   const [providerTab, setProviderTab] = useState('ACTIVE');
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isProviderHistoryOpen, setIsProviderHistoryOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({ 
     name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 
   });
@@ -386,9 +375,7 @@ export default function App() {
   const [providers, setProviders] = useState([]);
   const [selectedProviderMap, setSelectedProviderMap] = useState({});
   const [systemSettings, setSystemSettings] = useState({ default_deadline_days: 10, timeout_matched_mins: 15, timeout_accepted_hours: 24 });
-  const [settingsTab, setSettingsTab] = useState('GENERAL');
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
-  const [expandedQueueReqId, setExpandedQueueReqId] = useState(null);
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
   const [searchProviderText, setSearchProviderText] = useState('');
@@ -398,11 +385,9 @@ export default function App() {
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   
   const [features, setFeatures] = useState([]);
-  const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
   
   const [tests, setTests] = useState([]);
-  const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' });
   
   const [reviewRatingMap, setReviewRatingMap] = useState({});
@@ -427,9 +412,11 @@ export default function App() {
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   
-  // 🔥 TRACKER LİSTESİ İÇİN INLINE STATE'LER
+  // 🔥 DUAL WORKSPACE: TRACKER İÇİNDEN SAĞLAYICI PANELİNİ AÇMA (Modal)
+  const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
+  
+  // 🔥 LİSTE FİLTRE VE AKORDİYON STATE'LERİ
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
-  const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
 
   useEffect(() => {
@@ -519,7 +506,7 @@ export default function App() {
       const poolRes = await axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`);
       setPoolRequests(safeArray(poolRes?.data?.poolRequests));
     } catch (err) {
-      if (err.response?.status === 404) { setProviderProfile(null); }
+      if (err.response?.status === 404) { setProviderProfile(null); setProviderRequests([]); setPoolRequests([]); }
     }
   };
 
@@ -710,18 +697,15 @@ export default function App() {
   
   const handleJoinPool = async (requestId) => { 
     if (!providerProfile) { 
-        alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
-        setIsProfileOpen(true); 
+        alert("Sağlayıcı profili bulunamadı!"); 
         return; 
     } 
     try { 
         await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); 
         await fetchProviderData(false); 
         if (session.role === 'TRACKER') await fetchTrackerData();
-        setProviderTab('ACTIVE'); 
-        alert('Başarıyla sıraya girdiniz!');
     } catch (err) { 
-        alert('Hata oluştu veya zaten sıradaydınız.'); 
+        alert(err.response?.data?.message || 'İşlem başarısız veya zaten sıradaydınız.'); 
     } 
   };
   
@@ -739,7 +723,7 @@ export default function App() {
   };
   
   const handleProviderSkip = async (requestId) => {
-    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return;
+    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz?')) return;
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
       await fetchProviderData(false);
@@ -801,7 +785,7 @@ export default function App() {
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
 
   // =====================================================================
-  // 🛡️ ZIRHLI LİSTELER VE GİZLİLİK FİLTRELEMELERİ
+  // 🛡️ LİSTE FİLTRELEMELERİ
   // =====================================================================
 
   const activeCustomerRequests = safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status)));
@@ -859,14 +843,9 @@ export default function App() {
         }
     }
     
-    // 🔥 İşlerim Filtresi
-    if (showMyTrackerTasks && providerProfile) {
-        const isMyTask = activeProviderRequests.some(pr => Number(pr.id) === Number(r.id));
-        if (!isMyTask) return false;
-    } 
     // 🔥 Bana Uygun Havuz Filtresi (Direkt poolRequests üzerinden eşleştirme)
-    else if (isTrackerPoolFilterActive && providerProfile) {
-        const isInPool = poolRequests.some(pr => Number(pr.id) === Number(r.id));
+    if (isTrackerPoolFilterActive && providerProfile) {
+        const isInPool = poolRequests.some(pr => Number(pr?.id) === Number(r.id));
         if (!isInPool) return false;
     }
 
@@ -882,7 +861,7 @@ export default function App() {
     return true;
   });
 
-  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive || showMyTrackerTasks;
+  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive;
 
   const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
   
@@ -949,7 +928,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.24.1 (Queue Logic Patch)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.27 (Crash-Free & Synced Queue)</span>
             </div>
           </div>
 
@@ -1043,7 +1022,7 @@ export default function App() {
         {session?.role === 'CUSTOMER' && (
           <div className="max-w-3xl mx-auto w-full space-y-6">
               
-              {/* TALEP FORMU */}
+              {/* 🌟 YENİ TALEP FORMU (EN ÜSTTE) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -1095,8 +1074,11 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Gelişmiş Seçenekler Izgarası */}
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
+                          
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -1124,6 +1106,7 @@ export default function App() {
                               )}
                             </div>
 
+                            {/* HEMEN PAYLAŞ & ACİL (YAN YANA GRID) */}
                             <div className="grid grid-cols-2 gap-3 pt-2">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -1161,8 +1144,10 @@ export default function App() {
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
                             </div>
+                            
                           </div>
 
+                          {/* SAĞ PARÇA: 3/5 */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -1701,7 +1686,7 @@ export default function App() {
                           <Filter size={14} />
                         </button>
                       </div>
-
+                      
                       {/* 🔥 BANA UYGUN TALEPLER CHECKBOX BUTONU */}
                       {providerProfile && (
                         <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
@@ -1724,16 +1709,15 @@ export default function App() {
                       
                       const isExpanded = expandedTrackerReqId === req.id;
                       
-                      const isMyTask = providerProfile && activeProviderRequests.some(pr => Number(pr.id) === Number(req.id));
-                      
-                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL (poolRequests artık dahil değil)
+                      // Sıradayınız Kontrolü (Hatasız & Güvenli)
                       const hasJoined = providerProfile && (
-                                        safeArray(req.queuedProviders).some(qp => Number(qp.id) === Number(providerProfile.id)) || 
-                                        safeArray(req.queueList).some(qp => Number(qp.id) === Number(providerProfile.id)) ||
-                                        isMyTask);
+                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || 
+                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) ||
+                        activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id))
+                      );
 
                       // Anahtar kelime eşleşmesi
-                      const isMatch = providerProfile ? checkKeywordMatch(req.raw_text, providerProfile.service_keywords) : false;
+                      const isMatch = providerProfile ? checkKeywordMatch(req.raw_text, providerProfile?.service_keywords) : false;
 
                       return (
                         <div 
@@ -1755,7 +1739,7 @@ export default function App() {
                             </div>
 
                             {/* Zaten sıradaysa rozet çıkar */}
-                            {providerProfile && hasJoined && !isMyTask && (
+                            {providerProfile && hasJoined && (
                               <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 Sıradayınız
                               </span>
@@ -1769,7 +1753,7 @@ export default function App() {
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                           </div>
 
-                          {/* 🔥 AKORDİYON İÇİ İŞLEMLER */}
+                          {/* 🔥 AKORDİYON (COLLAPSIBLE) İÇİ İŞLEMLER */}
                           {isExpanded && (
                             <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                               
@@ -1798,13 +1782,12 @@ export default function App() {
                                 )
                               )}
                               
-                              {/* Sırada isem sadece bilgi ver */}
-                              {providerProfile && hasJoined && !isMyTask && (
+                              {/* Sırada isem veya sağlayıcı değilsem sadece bilgi ver */}
+                              {providerProfile && hasJoined && (
                                   <div className="text-[10px] text-center font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 p-1.5 rounded-md">
-                                     Bu talep için sıradayınız.
+                                     Bu talep için sıradayınız veya görev üzerinizde.
                                   </div>
                               )}
-                              
                               {!providerProfile && (
                                   <div className="text-[10px] text-center font-bold text-neutral-500 bg-neutral-50 border border-neutral-200 p-1.5 rounded-md">
                                      Detaylar haritada işaretlendi.
@@ -1821,7 +1804,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* TRACKER İÇİNDE SAĞLAYICI PANELİ MODALI (İŞLERİM) */}
+              {/* DUAL WORKSPACE: TRACKER İÇİNDE SAĞLAYICI PANELİ MODALI */}
               {isTrackerProviderModalOpen && (
                 <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-150">
                   <div className="bg-white rounded-2xl w-full max-w-xl p-5 shadow-2xl border border-neutral-200 max-h-[85vh] flex flex-col">
@@ -1878,7 +1861,7 @@ export default function App() {
                                    <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
                                    {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
                                      <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
-                                       <MessageCircle size={14} /><span>WhatsApp'tan Yaz</span>
+                                       <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
                                      </a>
                                    )}
                                  </>
@@ -2402,7 +2385,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.24.1 (Queue Logic Patch) | 14.09.2026
+        v18.27.0 (Crash-Free & Synced Queue) | 14.09.2026
       </div>
 
     </div>
