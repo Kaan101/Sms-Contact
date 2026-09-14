@@ -261,7 +261,7 @@ export default function App() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // 📍 YEDEKLEME SİSTEMLİ OTOMATİK KONUM ÇEKİCİ
+  // Otomatik Konum Çekici
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
     if (validReq) {
@@ -342,7 +342,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [myCustomerRequests, setMyCustomerRequests] = useState([]);
   
-  // Katlanabilir listeler için state'ler
   const [isActiveCustomerRequestsOpen, setIsActiveCustomerRequestsOpen] = useState(true);
   const [isPendingReviewsOpen, setIsPendingReviewsOpen] = useState(true);
   const [isCustomerHistoryOpen, setIsCustomerHistoryOpen] = useState(false);
@@ -411,6 +410,7 @@ export default function App() {
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
+  const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -533,13 +533,19 @@ export default function App() {
       if (session.role === 'CUSTOMER') fetchCustomerData();
       if (session.role === 'PROVIDER') fetchProviderData(true);
       if (session.role === 'ADMIN') fetchAdminData();
-      if (session.role === 'TRACKER') fetchTrackerData();
+      if (session.role === 'TRACKER') {
+        fetchTrackerData();
+        fetchProviderData(false);
+      }
 
       const interval = setInterval(() => {
         if (session.role === 'PROVIDER') fetchProviderData(false);
         if (session.role === 'CUSTOMER') fetchCustomerData();
         if (session.role === 'ADMIN' && (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ')) fetchAdminData();
-        if (session.role === 'TRACKER') fetchTrackerData();
+        if (session.role === 'TRACKER') {
+          fetchTrackerData();
+          fetchProviderData(false);
+        }
       }, 5000);
 
       return () => clearInterval(interval);
@@ -662,7 +668,25 @@ export default function App() {
   };
 
   const handleRepeatRequest = (req) => { setQueryText(req.raw_text || ''); if (req.location) setLocationValue(extractAddress(req.location)); setIsUrgent(req.is_urgent || false); setStep('INPUT'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleJoinPool = async (requestId) => { if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); setIsProfileOpen(true); return; } try { await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); await fetchProviderData(false); setProviderTab('ACTIVE'); } catch (err) { alert('Hata oluştu.'); } };
+  
+  // 🔥 YENİ GÜNCELLENEN POOL KATILMA FONKSİYONU (Tracker için anında refresh)
+  const handleJoinPool = async (requestId) => { 
+    if (!providerProfile) { 
+        alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
+        setIsProfileOpen(true); 
+        return; 
+    } 
+    try { 
+        await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); 
+        await fetchProviderData(false); 
+        if (session.role === 'TRACKER') await fetchTrackerData();
+        setProviderTab('ACTIVE'); 
+        alert('Başarıyla sıraya girdiniz!');
+    } catch (err) { 
+        alert('Hata oluştu veya zaten sıradaydınız.'); 
+    } 
+  };
+  
   const handleCustomerNextProvider = async (requestId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   const handleCustomerSelectCandidate = async (requestId, providerId) => { try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); setExpandedCustomerQueueReqId(null); await fetchCustomerData(); if (session.role === 'PROVIDER') await fetchProviderData(false); } catch (err) {} };
   
@@ -791,6 +815,13 @@ export default function App() {
             return false;
         }
     }
+    
+    if (isTrackerPoolFilterActive && providerProfile) {
+        if (status !== 'POOL' && status !== 'PENDING') return false;
+        const textToMatch = safeLower(r.raw_text);
+        const hasMatch = safeArray(providerProfile.service_keywords).some(kw => textToMatch.includes(safeLower(kw)));
+        if (!hasMatch) return false;
+    }
 
     const q = safeLower(trackerSearch).trim();
     const matchesSearch = !q || safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.location).includes(q) || String(r.id).includes(q);
@@ -804,7 +835,7 @@ export default function App() {
     return true;
   });
 
-  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code;
+  const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive;
 
   const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
   
@@ -871,7 +902,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.12 (Flat Lists)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.14 (Join Pool Shortcut)</span>
             </div>
           </div>
 
@@ -1609,14 +1640,27 @@ export default function App() {
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2.5">
                     <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-2">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 transition shrink-0"><X size={14}/></button></div>
                     
-                    <div className="flex items-center space-x-2">
-                      <div className="relative flex-1">
-                        <Search size={14} className="absolute left-2.5 top-2 text-neutral-400" />
-                        <input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-2 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex-1">
+                          <Search size={14} className="absolute left-2.5 top-2 text-neutral-400" />
+                          <input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} onDoubleClick={() => setTrackerSearch('')} placeholder="Talep ara..." className="w-full pl-7 pr-2 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium border-neutral-200 transition" />
+                        </div>
+                        <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-1.5 rounded-lg border transition ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`} title="Detaylı Filtrele">
+                          <Filter size={14} />
+                        </button>
                       </div>
-                      <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-1.5 rounded-lg border transition ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`} title="Detaylı Filtrele">
-                        <Filter size={14} />
-                      </button>
+                      
+                      {/* 🔥 BANA UYGUN HAVUZ TOGGLE BUTONU (Sadece Sağlayıcı Profili Varsa Çıkar) */}
+                      {providerProfile && (
+                        <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
+                          <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => setIsTrackerPoolFilterActive(e.target.checked)} className="hidden" />
+                          <span className="flex items-center gap-1.5">
+                            <Inbox size={12} className={isTrackerPoolFilterActive ? 'text-indigo-100' : 'text-neutral-400'}/>
+                            {isTrackerPoolFilterActive ? 'Sadece Bana Uygun Olanlar' : 'Bana Uygun Talepleri Göster'}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
 
@@ -1624,6 +1668,7 @@ export default function App() {
                     {filteredTrackerRequests.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Kriterlere uygun talep bulunamadı.</div>}
                     {filteredTrackerRequests.map(req => {
                       const coords = extractGPS(req.location);
+                      const hasAlreadyJoined = poolRequests.some(pr => pr.id === req.id) || providerRequests.some(pr => pr.id === req.id);
                       
                       return (
                         <div 
@@ -1641,7 +1686,30 @@ export default function App() {
                            }} 
                            className={`p-2 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 hover:shadow-md`}
                         >
-                          <div className="flex items-start justify-between mb-1"><span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span></div>
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : req.status === 'MATCHED' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status}</span>
+                            </div>
+
+                            {/* 🔥 SİRAYA GİR BUTONU */}
+                            {providerProfile && req.status === 'POOL' && !hasAlreadyJoined && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); }}
+                                className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded flex items-center gap-1 text-[8px] font-bold transition shadow-sm"
+                                title="Sağlayıcı olarak bu işe talip ol"
+                              >
+                                <Plus size={9} /> Sıraya Gir
+                              </button>
+                            )}
+
+                            {providerProfile && req.status === 'POOL' && hasAlreadyJoined && (
+                              <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                Sıradayınız
+                              </span>
+                            )}
+                          </div>
+                          
                           <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                           
                           <div className="space-y-1 text-[9px] font-mono text-neutral-500">
@@ -2170,7 +2238,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ (KÖŞEDE) */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.12.0 | 11.09.2026
+        v18.14.0 | 11.09.2026
       </div>
 
     </div>
