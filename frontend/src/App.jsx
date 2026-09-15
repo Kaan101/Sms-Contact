@@ -125,38 +125,34 @@ const checkKeywordMatch = (text, keywords) => {
 function TrackerMapController({ center }) {
   const map = useMap();
   
-  // 🔥 KESİN ÇÖZÜM: Hem ResizeObserver hem de CSS Animasyon Polling (Sadece Harita İçin)
+  // 🔥 BEMBEYAZ EKRANI ÇÖZEN, GÜVENLİ VE AGRESİF HARİTA YENİLEYİCİ
   useEffect(() => {
-    const container = map.getContainer();
-    let observer;
+    if (!map) return;
     
-    if (container) {
-      observer = new ResizeObserver(() => {
-        window.requestAnimationFrame(() => map.invalidateSize());
-      });
-      observer.observe(container);
-    }
-
-    // Mobildeki Collapse (açılma) animasyonu bitene kadar haritayı agresif uyar (500ms)
+    // Form aşağı doğru açılırken (CSS Transition) ilk 1.5 saniye boyunca
+    // haritanın boyutunu sürekli ve güvenli bir şekilde hesapla.
+    let ticks = 0;
     const interval = setInterval(() => {
       map.invalidateSize();
-    }, 50);
+      ticks++;
+      if (ticks >= 15) clearInterval(interval); // 1.5 saniye sonra dur
+    }, 100);
 
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
+    // Cihazı yan çevirme vb. ekran boyutu değişimlerini yakala
+    const handleResize = () => {
       map.invalidateSize();
-    }, 500); 
+    };
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      if (observer && container) observer.disconnect();
       clearInterval(interval);
-      clearTimeout(timeout);
+      window.removeEventListener('resize', handleResize);
     };
   }, [map]);
 
   useEffect(() => {
     if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
-      map.flyTo(center, 16, { duration: 1.5 });
+      map.flyTo(center, map.getZoom() > 14 ? map.getZoom() : 16, { duration: 1.5 });
     }
   }, [center, map]);
   return null;
@@ -458,6 +454,7 @@ export default function App() {
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
+  const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -648,7 +645,7 @@ export default function App() {
     setCompanyCode('');
     setIsCodeHidden(false);
     setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
-    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
+    setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
   };
 
   const handleOpenProviderDirectSession = (provPhone) => {
@@ -886,12 +883,12 @@ export default function App() {
     
     // 🔥 İşlerim Filtresi
     if (showMyTrackerTasks && providerProfile) {
-        const isMyTask = activeProviderRequests.some(pr => Number(pr?.id) === Number(r.id));
+        const isMyTask = activeProviderRequests.some(pr => String(pr?.id) === String(r.id));
         if (!isMyTask) return false;
     } 
     // 🔥 Bana Uygun Havuz Filtresi (Direkt poolRequests üzerinden eşleştirme)
     else if (isTrackerPoolFilterActive && providerProfile) {
-        const isInPool = poolRequests.some(pr => Number(pr?.id) === Number(r.id));
+        const isInPool = poolRequests.some(pr => String(pr?.id) === String(r.id));
         if (!isInPool) return false;
     }
 
@@ -974,7 +971,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.34 (Ultimate Mobile Map Fix)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.35 (Absolute Stability)</span>
             </div>
           </div>
 
@@ -1311,7 +1308,7 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* 🔥 RESTORE EDİLEN MÜŞTERİ KUYRUK VE AKSİYON ALANI */}
+                            {/* 🔥 MÜŞTERİ KUYRUK VE AKSİYON ALANI */}
                             {(req.provider_name || (safeArray(req.queuedProviders).length > 0)) && (
                               <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                                 <div onClick={() => { if (safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
@@ -1531,7 +1528,7 @@ export default function App() {
                 </form>
               )}
 
-              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AKTİF İŞLERİM" */}
+              {/* SAĞLAYICI "AKTİF İŞLERİM" */}
               <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
                 <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
                 <div className="space-y-3">
@@ -1577,7 +1574,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AÇIK TALEP HAVUZU" */}
+              {/* SAĞLAYICI "AÇIK TALEP HAVUZU" */}
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
                 <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
@@ -1768,10 +1765,10 @@ export default function App() {
                       
                       const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
-                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL (poolRequests artık dahil değil)
+                      // 🔥 GÜVENLİ VE DOĞRU KUYRUK KONTROLÜ
                       const hasJoined = providerProfile && (
-                                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile.id)) || 
-                                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile.id)) ||
+                                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || 
+                                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) ||
                                         isMyTask);
 
                       // Anahtar kelime eşleşmesi (poolRequests'e bağlı kalarak veya tracker'ın kelime filtresi ile)
@@ -1817,7 +1814,7 @@ export default function App() {
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                           </div>
 
-                          {/* 🔥 AKORDİYON (COLLAPSIBLE) İÇİ İŞLEMLER */}
+                          {/* 🔥 AKORDİYON İÇİ İŞLEMLER */}
                           {isExpanded && (
                             <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                               
@@ -2489,7 +2486,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.34.0 (Ultimate Mobile Map Fix) | 15.09.2026
+        v18.35.0 (Absolute Stability) | 15.09.2026
       </div>
 
     </div>
