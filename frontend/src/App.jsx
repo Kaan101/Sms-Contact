@@ -393,7 +393,9 @@ export default function App() {
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   
+  // 🔥 RESTORED: Admin Ekranı Akordiyon Durumları
   const [features, setFeatures] = useState([]);
+  const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
   
   const [tests, setTests] = useState([]);
@@ -616,7 +618,7 @@ export default function App() {
     setCompanyCode('');
     setIsCodeHidden(false);
     setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
-    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
+    setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
   };
 
   const handleOpenProviderDirectSession = (provPhone) => {
@@ -942,7 +944,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.30 (Full Restoration)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.31 (Admin Panels Patch)</span>
             </div>
           </div>
 
@@ -1036,7 +1038,7 @@ export default function App() {
         {session?.role === 'CUSTOMER' && (
           <div className="max-w-3xl mx-auto w-full space-y-6">
               
-              {/* TALEP FORMU */}
+              {/* 🌟 YENİ TALEP FORMU (EN ÜSTTE) */}
               {step === 'INPUT' && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
                   <div className="text-center space-y-1 mb-2">
@@ -1091,6 +1093,8 @@ export default function App() {
                       {/* Gelişmiş Seçenekler Izgarası */}
                       {!isDetailsCollapsed && (
                         <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
+                          
+                          {/* SOL: 2/5 */}
                           <div className="md:col-span-2 space-y-5">
                             <div>
                                 <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
@@ -1118,6 +1122,7 @@ export default function App() {
                               )}
                             </div>
 
+                            {/* HEMEN PAYLAŞ & ACİL (YAN YANA GRID) */}
                             <div className="grid grid-cols-2 gap-3 pt-2">
                               <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
                                 <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
@@ -1155,8 +1160,10 @@ export default function App() {
                                   <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
                                </div>
                             </div>
+                            
                           </div>
 
+                          {/* SAĞ PARÇA: 3/5 */}
                           <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span>
@@ -1212,7 +1219,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* BELİRSİZLİK ÇÖZÜMÜ */}
+              {/* D. BELİRSİZLİK ÇÖZÜM EKRANI */}
               {step === 'DISAMBIGUATE' && disambiguationData && (
                 <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
                   <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
@@ -1220,7 +1227,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* AKTİF TALEPLER */}
+              {/* 2. SIRADA: AKTİF TALEPLER */}
               {activeCustomerRequests.length > 0 && (
                 <div className="mt-8 space-y-3 transition-all duration-300">
                   <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -1272,7 +1279,7 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* 🔥 MÜŞTERİ KUYRUK VE AKSİYON ALANI */}
+                            {/* 🔥 RESTORE EDİLEN MÜŞTERİ KUYRUK VE AKSİYON ALANI */}
                             {(req.provider_name || (safeArray(req.queuedProviders).length > 0)) && (
                               <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                                 <div onClick={() => { if (safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
@@ -1592,6 +1599,7 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
+                
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1669,7 +1677,7 @@ export default function App() {
 
               {/* SAĞ LİSTE PANELİ */}
               {isTrackerListOpen && (
-                <div className="absolute top-0 right-0 w-[70vw] sm:w-[250px] md:w-[270px] min-w-[210px] max-w-[300px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+                <div className="absolute top-0 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
                   <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2">
                     <div className="flex items-center justify-between">
                       <h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3>
@@ -1686,7 +1694,7 @@ export default function App() {
                           <Filter size={14} />
                         </button>
                       </div>
-
+                      
                       {/* 🔥 İŞLERİM & BANA UYGUN TALEPLER FİLTRELERİ YAN YANA */}
                       {providerProfile && (
                         <div className="grid grid-cols-2 gap-2 mt-0.5">
@@ -1718,12 +1726,13 @@ export default function App() {
                       
                       const isExpanded = expandedTrackerReqId === req.id;
                       
-                      const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
+                      // BENİM İŞİM Mİ?
+                      const isMyTask = providerProfile && activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id));
 
-                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL (poolRequests artık dahil değil)
+                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL
                       const hasJoined = providerProfile && (
-                                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || 
-                                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) ||
+                                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile.id)) || 
+                                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile.id)) ||
                                         isMyTask);
 
                       // Anahtar kelime eşleşmesi (poolRequests'e bağlı kalarak veya tracker'ın kelime filtresi ile)
@@ -1737,7 +1746,6 @@ export default function App() {
                                setTrackerMapCenter(coords); 
                                setTrackerMapSelectedPos(null); 
                                setCoordinates('');
-                               if (window.innerWidth < 640) setIsTrackerListOpen(false);
                              }
                              setExpandedTrackerReqId(prev => prev === req.id ? null : req.id);
                            }} 
@@ -2370,7 +2378,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.30.0 (Tam Restorasyon) | 15.09.2026
+        v18.31.0 (Admin Panels Patch) | 15.09.2026
       </div>
 
     </div>
