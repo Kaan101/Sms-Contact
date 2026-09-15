@@ -124,6 +124,15 @@ const checkKeywordMatch = (text, keywords) => {
 
 function TrackerMapController({ center }) {
   const map = useMap();
+  
+  // 🔥 HARİTA BOŞ EKRAN ÇÖZÜMÜ (InvalidateSize)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [map]);
+
   useEffect(() => {
     if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
       map.flyTo(center, 16, { duration: 1.5 });
@@ -370,7 +379,6 @@ export default function App() {
   const [providerRequests, setProviderRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]); 
   const [hiddenPoolRequests, setHiddenPoolRequests] = useState([]); 
-  const [isPoolOpen, setIsPoolOpen] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [providerFormData, setProviderFormData] = useState({ 
     name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 
@@ -393,7 +401,6 @@ export default function App() {
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   
-  // 🔥 RESTORED: Admin Ekranı Akordiyon Durumları
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
@@ -424,7 +431,7 @@ export default function App() {
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   
-  // 🔥 TRACKER LİSTESİ İÇİN INLINE STATE'LER
+  // 🔥 LİSTE FİLTRE VE AKORDİYON STATE'LERİ
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
@@ -707,7 +714,7 @@ export default function App() {
   
   const handleJoinPool = async (requestId) => { 
     if (!providerProfile) { 
-        alert("Önce profilinizi oluşturup kaydetmelisiniz!"); 
+        alert("Sağlayıcı profili bulunamadı!"); 
         return; 
     } 
     try { 
@@ -734,7 +741,7 @@ export default function App() {
   };
   
   const handleProviderSkip = async (requestId) => {
-    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Talep sahibine bildirim gönderilecektir.')) return;
+    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz?')) return;
     try {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
       await fetchProviderData(false);
@@ -784,7 +791,7 @@ export default function App() {
       if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } 
       else { await axios.post(`${API_BASE}/providers`, payload); }
       setIsModalOpen(false); await fetchAdminData(); alert("Sağlayıcı başarıyla kaydedildi!");
-    } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi. Telefon numarası zaten mevcut olabilir."); } 
+    } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi."); } 
   };
   
   const handleAdminDeleteProvider = async (id) => { 
@@ -854,13 +861,11 @@ export default function App() {
         }
     }
     
-    // 🔥 İşlerim Filtresi
+    // 🔥 İşlerim veya Bana Uygun Havuz Filtreleri
     if (showMyTrackerTasks && providerProfile) {
         const isMyTask = activeProviderRequests.some(pr => Number(pr?.id) === Number(r.id));
         if (!isMyTask) return false;
-    } 
-    // 🔥 Bana Uygun Havuz Filtresi (Direkt poolRequests üzerinden eşleştirme)
-    else if (isTrackerPoolFilterActive && providerProfile) {
+    } else if (isTrackerPoolFilterActive && providerProfile) {
         const isInPool = poolRequests.some(pr => Number(pr?.id) === Number(r.id));
         if (!isInPool) return false;
     }
@@ -944,7 +949,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.31 (Admin Panels Patch)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.32 (Mobile Map Fix)</span>
             </div>
           </div>
 
@@ -1202,6 +1207,8 @@ export default function App() {
                                <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                 {/* 🔥 TrackerMapController Eklendi */}
+                                 <TrackerMapController center={mapPosition || [41.0082, 28.9784]} />
                                  <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                                </MapContainer>
                             </div>
@@ -1227,7 +1234,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 2. SIRADA: AKTİF TALEPLER */}
+              {/* AKTİF TALEPLER */}
               {activeCustomerRequests.length > 0 && (
                 <div className="mt-8 space-y-3 transition-all duration-300">
                   <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -1599,7 +1606,6 @@ export default function App() {
 
               {/* HARİTA ALANI */}
               <div className="flex-1 w-full h-full relative z-0">
-                
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -1694,7 +1700,7 @@ export default function App() {
                           <Filter size={14} />
                         </button>
                       </div>
-                      
+
                       {/* 🔥 İŞLERİM & BANA UYGUN TALEPLER FİLTRELERİ YAN YANA */}
                       {providerProfile && (
                         <div className="grid grid-cols-2 gap-2 mt-0.5">
@@ -1726,8 +1732,7 @@ export default function App() {
                       
                       const isExpanded = expandedTrackerReqId === req.id;
                       
-                      // BENİM İŞİM Mİ?
-                      const isMyTask = providerProfile && activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id));
+                      const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
                       // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL
                       const hasJoined = providerProfile && (
@@ -1735,7 +1740,7 @@ export default function App() {
                                         safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile.id)) ||
                                         isMyTask);
 
-                      // Anahtar kelime eşleşmesi (poolRequests'e bağlı kalarak veya tracker'ın kelime filtresi ile)
+                      // Anahtar kelime eşleşmesi
                       const isMatch = providerProfile ? poolRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
                       return (
@@ -1746,6 +1751,7 @@ export default function App() {
                                setTrackerMapCenter(coords); 
                                setTrackerMapSelectedPos(null); 
                                setCoordinates('');
+                               if (window.innerWidth < 640) setIsTrackerListOpen(false);
                              }
                              setExpandedTrackerReqId(prev => prev === req.id ? null : req.id);
                            }} 
@@ -2378,7 +2384,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.31.0 (Admin Panels Patch) | 15.09.2026
+        v18.32.0 (Mobile Map Fix) | 15.09.2026
       </div>
 
     </div>
