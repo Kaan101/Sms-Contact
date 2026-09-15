@@ -125,19 +125,32 @@ const checkKeywordMatch = (text, keywords) => {
 function TrackerMapController({ center }) {
   const map = useMap();
   
-  // 🔥 KESİN ÇÖZÜM: Kapsayıcı (Container) her değiştiğinde haritayı anında tetikle
+  // 🔥 KESİN ÇÖZÜM: Hem ResizeObserver hem de CSS Animasyon Polling (Sadece Harita İçin)
   useEffect(() => {
-    const mapContainer = map.getContainer();
-    if (!mapContainer) return;
+    const container = map.getContainer();
+    let observer;
+    
+    if (container) {
+      observer = new ResizeObserver(() => {
+        window.requestAnimationFrame(() => map.invalidateSize());
+      });
+      observer.observe(container);
+    }
 
-    const observer = new ResizeObserver(() => {
+    // Mobildeki Collapse (açılma) animasyonu bitene kadar haritayı agresif uyar (500ms)
+    const interval = setInterval(() => {
       map.invalidateSize();
-    });
+    }, 50);
 
-    observer.observe(mapContainer);
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      map.invalidateSize();
+    }, 500); 
 
     return () => {
-      observer.disconnect();
+      if (observer && container) observer.disconnect();
+      clearInterval(interval);
+      clearTimeout(timeout);
     };
   }, [map]);
 
@@ -410,6 +423,7 @@ export default function App() {
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   
+  // 🔥 RESTORED: Admin Ekranı Akordiyon Durumları
   const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
@@ -634,7 +648,7 @@ export default function App() {
     setCompanyCode('');
     setIsCodeHidden(false);
     setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
-    setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
+    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
   };
 
   const handleOpenProviderDirectSession = (provPhone) => {
@@ -960,7 +974,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.33.0 (Map Observer Fix)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.34 (Ultimate Mobile Map Fix)</span>
             </div>
           </div>
 
@@ -1297,7 +1311,7 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* MÜŞTERİ KUYRUK VE AKSİYON ALANI */}
+                            {/* 🔥 RESTORE EDİLEN MÜŞTERİ KUYRUK VE AKSİYON ALANI */}
                             {(req.provider_name || (safeArray(req.queuedProviders).length > 0)) && (
                               <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                                 <div onClick={() => { if (safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
@@ -1512,12 +1526,12 @@ export default function App() {
               {isProfileOpen && (
                 <form onSubmit={handleSaveProviderProfile} className="bg-white p-5 rounded-2xl border shadow-sm space-y-3.5">
                   <input type="text" required value={providerFormData.name} onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })} placeholder="İşletme Adı" className="w-full p-2 text-xs rounded-lg border outline-none" />
-                  <textarea rows={3} required value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana..." className="w-full p-2 text-xs rounded-lg border outline-none" />
+                  <textarea rows={3} required value={providerFormData.serviceKeywords} onChange={(e) => setProviderFormData({ ...providerFormData, serviceKeywords: e.target.value })} placeholder="su, damacana, çekici..." className="w-full p-2 text-xs rounded-lg border outline-none" />
                   <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold">Profili Kaydet</button>
                 </form>
               )}
 
-              {/* SAĞLAYICI "AKTİF İŞLERİM" */}
+              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AKTİF İŞLERİM" */}
               <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
                 <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
                 <div className="space-y-3">
@@ -1563,7 +1577,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SAĞLAYICI "AÇIK TALEP HAVUZU" */}
+              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AÇIK TALEP HAVUZU" */}
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
                 <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
@@ -1668,8 +1682,6 @@ export default function App() {
                 <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
                   <ZoomControl position="bottomleft" />
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                  
-                  {/* 🔥 TRACKER HARİTA BOYUT ONARICI */}
                   <TrackerMapController center={trackerMapCenter} />
                   
                   <SharedMapClickHandler 
@@ -1723,15 +1735,24 @@ export default function App() {
                         </button>
                       </div>
                       
-                      {/* 🔥 BANA UYGUN TALEPLER CHECKBOX BUTONU */}
+                      {/* 🔥 İŞLERİM & BANA UYGUN TALEPLER FİLTRELERİ YAN YANA */}
                       {providerProfile && (
-                        <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
-                          <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => setIsTrackerPoolFilterActive(e.target.checked)} className="hidden" />
-                          <span className="flex items-center gap-1.5">
-                            <Inbox size={12} className={isTrackerPoolFilterActive ? 'text-indigo-100' : 'text-neutral-400'}/>
-                            {isTrackerPoolFilterActive ? 'Sadece Bana Uygun Olanlar' : 'Bana Uygun Talepleri Göster'}
-                          </span>
-                        </label>
+                        <div className="grid grid-cols-2 gap-2 mt-0.5">
+                          <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${showMyTrackerTasks ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
+                            <input type="checkbox" checked={showMyTrackerTasks} onChange={(e) => {
+                                setShowMyTrackerTasks(e.target.checked);
+                                if (e.target.checked) setIsTrackerPoolFilterActive(false);
+                            }} className="hidden" />
+                            <Briefcase size={12} className="mr-1.5"/> İşlerim ({activeProviderRequests.length})
+                          </label>
+                          <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none transition shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
+                            <input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => {
+                                setIsTrackerPoolFilterActive(e.target.checked);
+                                if (e.target.checked) setShowMyTrackerTasks(false);
+                            }} className="hidden" />
+                            <Inbox size={12} className="mr-1.5"/> Uygun Havuz
+                          </label>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1747,14 +1768,14 @@ export default function App() {
                       
                       const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
-                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL
+                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL (poolRequests artık dahil değil)
                       const hasJoined = providerProfile && (
                                         safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile.id)) || 
                                         safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile.id)) ||
                                         isMyTask);
 
-                      // Anahtar kelime eşleşmesi
-                      const isMatch = providerProfile ? checkKeywordMatch(req.raw_text, providerProfile.service_keywords) : false;
+                      // Anahtar kelime eşleşmesi (poolRequests'e bağlı kalarak veya tracker'ın kelime filtresi ile)
+                      const isMatch = providerProfile ? poolRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
                       return (
                         <div 
@@ -1796,7 +1817,7 @@ export default function App() {
                              <p className="flex items-start space-x-1.5"><MapPin size={10} className="shrink-0 mt-0.5 text-neutral-400"/> <span className="line-clamp-2">{extractAddress(req.location)}</span></p>
                           </div>
 
-                          {/* 🔥 AKORDİYON İÇİ İŞLEMLER */}
+                          {/* 🔥 AKORDİYON (COLLAPSIBLE) İÇİ İŞLEMLER */}
                           {isExpanded && (
                             <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                               
@@ -1825,7 +1846,46 @@ export default function App() {
                                 )
                               )}
                               
-                              {/* Sırada isem bilgi ver */}
+                              {/* 2. AKTİF İŞLERİM (MY TASKS) AKSİYONLARI */}
+                              {providerProfile && isMyTask && (
+                                  <div className="flex flex-col gap-1.5">
+                                      <div className="space-y-1 text-[9px] font-mono text-neutral-600 bg-neutral-50 p-1.5 rounded-md border border-neutral-200 mb-1">
+                                        <p className="truncate">👤 Müşteri: <strong>{getProviderContactDisplay(req)}</strong></p>
+                                      </div>
+
+                                      {/* Eşleşti ama onaysız (Shared Contact) */}
+                                      {status === 'MATCHED' && safeString(req.contact_value).includes('|SHARED') && (
+                                        <div className="flex gap-1.5">
+                                           <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-semibold shadow-sm transition">İşi Kabul Et</button>
+                                           <button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="flex-1 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-md text-[10px] font-semibold shadow-sm transition">Pas Geç</button>
+                                        </div>
+                                     )}
+
+                                     {/* Eşleşti ama gizli (Hidden Contact) */}
+                                     {status === 'MATCHED' && safeString(req.contact_value).includes('|HIDDEN') && (
+                                        <div className="flex flex-col gap-1.5">
+                                           <span className="text-center py-1 bg-neutral-100 text-neutral-500 rounded-md text-[9px] font-semibold border border-neutral-200">Müşteri Onayı Bekleniyor</span>
+                                           <button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="w-full py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-md text-[10px] font-semibold shadow-sm transition">Pas Geç</button>
+                                        </div>
+                                     )}
+
+                                     {/* Kabul Edildi veya Tamamlandı */}
+                                     {(status === 'ACCEPTED' || status === 'PROVIDER_COMPLETED') && (
+                                       <div className="flex flex-col gap-1.5">
+                                         {status === 'ACCEPTED' && (
+                                           <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-md text-[10px] font-semibold shadow-sm transition">Teslim Et</button>
+                                         )}
+                                         {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
+                                           <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-[10px] font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition">
+                                             <MessageCircle size={12} /><span>WhatsApp'tan Yaz</span>
+                                           </a>
+                                         )}
+                                       </div>
+                                     )}
+                                  </div>
+                              )}
+
+                              {/* Sadece sıraya girdiğimizde bekliyor mesajı */}
                               {providerProfile && hasJoined && !isMyTask && (
                                   <div className="text-[10px] text-center font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 p-1.5 rounded-md">
                                      Bu talep için sıradayınız.
@@ -1905,7 +1965,7 @@ export default function App() {
                                    <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
                                    {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
                                      <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
-                                       <MessageCircle size={14} /><span>WhatsApp'tan Yaz</span>
+                                       <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
                                      </a>
                                    )}
                                  </>
@@ -2429,7 +2489,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.32.0 (Mobile Map Fix) | 15.09.2026
+        v18.34.0 (Ultimate Mobile Map Fix) | 15.09.2026
       </div>
 
     </div>
