@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css'; // 🔥 GÖRÜNMEZ HARİTAYI ÇÖZEN KRİTİK SATIR!
 import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, getProviderContactDisplay, extractPhoneForWa } from '../../../core/utils/helpers';
@@ -176,10 +177,10 @@ export default function TrackerDashboard() {
   const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive || showMyTrackerTasks;
 
   return (
-    <div className="w-full h-[calc(100vh-64px)] relative bg-neutral-100 overflow-hidden flex flex-col z-0">
+    <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR (HARİTANIN ÜSTÜNDE) */}
-        <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
+        {/* SOL ÜST BUTONLAR */}
+        <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
                <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
@@ -193,17 +194,16 @@ export default function TrackerDashboard() {
            )}
         </div>
 
-        {/* ANA HARİTA ALANI (FLEX-1 VE ABSOLUTE INSET-0 ZIRHI İLE) */}
-        <div className="flex-1 w-full relative z-0">
+        {/* ANA HARİTA ALANI */}
+        <div className="flex-1 w-full h-full relative z-0">
           
-          {/* HARİTA ARAMA ÇUBUĞU */}
+          {/* ARAMA ÇUBUĞU */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
               <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition focus:ring-2 focus:ring-neutral-900" />
             </div>
             
-            {/* WSOD HATASI ÇÖZÜLDÜ: mapSuggestions -> trackerMapSuggestions yapıldı */}
             {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
                 {trackerMapSuggestions.map((sug, idx) => (
@@ -213,7 +213,6 @@ export default function TrackerDashboard() {
             )}
           </div>
 
-          {/* LEAFLET ZIRHI: absolute inset-0 ile render problemleri önlendi */}
           <div className="absolute inset-0 z-0">
             <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
               <ZoomControl position="bottomleft" />
@@ -237,14 +236,13 @@ export default function TrackerDashboard() {
 
         {/* SAĞ PANEL: LİSTE */}
         {isTrackerListOpen && (
-          <div className="absolute top-0 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+          <div className="absolute top-16 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-[calc(100vh-64px)] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
              <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 p-1"><X size={14}/></button></div>
                 
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center space-x-2">
                     <div className="relative flex-1"><Search size={14} className="absolute left-2.5 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} placeholder="Talep ara..." className="w-full pl-8 pr-2 py-2 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
-                    {/* FİLTRE KAYMA HATASI ÇÖZÜLDÜ: shrink-0 eklendi */}
                     <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-2 rounded-lg border transition shrink-0 flex items-center justify-center ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white hover:bg-neutral-50 text-neutral-600'}`}><Filter size={15} /></button>
                   </div>
                   {providerProfile && (
