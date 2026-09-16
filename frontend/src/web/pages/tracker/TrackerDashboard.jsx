@@ -183,8 +183,8 @@ export default function TrackerDashboard() {
         <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
-               <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
-               <span className="text-sm font-bold text-neutral-900 leading-tight">{providerProfile.name}</span>
+                           <span className="text-sm font-bold text-neutral-900 leading-tight">{providerProfile.name}</span>
+                              <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
              </div>
            )}
            <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-neutral-800"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
