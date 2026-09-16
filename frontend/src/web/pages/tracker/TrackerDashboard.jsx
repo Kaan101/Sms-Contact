@@ -175,10 +175,10 @@ export default function TrackerDashboard() {
 
   const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive || showMyTrackerTasks;
 
-  // 🔥 ÇÖZÜM BURADA: absolute inset-0 yerine absolute top-16 left-0 right-0 bottom-0 kullanıyoruz. 
-  // Böylece App.jsx'teki 64px'lik (h-16) Header'ın altında kalmıyor.
   return (
-    <div className="absolute top-16 left-0 right-0 bottom-0 bg-neutral-100 overflow-hidden flex z-0">
+    <div className="w-full h-[calc(100vh-64px)] relative bg-neutral-100 overflow-hidden flex flex-col z-0">
+        
+        {/* SOL ÜST BUTONLAR (HARİTANIN ÜSTÜNDE) */}
         <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
@@ -186,66 +186,77 @@ export default function TrackerDashboard() {
                <span className="text-sm font-bold text-neutral-900 leading-tight">{providerProfile.name}</span>
              </div>
            )}
-           <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
-           <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
+           <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-neutral-800"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
+           <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto hover:bg-neutral-50"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
            {providerProfile && (
-             <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto"><Briefcase size={16} /> <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span></button>
+             <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-emerald-700"><Briefcase size={16} /> <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span></button>
            )}
         </div>
 
-        <div className="flex-1 w-full h-full relative z-0">
+        {/* ANA HARİTA ALANI (FLEX-1 VE ABSOLUTE INSET-0 ZIRHI İLE) */}
+        <div className="flex-1 w-full relative z-0">
+          
+          {/* HARİTA ARAMA ÇUBUĞU */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
-              <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition" />
+              <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition focus:ring-2 focus:ring-neutral-900" />
             </div>
-            {isTrackerSuggestionsVisible && mapSuggestions.length > 0 && (
+            
+            {/* WSOD HATASI ÇÖZÜLDÜ: mapSuggestions -> trackerMapSuggestions yapıldı */}
+            {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-60 overflow-y-auto z-[9999]">
-                {mapSuggestions.map((sug, idx) => (
-                  <div key={idx} className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setTrackerMapCenter([newPos.lat, newPos.lng]); setTrackerMapSelectedPos(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setTrackerMapSearchText(''); setIsTrackerSuggestionsVisible(false); }}><MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>
+                {trackerMapSuggestions.map((sug, idx) => (
+                  <div key={idx} className="p-3 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 border-b border-neutral-100 last:border-0" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setTrackerMapCenter([newPos.lat, newPos.lng]); setTrackerMapSelectedPos(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setTrackerMapSearchText(''); setIsTrackerSuggestionsVisible(false); }}><MapPin size={14} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>
                 ))}
               </div>
             )}
           </div>
 
-          <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
-            <ZoomControl position="bottomleft" />
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-            <UniversalMapController center={trackerMapCenter} />
-            <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.tracker} />
-            {filteredTrackerRequests.map(req => {
-              const coords = extractGPS(req.location);
-              if (coords && mapIcons) {
-                return (
-                  <Marker position={coords} icon={req.is_urgent ? mapIcons.urgent : mapIcons.custom} key={req.id}>
-                    <Popup className="custom-popup"><div className="w-48 p-1"><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status || 'POOL'}</span></div><p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p><div className="text-[10px] font-mono text-neutral-500 space-y-0.5">{req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}<p>📍 {extractAddress(req.location)}</p></div></div></Popup>
-                  </Marker>
-                );
-              }
-              return null;
-            })}
-          </MapContainer>
+          {/* LEAFLET ZIRHI: absolute inset-0 ile render problemleri önlendi */}
+          <div className="absolute inset-0 z-0">
+            <MapContainer center={trackerMapCenter} zoom={12} style={{ height: '100%', width: '100%' }} className="z-0" zoomControl={false}>
+              <ZoomControl position="bottomleft" />
+              <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+              <UniversalMapController center={trackerMapCenter} />
+              <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.tracker} />
+              {filteredTrackerRequests.map(req => {
+                const coords = extractGPS(req.location);
+                if (coords && mapIcons) {
+                  return (
+                    <Marker position={coords} icon={req.is_urgent ? mapIcons.urgent : mapIcons.custom} key={req.id}>
+                      <Popup className="custom-popup"><div className="w-48 p-1"><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status || 'POOL'}</span></div><p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p><div className="text-[10px] font-mono text-neutral-500 space-y-0.5">{req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}<p>📍 {extractAddress(req.location)}</p></div></div></Popup>
+                    </Marker>
+                  );
+                }
+                return null;
+              })}
+            </MapContainer>
+          </div>
         </div>
 
+        {/* SAĞ PANEL: LİSTE */}
         {isTrackerListOpen && (
           <div className="absolute top-0 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
-             <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={14}/></button></div>
-                <div className="flex flex-col gap-2 mt-1">
+             <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 p-1"><X size={14}/></button></div>
+                
+                <div className="flex flex-col gap-2">
                   <div className="flex items-center space-x-2">
-                    <div className="relative flex-1"><Search size={14} className="absolute left-2.5 top-2 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} placeholder="Talep ara..." className="w-full pl-7 pr-2 py-1.5 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
-                    <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-1.5 rounded-lg border ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white'}`}><Filter size={14} /></button>
+                    <div className="relative flex-1"><Search size={14} className="absolute left-2.5 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} placeholder="Talep ara..." className="w-full pl-8 pr-2 py-2 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
+                    {/* FİLTRE KAYMA HATASI ÇÖZÜLDÜ: shrink-0 eklendi */}
+                    <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-2 rounded-lg border transition shrink-0 flex items-center justify-center ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white hover:bg-neutral-50 text-neutral-600'}`}><Filter size={15} /></button>
                   </div>
                   {providerProfile && (
                     <div className="grid grid-cols-2 gap-2 mt-0.5">
-                      <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${showMyTrackerTasks ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white'}`}><input type="checkbox" checked={showMyTrackerTasks} onChange={(e) => { setShowMyTrackerTasks(e.target.checked); if (e.target.checked) setIsTrackerPoolFilterActive(false); }} className="hidden" /><Briefcase size={12} className="mr-1.5"/> İşlerim</label>
-                      <label className={`flex items-center justify-center py-1.5 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white'}`}><input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => { setIsTrackerPoolFilterActive(e.target.checked); if (e.target.checked) setShowMyTrackerTasks(false); }} className="hidden" /><Inbox size={12} className="mr-1.5"/> Uygun Havuz</label>
+                      <label className={`flex items-center justify-center py-2 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${showMyTrackerTasks ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white'}`}><input type="checkbox" checked={showMyTrackerTasks} onChange={(e) => { setShowMyTrackerTasks(e.target.checked); if (e.target.checked) setIsTrackerPoolFilterActive(false); }} className="hidden" /><Briefcase size={12} className="mr-1.5"/> İşlerim</label>
+                      <label className={`flex items-center justify-center py-2 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white'}`}><input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => { setIsTrackerPoolFilterActive(e.target.checked); if (e.target.checked) setShowMyTrackerTasks(false); }} className="hidden" /><Inbox size={12} className="mr-1.5"/> Uygun Havuz</label>
                     </div>
                   )}
                 </div>
              </div>
              
-             <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-neutral-50 pb-20">
+             <div className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-neutral-50 pb-20">
                {filteredTrackerRequests.map(req => {
                   const coords = extractGPS(req.location);
                   const isExpanded = expandedTrackerReqId === req.id;
@@ -254,25 +265,25 @@ export default function TrackerDashboard() {
                   const isMatch = providerProfile ? poolRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
                   return (
-                    <div key={req.id} onClick={() => { if(coords) { setTrackerMapCenter(coords); setTrackerMapSelectedPos(null); setCoordinates(''); if (window.innerWidth < 640) setIsTrackerListOpen(false); } setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); }} className={`p-2.5 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="flex items-center gap-1"><span className="text-[9px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status || 'POOL'}</span></div>
-                        {providerProfile && hasJoined && !isMyTask && <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
-                        {providerProfile && isMyTask && <span className="text-[8px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
+                    <div key={req.id} onClick={() => { if(coords) { setTrackerMapCenter(coords); setTrackerMapSelectedPos(null); setCoordinates(''); if (window.innerWidth < 640) setIsTrackerListOpen(false); } setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
+                      <div className="flex items-start justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status || 'POOL'}</span></div>
+                        {providerProfile && hasJoined && !isMyTask && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
+                        {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
                       </div>
-                      <h4 className="text-[11px] font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
+                      <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                       
                       {isExpanded && (
-                        <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
+                        <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            {providerProfile && (req.status === 'POOL' || req.status === 'PENDING') && !hasJoined && !isMyTask && (
                               isMatch ? (
-                                <div className="flex gap-1.5"><button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-md text-[11px] font-bold">Sıraya Gir</button><button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-md text-[11px]">Kaldır</button></div>
-                              ) : (<div className="text-[9px] text-amber-700 bg-amber-50 border p-1.5 rounded-md text-center">Anahtar kelimelerinizle uyuşmuyor.</div>)
+                                <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">Sıraya Gir</button><button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">Kaldır</button></div>
+                              ) : (<div className="text-[10px] text-amber-700 bg-amber-50 border p-2 rounded-lg text-center font-medium">Anahtar kelimelerinizle uyuşmuyor.</div>)
                            )}
                            {providerProfile && isMyTask && (
-                             <div className="flex flex-col gap-1.5">
-                               {req.status === 'MATCHED' && <div className="flex gap-1.5"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-md text-[10px] font-semibold">Kabul Et</button></div>}
-                               {req.status === 'ACCEPTED' && <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-1.5 bg-neutral-950 text-white rounded-md text-[10px] font-semibold">Teslim Et</button>}
+                             <div className="flex flex-col gap-2">
+                               {req.status === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
+                               {req.status === 'ACCEPTED' && <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition">İşi Teslim Et</button>}
                              </div>
                            )}
                         </div>
@@ -288,11 +299,11 @@ export default function TrackerDashboard() {
         {isTrackerAddModalOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
-                <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Operasyon Ekle</h3><button onClick={() => setIsTrackerAddModalOpen(false)}><X size={18}/></button></div>
+                <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Operasyon Ekle</h3><button onClick={() => setIsTrackerAddModalOpen(false)} className="hover:text-rose-600 transition"><X size={18}/></button></div>
                 <form onSubmit={submitWoZRequest} className="space-y-4">
-                  <textarea rows={2} required value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Talebi girin..." className="w-full p-3 border rounded-xl" />
-                  <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Konum adı..." className="w-full p-2.5 border rounded-xl" />
-                  <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 text-white rounded-xl font-bold">Operasyonu Başlat</button>
+                  <textarea rows={2} required value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Talebi girin..." className="w-full p-3 border rounded-xl outline-none focus:border-neutral-900" />
+                  <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Konum adı..." className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900" />
+                  <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-xl font-bold">Operasyonu Başlat</button>
                 </form>
              </div>
            </div>
@@ -302,12 +313,12 @@ export default function TrackerDashboard() {
         {isTrackerFilterOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border">
-               <div className="flex justify-between items-center border-b pb-3"><h3 className="font-bold text-sm">Gelişmiş Filtreleme</h3><button onClick={() => setIsTrackerFilterOpen(false)}><X size={16}/></button></div>
+               <div className="flex justify-between items-center border-b pb-3"><h3 className="font-bold text-sm">Gelişmiş Filtreleme</h3><button onClick={() => setIsTrackerFilterOpen(false)} className="hover:text-rose-600 transition"><X size={16}/></button></div>
                <div className="space-y-3 mt-4">
-                  <input type="text" value={trackerFilter.city} onChange={(e) => setTrackerFilter({...trackerFilter, city: e.target.value})} placeholder="İl" className="w-full p-2 text-xs border rounded-lg" />
-                  <input type="text" value={trackerFilter.district} onChange={(e) => setTrackerFilter({...trackerFilter, district: e.target.value})} placeholder="İlçe" className="w-full p-2 text-xs border rounded-lg" />
+                  <input type="text" value={trackerFilter.city} onChange={(e) => setTrackerFilter({...trackerFilter, city: e.target.value})} placeholder="İl" className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900" />
+                  <input type="text" value={trackerFilter.district} onChange={(e) => setTrackerFilter({...trackerFilter, district: e.target.value})} placeholder="İlçe" className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900" />
                </div>
-               <button onClick={() => setIsTrackerFilterOpen(false)} className="w-full mt-4 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold">Uygula</button>
+               <button onClick={() => setIsTrackerFilterOpen(false)} className="w-full mt-4 py-2 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-lg text-xs font-bold">Uygula</button>
              </div>
            </div>
         )}
