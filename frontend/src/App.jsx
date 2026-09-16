@@ -470,6 +470,7 @@ export default function App() {
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
+  const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -901,7 +902,7 @@ export default function App() {
         const isMyTask = activeProviderRequests.some(pr => Number(pr?.id) === Number(r.id));
         if (!isMyTask) return false;
     } 
-    // 🔥 Bana Uygun Havuz Filtresi (Direkt poolRequests üzerinden eşleştirme)
+    // 🔥 Bana Uygun Havuz Filtresi
     else if (isTrackerPoolFilterActive && providerProfile) {
         const isInPool = poolRequests.some(pr => Number(pr?.id) === Number(r.id));
         if (!isInPool) return false;
@@ -986,7 +987,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.35 (Absolute Stability)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.38 (Tracker WSOD Fix)</span>
             </div>
           </div>
 
@@ -1244,7 +1245,6 @@ export default function App() {
                                <MapContainer center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%', minHeight: '300px' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 {/* 🔥 MÜŞTERİ EKRANI HARİTA BOYUT ONARICI */}
                                  <UniversalMapController center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [41.0082, 28.9784]} />
                                  <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                                </MapContainer>
@@ -1543,7 +1543,7 @@ export default function App() {
                 </form>
               )}
 
-              {/* SAĞLAYICI "AKTİF İŞLERİM" */}
+              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AKTİF İŞLERİM" */}
               <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
                 <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
                 <div className="space-y-3">
@@ -1589,7 +1589,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SAĞLAYICI "AÇIK TALEP HAVUZU" */}
+              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AÇIK TALEP HAVUZU" */}
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
                 <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
@@ -1780,10 +1780,10 @@ export default function App() {
                       
                       const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
 
-                      // 🔥 SADECE BENİM SIRADA OLDUKLARIMI BUL
+                      // 🔥 GÜVENLİ VE DOĞRU KUYRUK KONTROLÜ
                       const hasJoined = providerProfile && (
-                                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile.id)) || 
-                                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile.id)) ||
+                                        safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || 
+                                        safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) ||
                                         isMyTask);
 
                       // Anahtar kelime eşleşmesi (poolRequests'e bağlı kalarak veya tracker'ın kelime filtresi ile)
@@ -1853,7 +1853,7 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="text-[9px] text-amber-700 bg-amber-50 border border-amber-200 p-1.5 rounded-md text-center font-mono">
-                                     Bu talep anahtar kelimelerinizle uyuşmuyor.
+                                     Anahtar kelimelerinizle uyuşmuyor.
                                   </div>
                                 )
                               )}
@@ -2501,7 +2501,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.37.0 (Ultimate Map Stability) | 15.09.2026
+        v18.38.0 (Tracker WSOD Fix) | 16.09.2026
       </div>
 
     </div>
