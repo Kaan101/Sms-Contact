@@ -16,10 +16,10 @@ export default function ProviderDashboard() {
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // 🔥 Akordiyon (Açılır/Kapanır) State'leri (Varsayılan olarak açık)
-  const [isProfileOpen, setIsProfileOpen] = useState(true);
-  const [isActiveTasksOpen, setIsActiveTasksOpen] = useState(true);
-  const [isPoolOpen, setIsPoolOpen] = useState(true);
+  // 🔥 Akordiyon (Açılır/Kapanır) State'leri (Başlangıçta KAPALI - false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isActiveTasksOpen, setIsActiveTasksOpen] = useState(false);
+  const [isPoolOpen, setIsPoolOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -120,6 +120,20 @@ export default function ProviderDashboard() {
     }
   };
 
+  // Açık havuzdan pas geçme fonksiyonu
+  const handlePoolSkip = async (requestId) => {
+    if (!window.confirm('Bu açık havuz talebini pas geçmek istediğinize emin misiniz?')) return;
+    setActionLoadingId(requestId);
+    try {
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' });
+      await fetchProviderData();
+    } catch (err) {
+      alert("İşlem gerçekleştirilemedi.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const getKeywordMetrics = (text) => {
     const words = safeString(text).split(',').map(w => w.trim()).filter(Boolean);
     return { wordCount: words.length, charCount: text.length };
@@ -144,7 +158,7 @@ export default function ProviderDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* PROFİL YÖNETİMİ AKORDİYON */}
+        {/* PROFİL YÖNETİMİ AKORDİYON (Başlangıçta Kapalı) */}
         <div className="lg:col-span-5 bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
           <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
             <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -193,7 +207,7 @@ export default function ProviderDashboard() {
         {/* TALEPLER VE UYGUN HAVUZ */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* AKTİF GÖREVLERİM AKORDİYON */}
+          {/* AKTİF GÖREVLERİM AKORDİYON (Başlangıçta Kapalı) */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
             <div onClick={() => setIsActiveTasksOpen(!isActiveTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -272,7 +286,7 @@ export default function ProviderDashboard() {
             )}
           </div>
 
-          {/* UYGUN HAVUZ AKORDİYON */}
+          {/* UYGUN HAVUZ AKORDİYON (Başlangıçta Kapalı) */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
             <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -299,10 +313,17 @@ export default function ProviderDashboard() {
                             <h4 className="font-bold text-neutral-950 text-sm">"{req.raw_text}"</h4>
                             <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
                           </div>
-                          <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 shrink-0 flex items-center space-x-1.5 transition">
-                            {isActionLoading && <Loader2 size={13} className="animate-spin" />}
-                            <span>Sıraya Gir</span>
-                          </button>
+                          
+                          {/* 🔥 AÇIK HAVUZ İÇİN: Sıraya Gir ve Pas Geç Butonları */}
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
+                              {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                              <span>Sıraya Gir</span>
+                            </button>
+                            <button disabled={isActionLoading} onClick={() => handlePoolSkip(req.id)} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
+                              Pas Geç
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
