@@ -263,33 +263,46 @@ export default function TrackerDashboard() {
                   const hasJoined = providerProfile && (safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || isMyTask);
                   const isMatch = providerProfile ? poolRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
                   
-                  const reqStatus = safeUpper(req.status);
+ const reqStatus = safeUpper(req.status);
+                  
+                  // 🔥 YENİ KURAL: Profil yoksa (gözlemci), eşleşme varsa, ya da zaten işe katılmışsa açılabilir.
+                  const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
 
                   return (
-                    <div key={req.id} onClick={() => { if(coords) { setTrackerMapCenter(coords); setTrackerMapSelectedPos(null); setCoordinates(''); if (window.innerWidth < 640) setIsTrackerListOpen(false); } setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
+                    <div key={req.id} onClick={() => { 
+                        if(coords) { 
+                            setTrackerMapCenter(coords); 
+                            setTrackerMapSelectedPos(null); 
+                            setCoordinates(''); 
+                            if (window.innerWidth < 640) setIsTrackerListOpen(false); 
+                        } 
+                        // SADECE İZİNLİYSE GENİŞLET
+                        if (canExpand) {
+                            setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); 
+                        }
+                    }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
                       <div className="flex items-start justify-between mb-1.5">
                         <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{reqStatus || 'POOL'}</span></div>
                         {providerProfile && hasJoined && !isMyTask && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
                         {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
                       </div>
                       <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
-        
-{isExpanded && (
+                      
+                      {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
-                         
-          {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
-                              isMatch ? (
-                                <div className="flex gap-2">
-                                  <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">Sıraya Gir</button>
-                                  <button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">Kaldır</button>
-                                </div>
-                              ) : (
-                                <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded-lg text-center font-medium shadow-sm">
-                                  Anahtar kelimelerinizle uyuşmuyor.
-                                </div>
-                              )
+                           
+                           {/* Eşleşmeyenler açılamadığı için uyarı yazısını sildik, sadece butonlar kaldı */}
+                           {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
+                              <div className="flex gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">
+                                  Sıraya Gir
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">
+                                  Kaldır
+                                </button>
+                              </div>
                            )}
-
+                           
                            {providerProfile && isMyTask && (
                              <div className="flex flex-col gap-2">
                                {reqStatus === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
@@ -297,12 +310,11 @@ export default function TrackerDashboard() {
                              </div>
                            )}
 
-                           {/* 🔥 DEFANSİF KUYRUK LİSTESİ ÇİZİMİ */}
+                           {/* DEFANSİF KUYRUK LİSTESİ ÇİZİMİ */}
                            {expandedTrackerReqId === req.id && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50 mt-1">
                                 <div className="space-y-2">
                                   {(() => {
-                                     // Backend'in hangi isimle gönderdiğini bilmediğimiz için iki ihtimali de birleştiriyoruz
                                      const queueData = req.queuedProviders || req.queueList || [];
                                      const safeQueue = safeArray(queueData);
                                      
@@ -311,9 +323,7 @@ export default function TrackerDashboard() {
                                      }
 
                                      return safeQueue.map((qProv, idx) => {
-                                        if (!qProv || !qProv.id) return null; // Kırık veri varsa atla
-                                        
-                                        // Matched provider ID string veya sayı gelebilir, güvenli kıyaslama yapıyoruz
+                                        if (!qProv || !qProv.id) return null;
                                         const isCurrent = String(req.matched_provider_id) === String(qProv.id);
                                         const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
                                         
@@ -342,14 +352,11 @@ export default function TrackerDashboard() {
 
                         </div>
                       )}
-
-
-
-
-
-
                     </div>
                   )
+
+
+
                })}
              </div>
           </div>
