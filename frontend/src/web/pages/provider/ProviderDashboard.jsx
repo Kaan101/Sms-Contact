@@ -54,13 +54,10 @@ export default function ProviderDashboard() {
         
         const allProviderReqs = safeArray(rRes?.data?.requests);
         
-        // Aktif görevler (MATCHED, ACCEPTED, PROVIDER_COMPLETED)
         const active = allProviderReqs.filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
         setActiveRequests(active);
 
-        // Geçmiş talepler (COMPLETED, CANCELLED, PROVIDER_SKIPPED veya başka statüler)
         const past = allProviderReqs.filter(r => r && ['COMPLETED', 'CANCELLED', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status)));
-        // En yeni en üstte olacak şekilde tarih sırasına göre sırala (id veya created_at azalan)
         past.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
         setPastRequests(past);
 
@@ -240,8 +237,14 @@ export default function ProviderDashboard() {
                     {activeRequests.map((req) => {
                       const reqStatus = safeUpper(req.status);
                       const isActionLoading = actionLoadingId === req.id;
+                      
+                      // 🔥 ZIRHLAMA: Sağlayıcıya atandığı veya kabul edildiği an (ACCEPTED veya MATCHED), gizli olsa bile müşteri numarasını açığa çıkarıyoruz
+                      const forceReveal = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus);
                       const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
-                      const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && !safeString(req.contact_value).includes('HIDDEN');
+                      const displayContact = forceReveal ? rawContact : getProviderContactDisplay(req.contact_value);
+                      
+                      // İletişimde WhatsApp tercihi varsa ve müşteri ilişki kurulmasına onay verdiyse butonu göster
+                      const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceReveal || !safeString(req.contact_value).includes('HIDDEN'));
 
                       return (
                         <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border space-y-3 text-xs">
@@ -259,7 +262,7 @@ export default function ProviderDashboard() {
                           <div className="bg-white border p-3 rounded-xl flex items-center justify-between shadow-xs">
                             <div className="flex flex-col">
                               <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
-                              <span className="text-xs font-bold text-neutral-900 mt-0.5">{getProviderContactDisplay(req.contact_value)}</span>
+                              <span className="text-xs font-bold text-neutral-900 mt-0.5">{displayContact}</span>
                             </div>
                             {showWhatsApp && (
                                <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
@@ -350,7 +353,7 @@ export default function ProviderDashboard() {
             )}
           </div>
 
-          {/* 🔥 GEÇMİŞ TALEPLER AKORDİYON (Pas geçilenler, tamamlananlar, iptal edilenler - Tarih sırasına göre en yeni en üstte) */}
+          {/* GEÇMİŞ TALEPLER AKORDİYON */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
             <div onClick={() => setIsPastTasksOpen(!isPastTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
