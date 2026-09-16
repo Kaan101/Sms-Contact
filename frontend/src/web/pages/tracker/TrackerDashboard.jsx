@@ -186,7 +186,7 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR - İşlerim butonu tamamen kaldırıldı */}
+        {/* SOL ÜST BUTONLAR - İşlerim butonu kaldırıldı */}
         <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
@@ -270,6 +270,16 @@ export default function TrackerDashboard() {
                   const reqStatus = safeUpper(req.status);
                   const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
 
+                  // 🔥 YENİ KURAL: Eğer Sağlayıcı bu işi almışsa, numaranın gizli kalmasına izin verme (İlişki aktif)
+                  const forceRevealContact = isMyTask; 
+                  const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
+                  
+                  // Sağlayıcıya gösterilecek numara
+                  const displayContact = forceRevealContact ? rawContact : getProviderContactDisplay(req.contact_value);
+                  
+                  // WhatsApp butonunu gösterme şartı
+                  const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !safeString(req.contact_value).includes('HIDDEN'));
+
                   return (
                     <div key={req.id} onClick={() => { 
                         if(coords) { 
@@ -305,14 +315,14 @@ export default function TrackerDashboard() {
                            
                            {providerProfile && isMyTask && (
                              <div className="flex flex-col gap-2">
-                               {/* WhatsApp Butonu Entegre Edildi */}
+                               {/* 🔥 YENİ: WhatsApp Butonu ve Müşteri Gerçek Numarası */}
                                <div className="bg-neutral-50 border border-neutral-200 p-2.5 rounded-lg flex items-center justify-between mb-1">
                                   <div className="flex flex-col">
                                     <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
-                                    <span className="text-xs font-bold text-neutral-900 mt-0.5">{getProviderContactDisplay(req.contact_value)}</span>
+                                    <span className="text-xs font-bold text-neutral-900 mt-0.5">{displayContact}</span>
                                   </div>
-                                  {safeString(req.preferred_channel).includes('WHATSAPP') && !safeString(req.contact_value).includes('HIDDEN') && (
-                                     <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
+                                  {showWhatsApp && (
+                                     <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
                                        <MessageCircle size={12} />
                                        <span>Yaz</span>
                                      </a>
