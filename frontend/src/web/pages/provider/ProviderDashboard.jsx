@@ -13,7 +13,6 @@ export default function ProviderDashboard() {
   const [providerProfile, setProviderProfile] = useState(null);
   const [activeRequests, setActiveRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]);
-  const [hiddenPoolIds, setHiddenPoolIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   
@@ -32,13 +31,14 @@ export default function ProviderDashboard() {
       const prov = pRes?.data?.provider;
       if (prov) {
         setProviderProfile(prov);
-        setFormData({
-          name: prov.name || '',
-          phone: prov.phone || session.phone,
-          email: prov.email || '',
+        setFormData(prev => ({
+          ...prev,
+          name: prov.name || prev.name,
+          phone: prov.phone || prev.phone,
+          email: prov.email || prev.email,
           serviceKeywords: safeArray(prov.service_keywords).join(', '),
           communicationChannels: safeArray(prov.communication_channels).length ? prov.communication_channels : ['PHONE', 'SMS', 'WHATSAPP', 'EMAIL']
-        });
+        }));
         
         const [rRes, poolRes] = await Promise.all([
           axios.get(`${API_BASE}/requests/provider-requests?providerId=${prov.id}&phone=${encodeURIComponent(session.phone)}`),
@@ -123,42 +123,42 @@ export default function ProviderDashboard() {
   const metrics = getKeywordMetrics(formData.serviceKeywords);
 
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-6 px-6 py-8">
-      <div className="flex items-center justify-between border-b pb-4">
+    <div className="max-w-5xl mx-auto w-full space-y-6 px-6 py-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
         <div>
           <h2 className="text-xl font-extrabold text-neutral-950">Sağlayıcı Paneli</h2>
           <p className="text-xs text-neutral-500 mt-0.5">Uzmanlık alanlarınıza göre eşleşen talepleri yönetin ve açık havuzdan iş alın.</p>
         </div>
         {providerProfile && (
-          <div className="px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center space-x-1.5 shadow-xs">
-            <CheckCircle2 size={14} className="text-emerald-600" />
+          <div className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center space-x-1.5 shadow-xs w-fit">
+            <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
             <span>Aktif Profil: {providerProfile.name}</span>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* PROFİL YÖNETİMİ FORM */}
-        <div className="md:col-span-5 bg-white rounded-2xl border p-5 shadow-sm space-y-4">
-          <h3 className="font-bold text-sm text-neutral-900 border-b pb-2.5 flex items-center space-x-2">
+        <div className="lg:col-span-5 bg-white rounded-2xl border p-6 shadow-sm space-y-4">
+          <h3 className="font-bold text-sm text-neutral-900 border-b pb-3 flex items-center space-x-2">
             <Briefcase size={16} className="text-neutral-700" />
             <span>Firma & Uzmanlık Profili</span>
           </h3>
           
-          <form onSubmit={handleSaveProfile} className="space-y-3.5">
+          <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
               <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma / Sağlayıcı Adı *</label>
-              <input type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="Örn: Yıldız Tesisat" className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50" />
+              <input type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="Örn: Yıldız Tesisat" className="w-full p-3 text-xs rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 font-medium" />
             </div>
 
             <div>
               <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İletişim Telefonu *</label>
-              <input type="tel" required value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="0555..." className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50" />
+              <input type="tel" required value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="0555..." className="w-full p-3 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 font-medium" />
             </div>
 
             <div>
               <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
-              <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="ornek@firma.com" className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50" />
+              <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="ornek@firma.com" className="w-full p-3 text-xs rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 font-medium" />
             </div>
 
             <div>
@@ -166,11 +166,11 @@ export default function ProviderDashboard() {
                 <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler (Uzmanlıklar) *</label>
                 <span className={`text-[10px] font-mono ${metrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600 font-bold' : 'text-neutral-400'}`}>{metrics.wordCount} / {MAX_KEYWORD_COUNT}</span>
               </div>
-              <textarea rows={4} maxLength={MAX_KEYWORD_CHARS} value={formData.serviceKeywords} onChange={(e) => setFormData({...formData, serviceKeywords: e.target.value})} placeholder="kombi, tamirat, nakliye, daire, tesisat..." className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 resize-none" />
+              <textarea rows={4} maxLength={MAX_KEYWORD_CHARS} value={formData.serviceKeywords} onChange={(e) => setFormData({...formData, serviceKeywords: e.target.value})} placeholder="kombi, tamirat, nakliye, daire, tesisat..." className="w-full p-3 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 resize-none font-medium leading-relaxed" />
               <span className="text-[10px] text-neutral-400 block mt-1">Hizmet verdiğiniz anahtar kelimeleri virgülle ayırarak yazın.</span>
             </div>
 
-            <button type="submit" disabled={loading || metrics.wordCount > MAX_KEYWORD_COUNT} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={loading || metrics.wordCount > MAX_KEYWORD_COUNT} className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50 transition">
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               <span>{providerProfile ? 'Profili Güncelle' : 'Profili Kaydet'}</span>
             </button>
@@ -178,21 +178,21 @@ export default function ProviderDashboard() {
         </div>
 
         {/* TALEPLER VE UYGUN HAVUZ */}
-        <div className="md:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-6">
           
           {/* AKTİF GÖREVLERİM */}
-          <div className="bg-white rounded-2xl border p-5 shadow-sm space-y-3">
-            <h3 className="font-bold text-sm text-neutral-900 border-b pb-2.5 flex items-center space-x-2">
+          <div className="bg-white rounded-2xl border p-6 shadow-sm space-y-4">
+            <h3 className="font-bold text-sm text-neutral-900 border-b pb-3 flex items-center space-x-2">
               <Clock size={16} className="text-emerald-600" />
               <span>Üzerimdeki Görevler & Eşleşmeler ({activeRequests.length})</span>
             </h3>
 
             {!providerProfile ? (
-              <div className="text-center text-xs text-neutral-400 py-6">Görevleri görebilmek için önce sol taraftan profilinizi oluşturmalısınız.</div>
+              <div className="text-center text-xs text-neutral-400 py-8">Görevleri görebilmek için önce sol taraftan profilinizi oluşturmalısınız.</div>
             ) : activeRequests.length === 0 ? (
-              <div className="text-center text-xs text-neutral-400 py-6">Şu an üzerinizde aktif bir görev bulunmuyor.</div>
+              <div className="text-center text-xs text-neutral-400 py-8">Şu an üzerinizde aktif bir görev bulunmuyor.</div>
             ) : (
-              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+              <div className="space-y-3.5 max-h-[350px] overflow-y-auto pr-1">
                 {activeRequests.map((req) => {
                   const reqStatus = safeUpper(req.status);
                   const isActionLoading = actionLoadingId === req.id;
@@ -200,7 +200,7 @@ export default function ProviderDashboard() {
                   const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && !safeString(req.contact_value).includes('HIDDEN');
 
                   return (
-                    <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border space-y-2 text-xs">
+                    <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border space-y-3 text-xs">
                       <div className="flex items-start justify-between">
                         <div>
                           <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
@@ -209,38 +209,38 @@ export default function ProviderDashboard() {
                         <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{reqStatus}</span>
                       </div>
 
-                      <div className="bg-white border p-2.5 rounded-lg flex items-center justify-between">
+                      <div className="bg-white border p-3 rounded-xl flex items-center justify-between shadow-xs">
                         <div className="flex flex-col">
                           <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
                           <span className="text-xs font-bold text-neutral-900 mt-0.5">{getProviderContactDisplay(req.contact_value)}</span>
                         </div>
                         {showWhatsApp && (
-                           <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
-                             <MessageCircle size={12} />
+                           <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+                             <MessageCircle size={13} />
                              <span>Yaz</span>
                            </a>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-neutral-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
                         <span className="text-[10px] font-mono text-neutral-500">📍 {extractAddress(req.location)}</span>
                         
                         <div className="flex items-center space-x-2">
                           {reqStatus === 'MATCHED' && (
                             <>
-                              <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1">
-                                {isActionLoading && <Loader2 size={11} className="animate-spin" />}
+                              <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1 transition shadow-xs">
+                                {isActionLoading && <Loader2 size={12} className="animate-spin" />}
                                 <span>Kabul Et</span>
                               </button>
-                              <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-3 py-1.5 border text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50">
+                              <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
                                 Pas Geç
                               </button>
                             </>
                           )}
                           {reqStatus === 'ACCEPTED' && (
-                            <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1.5">
-                              {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                              <span>İşi Teslim Et</span>
+                            <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition shadow-sm">
+                              {isActionLoading && <Loader2 size={13} className="animate-spin" />}
+                              <span>{isActionLoading ? 'İşleniyor...' : 'İşi Teslim Et'}</span>
                             </button>
                           )}
                         </div>
@@ -252,30 +252,30 @@ export default function ProviderDashboard() {
             )}
           </div>
 
-          {/* UYGUN HAVUZ (Sıraya Girebileceğiniz İşler) */}
-          <div className="bg-white rounded-2xl border p-5 shadow-sm space-y-3">
-            <h3 className="font-bold text-sm text-neutral-900 border-b pb-2.5 flex items-center space-x-2">
+          {/* UYGUN HAVUZ */}
+          <div className="bg-white rounded-2xl border p-6 shadow-sm space-y-4">
+            <h3 className="font-bold text-sm text-neutral-900 border-b pb-3 flex items-center space-x-2">
               <Tag size={16} className="text-blue-600" />
               <span>Uzmanlığınıza Uygun Açık Havuz ({poolRequests.length})</span>
             </h3>
 
             {!providerProfile ? (
-              <div className="text-center text-xs text-neutral-400 py-6">Uygun havuz işlerini görebilmek için önce profilinizi kaydetmelisiniz.</div>
+              <div className="text-center text-xs text-neutral-400 py-8">Uygun havuz işlerini görebilmek için önce profilinizi kaydetmelisiniz.</div>
             ) : poolRequests.length === 0 ? (
-              <div className="text-center text-xs text-neutral-400 py-6">Şu an anahtar kelimelerinizle eşleşen açık havuz talebi bulunmuyor.</div>
+              <div className="text-center text-xs text-neutral-400 py-8">Şu an anahtar kelimelerinizle eşleşen açık havuz talebi bulunmuyor.</div>
             ) : (
-              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                 {poolRequests.map((req) => {
                   const isActionLoading = actionLoadingId === req.id;
                   return (
-                    <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                    <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
                       <div className="space-y-1">
                         <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                        <h4 className="font-bold text-neutral-950">"{req.raw_text}"</h4>
+                        <h4 className="font-bold text-neutral-950 text-sm">"{req.raw_text}"</h4>
                         <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
                       </div>
-                      <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 shrink-0 flex items-center space-x-1">
-                        {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                      <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 shrink-0 flex items-center space-x-1.5 transition">
+                        {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                         <span>Sıraya Gir</span>
                       </button>
                     </div>
