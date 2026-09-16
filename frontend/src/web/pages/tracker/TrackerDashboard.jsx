@@ -3,7 +3,7 @@ import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, AlertTriangle, MessageCircle } from 'lucide-react';
+import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, AlertTriangle, MessageCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, getProviderContactDisplay, extractPhoneForWa } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
@@ -41,6 +41,9 @@ export default function TrackerDashboard() {
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
+
+  // Aksiyon Yüklenme (Loading) Durumları İçin State
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   // WoZ State
   const [queryText, setQueryText] = useState('');
@@ -95,39 +98,68 @@ export default function TrackerDashboard() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
           setTrackerMapSuggestions(safeArray(res?.data));
-          if (trackerSearchInputRef.current === document.activeElement) setIsTrackerSuggestionsVisible(true);
+          if (trackerSearchInputRef.current === document.activeElement) setIsSuggestionsVisible(true);
         } catch (err) {} finally { setIsTrackerMapSearching(false); }
       } else {
-        setTrackerMapSuggestions([]); setIsTrackerSuggestionsVisible(false);
+        setTrackerMapSuggestions([]); setIsSuggestionsVisible(false);
       }
     }, 400);
     return () => clearTimeout(delayDebounceFn);
   }, [trackerMapSearchText]);
 
   const handleStatusChange = async (requestId, newStatus) => { 
-    try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); await fetchTrackerData(); await fetchProviderData(); } catch (err) {} 
+    setActionLoadingId(requestId);
+    try { 
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
+      await fetchTrackerData(); 
+      await fetchProviderData(); 
+    } catch (err) {
+      alert('İşlem gerçekleştirilemedi.');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const handleProviderSkip = async (requestId) => {
     if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz?')) return;
-    try { await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' }); await fetchTrackerData(); await fetchProviderData(); } catch (err) { alert('İşlem başarısız oldu.'); }
+    setActionLoadingId(requestId);
+    try { 
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'PROVIDER_SKIPPED' }); 
+      await fetchTrackerData(); 
+      await fetchProviderData(); 
+    } catch (err) { 
+      alert('İşlem başarısız oldu.'); 
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const handleJoinPool = async (requestId) => { 
     if (!providerProfile) { alert("Önce profilinizi oluşturup kaydetmelisiniz!"); return; } 
+    setActionLoadingId(requestId);
     try { 
         await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id }); 
-        await fetchTrackerData(); await fetchProviderData();
+        await fetchTrackerData(); 
+        await fetchProviderData();
         alert('Başarıyla sıraya girdiniz!');
-    } catch (err) { alert(err.response?.data?.message || 'İşlem başarısız veya zaten sıradaydınız.'); } 
+    } catch (err) { 
+      alert(err.response?.data?.message || 'İşlem başarısız veya zaten sıradaydınız.'); 
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const handleCustomerSelectCandidate = async (requestId, providerId) => { 
+    setActionLoadingId(requestId);
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); 
       setExpandedTrackerReqId(null); 
       await fetchTrackerData(); 
-    } catch (err) {} 
+    } catch (err) {
+      alert('İşlem başarısız oldu.');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const submitWoZRequest = async (e) => {
@@ -195,8 +227,8 @@ export default function TrackerDashboard() {
                <span className="text-sm font-bold text-neutral-900 leading-tight">{providerProfile.name}</span>
              </div>
            )}
-           <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-neutral-800"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
-           <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto hover:bg-neutral-50"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
+           <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-neutral-800 cursor-pointer"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
+           <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto hover:bg-neutral-50 cursor-pointer"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
         </div>
 
         {/* ANA HARİTA ALANI */}
@@ -205,7 +237,7 @@ export default function TrackerDashboard() {
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
-              <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition focus:ring-2 focus:ring-neutral-900" />
+              <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition focus:ring-2 focus:ring-neutral-900" />
             </div>
             
             {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
@@ -244,17 +276,17 @@ export default function TrackerDashboard() {
         {isTrackerListOpen && (
           <div className="absolute top-16 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-[calc(100vh-64px)] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
              <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 p-1"><X size={14}/></button></div>
+                <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 p-1 cursor-pointer"><X size={14}/></button></div>
                 
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center space-x-2">
                     <div className="relative flex-1"><Search size={14} className="absolute left-2.5 top-2.5 text-neutral-400" /><input type="text" value={trackerSearch} onChange={(e) => setTrackerSearch(e.target.value)} placeholder="Talep ara..." className="w-full pl-8 pr-2 py-2 text-[11px] rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium" /></div>
-                    <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-2 rounded-lg border transition shrink-0 flex items-center justify-center ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white hover:bg-neutral-50 text-neutral-600'}`}><Filter size={15} /></button>
+                    <button onClick={() => setIsTrackerFilterOpen(true)} className={`p-2 rounded-lg border transition shrink-0 flex items-center justify-center cursor-pointer ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white hover:bg-neutral-50 text-neutral-600'}`}><Filter size={15} /></button>
                   </div>
                   {providerProfile && (
                     <div className="grid grid-cols-2 gap-2 mt-0.5">
-                      <label className={`flex items-center justify-center py-2 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${showMyTrackerTasks ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white'}`}><input type="checkbox" checked={showMyTrackerTasks} onChange={(e) => { setShowMyTrackerTasks(e.target.checked); if (e.target.checked) setIsTrackerPoolFilterActive(false); }} className="hidden" /><Briefcase size={12} className="mr-1.5"/> İşlerim</label>
-                      <label className={`flex items-center justify-center py-2 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white'}`}><input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => { setIsTrackerPoolFilterActive(e.target.checked); if (e.target.checked) setShowMyTrackerTasks(false); }} className="hidden" /><Inbox size={12} className="mr-1.5"/> Uygun Havuz</label>
+                      <label className={`flex items-center justify-center py-2 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${showMyTrackerTasks ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-white hover:bg-neutral-50'}`}><input type="checkbox" checked={showMyTrackerTasks} onChange={(e) => { setShowMyTrackerTasks(e.target.checked); if (e.target.checked) setIsTrackerPoolFilterActive(false); }} className="hidden" /><Briefcase size={12} className="mr-1.5"/> İşlerim</label>
+                      <label className={`flex items-center justify-center py-2 px-2 rounded-lg border cursor-pointer select-none shadow-sm text-[10px] font-bold ${isTrackerPoolFilterActive ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white hover:bg-neutral-50'}`}><input type="checkbox" checked={isTrackerPoolFilterActive} onChange={(e) => { setIsTrackerPoolFilterActive(e.target.checked); if (e.target.checked) setShowMyTrackerTasks(false); }} className="hidden" /><Inbox size={12} className="mr-1.5"/> Uygun Havuz</label>
                     </div>
                   )}
                 </div>
@@ -270,6 +302,7 @@ export default function TrackerDashboard() {
                   
                   const reqStatus = safeUpper(req.status);
                   const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
+                  const isActionLoading = actionLoadingId === req.id;
 
                   const forceRevealContact = isMyTask; 
                   const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
@@ -295,7 +328,6 @@ export default function TrackerDashboard() {
                       </div>
                       <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2">"{req.raw_text}"</h4>
                       
-                      {/* 🔥 EKLENEN KISIM: Kayıt Tarihi ve Adres kartın üzerinde sürekli görünür halde */}
                       <div className="flex flex-col gap-1 mt-2 mb-1 text-[10px] text-neutral-500 font-mono">
                           {req.created_at && (
                               <div className="flex items-center gap-1.5">
@@ -316,10 +348,11 @@ export default function TrackerDashboard() {
                            
                            {providerProfile && ['POOL', 'PENDING', 'MATCHED', 'ACCEPTED', 'PROVIDER_SKIPPED', 'PROVIDER_COMPLETED'].includes(reqStatus) && !hasJoined && !isMyTask && (
                               <div className="flex gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">
-                                  Sıraya Gir
+                                <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1">
+                                  {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                                  <span>Sıraya Gir</span>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">
+                                <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer disabled:opacity-50">
                                   Kaldır
                                 </button>
                               </div>
@@ -333,15 +366,31 @@ export default function TrackerDashboard() {
                                     <span className="text-xs font-bold text-neutral-900 mt-0.5">{displayContact}</span>
                                   </div>
                                   {showWhatsApp && (
-                                     <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
+                                     <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
                                        <MessageCircle size={12} />
                                        <span>Yaz</span>
                                      </a>
                                   )}
                                </div>
 
-                               {reqStatus === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
-                               {reqStatus === 'ACCEPTED' && <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition">İşi Teslim Et</button>}
+                               {reqStatus === 'MATCHED' && (
+                                 <div className="flex gap-2">
+                                   <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1">
+                                     {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                                     <span>İşi Kabul Et</span>
+                                   </button>
+                                   <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition cursor-pointer disabled:opacity-50">
+                                     Pas Geç
+                                   </button>
+                                 </div>
+                               )}
+                               
+                               {reqStatus === 'ACCEPTED' && (
+                                 <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5 shadow-sm">
+                                   {isActionLoading && <Loader2 size={13} className="animate-spin" />}
+                                   <span>{isActionLoading ? 'İşleniyor...' : 'İşi Teslim Et'}</span>
+                                 </button>
+                               )}
                              </div>
                            )}
 
@@ -373,8 +422,8 @@ export default function TrackerDashboard() {
                                               <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone || 'Gizli'}</p>
                                             </div>
                                             <div className="flex items-center space-x-2">
-                                                {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold"><ShieldCheck size={10} /><span>Onayla</span></button>)}
-                                                {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
+                                                {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50"><ShieldCheck size={10} /><span>Onayla</span></button>)}
+                                                {!isCurrent && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>)}
                                             </div>
                                           </div>
                                         );
@@ -397,7 +446,7 @@ export default function TrackerDashboard() {
         {isTrackerAddModalOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
-                <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Operasyon Ekle</h3><button onClick={() => setIsTrackerAddModalOpen(false)} className="hover:text-rose-600 transition"><X size={18}/></button></div>
+                <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Operasyon Ekle</h3><button onClick={() => setIsTrackerAddModalOpen(false)} className="hover:text-rose-600 transition cursor-pointer"><X size={18}/></button></div>
                 <form onSubmit={submitWoZRequest} className="space-y-4">
                   <textarea rows={2} required value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Talebi girin..." className="w-full p-3 border rounded-xl outline-none focus:border-neutral-900" />
                   
@@ -406,7 +455,7 @@ export default function TrackerDashboard() {
                      <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Koordinat (Haritadan seçin veya girin)" className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900 text-xs font-mono bg-neutral-50 text-neutral-600" />
                   </div>
 
-                  <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-xl font-bold">Operasyonu Başlat</button>
+                  <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-xl font-bold cursor-pointer disabled:opacity-50">Operasyonu Başlat</button>
                 </form>
              </div>
            </div>
@@ -416,7 +465,7 @@ export default function TrackerDashboard() {
         {isTrackerFilterOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border">
-               <div className="flex justify-between items-center border-b pb-3"><h3 className="font-bold text-sm">Gelişmiş Filtreleme</h3><button onClick={() => setIsTrackerFilterOpen(false)} className="hover:text-rose-600 transition"><X size={16}/></button></div>
+               <div className="flex justify-between items-center border-b pb-3"><h3 className="font-bold text-sm">Gelişmiş Filtreleme</h3><button onClick={() => setIsTrackerFilterOpen(false)} className="hover:text-rose-600 transition cursor-pointer"><X size={16}/></button></div>
                <div className="space-y-3 mt-4">
                   <div>
                     <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İl (Şehir)</label>
@@ -437,8 +486,8 @@ export default function TrackerDashboard() {
                </div>
                
                <div className="flex justify-between items-center space-x-2 pt-4 mt-4 border-t border-neutral-100">
-                  <button onClick={() => { setTrackerFilter({city:'', district:'', zip:'', code:''}); setIsTrackerFilterOpen(false); }} className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition">Filtreyi Temizle</button>
-                  <button onClick={() => setIsTrackerFilterOpen(false)} className="px-5 py-1.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-lg text-xs font-bold">Uygula</button>
+                  <button onClick={() => { setTrackerFilter({city:'', district:'', zip:'', code:''}); setIsTrackerFilterOpen(false); }} className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition cursor-pointer">Filtreyi Temizle</button>
+                  <button onClick={() => setIsTrackerFilterOpen(false)} className="px-5 py-1.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-lg text-xs font-bold cursor-pointer">Uygula</button>
                </div>
              </div>
            </div>
