@@ -276,7 +276,7 @@ export default function TrackerDashboard() {
                       </div>
                       <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                       
-               {isExpanded && (
+               {(
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING') && !hasJoined && !isMyTask && (
                               // 🔥 HATA BURADA ÇÖZÜLDÜ: isMatch zorunluluğu kaldırıldı.
