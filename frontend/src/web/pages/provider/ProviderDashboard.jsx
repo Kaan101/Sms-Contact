@@ -238,12 +238,11 @@ export default function ProviderDashboard() {
                       const reqStatus = safeUpper(req.status);
                       const isActionLoading = actionLoadingId === req.id;
                       
-                      // 🔥 ZIRHLAMA: Sağlayıcıya atandığı veya kabul edildiği an (ACCEPTED veya MATCHED), gizli olsa bile müşteri numarasını açığa çıkarıyoruz
-                      const forceReveal = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus);
+                      // 🔥 KESİN ÇÖZÜM: Bu iş bu sağlayıcıya atandıysa (activeRequests içinde görünüyor), durumunun MATCHED veya ACCEPTED olması fark etmeksizin gizliliği kaldırıyoruz!
+                      const forceReveal = true; 
                       const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
                       const displayContact = forceReveal ? rawContact : getProviderContactDisplay(req.contact_value);
                       
-                      // İletişimde WhatsApp tercihi varsa ve müşteri ilişki kurulmasına onay verdiyse butonu göster
                       const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceReveal || !safeString(req.contact_value).includes('HIDDEN'));
 
                       return (
