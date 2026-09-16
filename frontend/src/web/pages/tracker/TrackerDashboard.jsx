@@ -154,7 +154,6 @@ export default function TrackerDashboard() {
       if (hiddenPoolRequests.includes(r.id)) return false;
       const status = safeUpper(r.status);
       
-      // Tracker'da sadece İptal ve Tamamlandı olanları gizliyoruz
       if (status === 'COMPLETED' || status === 'CANCELLED') return false;
 
       const reqCode = safeLower(extractCode(r.location));
@@ -294,12 +293,27 @@ export default function TrackerDashboard() {
                         {providerProfile && hasJoined && !isMyTask && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
                         {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
                       </div>
-                      <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
+                      <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2">"{req.raw_text}"</h4>
+                      
+                      {/* 🔥 EKLENEN KISIM: Kayıt Tarihi ve Adres kartın üzerinde sürekli görünür halde */}
+                      <div className="flex flex-col gap-1 mt-2 mb-1 text-[10px] text-neutral-500 font-mono">
+                          {req.created_at && (
+                              <div className="flex items-center gap-1.5">
+                                  <Clock size={11} className="text-blue-500 shrink-0" />
+                                  <span>{safeDateTime(req.created_at)}</span>
+                              </div>
+                          )}
+                          {req.location && (
+                              <div className="flex items-start gap-1.5">
+                                  <MapPin size={11} className="text-rose-500 shrink-0 mt-0.5" />
+                                  <span className="line-clamp-2">{extractAddress(req.location)}</span>
+                              </div>
+                          )}
+                      </div>
                       
                       {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            
-                           {/* 🔥 HATA BURADA ÇÖZÜLDÜ: ACCEPTED ve PROVIDER_COMPLETED durumları eklendi. Diğer sağlayıcılar yedek olarak sıraya girebilsin. */}
                            {providerProfile && ['POOL', 'PENDING', 'MATCHED', 'ACCEPTED', 'PROVIDER_SKIPPED', 'PROVIDER_COMPLETED'].includes(reqStatus) && !hasJoined && !isMyTask && (
                               <div className="flex gap-2">
                                 <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">
