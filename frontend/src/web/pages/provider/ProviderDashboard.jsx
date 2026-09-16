@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Briefcase, Phone, Mail, Tag, Save, CheckCircle2, Clock, Trash2, X, AlertTriangle, ShieldCheck, PhoneCall, Loader2, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Briefcase, Phone, Mail, Tag, Save, CheckCircle2, Clock, Trash2, X, AlertTriangle, ShieldCheck, PhoneCall, Loader2, MessageCircle, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime } from '../../../core/utils/helpers';
 
@@ -13,13 +13,15 @@ export default function ProviderDashboard() {
   const [providerProfile, setProviderProfile] = useState(null);
   const [activeRequests, setActiveRequests] = useState([]);
   const [poolRequests, setPoolRequests] = useState([]);
+  const [pastRequests, setPastRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // 🔥 Akordiyon (Açılır/Kapanır) State'leri (Başlangıçta KAPALI - false)
+  // Akordiyon State'leri
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isActiveTasksOpen, setIsActiveTasksOpen] = useState(false);
   const [isPoolOpen, setIsPoolOpen] = useState(false);
+  const [isPastTasksOpen, setIsPastTasksOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -50,7 +52,18 @@ export default function ProviderDashboard() {
           axios.get(`${API_BASE}/requests/pool?providerId=${prov.id}`)
         ]);
         
-        setActiveRequests(safeArray(rRes?.data?.requests));
+        const allProviderReqs = safeArray(rRes?.data?.requests);
+        
+        // Aktif görevler (MATCHED, ACCEPTED, PROVIDER_COMPLETED)
+        const active = allProviderReqs.filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
+        setActiveRequests(active);
+
+        // Geçmiş talepler (COMPLETED, CANCELLED, PROVIDER_SKIPPED veya başka statüler)
+        const past = allProviderReqs.filter(r => r && ['COMPLETED', 'CANCELLED', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status)));
+        // En yeni en üstte olacak şekilde tarih sırasına göre sırala (id veya created_at azalan)
+        past.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        setPastRequests(past);
+
         setPoolRequests(safeArray(poolRes?.data?.poolRequests));
       }
     } catch (err) {}
@@ -120,7 +133,6 @@ export default function ProviderDashboard() {
     }
   };
 
-  // Açık havuzdan pas geçme fonksiyonu
   const handlePoolSkip = async (requestId) => {
     if (!window.confirm('Bu açık havuz talebini pas geçmek istediğinize emin misiniz?')) return;
     setActionLoadingId(requestId);
@@ -158,7 +170,7 @@ export default function ProviderDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* PROFİL YÖNETİMİ AKORDİYON (Başlangıçta Kapalı) */}
+        {/* PROFİL YÖNETİMİ AKORDİYON */}
         <div className="lg:col-span-5 bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
           <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
             <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -207,7 +219,7 @@ export default function ProviderDashboard() {
         {/* TALEPLER VE UYGUN HAVUZ */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* AKTİF GÖREVLERİM AKORDİYON (Başlangıçta Kapalı) */}
+          {/* AKTİF GÖREVLERİM AKORDİYON */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
             <div onClick={() => setIsActiveTasksOpen(!isActiveTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -235,8 +247,11 @@ export default function ProviderDashboard() {
                         <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border space-y-3 text-xs">
                           <div className="flex items-start justify-between">
                             <div>
-                              <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                              <h4 className="font-bold text-neutral-950 text-sm mt-0.5">"{req.raw_text}"</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
+                              </div>
+                              <h4 className="font-bold text-neutral-950 text-sm mt-1">"{req.raw_text}"</h4>
                             </div>
                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{reqStatus}</span>
                           </div>
@@ -286,7 +301,7 @@ export default function ProviderDashboard() {
             )}
           </div>
 
-          {/* UYGUN HAVUZ AKORDİYON (Başlangıçta Kapalı) */}
+          {/* UYGUN HAVUZ AKORDİYON */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
             <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -309,12 +324,14 @@ export default function ProviderDashboard() {
                       return (
                         <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
                           <div className="space-y-1">
-                            <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                            <h4 className="font-bold text-neutral-950 text-sm">"{req.raw_text}"</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                              {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
+                            </div>
+                            <h4 className="font-bold text-neutral-950 text-sm mt-0.5">"{req.raw_text}"</h4>
                             <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
                           </div>
                           
-                          {/* 🔥 AÇIK HAVUZ İÇİN: Sıraya Gir ve Pas Geç Butonları */}
                           <div className="flex items-center space-x-2 shrink-0">
                             <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
                               {isActionLoading && <Loader2 size={12} className="animate-spin" />}
@@ -323,6 +340,52 @@ export default function ProviderDashboard() {
                             <button disabled={isActionLoading} onClick={() => handlePoolSkip(req.id)} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
                               Pas Geç
                             </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 🔥 GEÇMİŞ TALEPLER AKORDİYON (Pas geçilenler, tamamlananlar, iptal edilenler - Tarih sırasına göre en yeni en üstte) */}
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
+            <div onClick={() => setIsPastTasksOpen(!isPastTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
+              <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
+                <History size={16} className="text-neutral-600" />
+                <span>Geçmiş Talepler ({pastRequests.length})</span>
+              </h3>
+              <div className="text-neutral-400">{isPastTasksOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
+            </div>
+
+            {isPastTasksOpen && (
+              <div className="p-6 animate-in fade-in duration-200">
+                {!providerProfile ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Geçmiş talepleri görebilmek için önce profilinizi kaydetmelisiniz.</div>
+                ) : pastRequests.length === 0 ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Henüz geçmiş bir talebiniz bulunmuyor.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {pastRequests.map((req) => {
+                      const reqStatus = safeUpper(req.status);
+                      return (
+                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border space-y-2 text-xs">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                {req.created_at && <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-semibold">⏰ {safeDateTime(req.created_at)}</span>}
+                              </div>
+                              <h4 className="font-semibold text-neutral-900 text-sm mt-1">"{req.raw_text}"</h4>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : reqStatus === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-700'}`}>
+                              {reqStatus === 'PROVIDER_SKIPPED' ? 'PAS GEÇİLDİ' : reqStatus}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-200">
+                            <span>📍 {extractAddress(req.location)}</span>
                           </div>
                         </div>
                       );
