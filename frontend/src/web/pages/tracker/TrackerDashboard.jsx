@@ -273,8 +273,8 @@ export default function TrackerDashboard() {
                         {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
                       </div>
                       <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
-                      
-                      {isExpanded && (
+        
+{isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
                               <div className="flex flex-col gap-2">
@@ -301,35 +301,57 @@ export default function TrackerDashboard() {
                              </div>
                            )}
 
-                           {/* KUYRUK LİSTESİ (safeArray Zırhı ile) */}
-                           {expandedTrackerReqId === req.id && safeArray(req.queuedProviders).length > 0 && (
+                           {/* 🔥 DEFANSİF KUYRUK LİSTESİ ÇİZİMİ */}
+                           {expandedTrackerReqId === req.id && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50 mt-1">
                                 <div className="space-y-2">
-                                  {safeArray(req.queuedProviders).map((qProv, idx) => {
-                                    const isCurrent = req.matched_provider_id === qProv.id;
-                                    const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
-                                    return (
-                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? (isSkippedByThis ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm') : 'bg-white border-neutral-200'}`}>
-                                        <div>
-                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
-                                            <span>#{idx + 1} {qProv.name}</span>
-                                            {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}{isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}{qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
-                                          </p>
-                                          <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold"><ShieldCheck size={10} /><span>Onayla</span></button>)}
-                                            {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+                                  {(() => {
+                                     // Backend'in hangi isimle gönderdiğini bilmediğimiz için iki ihtimali de birleştiriyoruz
+                                     const queueData = req.queuedProviders || req.queueList || [];
+                                     const safeQueue = safeArray(queueData);
+                                     
+                                     if (safeQueue.length === 0) {
+                                       return <div className="text-center text-[10px] text-neutral-500 py-2">Henüz sıraya giren sağlayıcı yok.</div>;
+                                     }
+
+                                     return safeQueue.map((qProv, idx) => {
+                                        if (!qProv || !qProv.id) return null; // Kırık veri varsa atla
+                                        
+                                        // Matched provider ID string veya sayı gelebilir, güvenli kıyaslama yapıyoruz
+                                        const isCurrent = String(req.matched_provider_id) === String(qProv.id);
+                                        const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
+                                        
+                                        return (
+                                          <div key={`qprov-${qProv.id}-${idx}`} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? (isSkippedByThis ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm') : 'bg-white border-neutral-200'}`}>
+                                            <div>
+                                              <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
+                                                <span>#{idx + 1} {qProv.name || 'İsimsiz Sağlayıcı'}</span>
+                                                {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
+                                                {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
+                                                {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                              </p>
+                                              <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone || 'Gizli'}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold"><ShieldCheck size={10} /><span>Onayla</span></button>)}
+                                                {!isCurrent && (<button onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1"><Check size={10} /><span>Bunu Seç</span></button>)}
+                                            </div>
+                                          </div>
+                                        );
+                                     });
+                                  })()}
                                 </div>
                               </div>
                            )}
 
                         </div>
                       )}
+
+
+
+
+
+
                     </div>
                   )
                })}
