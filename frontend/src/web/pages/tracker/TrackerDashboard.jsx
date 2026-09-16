@@ -179,7 +179,7 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR - DAHA DA AŞAĞIYA KAYDIRILDI (top-32 / 8rem aşağıda) */}
+        {/* SOL ÜST BUTONLAR */}
         <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
@@ -197,7 +197,6 @@ export default function TrackerDashboard() {
         {/* ANA HARİTA ALANI */}
         <div className="flex-1 w-full h-full relative z-0">
           
-          {/* ARAMA ÇUBUĞU */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
@@ -221,10 +220,13 @@ export default function TrackerDashboard() {
               <SharedMapClickHandler position={trackerMapSelectedPos} setPosition={setTrackerMapSelectedPos} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.tracker} />
               {filteredTrackerRequests.map(req => {
                 const coords = extractGPS(req.location);
+                // 🔥 HATA BURADA ÇÖZÜLDÜ: Durum her koşulda büyük harfe zorlanıyor
+                const reqStatus = safeUpper(req.status);
+                
                 if (coords && mapIcons) {
                   return (
                     <Marker position={coords} icon={req.is_urgent ? mapIcons.urgent : mapIcons.custom} key={req.id}>
-                      <Popup className="custom-popup"><div className="w-48 p-1"><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${req.status === 'POOL' ? 'bg-blue-100 text-blue-800' : req.status === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{req.status || 'POOL'}</span></div><p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p><div className="text-[10px] font-mono text-neutral-500 space-y-0.5">{req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}<p>📍 {extractAddress(req.location)}</p></div></div></Popup>
+                      <Popup className="custom-popup"><div className="w-48 p-1"><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${reqStatus === 'POOL' ? 'bg-blue-100 text-blue-800' : reqStatus === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{reqStatus || 'POOL'}</span></div><p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p><div className="text-[10px] font-mono text-neutral-500 space-y-0.5">{req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}<p>📍 {extractAddress(req.location)}</p></div></div></Popup>
                     </Marker>
                   );
                 }
@@ -261,11 +263,14 @@ export default function TrackerDashboard() {
                   const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
                   const hasJoined = providerProfile && (safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || isMyTask);
                   const isMatch = providerProfile ? poolRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
+                  
+                  // 🔥 HATA BURADA ÇÖZÜLDÜ: Durum her koşulda büyük harfe zorlanıyor
+                  const reqStatus = safeUpper(req.status);
 
                   return (
                     <div key={req.id} onClick={() => { if(coords) { setTrackerMapCenter(coords); setTrackerMapSelectedPos(null); setCoordinates(''); if (window.innerWidth < 640) setIsTrackerListOpen(false); } setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
                       <div className="flex items-start justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${req.status === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{req.status || 'POOL'}</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{reqStatus || 'POOL'}</span></div>
                         {providerProfile && hasJoined && !isMyTask && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
                         {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
                       </div>
@@ -273,15 +278,16 @@ export default function TrackerDashboard() {
                       
                       {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
-                           {providerProfile && (req.status === 'POOL' || req.status === 'PENDING') && !hasJoined && !isMyTask && (
+                           {/* KOŞULLARDA reqStatus DEĞİŞKENİ KULLANILDI */}
+                           {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING') && !hasJoined && !isMyTask && (
                               isMatch ? (
                                 <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">Sıraya Gir</button><button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">Kaldır</button></div>
                               ) : (<div className="text-[10px] text-amber-700 bg-amber-50 border p-2 rounded-lg text-center font-medium">Anahtar kelimelerinizle uyuşmuyor.</div>)
                            )}
                            {providerProfile && isMyTask && (
                              <div className="flex flex-col gap-2">
-                               {req.status === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
-                               {req.status === 'ACCEPTED' && <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition">İşi Teslim Et</button>}
+                               {reqStatus === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
+                               {reqStatus === 'ACCEPTED' && <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition">İşi Teslim Et</button>}
                              </div>
                            )}
                         </div>
@@ -293,7 +299,7 @@ export default function TrackerDashboard() {
           </div>
         )}
 
-        {/* Modal: Tracker WoZ (Yeni Talep) - KOORDİNAT KUTUSU EKLENDİ */}
+        {/* Modal: Tracker WoZ (Yeni Talep) */}
         {isTrackerAddModalOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
@@ -303,7 +309,6 @@ export default function TrackerDashboard() {
                   
                   <div className="space-y-2">
                      <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Konum adı veya açık adres..." className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900 text-sm" />
-                     {/* Haritadan gelen koordinatları gösteren kutu */}
                      <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Koordinat (Haritadan seçin veya girin)" className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900 text-xs font-mono bg-neutral-50 text-neutral-600" />
                   </div>
 
