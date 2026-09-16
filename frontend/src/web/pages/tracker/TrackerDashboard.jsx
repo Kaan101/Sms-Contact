@@ -36,8 +36,6 @@ export default function TrackerDashboard() {
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
-  
-  // Eksik filtre alanları geri eklendi
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
@@ -170,8 +168,6 @@ export default function TrackerDashboard() {
       const locLow = safeLower(r.location);
       if (trackerFilter.city && !locLow.includes(safeLower(trackerFilter.city).trim())) return false;
       if (trackerFilter.district && !locLow.includes(safeLower(trackerFilter.district).trim())) return false;
-      
-      // Posta kodu filtresi düzeltildi
       if (trackerFilter.zip && !locLow.includes(safeLower(trackerFilter.zip).trim())) return false;
 
       return true;
@@ -183,8 +179,8 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR - AŞAĞIYA KAYDIRILDI (top-20'den top-24'e çekildi) */}
-        <div className="absolute top-24 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
+        {/* SOL ÜST BUTONLAR - DAHA DA AŞAĞIYA KAYDIRILDI (top-32 / 8rem aşağıda) */}
+        <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
                <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
@@ -297,21 +293,27 @@ export default function TrackerDashboard() {
           </div>
         )}
 
-        {/* Modal: Tracker WoZ (Yeni Talep) */}
+        {/* Modal: Tracker WoZ (Yeni Talep) - KOORDİNAT KUTUSU EKLENDİ */}
         {isTrackerAddModalOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
                 <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Operasyon Ekle</h3><button onClick={() => setIsTrackerAddModalOpen(false)} className="hover:text-rose-600 transition"><X size={18}/></button></div>
                 <form onSubmit={submitWoZRequest} className="space-y-4">
                   <textarea rows={2} required value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Talebi girin..." className="w-full p-3 border rounded-xl outline-none focus:border-neutral-900" />
-                  <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Konum adı..." className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900" />
+                  
+                  <div className="space-y-2">
+                     <input type="text" value={locationValue} onChange={(e) => setLocationValue(e.target.value)} placeholder="Konum adı veya açık adres..." className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900 text-sm" />
+                     {/* Haritadan gelen koordinatları gösteren kutu */}
+                     <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Koordinat (Haritadan seçin veya girin)" className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900 text-xs font-mono bg-neutral-50 text-neutral-600" />
+                  </div>
+
                   <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-xl font-bold">Operasyonu Başlat</button>
                 </form>
              </div>
            </div>
         )}
 
-        {/* Modal: Tracker Gelişmiş Filtre (KOD VE ZIP EKLENDİ) */}
+        {/* Modal: Tracker Gelişmiş Filtre */}
         {isTrackerFilterOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border">
