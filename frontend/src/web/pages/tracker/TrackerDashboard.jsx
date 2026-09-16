@@ -179,7 +179,7 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR */}
+{/* SOL ÜST BUTONLAR */}
         <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
@@ -189,10 +189,9 @@ export default function TrackerDashboard() {
            )}
            <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-neutral-800"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
            <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto hover:bg-neutral-50"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
-           {providerProfile && (
-             <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto hover:bg-emerald-700"><Briefcase size={16} /> <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span></button>
-           )}
+           {/* İşlerim butonu buradan kaldırıldı */}
         </div>
+
 
         {/* ANA HARİTA ALANI */}
         <div className="flex-1 w-full h-full relative z-0">
@@ -288,7 +287,7 @@ export default function TrackerDashboard() {
                       </div>
                       <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2 mb-1.5">"{req.raw_text}"</h4>
                       
-                      {isExpanded && (
+  {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            
                            {/* Eşleşmeyenler açılamadığı için uyarı yazısını sildik, sadece butonlar kaldı */}
@@ -303,8 +302,24 @@ export default function TrackerDashboard() {
                               </div>
                            )}
                            
+                           {/* 🔥 WhatsApp BUTONU EKLENDİ */}
                            {providerProfile && isMyTask && (
                              <div className="flex flex-col gap-2">
+                               {/* Müşteri İletişim Bilgisi Gösterimi */}
+                               <div className="bg-neutral-50 border border-neutral-200 p-2.5 rounded-lg flex items-center justify-between mb-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
+                                    <span className="text-xs font-bold text-neutral-900 mt-0.5">{getProviderContactDisplay(req.contact_value)}</span>
+                                  </div>
+                                  {/* Eğer WhatsApp izni varsa ve numara gizli değilse butonu göster */}
+                                  {safeString(req.preferred_channel).includes('WHATSAPP') && !safeString(req.contact_value).includes('HIDDEN') && (
+                                     <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0">
+                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                       <span>Yaz</span>
+                                     </a>
+                                  )}
+                               </div>
+
                                {reqStatus === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
                                {reqStatus === 'ACCEPTED' && <button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="w-full py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition">İşi Teslim Et</button>}
                              </div>
@@ -352,8 +367,6 @@ export default function TrackerDashboard() {
 
                         </div>
                       )}
-                    </div>
-                  )
 
 
 
