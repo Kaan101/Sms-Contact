@@ -42,7 +42,7 @@ export default function TrackerDashboard() {
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
   const [isTrackerProviderModalOpen, setIsTrackerProviderModalOpen] = useState(false);
 
-  // WoZ (Manuel Ekleme) State
+  // WoZ State
   const [queryText, setQueryText] = useState('');
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineTime, setDeadlineTime] = useState('23:59'); 
@@ -175,9 +175,11 @@ export default function TrackerDashboard() {
 
   const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive || showMyTrackerTasks;
 
+  // 🔥 ÇÖZÜM BURADA: absolute inset-0 yerine absolute top-16 left-0 right-0 bottom-0 kullanıyoruz. 
+  // Böylece App.jsx'teki 64px'lik (h-16) Header'ın altında kalmıyor.
   return (
-    <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
-        <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
+    <div className="absolute top-16 left-0 right-0 bottom-0 bg-neutral-100 overflow-hidden flex z-0">
+        <div className="absolute top-4 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
                <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
@@ -227,7 +229,6 @@ export default function TrackerDashboard() {
 
         {isTrackerListOpen && (
           <div className="absolute top-0 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
-             {/* Liste İçi Filtreleme ve Kartlar Buraya Gelecek - Önceki kodunuzla birebir aynı */}
              <div className="p-2.5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-2">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800"><X size={14}/></button></div>
                 <div className="flex flex-col gap-2 mt-1">
@@ -263,7 +264,6 @@ export default function TrackerDashboard() {
                       
                       {isExpanded && (
                         <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
-                           {/* Tracker Akordiyon İşlemleri Kısaltıldı - Aynen Korunuyor */}
                            {providerProfile && (req.status === 'POOL' || req.status === 'PENDING') && !hasJoined && !isMyTask && (
                               isMatch ? (
                                 <div className="flex gap-1.5"><button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-md text-[11px] font-bold">Sıraya Gir</button><button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-md text-[11px]">Kaldır</button></div>
