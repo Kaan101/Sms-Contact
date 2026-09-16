@@ -122,56 +122,35 @@ const checkKeywordMatch = (text, keywords) => {
   });
 };
 
-// 🔥 YEPYENİ VE SÜPER GÜVENLİ HARİTA DENETLEYİCİSİ
 function UniversalMapController({ center }) {
   const map = useMap();
   
   useEffect(() => {
     if (!map) return;
     
-    const container = map.getContainer();
-    if (!container) return;
-
-    // 1. Zırhlı ResizeObserver: Çökmeyi engellemek için 100ms gecikmeli tetikleyici
-    let resizeTimeout;
-    const observer = new ResizeObserver(() => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
-    });
-    observer.observe(container);
-
-    // 2. CSS Animasyon Kurtarıcısı: İlk 2 saniye boyunca saniyede 10 kez haritayı hizala
     let ticks = 0;
     const interval = setInterval(() => {
       map.invalidateSize();
       ticks++;
-      if (ticks >= 20) clearInterval(interval);
+      if (ticks >= 15) clearInterval(interval);
     }, 100);
 
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
     return () => {
-      observer.disconnect();
-      clearTimeout(resizeTimeout);
       clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
     };
   }, [map]);
 
   useEffect(() => {
-    if (center) {
-      let lat, lng;
-      // Merkez objeyse (Müşteri ekranı) veya diziyse (Takip ekranı) her ikisini de güvenle işle
-      if (Array.isArray(center) && center.length === 2) {
-        lat = center[0]; lng = center[1];
-      } else if (center.lat !== undefined && center.lng !== undefined) {
-        lat = center.lat; lng = center.lng;
-      }
-      if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
-        map.flyTo([lat, lng], map.getZoom() > 14 ? map.getZoom() : 16, { duration: 1.5 });
-      }
+    if (center && Array.isArray(center) && center.length === 2 && !isNaN(center[0]) && !isNaN(center[1])) {
+      map.flyTo(center, map.getZoom() > 14 ? map.getZoom() : 16, { duration: 1.5 });
     }
   }, [center, map]);
-  
   return null;
 }
 
@@ -987,7 +966,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.38 (Tracker WSOD Fix)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.39 (Tracker Provider Badge)</span>
             </div>
           </div>
 
@@ -1245,6 +1224,7 @@ export default function App() {
                                <MapContainer center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%', minHeight: '300px' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                 {/* 🔥 MÜŞTERİ EKRANI HARİTA BOYUT ONARICI */}
                                  <UniversalMapController center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [41.0082, 28.9784]} />
                                  <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                                </MapContainer>
@@ -1543,7 +1523,7 @@ export default function App() {
                 </form>
               )}
 
-              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AKTİF İŞLERİM" */}
+              {/* SAĞLAYICI "AKTİF İŞLERİM" */}
               <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
                 <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
                 <div className="space-y-3">
@@ -1589,7 +1569,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AÇIK TALEP HAVUZU" */}
+              {/* SAĞLAYICI "AÇIK TALEP HAVUZU" */}
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all">
                 <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50 select-none transition">
                   <h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5">
@@ -1636,13 +1616,20 @@ export default function App() {
         {session?.role === 'TRACKER' && (
           <div className="absolute inset-0 top-0 bg-neutral-100 overflow-hidden flex z-0">
               
-              <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2">
-                 <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
-                 <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
+              <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2 items-start">
+                 {/* 🔥 YENİ: TRACKER EKRANINDA KİMLİĞİ GÖSTEREN BOLD ROZET */}
+                 {providerProfile && (
+                   <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
+                     <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
+                     <span className="text-sm font-bold text-neutral-900 leading-tight">{providerProfile.name}</span>
+                   </div>
+                 )}
+                 <button onClick={() => setIsTrackerAddModalOpen(true)} className="flex items-center space-x-2 bg-neutral-950 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto"><Plus size={16} /> <span className="font-semibold text-sm">Talep Ekle</span></button>
+                 <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
                  
                  {/* ÇİFT ROL: İŞLERİM MODALI BUTONU */}
                  {providerProfile && (
-                   <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-lg transition">
+                   <button onClick={() => setIsTrackerProviderModalOpen(true)} className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-lg transition w-full sm:w-auto">
                      <Briefcase size={16} /> 
                      <span className="font-semibold text-sm">İşlerim ({activeProviderRequests.length})</span>
                    </button>
@@ -1853,7 +1840,7 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="text-[9px] text-amber-700 bg-amber-50 border border-amber-200 p-1.5 rounded-md text-center font-mono">
-                                     Anahtar kelimelerinizle uyuşmuyor.
+                                     Bu talep anahtar kelimelerinizle uyuşmuyor.
                                   </div>
                                 )
                               )}
@@ -2501,7 +2488,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.38.0 (Tracker WSOD Fix) | 16.09.2026
+        v18.39.0 (Tracker Provider Badge) | 16.09.2026
       </div>
 
     </div>
