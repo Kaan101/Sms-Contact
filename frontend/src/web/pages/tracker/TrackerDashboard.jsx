@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css'; // 🔥 GÖRÜNMEZ HARİTAYI ÇÖZEN KRİTİK SATIR!
+import 'leaflet/dist/leaflet.css';
 import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, getProviderContactDisplay, extractPhoneForWa } from '../../../core/utils/helpers';
@@ -36,6 +36,8 @@ export default function TrackerDashboard() {
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
+  
+  // Eksik filtre alanları geri eklendi
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
@@ -168,6 +170,8 @@ export default function TrackerDashboard() {
       const locLow = safeLower(r.location);
       if (trackerFilter.city && !locLow.includes(safeLower(trackerFilter.city).trim())) return false;
       if (trackerFilter.district && !locLow.includes(safeLower(trackerFilter.district).trim())) return false;
+      
+      // Posta kodu filtresi düzeltildi
       if (trackerFilter.zip && !locLow.includes(safeLower(trackerFilter.zip).trim())) return false;
 
       return true;
@@ -179,8 +183,8 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR */}
-        <div className="absolute top-20 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
+        {/* SOL ÜST BUTONLAR - AŞAĞIYA KAYDIRILDI (top-20'den top-24'e çekildi) */}
+        <div className="absolute top-24 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
                <span className="text-[9px] font-mono text-neutral-500 block uppercase tracking-wider mb-0.5">Aktif Sağlayıcı</span>
@@ -307,16 +311,34 @@ export default function TrackerDashboard() {
            </div>
         )}
 
-        {/* Modal: Tracker Gelişmiş Filtre */}
+        {/* Modal: Tracker Gelişmiş Filtre (KOD VE ZIP EKLENDİ) */}
         {isTrackerFilterOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border">
                <div className="flex justify-between items-center border-b pb-3"><h3 className="font-bold text-sm">Gelişmiş Filtreleme</h3><button onClick={() => setIsTrackerFilterOpen(false)} className="hover:text-rose-600 transition"><X size={16}/></button></div>
                <div className="space-y-3 mt-4">
-                  <input type="text" value={trackerFilter.city} onChange={(e) => setTrackerFilter({...trackerFilter, city: e.target.value})} placeholder="İl" className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900" />
-                  <input type="text" value={trackerFilter.district} onChange={(e) => setTrackerFilter({...trackerFilter, district: e.target.value})} placeholder="İlçe" className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900" />
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İl (Şehir)</label>
+                    <input type="text" value={trackerFilter.city} onChange={(e) => setTrackerFilter({...trackerFilter, city: e.target.value})} placeholder="Örn: İstanbul" className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İlçe</label>
+                    <input type="text" value={trackerFilter.district} onChange={(e) => setTrackerFilter({...trackerFilter, district: e.target.value})} placeholder="Örn: Kadıköy" className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Posta Kodu</label>
+                    <input type="text" value={trackerFilter.zip} onChange={(e) => setTrackerFilter({...trackerFilter, zip: e.target.value})} placeholder="Örn: 34744" className="w-full p-2 text-xs font-mono border rounded-lg outline-none focus:border-neutral-900" />
+                  </div>
+                  <div className="pt-2 border-t border-neutral-100 mt-2">
+                    <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1.5">Kurum / Grup Kodu</label>
+                    <input type="text" value={trackerFilter.code} onChange={(e) => setTrackerFilter({...trackerFilter, code: e.target.value.toUpperCase()})} placeholder="Örn: MOB-2026" className="w-full p-2 text-xs font-mono border rounded-lg outline-none focus:border-neutral-900 uppercase" />
+                  </div>
                </div>
-               <button onClick={() => setIsTrackerFilterOpen(false)} className="w-full mt-4 py-2 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-lg text-xs font-bold">Uygula</button>
+               
+               <div className="flex justify-between items-center space-x-2 pt-4 mt-4 border-t border-neutral-100">
+                  <button onClick={() => { setTrackerFilter({city:'', district:'', zip:'', code:''}); setIsTrackerFilterOpen(false); }} className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition">Filtreyi Temizle</button>
+                  <button onClick={() => setIsTrackerFilterOpen(false)} className="px-5 py-1.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-lg text-xs font-bold">Uygula</button>
+               </div>
              </div>
            </div>
         )}
