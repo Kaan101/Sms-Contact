@@ -445,7 +445,6 @@ export default function App() {
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
   
-  // 🔥 TRACKER LİSTESİ İÇİN INLINE STATE'LER
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
@@ -640,7 +639,7 @@ export default function App() {
     setCompanyCode('');
     setIsCodeHidden(false);
     setSession(null); setProviderProfile(null); setIsProfileOpen(false); setIsCustomerHistoryOpen(false); 
-    setIsProviderHistoryOpen(false); setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
+    setMyCustomerRequests([]); setStep('INPUT'); setAdminTab('WOZ');
   };
 
   const handleOpenProviderDirectSession = (provPhone) => {
@@ -818,86 +817,79 @@ export default function App() {
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
 
   // =====================================================================
-  // 🛡️ LİSTE FİLTRELEMELERİ
+  // 🛡️ LİSTE FİLTRELEMELERİ (PERFORMANS MEMOIZATION)
   // =====================================================================
 
-  const activeCustomerRequests = safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status)));
-  const pendingReviewCustomerRequests = safeArray(myCustomerRequests).filter(r => r && safeUpper(r.status) === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]));
-  const pastCustomerRequests = safeArray(myCustomerRequests).filter(r => r && (safeUpper(r.status) === 'CANCELLED' || (safeUpper(r.status) === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`]))));
-  const filteredPastCustomerRequests = safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req.raw_text).includes(q) || safeLower(req.provider_name).includes(q) || safeLower(req.status).includes(q); });
+  const activeCustomerRequests = useMemo(() => 
+    safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status))),
+  [myCustomerRequests]);
+
+  const pendingReviewCustomerRequests = useMemo(() => 
+    safeArray(myCustomerRequests).filter(r => r && safeUpper(r.status) === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])),
+  [myCustomerRequests, reviewedRequestsMap]);
+
+  const pastCustomerRequests = useMemo(() => 
+    safeArray(myCustomerRequests).filter(r => r && (safeUpper(r.status) === 'CANCELLED' || (safeUpper(r.status) === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])))),
+  [myCustomerRequests, reviewedRequestsMap]);
+
+  const filteredPastCustomerRequests = useMemo(() => 
+    safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req.raw_text).includes(q) || safeLower(req.provider_name).includes(q) || safeLower(req.status).includes(q); }),
+  [pastCustomerRequests, searchCustomerHistoryText]);
   
-  const activeProviderRequests = safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
-  const pastProviderRequests = safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status)));
+  const activeProviderRequests = useMemo(() => 
+    safeArray(providerRequests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status))),
+  [providerRequests]);
+
+  const pastProviderRequests = useMemo(() => 
+    safeArray(providerRequests).filter(r => r && ['COMPLETED', 'CANCELLED'].includes(safeUpper(r.status))),
+  [providerRequests]);
   
-  const visiblePoolRequests = safeArray(poolRequests).filter(req => {
-    if (!req || hiddenPoolRequests.includes(req.id)) return false;
-    if (isCodeHiddenReq(req.location)) return false; 
-    return true;
-  });
+  const visiblePoolRequests = useMemo(() => 
+    safeArray(poolRequests).filter(req => { if (!req || hiddenPoolRequests.includes(req.id)) return false; if (isCodeHiddenReq(req.location)) return false; return true; }),
+  [poolRequests, hiddenPoolRequests]);
   
-  const filteredProviders = safeArray(providers).filter(p => { 
-    if(!p) return false;
-    const q = safeLower(searchProviderText).trim(); 
-    if (!q) return true; 
-    return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); 
-  });
+  const filteredProviders = useMemo(() => 
+    safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(searchProviderText).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }),
+  [providers, searchProviderText]);
   
-  const filteredMatchedRequests = safeArray(matchedRequests).filter(r => { 
-    if(!r) return false;
-    const q = safeLower(searchMatchText).trim(); 
-    const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; 
-    if (!statusMatch) return false; 
-    if (!q) return true; 
-    return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
-  });
+  const filteredMatchedRequests = useMemo(() => 
+    safeArray(matchedRequests).filter(r => { if(!r) return false; const q = safeLower(searchMatchText).trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); }),
+  [matchedRequests, searchMatchText, matchStatusFilter]);
 
-  const filteredTrackerRequests = safeArray(trackerRequests).filter(r => {
-    if(!r) return false;
-    
-    // Geçici olarak listeden kaldırılan talepler
-    if (hiddenPoolRequests.includes(r.id)) return false;
+  const filteredTrackerRequests = useMemo(() => 
+    safeArray(trackerRequests).filter(r => {
+      if(!r) return false;
+      if (hiddenPoolRequests.includes(r.id)) return false;
+      const status = safeUpper(r.status);
+      if (status === 'COMPLETED' || status === 'CANCELLED') return false;
 
-    const status = safeUpper(r.status);
-    if (status === 'COMPLETED' || status === 'CANCELLED') {
-       return false;
-    }
+      const reqCode = safeLower(extractCode(r.location));
+      const isHiddenReq = isCodeHiddenReq(r.location);
+      const filterCode = safeLower(trackerFilter.code).trim();
 
-    const reqCode = safeLower(extractCode(r.location));
-    const isHiddenReq = isCodeHiddenReq(r.location);
-    const filterCode = safeLower(trackerFilter.code).trim();
+      if (isHiddenReq) { if (!filterCode || reqCode !== filterCode) return false; } 
+      else { if (filterCode && reqCode !== filterCode) return false; }
+      
+      if (showMyTrackerTasks && providerProfile) {
+          const isMyTask = activeProviderRequests.some(pr => Number(pr?.id) === Number(r.id));
+          if (!isMyTask) return false;
+      } else if (isTrackerPoolFilterActive && providerProfile) {
+          const isInPool = poolRequests.some(pr => Number(pr?.id) === Number(r.id));
+          if (!isInPool) return false;
+      }
 
-    if (isHiddenReq) {
-        if (!filterCode || reqCode !== filterCode) {
-            return false;
-        }
-    } else {
-        if (filterCode && reqCode !== filterCode) {
-            return false;
-        }
-    }
-    
-    // 🔥 İşlerim Filtresi
-    if (showMyTrackerTasks && providerProfile) {
-        const isMyTask = activeProviderRequests.some(pr => Number(pr?.id) === Number(r.id));
-        if (!isMyTask) return false;
-    } 
-    // 🔥 Bana Uygun Havuz Filtresi
-    else if (isTrackerPoolFilterActive && providerProfile) {
-        const isInPool = poolRequests.some(pr => Number(pr?.id) === Number(r.id));
-        if (!isInPool) return false;
-    }
+      const q = safeLower(trackerSearch).trim();
+      const matchesSearch = !q || safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.location).includes(q) || String(r.id).includes(q);
+      if (!matchesSearch) return false;
 
-    const q = safeLower(trackerSearch).trim();
-    const matchesSearch = !q || safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.location).includes(q) || String(r.id).includes(q);
-    if (!matchesSearch) return false;
+      const locLow = safeLower(r.location);
+      if (trackerFilter.city && !locLow.includes(safeLower(trackerFilter.city).trim())) return false;
+      if (trackerFilter.district && !locLow.includes(safeLower(trackerFilter.district).trim())) return false;
+      if (trackerFilter.zip && !locLow.includes(safeLower(trackerFilter.zip).trim())) return false;
 
-    const locLow = safeLower(r.location);
-    if (trackerFilter.city && !locLow.includes(safeLower(trackerFilter.city).trim())) return false;
-    if (trackerFilter.district && !locLow.includes(safeLower(trackerFilter.district).trim())) return false;
-    if (trackerFilter.zip && !locLow.includes(safeLower(trackerFilter.zip).trim())) return false;
-
-    return true;
-  });
+      return true;
+    }),
+  [trackerRequests, hiddenPoolRequests, trackerFilter, showMyTrackerTasks, providerProfile, activeProviderRequests, isTrackerPoolFilterActive, poolRequests, trackerSearch]);
 
   const hasActiveFilters = trackerFilter.city || trackerFilter.district || trackerFilter.zip || trackerFilter.code || isTrackerPoolFilterActive || showMyTrackerTasks;
 
@@ -932,21 +924,13 @@ export default function App() {
     });
   }, [pendingRequests]);
   
-  const filteredSmsLogs = safeArray(smsLogs).filter(log => { 
-    if(!log) return false;
-    const q = safeLower(searchSmsText).trim(); 
-    const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; 
-    if (!recipientMatch) return false; 
-    if (!q) return true; 
-    return safeLower(log.recipient_phone).includes(q) || safeLower(log.message_body).includes(q); 
-  });
+  const filteredSmsLogs = useMemo(() => 
+    safeArray(smsLogs).filter(log => { if(!log) return false; const q = safeLower(searchSmsText).trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return safeLower(log.recipient_phone).includes(q) || safeLower(log.message_body).includes(q); }),
+  [smsLogs, searchSmsText, smsRecipientFilter]);
   
-  const filteredWozProviders = safeArray(providers).filter(p => { 
-    if(!p) return false;
-    const q = safeLower(wozProviderSearch).trim(); 
-    if (!q) return true; 
-    return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); 
-  });
+  const filteredWozProviders = useMemo(() => 
+    safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(wozProviderSearch).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }),
+  [providers, wozProviderSearch]);
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
@@ -966,7 +950,7 @@ export default function App() {
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
-              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.39 (Tracker Provider Badge)</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">Protocol 18.40.0 (Performance & Memoization)</span>
             </div>
           </div>
 
@@ -1224,7 +1208,6 @@ export default function App() {
                                <MapContainer center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [41.0082, 28.9784]} zoom={mapPosition ? 15 : 12} style={{ height: '100%', width: '100%', minHeight: '300px' }} zoomControl={false}>
                                  <ZoomControl position="bottomleft" />
                                  <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                 {/* 🔥 MÜŞTERİ EKRANI HARİTA BOYUT ONARICI */}
                                  <UniversalMapController center={mapPosition ? [mapPosition.lat, mapPosition.lng] : [41.0082, 28.9784]} />
                                  <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                                </MapContainer>
@@ -1523,7 +1506,7 @@ export default function App() {
                 </form>
               )}
 
-              {/* SAĞLAYICI "AKTİF İŞLERİM" */}
+              {/* 🔥 RESTORE EDİLEN SAĞLAYICI "AKTİF İŞLERİM" */}
               <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-3">
                 <h3 className="text-xs font-mono uppercase font-bold text-neutral-950">Aktif İşlerim ({activeProviderRequests.length})</h3>
                 <div className="space-y-3">
@@ -1964,7 +1947,7 @@ export default function App() {
                                    <button onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">Teslim Et</button>
                                    {safeString(req.preferred_channel).includes('WHATSAPP') && req.contact_value && (
                                      <a href={`https://wa.me/${extractPhoneForWa(req.contact_value)}?text=${encodeURIComponent('Merhaba, "' + req.raw_text + '" talebinizi aldım. Size nasıl yardımcı olabilirim?')}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
-                                       <MessageCircle size={14} /><span>Müşteriye WhatsApp'tan Yaz</span>
+                                       <MessageCircle size={14} /><span>WhatsApp'tan Yaz</span>
                                      </a>
                                    )}
                                  </>
@@ -2488,7 +2471,7 @@ export default function App() {
 
       {/* GİZLİ SÜRÜM BİLGİSİ */}
       <div className="fixed bottom-1 right-2 z-[9999] text-[9px] font-mono text-neutral-400 opacity-60 pointer-events-none select-none">
-        v18.39.0 (Tracker Provider Badge) | 16.09.2026
+        v18.40.0 (Performance & Memoization) | 16.09.2026
       </div>
 
     </div>
