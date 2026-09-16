@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Layers, FileCheck2, FolderKanban, Settings, Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown, X } from 'lucide-react';
+// 🔥 HATAYA SEBEP OLAN EKSİK İKONLAR (ChevronUp, ChevronDown) EKLENDİ
+import { Layers, FileCheck2, FolderKanban, Settings, Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
 
@@ -311,7 +312,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TEST VE PROJE KANBANLARI AYNEN KORUNDU */}
       {adminTab === 'TESTS' && (
         <div className="space-y-4">
           <form onSubmit={handleCreateTest} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
