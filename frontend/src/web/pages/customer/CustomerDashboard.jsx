@@ -7,7 +7,7 @@ import {
   Phone, MessageSquare, Mail, MessageCircle, MapPin, Clock, Shield, Tag, 
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
-  ArrowRight, X, Check, Calendar // 🔥 HATAYA SEBEP OLAN EKSİK 'Calendar' İKONU EKLENDİ
+  ArrowRight, X, Check, Calendar 
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -235,9 +235,11 @@ export default function CustomerDashboard() {
                   </div>
                 </div>
               </div>
+              
               {!isDetailsCollapsed && (
-                 <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:grid md:grid-cols-5 gap-6">
-                    <div className="md:col-span-2 space-y-5">
+                 <div className="mt-2 pt-5 border-t border-neutral-200/70 flex flex-col md:flex-row gap-6">
+                    {/* SOL PANEL (Ayarlar) */}
+                    <div className="w-full md:w-5/12 space-y-5">
                        <div>
                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>{deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase">temizle</button>}</label>
                            <div className="flex items-center gap-2"><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" /><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" /></div>
@@ -261,9 +263,13 @@ export default function CustomerDashboard() {
                           <div className="relative"><Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" /></div>
                        </div>
                     </div>
-                    <div className="md:col-span-3 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
+                    
+                    {/* SAĞ PANEL (Harita - 🔥 HEIGHT SORUNU ÇÖZÜLDÜ) */}
+                    <div className="w-full md:w-7/12 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
                        <div className="flex items-center justify-between mb-2"><span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span><button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button></div>
-                       <div className="relative w-full h-[300px] md:h-[400px] flex-1 rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
+                       
+                       {/* 🔥 ÇÖZÜM BURADA: Flex-1 yerine mobil için sabit height, masaüstü için md:flex-1 md:h-auto verildi */}
+                       <div className="relative w-full h-[350px] md:h-full md:min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                           <div className="absolute top-2 left-2 right-2 z-[1000]">
                              <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input ref={mapSearchInputRef} type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" /></div>
                              {isSuggestionsVisible && mapSuggestions.length > 0 && (
@@ -272,12 +278,15 @@ export default function CustomerDashboard() {
                                </div>
                              )}
                           </div>
-                          <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-                            <ZoomControl position="bottomleft" />
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                            <UniversalMapController center={mapPosition || [41.0082, 28.9784]} />
-                            <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
-                          </MapContainer>
+                          
+                          <div className="absolute inset-0 z-0">
+                            <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                              <ZoomControl position="bottomleft" />
+                              <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                              <UniversalMapController center={mapPosition || [41.0082, 28.9784]} />
+                              <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
+                            </MapContainer>
+                          </div>
                        </div>
                     </div>
                  </div>
