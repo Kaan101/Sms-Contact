@@ -279,15 +279,8 @@ export default function TrackerDashboard() {
             {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            
-                           {/* DEBUG: Şartların ne durumda olduğunu ekrana yazdırıyoruz */}
-                           <div className="text-[9px] font-mono text-neutral-400 bg-neutral-100 p-1.5 rounded mb-2">
-                             <div>hasProfile: {providerProfile ? 'EVET' : 'HAYIR'}</div>
-                             <div>reqStatus: {reqStatus}</div>
-                             <div>hasJoined: {hasJoined ? 'EVET' : 'HAYIR'}</div>
-                             <div>isMyTask: {isMyTask ? 'EVET' : 'HAYIR'}</div>
-                           </div>
-
-                           {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING') && !hasJoined && !isMyTask && (
+                           {/* 🔥 HATA BURADA ÇÖZÜLDÜ: reqStatus kontrolüne 'MATCHED' eklendi. Artık başkasına atanmış olsa bile kuyruğa girilebilecek. */}
+                           {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
                               <div className="flex flex-col gap-2">
                                 {!isMatch && (
                                   <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded-lg font-medium flex items-center space-x-1.5">
