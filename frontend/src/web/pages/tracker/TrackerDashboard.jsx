@@ -153,6 +153,8 @@ export default function TrackerDashboard() {
       if(!r) return false;
       if (hiddenPoolRequests.includes(r.id)) return false;
       const status = safeUpper(r.status);
+      
+      // Tracker'da sadece İptal ve Tamamlandı olanları gizliyoruz
       if (status === 'COMPLETED' || status === 'CANCELLED') return false;
 
       const reqCode = safeLower(extractCode(r.location));
@@ -186,7 +188,7 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR - İşlerim butonu kaldırıldı */}
+        {/* SOL ÜST BUTONLAR */}
         <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
@@ -270,14 +272,9 @@ export default function TrackerDashboard() {
                   const reqStatus = safeUpper(req.status);
                   const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
 
-                  // 🔥 YENİ KURAL: Eğer Sağlayıcı bu işi almışsa, numaranın gizli kalmasına izin verme (İlişki aktif)
                   const forceRevealContact = isMyTask; 
                   const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
-                  
-                  // Sağlayıcıya gösterilecek numara
                   const displayContact = forceRevealContact ? rawContact : getProviderContactDisplay(req.contact_value);
-                  
-                  // WhatsApp butonunu gösterme şartı
                   const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !safeString(req.contact_value).includes('HIDDEN'));
 
                   return (
@@ -302,7 +299,8 @@ export default function TrackerDashboard() {
                       {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                            
-                           {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
+                           {/* 🔥 HATA BURADA ÇÖZÜLDÜ: ACCEPTED ve PROVIDER_COMPLETED durumları eklendi. Diğer sağlayıcılar yedek olarak sıraya girebilsin. */}
+                           {providerProfile && ['POOL', 'PENDING', 'MATCHED', 'ACCEPTED', 'PROVIDER_SKIPPED', 'PROVIDER_COMPLETED'].includes(reqStatus) && !hasJoined && !isMyTask && (
                               <div className="flex gap-2">
                                 <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">
                                   Sıraya Gir
@@ -315,7 +313,6 @@ export default function TrackerDashboard() {
                            
                            {providerProfile && isMyTask && (
                              <div className="flex flex-col gap-2">
-                               {/* 🔥 YENİ: WhatsApp Butonu ve Müşteri Gerçek Numarası */}
                                <div className="bg-neutral-50 border border-neutral-200 p-2.5 rounded-lg flex items-center justify-between mb-1">
                                   <div className="flex flex-col">
                                     <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
@@ -334,7 +331,6 @@ export default function TrackerDashboard() {
                              </div>
                            )}
 
-                           {/* DEFANSİF KUYRUK LİSTESİ */}
                            {expandedTrackerReqId === req.id && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50 mt-1">
                                 <div className="space-y-2">
