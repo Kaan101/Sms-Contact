@@ -276,24 +276,20 @@ export default function TrackerDashboard() {
         
 {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2 cursor-default" onClick={(e) => e.stopPropagation()}>
-                           {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
-                              <div className="flex flex-col gap-2">
-                                {!isMatch && (
-                                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded-lg font-medium flex items-center space-x-1.5">
-                                    <AlertTriangle size={12} className="shrink-0" />
-                                    <span>Uyarı: Bu talep profilinizdeki anahtar kelimelerle tam eşleşmiyor.</span>
-                                  </div>
-                                )}
+                         
+          {providerProfile && (reqStatus === 'POOL' || reqStatus === 'PENDING' || reqStatus === 'MATCHED') && !hasJoined && !isMyTask && (
+                              isMatch ? (
                                 <div className="flex gap-2">
-                                  <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">
-                                    Sıraya Gir
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">
-                                    Kaldır
-                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleJoinPool(req.id); setExpandedTrackerReqId(null); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition">Sıraya Gir</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition">Kaldır</button>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded-lg text-center font-medium shadow-sm">
+                                  Anahtar kelimelerinizle uyuşmuyor.
+                                </div>
+                              )
                            )}
+
                            {providerProfile && isMyTask && (
                              <div className="flex flex-col gap-2">
                                {reqStatus === 'MATCHED' && <div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition">İşi Kabul Et</button><button onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition">Pas Geç</button></div>}
