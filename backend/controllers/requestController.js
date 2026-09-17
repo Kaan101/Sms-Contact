@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const fuzz = require('fuzzball');
 
 const logSms = async (requestId, type, phone, body) => {
   try {
@@ -34,17 +35,40 @@ const createRequest = async (req, res) => {
   }
 };
 
-// --- YARDIMCI FONKSİYON: Metni temizleyip kelimelere ayırır ---
-const extractWords = (text) => {
-  if (!text) return [];
-  // Noktalama işaretlerini boşlukla değiştir, boşluklardan böl ve 2 harften küçük kelimeleri (ve, a vs.) at ("su" kelimesi 2 harfli olduğu için kalır)
-  return text.toLowerCase()
-             .replace(/[.,!?/:;()'"-]/g, ' ')
-             .split(/\s+/)
-             .filter(w => w.length >= 2);
+// 🌟 YENİ: Bulanık Eşleşme (Fuzzy Logic) Yardımcı Fonksiyonu
+const isFuzzyMatch = (rawText, providerKeywords, threshold = 75) => {
+  if (!rawText || !providerKeywords) return false;
+  
+  const textLower = rawText.toLocaleLowerCase('tr-TR');
+  
+  let keywords = [];
+  if (typeof providerKeywords === 'string') {
+      keywords = providerKeywords.split(',');
+  } else if (Array.isArray(providerKeywords)) {
+      keywords = providerKeywords;
+  }
+
+  for (let keyword of keywords) {
+    const kwLower = String(keyword).trim().toLocaleLowerCase('tr-TR');
+    if (!kwLower || kwLower.length < 2) continue;
+    
+    // 1. Hızlı Yol: Alt metin olarak doğrudan geçiyorsa (Örn: "boya" -> "boyacı")
+    if (textLower.includes(kwLower)) {
+      return true;
+    }
+    
+    // 2. Bulanık Eşleşme (Fuzzy Match): Levenshtein tabanlı kök/oran karşılaştırması
+    // "ekmek" ile "Trabzon ekmeği" burada ~%81 skor üreterek 75 barajını geçer ve eşleşmeyi başarır.
+    const score = fuzz.token_set_ratio(kwLower, textLower);
+    
+    if (score >= threshold) {
+      return true;
+    }
+  }
+  return false;
 };
 
-// 🌟 GÜNCELLENDİ: Akıllı Kelime Kesişimi Algoritması (Smart Word Intersection)
+// 🌟 GÜNCELLENDİ: Fuzzy Logic Destekli Açık Havuz Eşleştirme Sistemi
 const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
@@ -65,31 +89,11 @@ const getOpenPoolRequests = async (req, res) => {
 
     let filteredPool = [];
     
-    if (providerKeywords.length > 0) {
-      // Sağlayıcının tüm anahtar kelimelerini tek bir havuzda toplayıp benzersiz kelimelere ayırıyoruz.
-      // Örn: ["su kaçağı", "damacana su"] -> ["su", "kaçağı", "damacana", "su"]
-      const provWordsArray = extractWords(providerKeywords.join(' '));
-
+    if (providerKeywords && providerKeywords.length > 0) {
       filteredPool = rows.filter(req => {
-        // Talebin içeriğini de kelimelere ayırıyoruz.
-        // Örn: "Acil su tesisatı lazım" -> ["acil", "su", "tesisatı", "lazım"]
+        // Talebin ham metnini ve kategori netleştirmesini birleştirip arıyoruz
         const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
-        const reqWords = extractWords(textToSearch);
-
-        // Herhangi bir talep kelimesi, sağlayıcının herhangi bir kelimesiyle eşleşiyor mu?
-        return reqWords.some(reqWord => {
-          return provWordsArray.some(provWord => {
-            // 1. Durum: Birebir kelime eşleşmesi (Örn: "su" === "su")
-            if (reqWord === provWord) return true;
-            
-            // 2. Durum: Kök kelime veya kelime öbeği geçişi (Örn: "boya" ve "boyacı")
-            // Yanlış eşleşmeyi önlemek için (Örn: "su" kelimesinin "sunum" içinde yakalanmaması için) 2 harften büyük olma şartı aranır.
-            if (reqWord.length > 2 && provWord.includes(reqWord)) return true;
-            if (provWord.length > 2 && reqWord.includes(provWord)) return true;
-            
-            return false;
-          });
-        });
+        return isFuzzyMatch(textToSearch, providerKeywords, 75); // 75 skor ve üzeri eşleşme kabul edilir
       });
     }
 
