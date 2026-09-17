@@ -370,7 +370,6 @@ export default function CustomerDashboard() {
                     const isActionLoading = actionLoadingId === req.id;
                     const reqStatus = safeUpper(req.status);
 
-                    // Sadece sağlayıcı kabul ettikten sonra numara açılır
                     const showProviderContact = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus);
 
                     return (
@@ -458,12 +457,17 @@ export default function CustomerDashboard() {
                                         <div>
                                           <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
                                             <span>#{idx + 1} {qProv.name}</span>
-                                            {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}{isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}{qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                            {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}{isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
                                           </p>
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {(isCurrent && showProviderContact) ? qProv.phone : '*** ** ** (Gizli)'}</p>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            {!isCurrent && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>)}
+                                            {!isCurrent && (
+                                                <div className="flex items-center">
+                                                    {qProv.interest_status === 'SKIPPED' && <span className="text-[11px] font-extrabold text-rose-400/80 mr-2 uppercase tracking-wider">Pas</span>}
+                                                    <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>
+                                                </div>
+                                            )}
                                         </div>
                                       </div>
                                     );
@@ -494,7 +498,7 @@ export default function CustomerDashboard() {
          </div>
       )}
 
-      {/* DEĞERLENDİRME VE GEÇMİŞ TALEPLER - (DEĞİŞİKLİK YOK) */}
+      {/* DEĞERLENDİRME VE GEÇMİŞ TALEPLER - (Aynen korundu) */}
       {pendingReviewCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">

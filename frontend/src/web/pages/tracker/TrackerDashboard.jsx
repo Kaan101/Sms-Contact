@@ -342,8 +342,8 @@ export default function TrackerDashboard() {
                                   {isActionLoading && <Loader2 size={12} className="animate-spin" />}
                                   <span>Sıraya Gir</span>
                                 </button>
-                                <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handlePoolSkip(req.id); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold transition cursor-pointer disabled:opacity-50">
-                                  Pas Geç
+                                <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer disabled:opacity-50">
+                                  Kaldır
                                 </button>
                               </div>
                            )}
@@ -369,21 +369,19 @@ export default function TrackerDashboard() {
                                      {isActionLoading && <Loader2 size={12} className="animate-spin" />}
                                      <span>İşi Kabul Et</span>
                                    </button>
-                                   <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1">
-                                     {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                                     <span>Pas Geç</span>
+                                   <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition cursor-pointer disabled:opacity-50">
+                                     Pas Geç
                                    </button>
                                  </div>
                                )}
                                
-                               {/* 🔥 ACCEPTED DURUMUNDA "İşi Teslim Et" ve "Pas Geç" YAN YANA */}
                                {reqStatus === 'ACCEPTED' && (
                                  <div className="flex gap-2">
                                    <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} className="flex-1 py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5 shadow-sm">
                                      {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                                      <span>{isActionLoading ? 'İşleniyor...' : 'İşi Teslim Et'}</span>
                                    </button>
-                                   <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-2 border text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1 shadow-sm">
+                                   <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} className="px-3 py-2 border text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1">
                                      {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                                      <span>Pas Geç</span>
                                    </button>
@@ -416,14 +414,19 @@ export default function TrackerDashboard() {
                                                 <span>#{idx + 1} {qProv.name || 'İsimsiz Sağlayıcı'}</span>
                                                 {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
                                                 {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
-                                                {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
                                               </p>
                                               <p className="text-[10px] font-mono text-neutral-500 mt-1">
                                                 📞 { (isCurrent && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus)) ? qProv.phone : '*** ** ** (Gizli)' }
                                               </p>
                                             </div>
                                             <div className="flex items-center space-x-2">
-                                                {!isCurrent && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>)}
+                                                {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50"><ShieldCheck size={10} /><span>Onayla</span></button>)}
+                                                {!isCurrent && (
+                                                    <div className="flex items-center">
+                                                        {qProv.interest_status === 'SKIPPED' && <span className="text-[11px] font-extrabold text-rose-400/70 mr-2 uppercase tracking-wider">Pas</span>}
+                                                        <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>
+                                                    </div>
+                                                )}
                                             </div>
                                           </div>
                                         );
