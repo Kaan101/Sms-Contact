@@ -35,11 +35,13 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 YENİ: Bulanık Eşleşme (Fuzzy Logic) Yardımcı Fonksiyonu
-const isFuzzyMatch = (rawText, providerKeywords, threshold = 75) => {
+// 🌟 TÜRKÇE NLP & FUZZY MATCH HİBRİT ALGORİTMASI
+const isFuzzyMatch = (rawText, providerKeywords, threshold = 70) => {
   if (!rawText || !providerKeywords) return false;
   
+  // 1. Metni küçük harfe çevirip kelimelere ayırıyoruz (Noktalama işaretlerini temizleyerek)
   const textLower = rawText.toLocaleLowerCase('tr-TR');
+  const textWords = textLower.split(/[\s,.;!?()]+/); 
   
   let keywords = [];
   if (typeof providerKeywords === 'string') {
@@ -52,23 +54,38 @@ const isFuzzyMatch = (rawText, providerKeywords, threshold = 75) => {
     const kwLower = String(keyword).trim().toLocaleLowerCase('tr-TR');
     if (!kwLower || kwLower.length < 2) continue;
     
-    // 1. Hızlı Yol: Alt metin olarak doğrudan geçiyorsa (Örn: "boya" -> "boyacı")
-    if (textLower.includes(kwLower)) {
-      return true;
+    // AŞAMA 1: Doğrudan Cümle İçinde Geçiyorsa (Örn: "su kaçağı")
+    if (textLower.includes(kwLower)) return true;
+    
+    // AŞAMA 2: Ek Alma Durumu (Örn: Sağlayıcı="tesisat", Müşteri="tesisatçı")
+    if (textWords.some(w => w.startsWith(kwLower))) return true;
+
+    // AŞAMA 3: Türkçe Ünsüz Yumuşaması (k->ğ, p->b, ç->c, t->d)
+    if (kwLower.length >= 3) {
+        const lastChar = kwLower.slice(-1);
+        if (['k', 'p', 'ç', 't'].includes(lastChar)) {
+            const root = kwLower.slice(0, -1); // "ekmek" -> "ekme" kökünü alır
+            
+            // Eğer müşterinin cümlesindeki kelimelerden biri "ekme" ile başlıyorsa (Örn: "ekmeği")
+            if (textWords.some(w => w.startsWith(root))) {
+                return true;
+            }
+        }
     }
+
+    // AŞAMA 4: Yazım Hataları ve Harf Kaymaları için Fuzzball
+    // Eşik (threshold) 75'ten 70'e düşürüldü ki "eknek" gibi hatalarda tolerans artsın
+    const partialScore = fuzz.partial_ratio(kwLower, textLower);
+    const tokenScore = fuzz.token_set_ratio(kwLower, textLower);
     
-    // 2. Bulanık Eşleşme (Fuzzy Match): Levenshtein tabanlı kök/oran karşılaştırması
-    // "ekmek" ile "Trabzon ekmeği" burada ~%81 skor üreterek 75 barajını geçer ve eşleşmeyi başarır.
-    const score = fuzz.token_set_ratio(kwLower, textLower);
-    
-    if (score >= threshold) {
+    if (Math.max(partialScore, tokenScore) >= threshold) {
       return true;
     }
   }
+  
   return false;
 };
 
-// 🌟 GÜNCELLENDİ: Fuzzy Logic Destekli Açık Havuz Eşleştirme Sistemi
 const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
@@ -91,9 +108,8 @@ const getOpenPoolRequests = async (req, res) => {
     
     if (providerKeywords && providerKeywords.length > 0) {
       filteredPool = rows.filter(req => {
-        // Talebin ham metnini ve kategori netleştirmesini birleştirip arıyoruz
         const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
-        return isFuzzyMatch(textToSearch, providerKeywords, 75); // 75 skor ve üzeri eşleşme kabul edilir
+        return isFuzzyMatch(textToSearch, providerKeywords, 70); // Eşik 70 yapıldı
       });
     }
 
