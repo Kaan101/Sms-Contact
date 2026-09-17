@@ -300,16 +300,12 @@ export default function TrackerDashboard() {
                   const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
                   const isActionLoading = actionLoadingId === req.id;
 
-                  // 🔥 YENİ KURAL: Sağlayıcı henüz "Kabul Et" demediyse (MATCHED) numara gizli kalır. ACCEPTED olunca açılır.
+                  // 🔥 YENİ VE KESİN KURAL: İletişim bilgisi SADECE sağlayıcı KABUL ET dedikten sonra açığa çıkar.
                   const forceRevealContact = isMyTask && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
                   const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
-                  const isHiddenPreference = safeString(req.contact_value).includes('HIDDEN');
                   
-                  const displayContact = forceRevealContact 
-                      ? rawContact 
-                      : (isHiddenPreference ? 'Gizli (Kabul Edince Açılacak)' : getProviderContactDisplay(req.contact_value));
-                      
-                  const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !isHiddenPreference);
+                  const displayContact = forceRevealContact ? rawContact : 'Gizli (Kabul Edince Açılacak)';
+                  const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
 
                   return (
                     <div key={req.id} onClick={() => { 
@@ -365,7 +361,7 @@ export default function TrackerDashboard() {
                                <div className="bg-neutral-50 border border-neutral-200 p-2.5 rounded-lg flex items-center justify-between mb-1">
                                   <div className="flex flex-col">
                                     <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
-                                    <span className="text-xs font-bold text-neutral-900 mt-0.5">{displayContact}</span>
+                                    <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-neutral-900' : 'text-neutral-400'}`}>{displayContact}</span>
                                   </div>
                                   {showWhatsApp && (
                                      <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
@@ -422,7 +418,9 @@ export default function TrackerDashboard() {
                                                 {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
                                                 {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
                                               </p>
-                                              <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone || 'Gizli'}</p>
+                                              <p className="text-[10px] font-mono text-neutral-500 mt-1">
+                                                📞 { (isCurrent && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus)) ? qProv.phone : '*** ** ** (Gizli)' }
+                                              </p>
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50"><ShieldCheck size={10} /><span>Onayla</span></button>)}

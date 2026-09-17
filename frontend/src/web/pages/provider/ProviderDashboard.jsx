@@ -17,7 +17,6 @@ export default function ProviderDashboard() {
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // Akordiyon State'leri
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isActiveTasksOpen, setIsActiveTasksOpen] = useState(false);
   const [isPoolOpen, setIsPoolOpen] = useState(false);
@@ -53,7 +52,6 @@ export default function ProviderDashboard() {
         ]);
         
         const allProviderReqs = safeArray(rRes?.data?.requests);
-        
         const active = allProviderReqs.filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status)));
         setActiveRequests(active);
 
@@ -201,7 +199,6 @@ export default function ProviderDashboard() {
                     <span className={`text-[10px] font-mono ${metrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600 font-bold' : 'text-neutral-400'}`}>{metrics.wordCount} / {MAX_KEYWORD_COUNT}</span>
                   </div>
                   <textarea rows={4} maxLength={MAX_KEYWORD_CHARS} value={formData.serviceKeywords} onChange={(e) => setFormData({...formData, serviceKeywords: e.target.value})} placeholder="kombi, tamirat, nakliye, daire, tesisat..." className="w-full p-3 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 resize-none font-medium leading-relaxed" />
-                  <span className="text-[10px] text-neutral-400 block mt-1">Hizmet verdiğiniz anahtar kelimeleri virgülle ayırarak yazın.</span>
                 </div>
 
                 <button type="submit" disabled={loading || metrics.wordCount > MAX_KEYWORD_COUNT} className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50 transition">
@@ -213,7 +210,6 @@ export default function ProviderDashboard() {
           )}
         </div>
 
-        {/* TALEPLER VE UYGUN HAVUZ */}
         <div className="lg:col-span-7 space-y-6">
           
           {/* AKTİF GÖREVLERİM AKORDİYON */}
@@ -238,12 +234,12 @@ export default function ProviderDashboard() {
                       const reqStatus = safeUpper(req.status);
                       const isActionLoading = actionLoadingId === req.id;
                       
-                      // 🔥 KESİN ÇÖZÜM: Bu iş bu sağlayıcıya atandıysa (activeRequests içinde görünüyor), durumunun MATCHED veya ACCEPTED olması fark etmeksizin gizliliği kaldırıyoruz!
-                      const forceReveal = true; 
+                      // 🔥 YENİ VE KESİN KURAL: İletişim bilgisi SADECE sağlayıcı KABUL ET dedikten sonra açığa çıkar.
+                      const isTaskActiveForMe = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus);
                       const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
-                      const displayContact = forceReveal ? rawContact : getProviderContactDisplay(req.contact_value);
                       
-                      const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceReveal || !safeString(req.contact_value).includes('HIDDEN'));
+                      const displayContact = isTaskActiveForMe ? rawContact : 'Gizli (Kabul Edince Açılacak)';
+                      const showWhatsApp = isTaskActiveForMe && safeString(req.preferred_channel).includes('WHATSAPP');
 
                       return (
                         <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border space-y-3 text-xs">
@@ -261,7 +257,7 @@ export default function ProviderDashboard() {
                           <div className="bg-white border p-3 rounded-xl flex items-center justify-between shadow-xs">
                             <div className="flex flex-col">
                               <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
-                              <span className="text-xs font-bold text-neutral-900 mt-0.5">{displayContact}</span>
+                              <span className={`text-xs font-bold mt-0.5 ${isTaskActiveForMe ? 'text-neutral-900' : 'text-neutral-400'}`}>{displayContact}</span>
                             </div>
                             {showWhatsApp && (
                                <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
