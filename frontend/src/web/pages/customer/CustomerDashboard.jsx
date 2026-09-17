@@ -198,7 +198,6 @@ export default function CustomerDashboard() {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
       await fetchCustomerData(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
     } finally {
       setActionLoadingId(null);
     }
@@ -210,7 +209,6 @@ export default function CustomerDashboard() {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); 
       await fetchCustomerData(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
     } finally {
       setActionLoadingId(null);
     }
@@ -223,20 +221,17 @@ export default function CustomerDashboard() {
       setExpandedCustomerQueueReqId(null); 
       await fetchCustomerData(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
     } finally {
       setActionLoadingId(null);
     }
   };
 
   const handleDeleteRequest = async (requestId) => { 
-    if (!window.confirm('Bu talebi iptal etmek istediğinize emin misiniz?')) return;
     setActionLoadingId(requestId);
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'CANCELLED' }); 
       await fetchCustomerData(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
     } finally {
       setActionLoadingId(null);
     }
@@ -251,7 +246,6 @@ export default function CustomerDashboard() {
       setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); 
       await fetchCustomerData(); 
     } catch (err) {
-      alert('Değerlendirme gönderilemedi.');
     } finally {
       setActionLoadingId(null);
     }
@@ -376,7 +370,7 @@ export default function CustomerDashboard() {
                     const isActionLoading = actionLoadingId === req.id;
                     const reqStatus = safeUpper(req.status);
 
-                    // 🔥 YENİ VE KESİN KURAL: Sağlayıcının telefon numarası sadece kendisi ACCEPTED aşamasına geçtiğinde müşteriye görünür.
+                    // Sadece sağlayıcı kabul ettikten sonra numara açılır
                     const showProviderContact = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus);
 
                     return (
@@ -430,7 +424,6 @@ export default function CustomerDashboard() {
                               <div className="px-3 pb-3"><div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 bg-rose-50 border border-rose-200 text-rose-950"><div className="flex items-center space-x-1.5"><AlertTriangle size={13} className="text-rose-700 shrink-0" /><span>Bu sağlayıcı talebinizi <strong>pas geçti</strong>. Lütfen listeden başka birini seçin.</span></div><button onClick={() => setExpandedCustomerQueueReqId(req.id)} className="px-2.5 py-1 bg-rose-600 text-white rounded text-[10px] font-bold shadow-sm cursor-pointer">Seçenekleri Gör</button></div></div>
                             )}
 
-                            {/* 🔥 YENİ KURAL: MATCHED Aşamasında onayla butonu yerine bekleyin ibaresi */}
                             {reqStatus === 'MATCHED' && !expandedCustomerQueueReqId && (
                               <div className="px-3 pb-3">
                                  <div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center space-x-1.5 bg-amber-50 border border-amber-200 text-amber-950">
@@ -467,7 +460,6 @@ export default function CustomerDashboard() {
                                             <span>#{idx + 1} {qProv.name}</span>
                                             {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}{isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}{qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
                                           </p>
-                                          {/* 🔥 YENİ KURAL: Kuyruktaki sağlayıcıların numaraları sadece mevcut ise ve KABUL EDİLMİŞSE görünür. Diğerleri hep GİZLİ. */}
                                           <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {(isCurrent && showProviderContact) ? qProv.phone : '*** ** ** (Gizli)'}</p>
                                         </div>
                                         <div className="flex items-center space-x-2">
@@ -502,7 +494,7 @@ export default function CustomerDashboard() {
          </div>
       )}
 
-      {/* DEĞERLENDİRME BEKLEYENLER VE GEÇMİŞ TALEPLER - DEĞİŞİKLİK YOK */}
+      {/* DEĞERLENDİRME VE GEÇMİŞ TALEPLER - (DEĞİŞİKLİK YOK) */}
       {pendingReviewCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
