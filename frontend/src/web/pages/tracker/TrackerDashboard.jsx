@@ -42,10 +42,8 @@ export default function TrackerDashboard() {
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
 
-  // Aksiyon Yüklenme (Loading) Durumları İçin State
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // WoZ State
   const [queryText, setQueryText] = useState('');
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineTime, setDeadlineTime] = useState('23:59'); 
@@ -98,10 +96,10 @@ export default function TrackerDashboard() {
         try {
           const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trackerMapSearchText)}&limit=5&countrycodes=tr`);
           setTrackerMapSuggestions(safeArray(res?.data));
-          if (trackerSearchInputRef.current === document.activeElement) setIsSuggestionsVisible(true);
+          if (trackerSearchInputRef.current === document.activeElement) setIsTrackerSuggestionsVisible(true);
         } catch (err) {} finally { setIsTrackerMapSearching(false); }
       } else {
-        setTrackerMapSuggestions([]); setIsSuggestionsVisible(false);
+        setTrackerMapSuggestions([]); setIsTrackerSuggestionsVisible(false);
       }
     }, 400);
     return () => clearTimeout(delayDebounceFn);
@@ -219,7 +217,6 @@ export default function TrackerDashboard() {
   return (
     <div className="absolute inset-0 pt-16 bg-neutral-100 overflow-hidden flex flex-col z-0">
         
-        {/* SOL ÜST BUTONLAR */}
         <div className="absolute top-32 left-4 z-[400] flex flex-col space-y-2 items-start pointer-events-auto">
            {providerProfile && (
              <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-neutral-200/50 shadow-sm mb-1 pointer-events-none">
@@ -231,13 +228,12 @@ export default function TrackerDashboard() {
            <button onClick={() => setIsTrackerListOpen(!isTrackerListOpen)} className="flex items-center space-x-2 bg-white text-neutral-900 border px-4 py-2.5 rounded-xl shadow-md transition w-full sm:w-auto hover:bg-neutral-50 cursor-pointer"><Layers size={16} /> <span className="font-semibold text-sm">Görev Listesi</span></button>
         </div>
 
-        {/* ANA HARİTA ALANI */}
         <div className="flex-1 w-full h-full relative z-0">
           
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[90vw] sm:w-96 max-w-[400px]">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-3.5 text-neutral-400" />
-              <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition focus:ring-2 focus:ring-neutral-900" />
+              <input ref={trackerSearchInputRef} type="text" value={trackerMapSearchText} onChange={(e) => setTrackerMapSearchText(e.target.value)} onFocus={() => setIsTrackerSuggestionsVisible(true)} onBlur={() => setTimeout(() => setIsTrackerSuggestionsVisible(false), 200)} placeholder="Haritada adres ara ve git..." className="w-full pl-10 pr-4 py-3 text-sm rounded-xl outline-none shadow-lg bg-white/90 backdrop-blur-sm transition focus:ring-2 focus:ring-neutral-900" />
             </div>
             
             {isTrackerSuggestionsVisible && trackerMapSuggestions.length > 0 && (
@@ -304,10 +300,16 @@ export default function TrackerDashboard() {
                   const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
                   const isActionLoading = actionLoadingId === req.id;
 
-                  const forceRevealContact = isMyTask; 
+                  // 🔥 YENİ KURAL: Sağlayıcı henüz "Kabul Et" demediyse (MATCHED) numara gizli kalır. ACCEPTED olunca açılır.
+                  const forceRevealContact = isMyTask && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
                   const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
-                  const displayContact = forceRevealContact ? rawContact : getProviderContactDisplay(req.contact_value);
-                  const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !safeString(req.contact_value).includes('HIDDEN'));
+                  const isHiddenPreference = safeString(req.contact_value).includes('HIDDEN');
+                  
+                  const displayContact = forceRevealContact 
+                      ? rawContact 
+                      : (isHiddenPreference ? 'Gizli (Kabul Edince Açılacak)' : getProviderContactDisplay(req.contact_value));
+                      
+                  const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !isHiddenPreference);
 
                   return (
                     <div key={req.id} onClick={() => { 
@@ -394,6 +396,7 @@ export default function TrackerDashboard() {
                              </div>
                            )}
 
+                           {/* DEFANSİF KUYRUK LİSTESİ */}
                            {expandedTrackerReqId === req.id && (
                               <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50 mt-1">
                                 <div className="space-y-2">
