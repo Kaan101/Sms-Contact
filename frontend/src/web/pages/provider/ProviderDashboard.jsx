@@ -261,26 +261,27 @@ export default function ProviderDashboard() {
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
                             <span className="text-[10px] font-mono text-neutral-500">📍 {extractAddress(req.location)}</span>
                             
-                            <div className="flex items-center space-x-2 w-full mt-2 sm:w-auto sm:mt-0">
+                            <div className="flex items-center space-x-2">
                               {reqStatus === 'MATCHED' && (
                                 <>
-                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1 transition shadow-xs">
+                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1 transition shadow-xs">
                                     {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                                    <span>{isActionLoading ? 'İşleniyor...' : 'Kabul Et'}</span>
+                                    <span>Kabul Et</span>
                                   </button>
-                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition flex items-center justify-center space-x-1">
-                                    {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                                    <span>Pas Geç</span>
+                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
+                                    Pas Geç
                                   </button>
                                 </>
                               )}
+                              
+                              {/* 🔥 ACCEPTED DURUMUNDA "İşi Teslim Et" ve "Pas Geç" YAN YANA */}
                               {reqStatus === 'ACCEPTED' && (
                                 <>
-                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="flex-1 sm:flex-none px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5 transition shadow-sm">
+                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition shadow-sm">
                                     {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                                     <span>{isActionLoading ? 'İşleniyor...' : 'İşi Teslim Et'}</span>
                                   </button>
-                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-3.5 py-2.5 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition flex items-center justify-center space-x-1 shadow-sm">
+                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-4 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 flex items-center space-x-1 transition">
                                     {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                                     <span>Pas Geç</span>
                                   </button>
@@ -297,4 +298,101 @@ export default function ProviderDashboard() {
             )}
           </div>
 
-          <div className="bg
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
+            <div onClick={() => setIsPoolOpen(!isPoolOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
+              <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
+                <Tag size={16} className="text-blue-600" />
+                <span>Uzmanlığınıza Uygun Açık Havuz ({poolRequests.length})</span>
+              </h3>
+              <div className="text-neutral-400">{isPoolOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
+            </div>
+
+            {isPoolOpen && (
+              <div className="p-6 animate-in fade-in duration-200">
+                {!providerProfile ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Uygun havuz işlerini görebilmek için önce profilinizi kaydetmelisiniz.</div>
+                ) : poolRequests.length === 0 ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Şu an anahtar kelimelerinizle eşleşen açık havuz talebi bulunmuyor.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {poolRequests.map((req) => {
+                      const isActionLoading = actionLoadingId === req.id;
+                      return (
+                        <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                              {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
+                            </div>
+                            <h4 className="font-bold text-neutral-950 text-sm mt-0.5">"{req.raw_text}"</h4>
+                            <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
+                              {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                              <span>Sıraya Gir</span>
+                            </button>
+                            <button disabled={isActionLoading} onClick={() => handlePoolSkip(req.id)} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
+                              Pas Geç
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
+            <div onClick={() => setIsPastTasksOpen(!isPastTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
+              <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
+                <History size={16} className="text-neutral-600" />
+                <span>Geçmiş Talepler ({pastRequests.length})</span>
+              </h3>
+              <div className="text-neutral-400">{isPastTasksOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
+            </div>
+
+            {isPastTasksOpen && (
+              <div className="p-6 animate-in fade-in duration-200">
+                {!providerProfile ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Geçmiş talepleri görebilmek için önce profilinizi kaydetmelisiniz.</div>
+                ) : pastRequests.length === 0 ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Henüz geçmiş bir talebiniz bulunmuyor.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {pastRequests.map((req) => {
+                      const reqStatus = safeUpper(req.status);
+                      return (
+                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border space-y-2 text-xs">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                {req.created_at && <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-semibold">⏰ {safeDateTime(req.created_at)}</span>}
+                              </div>
+                              <h4 className="font-semibold text-neutral-900 text-sm mt-1">"{req.raw_text}"</h4>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : reqStatus === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-700'}`}>
+                              {reqStatus === 'PROVIDER_SKIPPED' ? 'PAS GEÇİLDİ' : reqStatus}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-200">
+                            <span>📍 {extractAddress(req.location)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
