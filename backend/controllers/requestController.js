@@ -32,61 +32,57 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 %100 TÜRKÇE ODAKLI AKILLI EŞLEŞTİRME MOTORU (KÜTÜPHANESİZ)
-const normalizeTr = (str) => {
+// 🌟 %100 TÜRKÇE ODAKLI AKILLI EŞLEŞTİRME MOTORU (KÜTÜPHANESİZ & GARANTİLİ)
+const normalizeToEn = (str) => {
+  if (!str) return '';
   return String(str)
     .replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase()
     .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
-    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c');
+    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .trim();
 };
 
 const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
-  // Metni küçük harfe çevir ve kelimelere böl (Noktalama işaretlerini at)
-  const textLower = String(rawText).replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase();
-  const textNorm = normalizeTr(textLower);
-  const textWords = textLower.split(/[\s,.;!?()]+/);
+  const textNorm = normalizeToEn(rawText);
+  const textWords = textNorm.split(/[\s,.;!?()]+/);
   
-  let keywords = Array.isArray(providerKeywords) ? providerKeywords : String(providerKeywords).split(',');
+  let keywords = [];
+  if (Array.isArray(providerKeywords)) {
+      keywords = providerKeywords;
+  } else {
+      try { keywords = JSON.parse(providerKeywords); } 
+      catch (e) { keywords = String(providerKeywords).split(','); }
+  }
 
   for (let kw of keywords) {
-    const kwLower = String(kw).trim().replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase();
-    if (!kwLower || kwLower.length < 2) continue;
-    
-    const kwNorm = normalizeTr(kwLower);
+    const kwNorm = normalizeToEn(kw);
+    if (!kwNorm || kwNorm.length < 2) continue;
 
-    // 1. AŞAMA: TAM VEYA NORMALİZE EŞLEŞME (Alt Metin)
-    // Örn: Sağlayıcı "su kaçağı" dedi. Müşteri "su kacagi" yazdı. Burada hemen yakalanır.
-    // Örn: Sağlayıcı "boya" dedi. Müşteri "boyacı" yazdı. Burada hemen yakalanır.
-    if (textLower.includes(kwLower) || textNorm.includes(kwNorm)) {
-        return true;
-    }
+    // 1. Doğrudan Alt Metin Eşleşmesi (Örn: "su kacagi")
+    if (textNorm.includes(kwNorm)) return true;
 
-    // 2. AŞAMA: KÖK VE ÜNSÜZ YUMUŞAMASI (ekmek -> ekmeği, dolap -> dolabı)
-    // Eğer doğrudan yakalayamadıysak kelimenin son harfine bakarak olası çekimleri tarıyoruz.
-    if (kwLower.length >= 3) {
-        const root = kwLower.slice(0, -1); // "ekmek" -> "ekme"
-        const lastChar = kwLower.slice(-1); // "k"
+    // 2. Kök ve Ünsüz Yumuşaması Eşleşmesi (Örn: ekmek -> ekmegi)
+    if (kwNorm.length >= 3) {
+        const root = kwNorm.slice(0, -1); // "ekmek" -> "ekme"
+        const lastChar = kwNorm.slice(-1); // "k"
         
-        let mutations = [root]; // Kökü listeye koy ("ekme")
+        let mutations = [kwNorm, root]; 
         
-        // Türkçedeki kurala göre son harf değişimi:
-        if (lastChar === 'k') { mutations.push(root + 'ğ', root + 'g'); }
-        else if (lastChar === 'p') { mutations.push(root + 'b'); }
-        else if (lastChar === 'ç') { mutations.push(root + 'c'); }
-        else if (lastChar === 't') { mutations.push(root + 'd'); }
+        if (lastChar === 'k') { mutations.push(root + 'g'); } // ekmek -> ekmeg
+        else if (lastChar === 'p') { mutations.push(root + 'b'); } // dolap -> dolab
+        else if (lastChar === 'c') { mutations.push(root + 'c'); } // agac -> agac
+        else if (lastChar === 't') { mutations.push(root + 'd'); } // kilit -> kilid
 
-        // Müşterinin yazdığı kelimelerden ("trabzon", "ekmeği") herhangi biri 
-        // bizim ürettiğimiz mutasyonlarla ("ekme", "ekmeğ", "ekmeg") başlıyor mu?
+        // Müşterinin yazdığı herhangi bir kelime bu mutasyonlarla ("ekmeg", "ekme") başlıyor mu?
         for (const word of textWords) {
             for (const mut of mutations) {
-                if (word.startsWith(mut)) return true; // "ekmeği" kelimesi "ekmeğ" ile başlar -> EŞLEŞTİ!
+                if (word.startsWith(mut)) return true; // "ekmegi".startsWith("ekmeg") -> TRUE!
             }
         }
     }
   }
-  
   return false;
 };
 
@@ -109,11 +105,10 @@ const getOpenPoolRequests = async (req, res) => {
     );
 
     let filteredPool = [];
-    
     if (providerKeywords && providerKeywords.length > 0) {
       filteredPool = rows.filter(req => {
         const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
-        return isSmartMatch(textToSearch, providerKeywords); // YENİ ALGORTİMA KULLANILIYOR
+        return isSmartMatch(textToSearch, providerKeywords);
       });
     }
 
