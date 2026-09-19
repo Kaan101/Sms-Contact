@@ -32,53 +32,47 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 %100 TÜRKÇE ODAKLI AKILLI EŞLEŞTİRME MOTORU (KÜTÜPHANESİZ & GARANTİLİ)
-const normalizeToEn = (str) => {
-  if (!str) return '';
-  return String(str)
-    .replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase()
+// 🌟 %100 YERLİ & KÜTÜPHANESİZ TÜRKÇE EŞLEŞTİRME MOTORU
+const normalizeTr = (str) => {
+  return String(str || '')
+    .replace(/İ/g, 'i').replace(/I/g, 'ı')
+    .toLowerCase()
     .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
     .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]/g, ' ') // Noktalama işaretlerini boşluk yap
     .trim();
 };
 
 const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
-  const textNorm = normalizeToEn(rawText);
-  const textWords = textNorm.split(/[\s,.;!?()]+/);
+  const textNorm = normalizeTr(rawText);
+  const textWords = textNorm.split(/\s+/).filter(w => w.length > 0);
   
   let keywords = [];
   if (Array.isArray(providerKeywords)) {
       keywords = providerKeywords;
   } else {
-      try { keywords = JSON.parse(providerKeywords); } 
-      catch (e) { keywords = String(providerKeywords).split(','); }
+      keywords = String(providerKeywords).replace(/[{}"']/g, '').split(',');
   }
 
   for (let kw of keywords) {
-    const kwNorm = normalizeToEn(kw);
-    if (!kwNorm || kwNorm.length < 2) continue;
+    const kwNorm = normalizeTr(kw);
+    if (!kwNorm) continue;
 
-    // 1. Doğrudan Alt Metin Eşleşmesi (Örn: "su kacagi")
+    // 1. TAM VEYA ALT METİN EŞLEŞMESİ (Örn: "su kacagi")
     if (textNorm.includes(kwNorm)) return true;
 
-    // 2. Kök ve Ünsüz Yumuşaması Eşleşmesi (Örn: ekmek -> ekmegi)
+    // 2. KÖK YAKALAMA VE ÜNSÜZ YUMUŞAMASI (Örn: ekmek -> ekmeği)
+    // Mantık: Sağlayıcının kelimesinin son harfini keseriz (ekmek -> ekme). 
+    // Eğer müşterinin kelimelerinden biri "ekme" ile başlıyorsa (Örn: "ekmegi".startsWith("ekme")), %100 eşleşme sayarız!
     if (kwNorm.length >= 3) {
-        const root = kwNorm.slice(0, -1); // "ekmek" -> "ekme"
-        const lastChar = kwNorm.slice(-1); // "k"
+        const root = kwNorm.slice(0, -1);
         
-        let mutations = [kwNorm, root]; 
-        
-        if (lastChar === 'k') { mutations.push(root + 'g'); } // ekmek -> ekmeg
-        else if (lastChar === 'p') { mutations.push(root + 'b'); } // dolap -> dolab
-        else if (lastChar === 'c') { mutations.push(root + 'c'); } // agac -> agac
-        else if (lastChar === 't') { mutations.push(root + 'd'); } // kilit -> kilid
-
-        // Müşterinin yazdığı herhangi bir kelime bu mutasyonlarla ("ekmeg", "ekme") başlıyor mu?
         for (const word of textWords) {
-            for (const mut of mutations) {
-                if (word.startsWith(mut)) return true; // "ekmegi".startsWith("ekmeg") -> TRUE!
+            if (word.startsWith(root)) {
+                console.log(`[EŞLEŞTİ] Sağlayıcı: "${kwNorm}", Müşteri Kelimesi: "${word}" (Kök: "${root}")`);
+                return true;
             }
         }
     }
