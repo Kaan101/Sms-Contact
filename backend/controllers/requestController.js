@@ -1,5 +1,4 @@
 const { pool } = require('../config/db');
-const fuzz = require('fuzzball');
 
 const logSms = async (requestId, type, phone, body) => {
   try {
@@ -33,65 +32,58 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 TÜRKÇE ODAKLI HİBRİT EŞLEŞTİRME ALGORİTMASI
-const isFuzzyMatch = (rawText, providerKeywords, threshold = 65) => {
+// 🌟 %100 TÜRKÇE ODAKLI AKILLI EŞLEŞTİRME MOTORU (KÜTÜPHANESİZ)
+const normalizeTr = (str) => {
+  return String(str)
+    .replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase()
+    .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c');
+};
+
+const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
-  const textLower = rawText.toLocaleLowerCase('tr-TR');
+  // Metni küçük harfe çevir ve kelimelere böl (Noktalama işaretlerini at)
+  const textLower = String(rawText).replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase();
+  const textNorm = normalizeTr(textLower);
+  const textWords = textLower.split(/[\s,.;!?()]+/);
   
-  let keywords = [];
-  if (typeof providerKeywords === 'string') {
-      keywords = providerKeywords.split(',');
-  } else if (Array.isArray(providerKeywords)) {
-      keywords = providerKeywords;
-  }
+  let keywords = Array.isArray(providerKeywords) ? providerKeywords : String(providerKeywords).split(',');
 
-  for (let keyword of keywords) {
-    const kwLower = String(keyword).trim().toLocaleLowerCase('tr-TR');
+  for (let kw of keywords) {
+    const kwLower = String(kw).trim().replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase();
     if (!kwLower || kwLower.length < 2) continue;
     
-    // AŞAMA 1: Doğrudan Cümle İçinde Geçiyorsa (Örn: "su kaçağı", "ekmeki")
-    if (textLower.includes(kwLower)) {
+    const kwNorm = normalizeTr(kwLower);
+
+    // 1. AŞAMA: TAM VEYA NORMALİZE EŞLEŞME (Alt Metin)
+    // Örn: Sağlayıcı "su kaçağı" dedi. Müşteri "su kacagi" yazdı. Burada hemen yakalanır.
+    // Örn: Sağlayıcı "boya" dedi. Müşteri "boyacı" yazdı. Burada hemen yakalanır.
+    if (textLower.includes(kwLower) || textNorm.includes(kwNorm)) {
         return true;
     }
-    
-    // AŞAMA 2: Türkçe Ünsüz Yumuşaması (k->ğ, p->b, ç->c, t->d)
-    // Sağlayıcı "ekmek" dediyse biz müşterinin cümlesinde "ekmeğ" de ararız.
+
+    // 2. AŞAMA: KÖK VE ÜNSÜZ YUMUŞAMASI (ekmek -> ekmeği, dolap -> dolabı)
+    // Eğer doğrudan yakalayamadıysak kelimenin son harfine bakarak olası çekimleri tarıyoruz.
     if (kwLower.length >= 3) {
-        const lastChar = kwLower.slice(-1);
-        const root = kwLower.slice(0, -1);
-        let mutated = null;
+        const root = kwLower.slice(0, -1); // "ekmek" -> "ekme"
+        const lastChar = kwLower.slice(-1); // "k"
+        
+        let mutations = [root]; // Kökü listeye koy ("ekme")
+        
+        // Türkçedeki kurala göre son harf değişimi:
+        if (lastChar === 'k') { mutations.push(root + 'ğ', root + 'g'); }
+        else if (lastChar === 'p') { mutations.push(root + 'b'); }
+        else if (lastChar === 'ç') { mutations.push(root + 'c'); }
+        else if (lastChar === 't') { mutations.push(root + 'd'); }
 
-        if (lastChar === 'k') mutated = root + 'ğ'; // ekmek -> ekmeğ
-        else if (lastChar === 'p') mutated = root + 'b'; // dolap -> dolab
-        else if (lastChar === 'ç') mutated = root + 'c'; // ağaç -> ağac
-        else if (lastChar === 't') mutated = root + 'd'; // kilit -> kilid
-
-        // Eğer mutasyona uğramış hali müşterinin metninde geçiyorsa ("trabzon ekmeği" -> "ekmeğ"i içerir)
-        if (mutated && textLower.includes(mutated)) {
-            return true;
+        // Müşterinin yazdığı kelimelerden ("trabzon", "ekmeği") herhangi biri 
+        // bizim ürettiğimiz mutasyonlarla ("ekme", "ekmeğ", "ekmeg") başlıyor mu?
+        for (const word of textWords) {
+            for (const mut of mutations) {
+                if (word.startsWith(mut)) return true; // "ekmeği" kelimesi "ekmeğ" ile başlar -> EŞLEŞTİ!
+            }
         }
-
-        // İstisna: "renk" -> "rengi" (k->g)
-        if (lastChar === 'k' && textLower.includes(root + 'g')) {
-            return true;
-        }
-    }
-
-    // AŞAMA 3: Kelimeleri ayırarak 'ile başlar' veya 'ek almış' kontrolü (tesisat -> tesisatçı)
-    if (!kwLower.includes(' ')) {
-         const textWords = textLower.split(/[\s,.;!?()]+/);
-         if (textWords.some(w => w.startsWith(kwLower))) {
-             return true;
-         }
-    }
-
-    // AŞAMA 4: Yazım Hataları ve Harf Kaymaları için Fuzzball
-    const partialScore = fuzz.partial_ratio(kwLower, textLower);
-    const tokenScore = fuzz.token_set_ratio(kwLower, textLower);
-    
-    if (Math.max(partialScore, tokenScore) >= threshold) {
-      return true;
     }
   }
   
@@ -121,7 +113,7 @@ const getOpenPoolRequests = async (req, res) => {
     if (providerKeywords && providerKeywords.length > 0) {
       filteredPool = rows.filter(req => {
         const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
-        return isFuzzyMatch(textToSearch, providerKeywords, 65);
+        return isSmartMatch(textToSearch, providerKeywords); // YENİ ALGORTİMA KULLANILIYOR
       });
     }
 
