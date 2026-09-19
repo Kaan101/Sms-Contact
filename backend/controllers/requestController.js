@@ -25,23 +25,19 @@ const createRequest = async (req, res) => {
     );
 
     const newRequest = requestRows[0];
-
     await logSms(newRequest.id, 'USER', contactValue, `Talebiniz alınmış ve servis havuzuna eklenmiştir. Hizmet sağlayıcılar sıraya girdiğinde size bilgi vereceğiz.`);
 
     res.status(201).json({ status: 'success', request: newRequest });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ status: 'error', message: 'Sunucu hatası' });
   }
 };
 
-// 🌟 TÜRKÇE NLP & FUZZY MATCH HİBRİT ALGORİTMASI
-const isFuzzyMatch = (rawText, providerKeywords, threshold = 70) => {
+// 🌟 TÜRKÇE ODAKLI HİBRİT EŞLEŞTİRME ALGORİTMASI
+const isFuzzyMatch = (rawText, providerKeywords, threshold = 65) => {
   if (!rawText || !providerKeywords) return false;
   
-  // 1. Metni küçük harfe çevirip kelimelere ayırıyoruz (Noktalama işaretlerini temizleyerek)
   const textLower = rawText.toLocaleLowerCase('tr-TR');
-  const textWords = textLower.split(/[\s,.;!?()]+/); 
   
   let keywords = [];
   if (typeof providerKeywords === 'string') {
@@ -54,27 +50,43 @@ const isFuzzyMatch = (rawText, providerKeywords, threshold = 70) => {
     const kwLower = String(keyword).trim().toLocaleLowerCase('tr-TR');
     if (!kwLower || kwLower.length < 2) continue;
     
-    // AŞAMA 1: Doğrudan Cümle İçinde Geçiyorsa (Örn: "su kaçağı")
-    if (textLower.includes(kwLower)) return true;
+    // AŞAMA 1: Doğrudan Cümle İçinde Geçiyorsa (Örn: "su kaçağı", "ekmeki")
+    if (textLower.includes(kwLower)) {
+        return true;
+    }
     
-    // AŞAMA 2: Ek Alma Durumu (Örn: Sağlayıcı="tesisat", Müşteri="tesisatçı")
-    if (textWords.some(w => w.startsWith(kwLower))) return true;
-
-    // AŞAMA 3: Türkçe Ünsüz Yumuşaması (k->ğ, p->b, ç->c, t->d)
+    // AŞAMA 2: Türkçe Ünsüz Yumuşaması (k->ğ, p->b, ç->c, t->d)
+    // Sağlayıcı "ekmek" dediyse biz müşterinin cümlesinde "ekmeğ" de ararız.
     if (kwLower.length >= 3) {
         const lastChar = kwLower.slice(-1);
-        if (['k', 'p', 'ç', 't'].includes(lastChar)) {
-            const root = kwLower.slice(0, -1); // "ekmek" -> "ekme" kökünü alır
-            
-            // Eğer müşterinin cümlesindeki kelimelerden biri "ekme" ile başlıyorsa (Örn: "ekmeği")
-            if (textWords.some(w => w.startsWith(root))) {
-                return true;
-            }
+        const root = kwLower.slice(0, -1);
+        let mutated = null;
+
+        if (lastChar === 'k') mutated = root + 'ğ'; // ekmek -> ekmeğ
+        else if (lastChar === 'p') mutated = root + 'b'; // dolap -> dolab
+        else if (lastChar === 'ç') mutated = root + 'c'; // ağaç -> ağac
+        else if (lastChar === 't') mutated = root + 'd'; // kilit -> kilid
+
+        // Eğer mutasyona uğramış hali müşterinin metninde geçiyorsa ("trabzon ekmeği" -> "ekmeğ"i içerir)
+        if (mutated && textLower.includes(mutated)) {
+            return true;
+        }
+
+        // İstisna: "renk" -> "rengi" (k->g)
+        if (lastChar === 'k' && textLower.includes(root + 'g')) {
+            return true;
         }
     }
 
+    // AŞAMA 3: Kelimeleri ayırarak 'ile başlar' veya 'ek almış' kontrolü (tesisat -> tesisatçı)
+    if (!kwLower.includes(' ')) {
+         const textWords = textLower.split(/[\s,.;!?()]+/);
+         if (textWords.some(w => w.startsWith(kwLower))) {
+             return true;
+         }
+    }
+
     // AŞAMA 4: Yazım Hataları ve Harf Kaymaları için Fuzzball
-    // Eşik (threshold) 75'ten 70'e düşürüldü ki "eknek" gibi hatalarda tolerans artsın
     const partialScore = fuzz.partial_ratio(kwLower, textLower);
     const tokenScore = fuzz.token_set_ratio(kwLower, textLower);
     
@@ -109,7 +121,7 @@ const getOpenPoolRequests = async (req, res) => {
     if (providerKeywords && providerKeywords.length > 0) {
       filteredPool = rows.filter(req => {
         const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
-        return isFuzzyMatch(textToSearch, providerKeywords, 70); // Eşik 70 yapıldı
+        return isFuzzyMatch(textToSearch, providerKeywords, 65);
       });
     }
 
