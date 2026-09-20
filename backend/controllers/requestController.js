@@ -32,19 +32,7 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 %100 KESİN ÇÖZÜM: ACIMASIZ KÖK YAKALAYICI (AGGRESSIVE ROOT STEMMER)
-const normalizeTr = (str) => {
-  return String(str || '')
-    .replace(/İ/g, 'i').replace(/I/g, 'ı')
-    .toLowerCase()
-    .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
-    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    .replace(/[^a-z0-9\s]/g, ' ') // Sadece harf ve rakamlar kalsın
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
-// 🌟 ÜNSÜZ YUMUŞAMASINI (%100 K/Ğ/G DÖNÜŞÜMÜ) DESTEKLEYEN AKILLI EŞLEŞTİRME MOTORU
+// 🌟 SON HAMLE: İLK 4 HARF KÖK KURALI (PREFIX MATCHING)
 const normalizeTr = (str) => {
   return String(str || '')
     .replace(/İ/g, 'i').replace(/I/g, 'ı')
@@ -58,7 +46,7 @@ const normalizeTr = (str) => {
 const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
-  const textNorm = normalizeTr(rawText); // Örn: "ordu ekmegi" (ğ -> g oldu)
+  const textNorm = normalizeTr(rawText); // Örn: "ordu ekmegi"
   
   let keywords = [];
   if (Array.isArray(providerKeywords)) {
@@ -71,30 +59,23 @@ const isSmartMatch = (rawText, providerKeywords) => {
     const cleanKw = normalizeTr(kw); // Örn: "ekmek"
     if (!cleanKw || cleanKw.length < 2) continue;
 
-    // 1. TAM EŞLEŞME: Zaten içinde geçiyorsa
+    // 1. Doğrudan geçiyorsa zaten kabul
     if (textNorm.includes(cleanKw)) return true;
 
-    // 2. TÜRKÇE ÜNSÜZ YUMUŞAMASI (K -> G / Ğ DÖNÜŞÜMÜ)
-    // Sağlayıcı "ekmek" yazdığında, biz bunu "ekmeg" olarak da arıyoruz.
-    // "ordu ekmegi" metni "ekmeg" kelimesini içerdiği için eşleşme başarılı olur!
-    if (cleanKw.endsWith('k')) {
-        const mutatedKw = cleanKw.slice(0, -1) + 'g'; // "ekmek" -> "ekmeg"
-        if (textNorm.includes(mutatedKw)) return true;
-    }
-
-    // 3. GENEL KÖK EŞLEŞMESİ (Diğer ekler için)
-    let baseRoot = cleanKw;
-    if (cleanKw.length >= 4) {
-        baseRoot = cleanKw.slice(0, -1);
-    }
-
-    if (baseRoot.length >= 2 && textNorm.includes(baseRoot)) {
+    // 2. İLK 4 HARF KÖKÜ (PREFIX): 
+    // "ekmek" kelimesinin ilk 4 harfi "ekme"dir. 
+    // "ordu ekmegi" cümlesi "ekme" içerdiği için bu iş burada biter!
+    const prefix = cleanKw.length >= 4 ? cleanKw.slice(0, 4) : cleanKw; // "ekme"
+    
+    if (textNorm.includes(prefix)) {
         return true;
     }
   }
   
   return false;
 };
+
+
 
 const getOpenPoolRequests = async (req, res) => {
   try {
