@@ -32,14 +32,14 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 %100 YERLİ & KÜTÜPHANESİZ TÜRKÇE EŞLEŞTİRME MOTORU
+// 🌟 %100 YERLİ & KÜTÜPHANESİZ TÜRKÇE KÖK EŞLEŞTİRME MOTORU
 const normalizeTr = (str) => {
   return String(str || '')
     .replace(/İ/g, 'i').replace(/I/g, 'ı')
     .toLowerCase()
     .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
     .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    .replace(/[^a-z0-9]/g, ' ') // Noktalama işaretlerini boşluk yap
+    .replace(/[^a-z0-9\s]/g, '') // Özel karakterleri (nokta, virgül vb.) siler
     .trim();
 };
 
@@ -47,6 +47,7 @@ const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
   const textNorm = normalizeTr(rawText);
+  // Cümleyi boşluklardan kelimelere ayırıyoruz ("trabzon", "ekmegi")
   const textWords = textNorm.split(/\s+/).filter(w => w.length > 0);
   
   let keywords = [];
@@ -58,21 +59,32 @@ const isSmartMatch = (rawText, providerKeywords) => {
 
   for (let kw of keywords) {
     const kwNorm = normalizeTr(kw);
-    if (!kwNorm) continue;
+    if (!kwNorm || kwNorm.length < 2) continue;
 
-    // 1. TAM VEYA ALT METİN EŞLEŞMESİ (Örn: "su kacagi")
+    // 1. AŞAMA: TAM VEYA ALT METİN EŞLEŞMESİ (Örn: "su kacagi")
     if (textNorm.includes(kwNorm)) return true;
 
-    // 2. KÖK YAKALAMA VE ÜNSÜZ YUMUŞAMASI (Örn: ekmek -> ekmeği)
-    // Mantık: Sağlayıcının kelimesinin son harfini keseriz (ekmek -> ekme). 
-    // Eğer müşterinin kelimelerinden biri "ekme" ile başlıyorsa (Örn: "ekmegi".startsWith("ekme")), %100 eşleşme sayarız!
-    if (kwNorm.length >= 3) {
-        const root = kwNorm.slice(0, -1);
-        
-        for (const word of textWords) {
-            if (word.startsWith(root)) {
-                console.log(`[EŞLEŞTİ] Sağlayıcı: "${kwNorm}", Müşteri Kelimesi: "${word}" (Kök: "${root}")`);
-                return true;
+    // 2. AŞAMA: KÖK YAKALAMA (Ünsüz Yumuşaması ve Ekler için)
+    // Anahtar kelimenin son 1 ve 2 harfini atarak kökünü buluruz ("ekmek" -> "ekme", "ekm")
+    let rootsToTest = [ kwNorm.slice(0, -1) ];
+    if (kwNorm.length >= 5) {
+        rootsToTest.push(kwNorm.slice(0, -2));
+    }
+
+    for (const root of rootsToTest) {
+        if (root.length < 2) continue; // Çok kısa hataları engellemek için
+
+        // Eğer anahtar kelime birden fazla kelimeden oluşuyorsa (Örn: "su kacagi" -> "su kaca")
+        if (kwNorm.includes(' ')) {
+            if (textNorm.includes(root)) return true;
+        } 
+        // Eğer tek kelimeyse (Örn: "ekmek" -> "ekme")
+        else {
+            for (const word of textWords) {
+                // Müşterinin yazdığı herhangi bir kelime bu kökle başlıyor mu?
+                if (word.startsWith(root)) {
+                    return true;
+                }
             }
         }
     }
