@@ -32,60 +32,48 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 %100 YERLİ & KÜTÜPHANESİZ TÜRKÇE KÖK EŞLEŞTİRME MOTORU
+// 🌟 %100 KESİN ÇÖZÜM: ACIMASIZ KÖK YAKALAYICI (AGGRESSIVE ROOT STEMMER)
 const normalizeTr = (str) => {
   return String(str || '')
     .replace(/İ/g, 'i').replace(/I/g, 'ı')
     .toLowerCase()
     .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
     .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    .replace(/[^a-z0-9\s]/g, '') // Özel karakterleri (nokta, virgül vb.) siler
+    .replace(/[^a-z0-9\s]/g, ' ') // Sadece harf ve rakamlar kalsın
+    .replace(/\s+/g, ' ')
     .trim();
 };
 
 const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
+  // 1. Müşterinin talebini temizle ve kelimelere böl
   const textNorm = normalizeTr(rawText);
-  // Cümleyi boşluklardan kelimelere ayırıyoruz ("trabzon", "ekmegi")
-  const textWords = textNorm.split(/\s+/).filter(w => w.length > 0);
+  const textWords = textNorm.split(' ').filter(w => w.length > 0);
   
-  let keywords = [];
-  if (Array.isArray(providerKeywords)) {
-      keywords = providerKeywords;
-  } else {
-      keywords = String(providerKeywords).replace(/[{}"']/g, '').split(',');
-  }
+  // 2. Veritabanından gelen sağlayıcı kelimelerini temizle ve tek tek ayır
+  const keywordsRaw = Array.isArray(providerKeywords) ? providerKeywords.join(' ') : String(providerKeywords);
+  const keywords = keywordsRaw.split(/[\s,]+/).map(k => normalizeTr(k)).filter(k => k.length >= 2);
 
   for (let kw of keywords) {
-    const kwNorm = normalizeTr(kw);
-    if (!kwNorm || kwNorm.length < 2) continue;
+    // AŞAMA 1: DOĞRUDAN EŞLEŞME (Eğer kelime aynen geçiyorsa)
+    if (textNorm.includes(kw)) return true;
 
-    // 1. AŞAMA: TAM VEYA ALT METİN EŞLEŞMESİ (Örn: "su kacagi")
-    if (textNorm.includes(kwNorm)) return true;
-
-    // 2. AŞAMA: KÖK YAKALAMA (Ünsüz Yumuşaması ve Ekler için)
-    // Anahtar kelimenin son 1 ve 2 harfini atarak kökünü buluruz ("ekmek" -> "ekme", "ekm")
-    let rootsToTest = [ kwNorm.slice(0, -1) ];
-    if (kwNorm.length >= 5) {
-        rootsToTest.push(kwNorm.slice(0, -2));
+    // AŞAMA 2: ACIMASIZ KÖK BUDAMA VE EŞLEŞTİRME
+    // Anahtar kelime 5 harf veya uzunsa son 2 harfi sil ("ekmek" -> "ekm")
+    // Anahtar kelime 3-4 harfse son 1 harfi sil ("boya" -> "boy")
+    let root = kw;
+    if (kw.length >= 5) {
+        root = kw.slice(0, -2);
+    } else if (kw.length >= 3) {
+        root = kw.slice(0, -1);
     }
-
-    for (const root of rootsToTest) {
-        if (root.length < 2) continue; // Çok kısa hataları engellemek için
-
-        // Eğer anahtar kelime birden fazla kelimeden oluşuyorsa (Örn: "su kacagi" -> "su kaca")
-        if (kwNorm.includes(' ')) {
-            if (textNorm.includes(root)) return true;
-        } 
-        // Eğer tek kelimeyse (Örn: "ekmek" -> "ekme")
-        else {
-            for (const word of textWords) {
-                // Müşterinin yazdığı herhangi bir kelime bu kökle başlıyor mu?
-                if (word.startsWith(root)) {
-                    return true;
-                }
-            }
+    
+    // Müşterinin cümlesindeki herhangi bir kelime bu kökle başlıyor mu?
+    for (let word of textWords) {
+        // Örn: "ekmegi".startsWith("ekm") -> TRUE!
+        if (word.startsWith(root)) {
+            return true;
         }
     }
   }
