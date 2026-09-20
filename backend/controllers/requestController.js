@@ -45,38 +45,39 @@ const normalizeTr = (str) => {
 };
 
 const isSmartMatch = (rawText, providerKeywords) => {
+  console.log('--- EŞLEŞTİRME TESTİ ---');
+  console.log('Müşteri Talebi (rawText):', rawText);
+  console.log('Sağlayıcı Kelimeleri (providerKeywords):', providerKeywords);
+
   if (!rawText || !providerKeywords) return false;
   
-  // 1. Müşterinin talebini temizle ve kelimelere böl
   const textNorm = normalizeTr(rawText);
   const textWords = textNorm.split(' ').filter(w => w.length > 0);
   
-  // 2. Veritabanından gelen sağlayıcı kelimelerini temizle ve tek tek ayır
   const keywordsRaw = Array.isArray(providerKeywords) ? providerKeywords.join(' ') : String(providerKeywords);
   const keywords = keywordsRaw.split(/[\s,]+/).map(k => normalizeTr(k)).filter(k => k.length >= 2);
 
-  for (let kw of keywords) {
-    // AŞAMA 1: DOĞRUDAN EŞLEŞME (Eğer kelime aynen geçiyorsa)
-    if (textNorm.includes(kw)) return true;
+  console.log('İşlenmiş Müşteri Kelimeleri:', textWords);
+  console.log('İşlenmiş Sağlayıcı Kelimeleri:', keywords);
 
-    // AŞAMA 2: ACIMASIZ KÖK BUDAMA VE EŞLEŞTİRME
-    // Anahtar kelime 5 harf veya uzunsa son 2 harfi sil ("ekmek" -> "ekm")
-    // Anahtar kelime 3-4 harfse son 1 harfi sil ("boya" -> "boy")
-    let root = kw;
-    if (kw.length >= 5) {
-        root = kw.slice(0, -2);
-    } else if (kw.length >= 3) {
-        root = kw.slice(0, -1);
+  for (let kw of keywords) {
+    if (textNorm.includes(kw)) {
+        console.log(`[BAŞARILI] Tam eşleşme: "${kw}"`);
+        return true;
     }
+
+    let root = kw;
+    if (kw.length >= 5) root = kw.slice(0, -2);
+    else if (kw.length >= 3) root = kw.slice(0, -1);
     
-    // Müşterinin cümlesindeki herhangi bir kelime bu kökle başlıyor mu?
     for (let word of textWords) {
-        // Örn: "ekmegi".startsWith("ekm") -> TRUE!
         if (word.startsWith(root)) {
+            console.log(`[BAŞARILI] Kök eşleşmesi! Sağlayıcı Kök: "${root}", Müşteri Kelimesi: "${word}"`);
             return true;
         }
     }
   }
+  console.log('[BAŞARISIZ] Hiçbir eşleşme sağlanamadı.');
   return false;
 };
 
