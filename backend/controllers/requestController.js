@@ -44,40 +44,55 @@ const normalizeTr = (str) => {
     .trim();
 };
 
-const isSmartMatch = (rawText, providerKeywords) => {
-  console.log('--- EŞLEŞTİRME TESTİ ---');
-  console.log('Müşteri Talebi (rawText):', rawText);
-  console.log('Sağlayıcı Kelimeleri (providerKeywords):', providerKeywords);
+// 🌟 ÜNSÜZ YUMUŞAMASINI (%100 K/Ğ/G DÖNÜŞÜMÜ) DESTEKLEYEN AKILLI EŞLEŞTİRME MOTORU
+const normalizeTr = (str) => {
+  return String(str || '')
+    .replace(/İ/g, 'i').replace(/I/g, 'ı')
+    .toLowerCase()
+    .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .trim();
+};
 
+const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
-  const textNorm = normalizeTr(rawText);
-  const textWords = textNorm.split(' ').filter(w => w.length > 0);
+  const textNorm = normalizeTr(rawText); // Örn: "ordu ekmegi" (ğ -> g oldu)
   
-  const keywordsRaw = Array.isArray(providerKeywords) ? providerKeywords.join(' ') : String(providerKeywords);
-  const keywords = keywordsRaw.split(/[\s,]+/).map(k => normalizeTr(k)).filter(k => k.length >= 2);
-
-  console.log('İşlenmiş Müşteri Kelimeleri:', textWords);
-  console.log('İşlenmiş Sağlayıcı Kelimeleri:', keywords);
+  let keywords = [];
+  if (Array.isArray(providerKeywords)) {
+      keywords = providerKeywords;
+  } else {
+      keywords = String(providerKeywords).replace(/[{}"']/g, '').split(/[,]/);
+  }
 
   for (let kw of keywords) {
-    if (textNorm.includes(kw)) {
-        console.log(`[BAŞARILI] Tam eşleşme: "${kw}"`);
-        return true;
+    const cleanKw = normalizeTr(kw); // Örn: "ekmek"
+    if (!cleanKw || cleanKw.length < 2) continue;
+
+    // 1. TAM EŞLEŞME: Zaten içinde geçiyorsa
+    if (textNorm.includes(cleanKw)) return true;
+
+    // 2. TÜRKÇE ÜNSÜZ YUMUŞAMASI (K -> G / Ğ DÖNÜŞÜMÜ)
+    // Sağlayıcı "ekmek" yazdığında, biz bunu "ekmeg" olarak da arıyoruz.
+    // "ordu ekmegi" metni "ekmeg" kelimesini içerdiği için eşleşme başarılı olur!
+    if (cleanKw.endsWith('k')) {
+        const mutatedKw = cleanKw.slice(0, -1) + 'g'; // "ekmek" -> "ekmeg"
+        if (textNorm.includes(mutatedKw)) return true;
     }
 
-    let root = kw;
-    if (kw.length >= 5) root = kw.slice(0, -2);
-    else if (kw.length >= 3) root = kw.slice(0, -1);
-    
-    for (let word of textWords) {
-        if (word.startsWith(root)) {
-            console.log(`[BAŞARILI] Kök eşleşmesi! Sağlayıcı Kök: "${root}", Müşteri Kelimesi: "${word}"`);
-            return true;
-        }
+    // 3. GENEL KÖK EŞLEŞMESİ (Diğer ekler için)
+    let baseRoot = cleanKw;
+    if (cleanKw.length >= 4) {
+        baseRoot = cleanKw.slice(0, -1);
+    }
+
+    if (baseRoot.length >= 2 && textNorm.includes(baseRoot)) {
+        return true;
     }
   }
-  console.log('[BAŞARISIZ] Hiçbir eşleşme sağlanamadı.');
+  
   return false;
 };
 
