@@ -1,11 +1,12 @@
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
-import { Download, Upload } from 'lucide-react';
-
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-// 🔥 HATAYA SEBEP OLAN EKSİK İKONLAR (ChevronUp, ChevronDown) EKLENDİ
-import { Layers, FileCheck2, FolderKanban, Settings, Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown, X, ChevronUp, ChevronDown } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import { 
+  Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
+  Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
+  ArrowUpDown, X, ChevronUp, ChevronDown 
+} from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
 
@@ -187,64 +188,151 @@ export default function AdminDashboard() {
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-
-// 1. ADIM BURAYA: İçe aktarmalar en üstte olur
-import React, { useState, useEffect } from 'react';
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
-import { Download, Upload } from 'lucide-react';
-
-export default function AdminDashboard() {
-  // Burada mevcut state'lerin vardır (Örn: requests, loading vs.)
-  const [requests, setRequests] = useState([]); 
-
-  // ... diğer mevcut fonksiyonların (fetchAdminData vb.) ...
-
-
   // ==========================================
-  // 2. ADIMI BURAYA EKLİYORUZ
-  // (return ifadesinden hemen önce)
+  // EXCEL DIŞA AKTARMA
   // ==========================================
-  
   const handleExportExcel = async () => {
-    // ... dışa aktarma kodları ...
-  };
+    let exportData = [];
+    let sheetName = "Veriler";
 
-  const handleFileUpload = async (e) => {
-    // ... içe aktarma kodları ...
-  };
+    if (adminTab === 'WOZ') { exportData = pendingRequests; sheetName = "WoZ_Havuzu"; }
+    else if (adminTab === 'PROVIDERS') { exportData = providers; sheetName = "Saglayicilar"; }
+    else if (adminTab === 'ALL_MATCHED') { exportData = matchedRequests; sheetName = "Eslesmeler"; }
+    else if (adminTab === 'SMS_LOGS') { exportData = smsLogs; sheetName = "SMS_Loglari"; }
+    else if (adminTab === 'TESTS') { exportData = tests; sheetName = "Test_Senaryolari"; }
+    else if (adminTab === 'PROJECT') { exportData = features; sheetName = "Proje_Yol_Haritasi"; }
 
+    if (!exportData || exportData.length === 0) {
+      alert(`Şu an "${sheetName}" sekmesinde indirilecek herhangi bir veri bulunamadı!`);
+      return;
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(sheetName);
+      
+      const columns = Object.keys(exportData[0]).map(key => ({
+        header: key.toUpperCase(), key: key, width: 20
+      }));
+      worksheet.columns = columns;
+      worksheet.addRows(exportData);
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Admin_${sheetName}_${new Date().getTime()}.xlsx`);
+    } catch (error) {
+      console.error("Dışa Aktarma Hatası:", error);
+      alert("Excel dosyası oluşturulurken bir hata oluştu. (F12 Konsoluna bakın)");
+    }
+  };
 
   // ==========================================
+  // EXCEL İÇE AKTARMA (FileReader Yapısı)
+  // ==========================================
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  return (
-    <div className="admin-container">
-      {/* 3. ADIM BURADA: Butonları return içindeki uygun bir yere koyuyorsun */}
-      <button onClick={handleExportExcel}>...</button>
-      
-      {/* Tablolar ve diğer tasarımlar... */}
-    </div>
-  );
-}
+    alert("Excel dosyası alındı. Veriler okunuyor...");
+    
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      try {
+        const buffer = event.target.result;
+        const workbook = new ExcelJS.Workbook();
+        
+        await workbook.xlsx.load(buffer);
+        
+        const worksheet = workbook.worksheets[0];
+        const importedData = [];
+        const headers = {};
 
+        worksheet.getRow(1).eachCell((cell, colNumber) => {
+          headers[colNumber] = cell.value;
+        });
 
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          
+          const rowData = {};
+          row.eachCell((cell, colNumber) => {
+            rowData[headers[colNumber] || `Sutun_${colNumber}`] = cell.value;
+          });
+          importedData.push(rowData);
+        });
 
+        if (importedData.length === 0) {
+          alert("Yüklediğiniz Excel dosyası boş veya formatı desteklenmiyor.");
+          return;
+        }
+
+        console.log("✅ EXCEL'DEN OKUNAN VERİLER:", importedData);
+        alert(`${importedData.length} satır başarıyla okundu!\n\nVeritabanı kayıt işlemi (Backend) bağlanmadığı için şu an sadece konsola (F12) yazdırıldı.`);
+        
+        // Backend bağlamak istediğinde `axios.post` kodlarını buraya ekleyeceksin.
+        
+      } catch (error) {
+        console.error("❌ Excel Okuma Hatası:", error);
+        alert("Excel dosyası işlenirken bir hata oluştu. Lütfen dosyanın bozuk olmadığından emin olun.");
+      } finally {
+        e.target.value = null; // Aynı dosyayı üst üste seçebilmek için input'u sıfırlıyoruz.
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
 
   return (
     <div className="w-full max-w-[100%] mx-auto px-6 py-8 flex-1 flex flex-col justify-start space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
-        <h2 className="text-lg font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
-        <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1 rounded-lg border text-xs font-semibold">
-          <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1 rounded-md ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>WoZ Havuzu ({pendingRequests.length})</button>
-          <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1 rounded-md ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
-          <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1 rounded-md flex items-center space-x-1 ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Layers size={13} /><span>Tüm Eşleşmeler</span></button>
-          <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1 rounded-md ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}>SMS Log ({filteredSmsLogs.length})</button>
-          <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FileCheck2 size={13} /><span>Test Senaryoları ({tests.length})</span></button>
-          <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><FolderKanban size={13} /><span>Yol Haritası ({features.length})</span></button>
-          <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1 rounded-md flex items-center space-x-1.5 ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500'}`}><Settings size={13} /><span>Ayarlar</span></button>
+      
+      {/* BAŞLIK VE SEKMELER (TABS) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+        <h2 className="text-2xl font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
+
+        <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1.5 rounded-xl border text-xs font-semibold">
+          <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>WoZ Havuzu ({pendingRequests.length})</button>
+          <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
+          <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Layers size={14} /><span>Tüm Eşleşmeler</span></button>
+          <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>SMS Log ({filteredSmsLogs.length})</button>
+          <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FileCheck2 size={14} /><span>Test Senaryoları ({tests.length})</span></button>
+          <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Yol Haritası ({features.length})</span></button>
+          <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Settings size={14} /><span>Ayarlar</span></button>
         </div>
       </div>
 
+      {/* EXCEL BUTONLARI - KENDİNE AİT ŞIK SATIR */}
+      <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
+        <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
+          <span>Şu anki görünüm:</span>
+          <span className="font-bold text-neutral-900 bg-white px-2 py-1 rounded border shadow-xs">{adminTab}</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleExportExcel} 
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer"
+          >
+            <Download size={18} />
+            <span>Seçili Sekmeyi İndir</span>
+          </button>
+
+          <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
+            <Upload size={18} />
+            <span>Excel'den Veri Yükle</span>
+            <input 
+              type="file" 
+              accept=".xlsx, .xls" 
+              className="hidden"
+              // onClick eklenerek aynı dosya tekrar seçildiğinde de tetiklenmesi garanti altına alındı 
+              onChange={handleFileUpload} 
+              onClick={(e) => { e.target.value = null; }}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* İÇERİK BÖLÜMÜ BAŞLANGICI */}
       {adminTab === 'SETTINGS' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border shadow-sm">
