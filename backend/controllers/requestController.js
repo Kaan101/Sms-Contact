@@ -32,7 +32,7 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 SON HAMLE: İLK 4 HARF KÖK KURALI (PREFIX MATCHING)
+// 🌟 SADELEŞTİRİLMİŞ, TERTEMİZ EŞLEŞTİRME MOTORU
 const normalizeTr = (str) => {
   return String(str || '')
     .replace(/İ/g, 'i').replace(/I/g, 'ı')
@@ -46,36 +46,23 @@ const normalizeTr = (str) => {
 const isSmartMatch = (rawText, providerKeywords) => {
   if (!rawText || !providerKeywords) return false;
   
-  const textNorm = normalizeTr(rawText); // Örn: "ordu ekmegi"
-  
-  let keywords = [];
-  if (Array.isArray(providerKeywords)) {
-      keywords = providerKeywords;
-  } else {
-      keywords = String(providerKeywords).replace(/[{}"']/g, '').split(/[,]/);
-  }
+  const textNorm = normalizeTr(rawText);
+  const keywords = Array.isArray(providerKeywords) 
+    ? providerKeywords 
+    : String(providerKeywords).replace(/[{}"']/g, '').split(',');
 
-  for (let kw of keywords) {
-    const cleanKw = normalizeTr(kw); // Örn: "ekmek"
-    if (!cleanKw || cleanKw.length < 2) continue;
-
-    // 1. Doğrudan geçiyorsa zaten kabul
-    if (textNorm.includes(cleanKw)) return true;
-
-    // 2. İLK 4 HARF KÖKÜ (PREFIX): 
-    // "ekmek" kelimesinin ilk 4 harfi "ekme"dir. 
-    // "ordu ekmegi" cümlesi "ekme" içerdiği için bu iş burada biter!
-    const prefix = cleanKw.length >= 4 ? cleanKw.slice(0, 4) : cleanKw; // "ekme"
+  // keywords dizisindeki (Örn: "ekmek", "su") kelimelerden HERHANGİ BİRİ (.some) eşleşirse TRUE döner
+  return keywords.some(kw => {
+    const cleanKw = normalizeTr(kw).trim();
+    if (cleanKw.length < 2) return false;
     
-    if (textNorm.includes(prefix)) {
-        return true;
-    }
-  }
-  
-  return false;
+    // Sağlayıcı kelimesinin ilk 4 harfini kök olarak al ("ekmek" -> "ekme", "su" -> "su")
+    const root = cleanKw.slice(0, 4); 
+    
+    // Müşterinin yazdığı metin, bu kökü barındırıyorsa eşleşme başarılıdır
+    return textNorm.includes(root);
+  });
 };
-
-
 
 const getOpenPoolRequests = async (req, res) => {
   try {
@@ -197,7 +184,7 @@ const passToNextProvider = async (req, res) => {
 
 const selectCandidateProvider = async (req, res) => {
   try {
-    const { requestId } = req.params;
+    const { requestId } = params;
     const { providerId } = req.body;
     
     await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
