@@ -1,3 +1,7 @@
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import { Download, Upload } from 'lucide-react';
+
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 // 🔥 HATAYA SEBEP OLAN EKSİK İKONLAR (ChevronUp, ChevronDown) EKLENDİ
@@ -182,6 +186,49 @@ export default function AdminDashboard() {
   [providers, wozProviderSearch]);
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
+
+
+// 1. ADIM BURAYA: İçe aktarmalar en üstte olur
+import React, { useState, useEffect } from 'react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import { Download, Upload } from 'lucide-react';
+
+export default function AdminDashboard() {
+  // Burada mevcut state'lerin vardır (Örn: requests, loading vs.)
+  const [requests, setRequests] = useState([]); 
+
+  // ... diğer mevcut fonksiyonların (fetchAdminData vb.) ...
+
+
+  // ==========================================
+  // 2. ADIMI BURAYA EKLİYORUZ
+  // (return ifadesinden hemen önce)
+  // ==========================================
+  
+  const handleExportExcel = async () => {
+    // ... dışa aktarma kodları ...
+  };
+
+  const handleFileUpload = async (e) => {
+    // ... içe aktarma kodları ...
+  };
+
+
+  // ==========================================
+
+  return (
+    <div className="admin-container">
+      {/* 3. ADIM BURADA: Butonları return içindeki uygun bir yere koyuyorsun */}
+      <button onClick={handleExportExcel}>...</button>
+      
+      {/* Tablolar ve diğer tasarımlar... */}
+    </div>
+  );
+}
+
+
+
 
   return (
     <div className="w-full max-w-[100%] mx-auto px-6 py-8 flex-1 flex flex-col justify-start space-y-4">
