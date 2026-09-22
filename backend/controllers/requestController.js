@@ -104,20 +104,26 @@ const joinRequestPool = async (req, res) => {
     const { requestId } = req.params;
     const { providerId } = req.body;
 
-    await pool.query(`INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'WAITING') ON CONFLICT DO NOTHING`, [requestId, providerId]);
+    // 1. Sağlayıcıyı sadece WAITING (Bekleyen) olarak listeye ekleriz, OTOMATİK EŞLEŞTİRME YAPMAYIZ.
+    await pool.query(
+      `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'WAITING') ON CONFLICT DO NOTHING`, 
+      [requestId, providerId]
+    );
 
-    const reqCheck = await pool.query(`SELECT matched_provider_id, contact_value FROM requests WHERE id = $1`, [requestId]);
+    // 2. Müşteriye "Sıraya biri girdi, girip seç" SMS'i atarız.
+    const reqCheck = await pool.query(`SELECT contact_value FROM requests WHERE id = $1`, [requestId]);
+    const provCheck = await pool.query(`SELECT name FROM service_providers WHERE id = $1`, [providerId]);
     
-    if (reqCheck.rows.length > 0 && !reqCheck.rows[0].matched_provider_id) {
-      await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
-      await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, providerId]);
-      
-      const provCheck = await pool.query(`SELECT name FROM service_providers WHERE id = $1`, [providerId]);
-      
-      await logSms(requestId, 'USER', reqCheck.rows[0].contact_value, `Talebinizle ilgilenen ilk sağlayıcı (${provCheck.rows[0].name}) bulundu. Lütfen sisteme girip değerlendirin.`);
+    if (reqCheck.rows.length > 0 && provCheck.rows.length > 0) {
+      await logSms(
+        requestId, 
+        'USER', 
+        reqCheck.rows[0].contact_value, 
+        `Talebinize bir sağlayıcı (${provCheck.rows[0].name}) talip oldu. Lütfen sisteme girip onaylayın (Seçin).`
+      );
     }
 
-    res.status(200).json({ status: 'success', message: 'Talebe talip oldunuz ve sıraya girdiniz.' });
+    res.status(200).json({ status: 'success', message: 'Talebe talip oldunuz. Müşteri sizi seçtiğinde görevlerinize düşecektir.' });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
