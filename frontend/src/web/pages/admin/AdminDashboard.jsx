@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx'; // exceljs yerine xlsx (SheetJS) kullanıyoruz
 import { saveAs } from 'file-saver';
 import { 
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
@@ -189,9 +189,9 @@ export default function AdminDashboard() {
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
   // ==========================================
-  // EXCEL DIŞA AKTARMA
+  // EXCEL DIŞA AKTARMA (SheetJS)
   // ==========================================
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     let exportData = [];
     let sheetName = "Veriler";
 
@@ -208,18 +208,13 @@ export default function AdminDashboard() {
     }
 
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(sheetName);
+      // SheetJS (XLSX) formatına dönüştürme
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       
-      const columns = Object.keys(exportData[0]).map(key => ({
-        header: key.toUpperCase(), key: key, width: 20
-      }));
-      worksheet.columns = columns;
-      worksheet.addRows(exportData);
-      
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, `Admin_${sheetName}_${new Date().getTime()}.xlsx`);
+      // Dosyayı oluştur ve indir
+      XLSX.writeFile(workbook, `Admin_${sheetName}_${new Date().getTime()}.xlsx`);
     } catch (error) {
       console.error("Dışa Aktarma Hatası:", error);
       alert("Excel dosyası oluşturulurken bir hata oluştu.");
@@ -227,7 +222,7 @@ export default function AdminDashboard() {
   };
 
   // ==========================================
-  // EXCEL İÇE AKTARMA & BACKEND ENTEGRASYONU
+  // EXCEL İÇE AKTARMA & BACKEND ENTEGRASYONU (SheetJS)
   // ==========================================
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -239,29 +234,18 @@ export default function AdminDashboard() {
     
     reader.onload = async (event) => {
       try {
-        const buffer = event.target.result;
-        const workbook = new ExcelJS.Workbook();
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
         
-        await workbook.xlsx.load(buffer);
-        const worksheet = workbook.worksheets[0];
-        const importedData = [];
-        const headers = {};
+        // İlk çalışma sayfasını al
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Veriyi JSON formatına dönüştür (ilk satırı başlık kabul eder)
+        const importedData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-        worksheet.getRow(1).eachCell((cell, colNumber) => {
-          headers[colNumber] = cell.value;
-        });
-
-        worksheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const rowData = {};
-          row.eachCell((cell, colNumber) => {
-            rowData[headers[colNumber] || `Sutun_${colNumber}`] = cell.value;
-          });
-          importedData.push(rowData);
-        });
-
-        if (importedData.length === 0) {
-          alert("Excel dosyası boş.");
+        if (!importedData || importedData.length === 0) {
+          alert("Excel dosyası boş veya formatı hatalı.");
           return;
         }
 
@@ -270,10 +254,11 @@ export default function AdminDashboard() {
           if (adminTab === 'PROVIDERS') {
             for (const item of importedData) {
               await axios.post(`${API_BASE}/providers`, {
+                // Büyük-küçük harf duyarlılığı olmadan anahtar bulma
                 name: item.NAME || item.name || item.isim || 'İsimsiz Firma',
                 phone: String(item.PHONE || item.phone || item.telefon || ''),
                 email: item.EMAIL || item.email || item.eposta || null,
-                serviceKeywords: (item.SERVICEKEYWORDS || item.serviceKeywords || item.anahtarkelime || '').split(','),
+                serviceKeywords: String(item.SERVICEKEYWORDS || item.serviceKeywords || item.anahtarkelime || '').split(','),
                 communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
                 priorityScore: parseInt(item.PRIORITYSCORE || item.priorityScore || 100, 10)
               });
@@ -313,7 +298,7 @@ export default function AdminDashboard() {
         console.error("Excel Okuma Hatası:", error);
         alert("Dosya okunamadı. Lütfen formatını kontrol edin.");
       } finally {
-        e.target.value = null;
+        e.target.value = null; // Aynı dosyayı tekrar seçebilmek için inputu sıfırla
       }
     };
 
