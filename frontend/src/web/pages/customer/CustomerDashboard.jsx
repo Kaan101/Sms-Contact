@@ -463,14 +463,11 @@ export default function CustomerDashboard() {
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             {!isCurrent && (
-                                                <div className="flex items-center">
-                                                    {qProv.interest_status === 'SKIPPED' && <span className="text-[11px] font-extrabold text-rose-400/80 mr-2 uppercase tracking-wider">Pas</span>}
-                                                    
-                                                    {/* YALNIZCA interest_status === 'WAITING' olanlara "Bunu Seç" butonu gösterilecek */}
-                                                    {qProv.interest_status === 'WAITING' && (
-                                                        <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>
-                                                    )}
-                                                </div>
+<div className="flex items-center space-x-2">
+    <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50">
+        <Check size={10} /><span>Bunu Seç</span>
+    </button>
+</div>
                                             )}
                                         </div>
                                       </div>
