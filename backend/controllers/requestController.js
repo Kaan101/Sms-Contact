@@ -184,7 +184,7 @@ const passToNextProvider = async (req, res) => {
 
 const selectCandidateProvider = async (req, res) => {
   try {
-    const { requestId } = params;
+    const { requestId } = req.params; // req.params olarak DÜZELTİLDİ
     const { providerId } = req.body;
     
     await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
