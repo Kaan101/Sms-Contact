@@ -87,7 +87,10 @@ const getOpenPoolRequests = async (req, res) => {
       filteredPool = rows.filter(req => {
         const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
         return isSmartMatch(textToSearch, providerKeywords);
-      });
+      }).map(req => ({
+        ...req,
+        contact_value: '*** ** ** (Eşleşince Görünür)' // Havuzdaki herkes için maskele
+      }));
     }
 
     res.status(200).json({ status: 'success', poolRequests: filteredPool });
@@ -233,7 +236,19 @@ const getProviderAssignedRequests = async (req, res) => {
        ORDER BY r.updated_at DESC;`,
       [providerId]
     );
-    res.status(200).json({ status: 'success', requests: rows });
+
+    // GİZLİLİK KALKANI: Sağlayıcı henüz kabul etmediyse iletişim bilgisini maskele
+    const secureRows = rows.map(r => {
+      if (!['ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED'].includes(r.status)) {
+        return {
+          ...r,
+          contact_value: '*** ** ** (İşi Kabul Edince Görünür)' // Maskelenmiş değer
+        };
+      }
+      return r;
+    });
+
+    res.status(200).json({ status: 'success', requests: secureRows });
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
