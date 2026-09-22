@@ -227,8 +227,8 @@ export default function ProviderDashboard() {
                       const isHiddenPreference = safeString(req.contact_value).includes('HIDDEN');
                       
                       const displayContact = forceRevealContact 
-                        ? rawContact 
-                        : (isHiddenPreference ? 'Gizli (Kabul Edince Açılacak)' : getProviderContactDisplay(req.contact_value));
+                      ? rawContact 
+                      : '*** ** ** (İşi Kabul Edince Açılacak)';
                       
                       const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !isHiddenPreference);
 
