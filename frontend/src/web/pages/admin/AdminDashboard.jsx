@@ -222,18 +222,18 @@ export default function AdminDashboard() {
       saveAs(blob, `Admin_${sheetName}_${new Date().getTime()}.xlsx`);
     } catch (error) {
       console.error("Dışa Aktarma Hatası:", error);
-      alert("Excel dosyası oluşturulurken bir hata oluştu. (F12 Konsoluna bakın)");
+      alert("Excel dosyası oluşturulurken bir hata oluştu.");
     }
   };
 
   // ==========================================
-  // EXCEL İÇE AKTARMA (FileReader Yapısı)
+  // EXCEL İÇE AKTARMA & BACKEND ENTEGRASYONU
   // ==========================================
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    alert("Excel dosyası alındı. Veriler okunuyor...");
+    alert("Excel dosyası alındı. Veriler okunuyor ve kaydediliyor...");
     
     const reader = new FileReader();
     
@@ -243,7 +243,6 @@ export default function AdminDashboard() {
         const workbook = new ExcelJS.Workbook();
         
         await workbook.xlsx.load(buffer);
-        
         const worksheet = workbook.worksheets[0];
         const importedData = [];
         const headers = {};
@@ -254,7 +253,6 @@ export default function AdminDashboard() {
 
         worksheet.eachRow((row, rowNumber) => {
           if (rowNumber === 1) return;
-          
           const rowData = {};
           row.eachCell((cell, colNumber) => {
             rowData[headers[colNumber] || `Sutun_${colNumber}`] = cell.value;
@@ -263,20 +261,59 @@ export default function AdminDashboard() {
         });
 
         if (importedData.length === 0) {
-          alert("Yüklediğiniz Excel dosyası boş veya formatı desteklenmiyor.");
+          alert("Excel dosyası boş.");
           return;
         }
 
-        console.log("✅ EXCEL'DEN OKUNAN VERİLER:", importedData);
-        alert(`${importedData.length} satır başarıyla okundu!\n\nVeritabanı kayıt işlemi (Backend) bağlanmadığı için şu an sadece konsola (F12) yazdırıldı.`);
-        
-        // Backend bağlamak istediğinde `axios.post` kodlarını buraya ekleyeceksin.
-        
+        // BACKEND KAYIT İŞLEMİ
+        try {
+          if (adminTab === 'PROVIDERS') {
+            for (const item of importedData) {
+              await axios.post(`${API_BASE}/providers`, {
+                name: item.NAME || item.name || item.isim || 'İsimsiz Firma',
+                phone: String(item.PHONE || item.phone || item.telefon || ''),
+                email: item.EMAIL || item.email || item.eposta || null,
+                serviceKeywords: (item.SERVICEKEYWORDS || item.serviceKeywords || item.anahtarkelime || '').split(','),
+                communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
+                priorityScore: parseInt(item.PRIORITYSCORE || item.priorityScore || 100, 10)
+              });
+            }
+          } else if (adminTab === 'TESTS') {
+            for (const item of importedData) {
+              await axios.post(`${API_BASE}/tests`, {
+                title: item.TITLE || item.title || 'Yeni Test',
+                description: item.DESCRIPTION || item.description || '',
+                testerName: item.TESTERNAME || item.testerName || 'Sistem',
+                testDate: new Date().toISOString().split('T')[0],
+                status: 'BEKLİYOR'
+              });
+            }
+          } else if (adminTab === 'PROJECT') {
+            for (const item of importedData) {
+              await axios.post(`${API_BASE}/features`, {
+                title: item.TITLE || item.title || 'Yeni Özellik',
+                description: item.DESCRIPTION || item.description || '',
+                targetDate: new Date().toISOString().split('T')[0],
+                status: item.STATUS || item.status || 'BEKLİYOR',
+                priority: item.PRIORITY || item.priority || 'ORTA'
+              });
+            }
+          } else {
+             alert("Bu sekme için Excel'den içe aktarma işlemi desteklenmiyor.");
+             return;
+          }
+          await fetchAdminData();
+          alert("İşlem Başarılı! Veriler veritabanına kaydedildi.");
+        } catch (dbError) {
+          console.error("Veritabanı Kayıt Hatası:", dbError);
+          alert("Veriler okundu ancak kaydedilirken hata oluştu. Lütfen formatı kontrol edin.");
+        }
+
       } catch (error) {
-        console.error("❌ Excel Okuma Hatası:", error);
-        alert("Excel dosyası işlenirken bir hata oluştu. Lütfen dosyanın bozuk olmadığından emin olun.");
+        console.error("Excel Okuma Hatası:", error);
+        alert("Dosya okunamadı. Lütfen formatını kontrol edin.");
       } finally {
-        e.target.value = null; // Aynı dosyayı üst üste seçebilmek için input'u sıfırlıyoruz.
+        e.target.value = null;
       }
     };
 
@@ -289,7 +326,6 @@ export default function AdminDashboard() {
       {/* BAŞLIK VE SEKMELER (TABS) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <h2 className="text-2xl font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
-
         <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1.5 rounded-xl border text-xs font-semibold">
           <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>WoZ Havuzu ({pendingRequests.length})</button>
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
@@ -307,32 +343,20 @@ export default function AdminDashboard() {
           <span>Şu anki görünüm:</span>
           <span className="font-bold text-neutral-900 bg-white px-2 py-1 rounded border shadow-xs">{adminTab}</span>
         </div>
-        
         <div className="flex items-center gap-3">
-          <button 
-            onClick={handleExportExcel} 
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer"
-          >
+          <button onClick={handleExportExcel} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
             <Download size={18} />
             <span>Seçili Sekmeyi İndir</span>
           </button>
-
           <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
             <Upload size={18} />
             <span>Excel'den Veri Yükle</span>
-            <input 
-              type="file" 
-              accept=".xlsx, .xls" 
-              className="hidden"
-              // onClick eklenerek aynı dosya tekrar seçildiğinde de tetiklenmesi garanti altına alındı 
-              onChange={handleFileUpload} 
-              onClick={(e) => { e.target.value = null; }}
-            />
+            <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} onClick={(e) => { e.target.value = null; }} />
           </label>
         </div>
       </div>
 
-      {/* İÇERİK BÖLÜMÜ BAŞLANGICI */}
+      {/* İÇERİK BÖLÜMÜ */}
       {adminTab === 'SETTINGS' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border shadow-sm">
@@ -418,7 +442,7 @@ export default function AdminDashboard() {
                   <SortableHeader label="Talep Metni" sortKey="raw_text" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Müşteri" sortKey="contact_value" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Sağlayıcı" sortKey="provider_name" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                  <SortableHeader label="Konum / Aciliyet" sortKey="location" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
+                  <SortableHeader label="Konum" sortKey="location" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-right">İşlem</th>
                 </tr>
               </thead>
