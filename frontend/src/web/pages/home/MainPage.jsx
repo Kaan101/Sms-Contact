@@ -70,7 +70,7 @@ export default function MainPage() {
               </span>
             </h1>
             <p className="text-lg text-neutral-600 mb-8 leading-relaxed font-medium">
-              Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefonla aranmak mı, yoksa WhatsApp / SMS ile mesajlaşmak mı? Karar sizin.
+              Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefon mu, yoksa SMS mi? Karar sizin.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <button className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2">
@@ -108,7 +108,7 @@ export default function MainPage() {
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">Canlı Akış Simülasyonu</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-mono font-bold text-neutral-400">Senaryo {scenario}/2 ({scenario === 1 ? "Aranmak İstiyorum" : "WhatsApp / SMS İsteği"})</span>
+                  <span className="text-[11px] font-mono font-bold text-neutral-400">Senaryo {scenario}/2 ({scenario === 1 ? "Telefon" : "SMS"})</span>
                   <div className="flex space-x-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full transition-all ${scenario === 1 ? 'w-4 bg-neutral-900' : 'bg-neutral-300'}`} />
                     <div className={`w-1.5 h-1.5 rounded-full transition-all ${scenario === 2 ? 'w-4 bg-neutral-900' : 'bg-neutral-300'}`} />
@@ -133,8 +133,8 @@ export default function MainPage() {
                     <div className="bg-white border p-3 rounded-xl shadow-xs">
                       <p className="text-xs font-medium text-neutral-800 leading-relaxed">
                         {scenario === 1 
-                          ? "Tarabya'da 3+1 kiralık ev arıyorum. Bütçe 40.000 TL." 
-                          : "Bosch çamaşır makinesi su akıtıyor. Orijinal parça değişimi lazım."}
+                          ? "Tarabya'da 3+1 kiralık" 
+                          : "Bosch servis"}
                       </p>
                     </div>
                   </div>
@@ -144,11 +144,11 @@ export default function MainPage() {
                     <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
                     <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-blue-600 text-white border-blue-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
                       <Phone size={12} />
-                      <span>Aranmak İstiyorum</span>
+                      <span>Telefon</span>
                     </div>
                     <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
                       <MessageCircle size={12} />
-                      <span>WhatsApp / SMS İstiyorum</span>
+                      <span>SMS</span>
                     </div>
                   </div>
                 </div>
@@ -176,7 +176,7 @@ export default function MainPage() {
                     </div>
 
                     <div className="bg-neutral-50 border p-3 rounded-xl text-xs font-medium text-neutral-700">
-                      {scenario === 1 ? "Talep: Tarabya 3+1 Kiralık" : "Talep: Bosch Çamaşır Makinesi"}
+                      {scenario === 1 ? "Talep: Tarabya'da 3+1 kiralık" : "Talep: Bosch servis"}
                     </div>
                   </div>
 
@@ -189,7 +189,7 @@ export default function MainPage() {
                     ) : (
                       <div className="space-y-2.5 animate-in fade-in zoom-in duration-300">
                         
-                        {/* Senaryo 1 Sonucu (Direkt Arama) */}
+                        {/* Senaryo 1 Sonucu (Telefon) */}
                         {scenario === 1 && (
                           <>
                             <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
@@ -203,19 +203,19 @@ export default function MainPage() {
                           </>
                         )}
 
-                        {/* Senaryo 2 Sonucu (WhatsApp / SMS Mesajı) */}
+                        {/* Senaryo 2 Sonucu (SMS) */}
                         {scenario === 2 && (
                           <>
                             <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
                               <span className="text-neutral-400 font-bold uppercase text-[9px]">İletişim Kanalı</span>
                               <div className="flex items-center space-x-1 text-emerald-600 font-bold">
                                 <MessageCircle size={11} />
-                                <span className="text-[10px]">WhatsApp / SMS</span>
+                                <span className="text-[10px]">SMS</span>
                               </div>
                             </div>
                             <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl text-[11px] font-medium text-emerald-950 shadow-xs flex items-start space-x-2">
                               <Send size={12} className="text-emerald-600 shrink-0 mt-0.5" />
-                              <p>"Merhaba Mehmet Bey, Bosch yetkili servisiyim. Orijinal parça stoklarımızda mevcut..."</p>
+                              <p>"Merhaba Mehmet Bey, Bosch yetkili servisiyim. Size nasıl yardımcı olabilirim?"</p>
                             </div>
                           </>
                         )}
@@ -261,7 +261,7 @@ export default function MainPage() {
                 <ShieldCheck size={20} />
               </div>
               <h3 className="text-lg font-bold text-neutral-950 mb-2">Seçim Özgürlüğü</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">İster telefonla aranarak hızlı çözüm bulun, isterseniz WhatsApp / SMS ile mesajlaşarak fiyat tekliflerini toplayın.</p>
+              <p className="text-sm text-neutral-600 leading-relaxed">İster telefonla aranarak hızlı çözüm bulun, isterseniz SMS ile mesajlaşarak fiyat tekliflerini toplayın.</p>
             </div>
           </div>
         </div>
