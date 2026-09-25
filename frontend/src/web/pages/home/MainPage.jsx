@@ -165,7 +165,7 @@ export default function MainPage({ onGoToLogin }) {
                 <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs">
                   <div>
                     <div className="flex items-center space-x-2.5 mb-3">
-                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
+                      <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
                       <div>
                         <h4 className="text-xs font-bold text-neutral-900">Mehmet Bey</h4>
                         <span className="text-[10px] text-neutral-500 flex items-center"><MapPin size={9} className="mr-0.5" /> Tarabya, İstanbul</span>
@@ -191,25 +191,25 @@ export default function MainPage({ onGoToLogin }) {
                     }`}>
                       <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                       
-                      {/* Telefon Arama Düğmesi (Hafif Transparan Aktif Durum) */}
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
+                      {/* Telefon Arama Düğmesi (Renksiz, Kalın Gri Çerçeveli) */}
+                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 1 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                              ? 'bg-sky-50 text-sky-700 border-sky-300 scale-98 shadow-inner' 
-                              : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed') 
-                          : 'bg-transparent text-neutral-700 border-neutral-400 border-dashed'
+                              ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
+                              : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
+                          : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
                       }`}>
                         <Phone size={12} />
                         <span>Telefon arama</span>
                       </div>
 
-                      {/* Whatsapp/Sms Düğmesi (Hafif Transparan Aktif Durum) */}
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
+                      {/* Whatsapp/Sms Düğmesi (Renksiz, Kalın Gri Çerçeveli) */}
+                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 2 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 scale-98 shadow-inner' 
-                              : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed') 
-                          : 'bg-transparent text-neutral-700 border-neutral-400 border-dashed'
+                              ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
+                              : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
+                          : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
                       }`}>
                         <MessageCircle size={12} />
                         <span>Whatsapp/Sms</span>
@@ -217,7 +217,7 @@ export default function MainPage({ onGoToLogin }) {
 
                       <div className="pt-1 flex justify-end">
                         <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${
-                          phase === 'CLICK_SEND' ? 'bg-emerald-700 text-white scale-95' : 'bg-neutral-950 text-white'
+                          phase === 'CLICK_SEND' ? 'bg-neutral-700 text-white scale-95' : 'bg-neutral-950 text-white'
                         }`}>
                           <span>Gönder</span>
                           <Send size={10} />
@@ -228,24 +228,24 @@ export default function MainPage({ onGoToLogin }) {
                     {phase === 'FINAL_ACTION' && (
                       <div className="animate-in fade-in zoom-in duration-500">
                         {scenario === 1 && (
-                          <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
+                          <div className="bg-gradient-to-b from-neutral-700 to-neutral-900 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
                             <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
                             <div className="relative z-10 flex flex-col items-center space-y-1">
                               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-1 animate-ping absolute top-3" />
-                              <PhoneIncoming size={20} className="animate-bounce mb-1 text-emerald-200" />
-                              <span className="text-[9px] uppercase tracking-widest font-mono text-emerald-200 font-bold">Gelen Telefon Araması</span>
+                              <PhoneIncoming size={20} className="animate-bounce mb-1 text-neutral-200" />
+                              <span className="text-[9px] uppercase tracking-widest font-mono text-neutral-300 font-bold">Gelen Telefon Araması</span>
                               <h5 className="text-sm font-extrabold tracking-tight mt-1">Ayşe Hanım (Tarabya Emlak)</h5>
-                              <p className="text-[11px] text-emerald-100 font-mono">0532 555 44 33</p>
+                              <p className="text-[11px] text-neutral-300 font-mono">0532 555 44 33</p>
                             </div>
                             <div className="relative z-10 flex items-center justify-center space-x-8 pt-2">
                               <div className="flex flex-col items-center space-y-1">
-                                <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
+                                <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white shadow-md">
                                   <Phone size={14} className="rotate-[135deg]" />
                                 </div>
                                 <span className="text-[8px] opacity-80">Reddet</span>
                               </div>
                               <div className="flex flex-col items-center space-y-1">
-                                <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-neutral-950 shadow-md animate-pulse">
+                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-md animate-pulse">
                                   <Phone size={14} />
                                 </div>
                                 <span className="text-[8px] opacity-80 font-bold">Yanıtla</span>
@@ -276,7 +276,7 @@ export default function MainPage({ onGoToLogin }) {
 
                   <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3">
                     <div className="flex items-center space-x-2.5">
-                      <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-neutral-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
                         {scenario === 1 ? "A" : "M"}
                       </div>
                       <div>
@@ -289,8 +289,8 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono transition-all ${
-                      phase === 'MAP_SCANNING' ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse' : 
-                      phase === 'FINAL_ACTION' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-neutral-200 text-neutral-600'
+                      phase === 'MAP_SCANNING' ? 'bg-neutral-200 text-neutral-700 border border-neutral-300 animate-pulse' : 
+                      phase === 'FINAL_ACTION' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
                     }`}>
                       {phase === 'MAP_SCANNING' ? 'Harita Taranıyor...' : phase === 'FINAL_ACTION' ? 'Eşleşti' : 'Bekliyor'}
                     </span>
@@ -299,8 +299,8 @@ export default function MainPage({ onGoToLogin }) {
                   <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
                     {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
                       <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
-                        <span className="text-[10px] font-mono text-emerald-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/90 px-2.5 py-1 rounded-full border border-emerald-300 shadow-xs">
-                          <Compass size={13} className="animate-spin text-emerald-600" /> Bölgedeki Alternatifler Analiz Ediliyor
+                        <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/90 px-2.5 py-1 rounded-full border border-neutral-300 shadow-xs">
+                          <Compass size={13} className="animate-spin text-neutral-600" /> Bölgedeki Alternatifler Analiz Ediliyor
                         </span>
                         
                         <div className="flex items-center justify-center space-x-8 relative my-2 w-full">
@@ -312,12 +312,12 @@ export default function MainPage({ onGoToLogin }) {
                           <div className="flex flex-col items-center transform scale-110">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-700 ${
                               phase === 'FINAL_ACTION' 
-                                ? 'bg-emerald-600 text-white ring-4 ring-emerald-600/30 scale-125' 
-                                : 'bg-amber-500 text-white animate-bounce ring-2 ring-amber-500/50'
+                                ? 'bg-neutral-800 text-white ring-4 ring-neutral-800/30 scale-125' 
+                                : 'bg-neutral-300 text-neutral-800 animate-bounce ring-2 ring-neutral-300/50'
                             }`}>
                               <MapPin size={16} />
                             </div>
-                            <span className="text-[10px] text-emerald-900 font-extrabold mt-1 bg-white px-2 py-0.5 rounded border border-emerald-300 shadow-xs">
+                            <span className="text-[10px] text-neutral-900 font-extrabold mt-1 bg-white px-2 py-0.5 rounded border border-neutral-300 shadow-xs">
                               {scenario === 1 ? "Ayşe H." : "Murat U."}
                             </span>
                           </div>
@@ -348,7 +348,7 @@ export default function MainPage({ onGoToLogin }) {
                               <span className="text-neutral-600 font-bold uppercase text-[9px]">Müşteri No</span>
                               <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
                             </div>
-                            <div className="flex items-center justify-center space-x-1.5 text-emerald-800 bg-emerald-100 border border-emerald-300 p-2 rounded-xl text-[11px] font-bold shadow-xs">
+                            <div className="flex items-center justify-center space-x-1.5 text-neutral-800 bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-bold shadow-xs">
                               <PhoneCall size={12} className="animate-bounce" />
                               <span>Telefon Araması Başlatıldı</span>
                             </div>
@@ -359,13 +359,13 @@ export default function MainPage({ onGoToLogin }) {
                           <>
                             <div className="flex items-center justify-between text-[11px] border-b border-neutral-300 pb-1">
                               <span className="text-neutral-600 font-bold uppercase text-[9px]">İletişim Kanalı</span>
-                              <div className="flex items-center space-x-1 text-emerald-800 font-bold">
+                              <div className="flex items-center space-x-1 text-neutral-800 font-bold">
                                 <MessageCircle size={11} />
                                 <span className="text-[10px]">Whatsapp/Sms</span>
                               </div>
                             </div>
-                            <div className="bg-emerald-100 border border-emerald-300 p-2 rounded-xl text-[11px] font-medium text-emerald-950 flex items-start space-x-1.5 shadow-xs">
-                              <Send size={12} className="text-emerald-700 shrink-0 mt-0.5" />
+                            <div className="bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-medium text-neutral-900 flex items-start space-x-1.5 shadow-xs">
+                              <Send size={12} className="text-neutral-700 shrink-0 mt-0.5" />
                               <p>"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
                             </div>
                           </>
