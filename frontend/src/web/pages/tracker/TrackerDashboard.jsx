@@ -3,10 +3,10 @@ import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import useSWR from 'swr'; // --- SWR EKLENDİ ---
-import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, MessageCircle, Loader2 } from 'lucide-react';
+import useSWR from 'swr';
+import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, MessageCircle, Loader2, Timer, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
-import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, extractPhoneForWa } from '../../../core/utils/helpers';
+import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, extractPhoneForWa, calculateRemainingTime } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
 
 // --- SWR İÇİN GLOBAL FETCHER FONKSİYONU ---
@@ -17,7 +17,7 @@ const TaskCard = React.memo(({
   req, providerProfile, activeProviderRequests, poolRequests, expandedTrackerReqId, 
   actionLoadingId, setTrackerMapCenter, setTrackerMapSelectedPos, setCoordinates, 
   setIsTrackerListOpen, setExpandedTrackerReqId, handleJoinPool, setHiddenPoolRequests, 
-  handleStatusChange, handleProviderSkip, handleCustomerSelectCandidate 
+  handleStatusChange, handleProviderSkip, handleCustomerSelectCandidate, systemSettings 
 }) => {
   const coords = extractGPS(req.location);
   const isExpanded = expandedTrackerReqId === req.id;
@@ -35,6 +35,39 @@ const TaskCard = React.memo(({
   const displayContact = forceRevealContact ? rawContact : 'Gizli (Kabul Edince Açılacak)';
   const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
 
+  // --- SAYAÇ (TIMER) MANTIĞI ---
+  let timerDisplay = null;
+  let isTimerCritical = false;
+
+  if (reqStatus === 'POOL' || reqStatus === 'PENDING') {
+     const poolLimit = systemSettings?.pool_lifespan_hours || 72;
+     const remaining = calculateRemainingTime(req.created_at, poolLimit, 'hours');
+     if (remaining) {
+       timerDisplay = `Havuz: ${remaining}`;
+       isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+     }
+  } else if (reqStatus === 'MATCHED' && !isMyTask) {
+     const selectLimit = systemSettings?.customer_selection_timeout_mins || 60;
+     const remaining = calculateRemainingTime(req.updated_at || req.created_at, selectLimit, 'mins');
+     if (remaining) {
+       timerDisplay = `Seçim: ${remaining}`;
+       isTimerCritical = remaining === "Süresi Doldu" || (parseInt(remaining) < 15 && remaining.includes("dk") && !remaining.includes("saat"));
+     }
+  } else if (reqStatus === 'ACCEPTED' && isMyTask) {
+     const completionLimit = systemSettings?.provider_completion_timeout_hours || 48;
+     const remaining = calculateRemainingTime(req.updated_at, completionLimit, 'hours');
+     if (remaining) {
+       timerDisplay = `Teslimat: ${remaining}`;
+       isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+     }
+  } else if (reqStatus === 'PROVIDER_COMPLETED') {
+     const approvalLimit = systemSettings?.customer_approval_timeout_hours || 24;
+     const remaining = calculateRemainingTime(req.updated_at, approvalLimit, 'hours');
+     if (remaining) {
+       timerDisplay = `Oto Onay: ${remaining}`;
+     }
+  }
+
   return (
     <div onClick={() => { 
         if(coords) { 
@@ -47,8 +80,19 @@ const TaskCard = React.memo(({
             setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); 
         }
     }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
-      <div className="flex items-start justify-between mb-1.5">
-        <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{reqStatus || 'POOL'}</span></div>
+      <div className="flex items-start justify-between mb-1.5 flex-wrap gap-y-1">
+        <div className="flex items-center gap-1.5">
+           <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{reqStatus || 'POOL'}</span>
+        </div>
+        
+        {timerDisplay && (
+           <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+              {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
+              <span>{timerDisplay}</span>
+           </div>
+        )}
+
         {providerProfile && hasJoined && !isMyTask && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
         {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
       </div>
@@ -171,7 +215,6 @@ const TaskCard = React.memo(({
                 </div>
               </div>
            )}
-
         </div>
       )}
     </div>
@@ -190,11 +233,12 @@ export default function TrackerDashboard() {
   const trackerSearchInputRef = useRef(null);
 
   // --- SWR VERİ ÇEKME HOOK'LARI ---
-  // Pending ve Matched Requestleri ayrı ayrı çeker
+  const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
+  const systemSettings = rawSettings?.settings || { pool_lifespan_hours: 72, customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48, customer_approval_timeout_hours: 24 };
+
   const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: 5000 });
   const { data: rawMatchedRequests, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: 5000 });
   
-  // Provider Verileri (Kişiye Özel)
   const providerPhoneQuery = session?.phone ? `phone=${encodeURIComponent(session.phone)}` : null;
   const { data: providerRes } = useSWR(providerPhoneQuery ? `${API_BASE}/providers/by-phone?${providerPhoneQuery}` : null, fetcher);
   const providerProfile = providerRes?.provider || null;
@@ -215,7 +259,6 @@ export default function TrackerDashboard() {
 
   const activeProviderRequests = useMemo(() => safeArray(activeRequestsRes?.requests).filter(r => r && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(safeUpper(r.status))), [activeRequestsRes]);
   const poolRequests = useMemo(() => safeArray(poolRequestsRes?.poolRequests), [poolRequestsRes]);
-
 
   const [hiddenPoolRequests, setHiddenPoolRequests] = useState([]); 
 
@@ -444,10 +487,10 @@ export default function TrackerDashboard() {
              
              <div className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-neutral-50 pb-20">
                {filteredTrackerRequests.map(req => (
-                  // PERFORMANS: React.memo kullanılarak sadece değişen kartların güncellenmesi sağlandı.
                   <TaskCard 
                      key={req.id}
                      req={req}
+                     systemSettings={systemSettings}
                      providerProfile={providerProfile}
                      activeProviderRequests={activeProviderRequests}
                      poolRequests={poolRequests}
