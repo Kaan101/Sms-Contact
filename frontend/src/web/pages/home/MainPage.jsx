@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, MessageSquare, ShieldCheck, Zap, User, 
   MapPin, CheckCircle2, ArrowRight, Search, Lock, 
-  Clock, Star, ChevronRight, ArrowDown 
+  Clock, Star, MessageCircle, Send 
 } from 'lucide-react';
 
 export default function MainPage() {
@@ -55,7 +55,7 @@ export default function MainPage() {
           <div className="absolute top-[40%] -left-[10%] w-[50%] h-[50%] rounded-full bg-emerald-100/40 blur-3xl" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
+        <div className="max-w-7xl mx-auto px-6 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
           {/* Sol Taraf: Metinler (5 Kolon) */}
           <div className="lg:col-span-5 max-w-xl">
@@ -70,7 +70,7 @@ export default function MainPage() {
               </span>
             </h1>
             <p className="text-lg text-neutral-600 mb-8 leading-relaxed font-medium">
-              Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Aranmak mı istiyorsunuz, yoksa sadece uygulama içi mesajlaşmak mı? Karar sizin.
+              Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefonla aranmak mı, yoksa WhatsApp / SMS ile mesajlaşmak mı? Karar sizin.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <button className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2">
@@ -95,7 +95,7 @@ export default function MainPage() {
             </div>
           </div>
 
-          {/* Sağ Taraf: İnteraktif Dikey Simülasyon (7 Kolon) */}
+          {/* Sağ Taraf: İki Sütunlu Yan Yana Simülasyon (7 Kolon) */}
           <div className="lg:col-span-7 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-neutral-100 to-white rounded-[2rem] transform rotate-1 scale-105 border border-neutral-200 shadow-xl" />
             
@@ -108,7 +108,7 @@ export default function MainPage() {
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">Canlı Akış Simülasyonu</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-mono font-bold text-neutral-400">Senaryo {scenario}/2</span>
+                  <span className="text-[11px] font-mono font-bold text-neutral-400">Senaryo {scenario}/2 ({scenario === 1 ? "Aranmak İstiyorum" : "WhatsApp / SMS İsteği"})</span>
                   <div className="flex space-x-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full transition-all ${scenario === 1 ? 'w-4 bg-neutral-900' : 'bg-neutral-300'}`} />
                     <div className={`w-1.5 h-1.5 rounded-full transition-all ${scenario === 2 ? 'w-4 bg-neutral-900' : 'bg-neutral-300'}`} />
@@ -116,122 +116,112 @@ export default function MainPage() {
                 </div>
               </div>
 
-              {/* DİKEY AKIS KAPSAYICISI (ARADA ÇİZGİ İLE) */}
-              <div className="relative pl-6 sm:pl-8 space-y-8">
+              {/* ÇİFT SÜTUNLU YAPI (SOL: MÜŞTERİ | SAĞ: SAĞLAYICI) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative">
                 
-                {/* Dikey Bağlantı Çizgisi */}
-                <div className="absolute left-[11px] sm:left-[15px] top-6 bottom-6 w-0.5 bg-gradient-to-b from-blue-500 via-neutral-200 to-emerald-500" />
-
-                {/* 1. Müşteri (Mehmet Bey) Bölümü */}
-                <div className="relative space-y-3">
-                  <div className="absolute -left-6 sm:-left-8 top-1 w-3 h-3 rounded-full bg-blue-600 ring-4 ring-blue-50" />
-                  
-                  <div className="flex items-center space-x-3">
-                    <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs">M</div>
-                    <div>
-                      <h4 className="text-xs font-bold text-neutral-900">Mehmet Bey (Müşteri)</h4>
-                      <span className="text-[10px] text-neutral-500 flex items-center"><MapPin size={10} className="mr-0.5" /> Konum: Tarabya</span>
+                {/* SOL TARAF: MÜŞTERİ (MEHMET BEY) */}
+                <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs">
+                  <div>
+                    <div className="flex items-center space-x-2.5 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
+                      <div>
+                        <h4 className="text-xs font-bold text-neutral-900">Mehmet Bey</h4>
+                        <span className="text-[10px] text-neutral-500 flex items-center"><MapPin size={9} className="mr-0.5" /> Tarabya, İstanbul</span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="bg-neutral-50 border border-neutral-100 p-3.5 rounded-2xl rounded-tl-none shadow-inner">
-                    <p className="text-xs sm:text-sm font-medium text-neutral-800 leading-relaxed">
-                      {scenario === 1 
-                        ? "Tarabya'da 3+1 kiralık ev arıyorum. Bütçe 40.000 TL." 
-                        : "Bosch çamaşır makinesi su akıtıyor. Orijinal parça değişimi lazım."}
-                    </p>
+                    
+                    <div className="bg-white border p-3 rounded-xl shadow-xs">
+                      <p className="text-xs font-medium text-neutral-800 leading-relaxed">
+                        {scenario === 1 
+                          ? "Tarabya'da 3+1 kiralık ev arıyorum. Bütçe 40.000 TL." 
+                          : "Bosch çamaşır makinesi su akıtıyor. Orijinal parça değişimi lazım."}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Tercih Butonları */}
-                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-                    <div className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-xl border text-[11px] font-bold transition-all ${scenario === 1 ? 'bg-neutral-950 text-white border-neutral-950 scale-102 shadow-md' : 'bg-white text-neutral-400 border-neutral-200 opacity-50'}`}>
-                      <Phone size={13} />
+                  <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                    <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
+                    <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-blue-600 text-white border-blue-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                      <Phone size={12} />
                       <span>Aranmak İstiyorum</span>
                     </div>
-                    <div className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-xl border text-[11px] font-bold transition-all ${scenario === 2 ? 'bg-neutral-950 text-white border-neutral-950 scale-102 shadow-md' : 'bg-white text-neutral-400 border-neutral-200 opacity-50'}`}>
-                      <MessageSquare size={13} />
-                      <span>Mesaj İstiyorum</span>
+                    <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                      <MessageCircle size={12} />
+                      <span>WhatsApp / SMS İstiyorum</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Sistem Eşleşme Bildirimi */}
-                <div className={`transition-all duration-700 ${step >= 2 ? 'opacity-100' : 'opacity-0'}`}>
-                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                    <CheckCircle2 size={12} />
-                    <span>Sistem bölgedeki uzmanla eşleştirdi</span>
-                  </div>
-                </div>
-
-                {/* 2. Sağlayıcı Bölümü */}
-                <div className={`relative space-y-3 transition-all duration-700 transform ${step >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-                  <div className="absolute -left-6 sm:-left-8 top-1 w-3 h-3 rounded-full bg-emerald-600 ring-4 ring-emerald-50" />
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-                        {scenario === 1 ? <User size={13} /> : <Search size={13} />}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-neutral-900">
-                          {scenario === 1 ? "Ayşe Hanım" : "Murat Usta"}
-                        </h4>
-                        <span className="text-[10px] text-neutral-500">
-                          {scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis"}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-[9px] font-bold text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-md uppercase font-mono">
-                      {scenario === 1 ? "Arama Akışı" : "Gizli Mesaj Akışı"}
-                    </span>
-                  </div>
-
-                  <div className={`bg-white border p-4 rounded-2xl shadow-sm transition-all duration-500 ${step >= 3 ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-neutral-200'}`}>
-                    
-                    {step < 3 ? (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-neutral-600 font-medium">Yeni talep panoya düştü...</span>
-                        <div className="px-3 py-1.5 bg-neutral-950 text-white text-[11px] font-bold rounded-xl animate-pulse">
-                          İşi Kabul Et
+                {/* SAĞ TARAF: SAĞLAYICI (AYŞE HANIM / MURAT USTA) */}
+                <div className={`bg-white border rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm transition-all duration-700 ${step >= 2 ? 'opacity-100 border-emerald-500 ring-2 ring-emerald-500/10' : 'opacity-40 border-neutral-200 pointer-events-none'}`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {scenario === 1 ? "A" : "M"}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-neutral-900">
+                            {scenario === 1 ? "Ayşe Hanım" : "Murat Usta"}
+                          </h4>
+                          <span className="text-[10px] text-neutral-500">
+                            {scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis"}
+                          </span>
                         </div>
                       </div>
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-mono">
+                        {step >= 2 ? "Eşleşti" : "Bekliyor"}
+                      </span>
+                    </div>
+
+                    <div className="bg-neutral-50 border p-3 rounded-xl text-xs font-medium text-neutral-700">
+                      {scenario === 1 ? "Talep: Tarabya 3+1 Kiralık" : "Talep: Bosch Çamaşır Makinesi"}
+                    </div>
+                  </div>
+
+                  {/* Sonuç Alanı */}
+                  <div>
+                    {step < 3 ? (
+                      <button className="w-full py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl animate-pulse">
+                        İşi Kabul Et
+                      </button>
                     ) : (
-                      <div className="space-y-3 animate-in fade-in zoom-in duration-300">
+                      <div className="space-y-2.5 animate-in fade-in zoom-in duration-300">
                         
-                        {/* Senaryo 1 Sonucu (Arama) */}
+                        {/* Senaryo 1 Sonucu (Direkt Arama) */}
                         {scenario === 1 && (
                           <>
-                            <div className="flex items-center justify-between border-b pb-2 text-xs">
-                              <span className="text-[10px] font-bold text-neutral-500 uppercase">Müşteri Numarası</span>
+                            <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
+                              <span className="text-neutral-400 font-bold uppercase text-[9px]">Müşteri No</span>
                               <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
                             </div>
-                            <div className="flex items-center justify-center space-x-2 text-emerald-600 bg-emerald-50 p-2 rounded-xl text-xs font-bold">
-                              <Phone size={13} className="animate-bounce" />
-                              <span>Ayşe Hanım müşteriyi arıyor...</span>
+                            <div className="flex items-center justify-center space-x-1.5 text-emerald-700 bg-emerald-50 p-2 rounded-xl text-[11px] font-bold">
+                              <Phone size={12} className="animate-bounce" />
+                              <span>Telefon Araması Başlatıldı</span>
                             </div>
                           </>
                         )}
 
-                        {/* Senaryo 2 Sonucu (Gizli / Mesaj) */}
+                        {/* Senaryo 2 Sonucu (WhatsApp / SMS Mesajı) */}
                         {scenario === 2 && (
                           <>
-                            <div className="flex items-center justify-between border-b pb-2 text-xs">
-                              <span className="text-[10px] font-bold text-neutral-500 uppercase">Müşteri Numarası</span>
-                              <div className="flex items-center space-x-1 bg-neutral-100 px-2 py-0.5 rounded">
-                                <Lock size={10} className="text-neutral-500" />
-                                <span className="font-extrabold text-neutral-400 font-mono text-xs">0532 *** ** **</span>
+                            <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
+                              <span className="text-neutral-400 font-bold uppercase text-[9px]">İletişim Kanalı</span>
+                              <div className="flex items-center space-x-1 text-emerald-600 font-bold">
+                                <MessageCircle size={11} />
+                                <span className="text-[10px]">WhatsApp / SMS</span>
                               </div>
                             </div>
-                            <div className="bg-blue-50 border border-blue-100 p-2.5 rounded-xl text-[11px] font-medium text-blue-900 shadow-xs">
-                              "Merhaba Mehmet Bey, servisimizde orijinal parçalar mevcuttur. Bilgi için numaranızı paylaşmak ister misiniz?"
+                            <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl text-[11px] font-medium text-emerald-950 shadow-xs flex items-start space-x-2">
+                              <Send size={12} className="text-emerald-600 shrink-0 mt-0.5" />
+                              <p>"Merhaba Mehmet Bey, Bosch yetkili servisiyim. Orijinal parça stoklarımızda mevcut..."</p>
                             </div>
-                            <div className="text-[9px] font-bold text-neutral-400 text-right">Uygulama İçi Güvenli Mesajlaşma</div>
                           </>
                         )}
 
                       </div>
                     )}
-
                   </div>
 
                 </div>
@@ -271,7 +261,7 @@ export default function MainPage() {
                 <ShieldCheck size={20} />
               </div>
               <h3 className="text-lg font-bold text-neutral-950 mb-2">Seçim Özgürlüğü</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">İster telefonla aranarak hızlı çözüm bulun, isterseniz uygulama içi mesajlaşarak fiyat tekliflerini toplayın.</p>
+              <p className="text-sm text-neutral-600 leading-relaxed">İster telefonla aranarak hızlı çözüm bulun, isterseniz WhatsApp / SMS ile mesajlaşarak fiyat tekliflerini toplayın.</p>
             </div>
           </div>
         </div>
