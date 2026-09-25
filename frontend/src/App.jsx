@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuth } from './core/context/AuthContext';
 // IMPORT YOLUNU DÜZELTTİK:
@@ -26,6 +26,40 @@ export default function App() {
   // ANA SAYFADAN GİRİŞ EKRANINA GEÇİŞ İÇİN KONTROL:
   const [showLogin, setShowLogin] = useState(false);
 
+  // --- YENİ EKLENEN BÖLÜM: TARAYICI GERİ TUŞU YÖNETİMİ ---
+  useEffect(() => {
+    // Uygulama ilk yüklendiğinde mevcut durumu geçmişe yaz
+    window.history.replaceState({ view: 'main' }, '', window.location.pathname);
+
+    // Tarayıcının Geri/İleri tuşlarına basıldığını dinle
+    const handlePopState = (event) => {
+      // Eğer kullanıcı giriş yapmışsa (session varsa) yönlendirmelere karışma
+      if (session) return; 
+
+      // Eğer url'in sonunda #login yoksa demek ki geri tuşuna basılıp ana sayfaya dönülmek isteniyor
+      if (window.location.hash !== '#login') {
+        setShowLogin(false);
+      } else {
+        setShowLogin(true);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    // Temizlik
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [session]); // Session değiştiğinde hook'u güncel tut
+
+  // Kullanıcı Giriş Yap butonuna tıkladığında çağrılacak fonksiyon
+  const handleGoToLogin = () => {
+    // Tarayıcı geçmişine yeni bir kayıt ekliyoruz ki "Geri" tuşu çalışabilsin
+    window.history.pushState({ view: 'login' }, '', '#login');
+    setShowLogin(true);
+  };
+  // -------------------------------------------------------
+
   const renderDashboard = () => {
     switch (session.role) {
       case 'CUSTOMER': return <CustomerDashboard />;
@@ -37,8 +71,9 @@ export default function App() {
   };
 
   // Eğer oturum yoksa ve kullanıcı henüz Giriş Yap'a basmadıysa Ana Sayfayı göster
+  // Artık tetikleyici olarak onGoToLogin'e setShowLogin yerine yazdığımız yeni handleGoToLogin fonksiyonunu veriyoruz.
   if (!session && !showLogin) {
-    return <MainPage onGoToLogin={() => setShowLogin(true)} />;
+    return <MainPage onGoToLogin={handleGoToLogin} />;
   }
 
   return (
@@ -46,7 +81,12 @@ export default function App() {
       
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-[500]">
         <div className={`${session?.role === 'ADMIN' || session?.role === 'TRACKER' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { if(session) handleLogout(); setShowLogin(false); }}>
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { 
+            if(session) handleLogout(); 
+            setShowLogin(false);
+            // Logoya tıklayınca URL'deki #login kısmını temizle
+            window.history.pushState({ view: 'main' }, '', window.location.pathname);
+          }}>
             <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">MB</div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
@@ -65,7 +105,11 @@ export default function App() {
                 {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : session.role === 'TRACKER' ? '🗺️ Takip' : '⚙️ Admin'}
               </span>
               <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
-              <button onClick={() => { handleLogout(); setShowLogin(false); }} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
+              <button onClick={() => { 
+                handleLogout(); 
+                setShowLogin(false);
+                window.history.pushState({ view: 'main' }, '', window.location.pathname); 
+              }} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
             </div>
           )}
         </div>
