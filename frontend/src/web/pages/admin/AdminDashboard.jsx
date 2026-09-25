@@ -331,22 +331,73 @@ export default function AdminDashboard() {
       </div>
 
       {/* İÇERİK BÖLÜMÜ */}
-      {adminTab === 'SETTINGS' && (
+{adminTab === 'SETTINGS' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border shadow-sm">
-            <div className="flex items-center space-x-2 mb-4"><Settings className="text-neutral-700" size={18} /><h3 className="font-bold text-neutral-950">Sistem Ayarları ve Parametreler</h3></div>
+            <div className="flex items-center space-x-2 mb-4">
+              <Settings className="text-neutral-700" size={18} />
+              <h3 className="font-bold text-neutral-950">İş Akışı Zaman Aşımı (Timeout) Parametreleri</h3>
+            </div>
             <div className="overflow-x-auto w-full border rounded-xl">
               <table className="w-full text-left text-xs table-auto">
                 <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
-                  <tr><th className="px-4 py-3 w-1/4">Ayar Adı</th><th className="px-4 py-3 w-2/4">Açıklama</th><th className="px-4 py-3 w-32 text-center">Değer</th><th className="px-4 py-3 w-24 text-right">İşlem</th></tr>
+                  <tr>
+                    <th className="px-4 py-3 w-1/4">Parametre Adı</th>
+                    <th className="px-4 py-3 w-2/4">Açıklama / Senaryo</th>
+                    <th className="px-4 py-3 w-32 text-center">Değer</th>
+                    <th className="px-4 py-3 w-24 text-right">İşlem</th>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 bg-white">
-                  <tr className="hover:bg-neutral-50">
-                    <td className="px-4 py-3 font-bold text-neutral-900">Varsayılan Bitiş Süresi</td>
-                    <td className="px-4 py-3 text-neutral-500">Müşteri özel bir son tarih belirlemezse, talep kaç gün sonra açık havuzdan otomatik düşsün?</td>
-                    <td className="px-4 py-3 text-center"><input type="number" min="1" value={systemSettings.default_deadline_days || ''} onChange={(e) => setSystemSettings({...systemSettings, default_deadline_days: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none" /></td>
-                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('default_deadline_days', systemSettings.default_deadline_days)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold">Kaydet</button></td>
+                  
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">Havuz Yaşam Süresi <span className="text-[9px] text-neutral-400 block font-mono">pool_lifespan_hours</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Açık havuza düşen bir talep için hiçbir sağlayıcı sıraya girmezse, talep kaç <span className="font-bold">saat</span> sonra sistem tarafından otomatik iptal edilsin?</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.pool_lifespan_hours || 72} onChange={(e) => setSystemSettings({...systemSettings, pool_lifespan_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('pool_lifespan_hours', systemSettings.pool_lifespan_hours || 72)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
                   </tr>
+
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">Müşteri Seçim Süresi <span className="text-[9px] text-neutral-400 block font-mono">customer_selection_timeout_mins</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcılar sıraya girdikten sonra, müşteri kaç <span className="font-bold">dakika</span> içinde seçim yapmazsa işlem askıya alınsın (veya düşürülsün)?</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.customer_selection_timeout_mins || 60} onChange={(e) => setSystemSettings({...systemSettings, customer_selection_timeout_mins: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Dk</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_selection_timeout_mins', systemSettings.customer_selection_timeout_mins || 60)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">İş Teslimat Süresi <span className="text-[9px] text-neutral-400 block font-mono">provider_completion_timeout_hours</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcı işi onayladıktan (Kabul Et) sonra, işi fiilen teslim etmesi (Tamamla) için tanınan maksimum <span className="font-bold">saat</span> limiti.</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.provider_completion_timeout_hours || 48} onChange={(e) => setSystemSettings({...systemSettings, provider_completion_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('provider_completion_timeout_hours', systemSettings.provider_completion_timeout_hours || 48)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">Otomatik Onay Süresi <span className="text-[9px] text-neutral-400 block font-mono">customer_approval_timeout_hours</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcı işi teslim ettikten sonra, müşteri onay butonuna basmazsa sistemin süreci otomatik tamamlaması için bekleyeceği <span className="font-bold">saat</span>.</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.customer_approval_timeout_hours || 24} onChange={(e) => setSystemSettings({...systemSettings, customer_approval_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_approval_timeout_hours', systemSettings.customer_approval_timeout_hours || 24)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
                 </tbody>
               </table>
             </div>
