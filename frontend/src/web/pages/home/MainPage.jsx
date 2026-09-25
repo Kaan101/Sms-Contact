@@ -225,27 +225,28 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
 
+                    {/* FİNAL AKSİYONLARI (MÜŞTERİ EKRANI) */}
                     {phase === 'FINAL_ACTION' && (
                       <div className="animate-in fade-in zoom-in duration-500">
                         {scenario === 1 && (
-                          <div className="bg-gradient-to-b from-neutral-700 to-neutral-900 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
+                          <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
                             <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
                             <div className="relative z-10 flex flex-col items-center space-y-1">
                               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-1 animate-ping absolute top-3" />
-                              <PhoneIncoming size={20} className="animate-bounce mb-1 text-neutral-200" />
-                              <span className="text-[9px] uppercase tracking-widest font-mono text-neutral-300 font-bold">Gelen Telefon Araması</span>
-                              <h5 className="text-sm font-extrabold tracking-tight mt-1">Ayşe Hanım (Tarabya Emlak)</h5>
-                              <p className="text-[11px] text-neutral-300 font-mono">0532 555 44 33</p>
+                              <PhoneIncoming size={20} className="animate-bounce mb-1 text-emerald-200" />
+                              <span className="text-[9px] uppercase tracking-widest font-mono text-emerald-200 font-bold">Gelen Telefon Araması</span>
+                              <h5 className="text-sm font-extrabold tracking-tight mt-1">Emlakçı (Ayşe Hanım) arıyor.</h5>
+                              <p className="text-[11px] text-emerald-100 font-mono">0532 555 44 33</p>
                             </div>
                             <div className="relative z-10 flex items-center justify-center space-x-8 pt-2">
                               <div className="flex flex-col items-center space-y-1">
-                                <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white shadow-md">
+                                <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
                                   <Phone size={14} className="rotate-[135deg]" />
                                 </div>
                                 <span className="text-[8px] opacity-80">Reddet</span>
                               </div>
                               <div className="flex flex-col items-center space-y-1">
-                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-md animate-pulse">
+                                <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-neutral-950 shadow-md animate-pulse">
                                   <Phone size={14} />
                                 </div>
                                 <span className="text-[8px] opacity-80 font-bold">Yanıtla</span>
@@ -260,7 +261,7 @@ export default function MainPage({ onGoToLogin }) {
                               <span className="flex items-center gap-1"><BellRing size={11} className="text-neutral-950" /> Whatsapp / SMS Mesajı</span>
                               <span className="text-neutral-400 font-normal">Şimdi</span>
                             </div>
-                            <p className="font-medium text-[11px] text-neutral-800 leading-tight">"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
+                            <p className="font-medium text-[11px] text-neutral-800 leading-tight">Bosch servis arıyor. "Size nasıl yardımcı olabilirim?"</p>
                           </div>
                         )}
                       </div>
@@ -366,7 +367,7 @@ export default function MainPage({ onGoToLogin }) {
                             </div>
                             <div className="bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-medium text-neutral-900 flex items-start space-x-1.5 shadow-xs">
                               <Send size={12} className="text-neutral-700 shrink-0 mt-0.5" />
-                              <p>"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
+                              <p>Bosch servis arıyor. "Size nasıl yardımcı olabilirim?"</p>
                             </div>
                           </>
                         )}
