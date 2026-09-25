@@ -69,22 +69,16 @@ export default function MainPage({ onGoToLogin }) {
             <span>SMS KONTAK</span>
           </div>
           <div className="hidden md:flex items-center space-x-8 text-sm font-semibold text-neutral-600">
-            <a href="#" className="hover:text-neutral-950 transition">Nasıl Çalışır?</a>
-            <a href="#" className="hover:text-neutral-950 transition">Hizmet Alanlar</a>
-            <a href="#" className="hover:text-neutral-950 transition">Sağlayıcılar</a>
+            <a href="#" className="hover:text-neutral-950 transition cursor-pointer">Nasıl Çalışır?</a>
+            <a href="#" className="hover:text-neutral-950 transition cursor-pointer">Hizmet Alanlar</a>
+            <a href="#" className="hover:text-neutral-950 transition cursor-pointer">Sağlayıcılar</a>
           </div>
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => onGoToLogin('CUSTOMER')} 
-              className="px-4 py-2 text-sm font-bold text-neutral-700 hover:text-neutral-950 transition"
+              className="px-6 py-2.5 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm cursor-pointer"
             >
               Giriş Yap
-            </button>
-            <button 
-              onClick={() => onGoToLogin('CUSTOMER')}
-              className="px-5 py-2 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm"
-            >
-              Kayıt Ol
             </button>
           </div>
         </div>
@@ -119,14 +113,14 @@ export default function MainPage({ onGoToLogin }) {
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <button 
                 onClick={() => onGoToLogin('CUSTOMER')} 
-                className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2"
+                className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <span>Hemen Talep Oluştur</span>
                 <ArrowRight size={16} />
               </button>
               <button 
                 onClick={() => onGoToLogin('PROVIDER')} 
-                className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-neutral-50 text-neutral-950 border border-neutral-200 rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center space-x-2"
+                className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-neutral-50 text-neutral-950 border border-neutral-200 rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <ShieldCheck size={16} className="text-neutral-500" />
                 <span>Hizmet Veren Olun</span>
