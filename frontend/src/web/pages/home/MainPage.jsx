@@ -141,26 +141,30 @@ export default function MainPage() {
 
                   {/* Tercih Butonları & Müşteri Ekranı Reaksiyonu */}
                   <div className="space-y-3">
-                    <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-                      <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
-                      
-                      {/* ŞEFFAF / İÇİ BOŞ TELEFON ARAMA BUTONU */}
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-transparent text-neutral-950 border-neutral-950 ring-2 ring-neutral-950/20 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
-                        <Phone size={12} />
-                        <span>Telefon arama</span>
-                      </div>
+                    
+                    {/* ADIM 1 & 2: Butonlar Görüntülenir ve Seçim Simüle Edilir */}
+                    {step < 3 ? (
+                      <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                        <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
+                        
+                        {/* ŞEFFAF / İÇİ BOŞ TELEFON ARAMA BUTONU */}
+                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-transparent text-neutral-950 border-neutral-950 ring-2 ring-neutral-950/20 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                          <Phone size={12} />
+                          <span>Telefon arama</span>
+                        </div>
 
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
-                        <MessageCircle size={12} />
-                        <span>Whatsapp/Sms</span>
+                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                          <MessageCircle size={12} />
+                          <span>Whatsapp/Sms</span>
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
 
-                    {/* Müşteri Ekranına Düşen Simülasyon Bildirimleri */}
+                    {/* ADIM 3: İŞLEM TAMAMLANDIĞINDA ÜSTTEKİ DÜĞMELER KAYBOLUR, SONUÇ GÖRÜNÜR */}
                     {step >= 3 && (
-                      <div className="animate-in fade-in zoom-in duration-300 pt-2 border-t border-neutral-200/60">
+                      <div className="animate-in fade-in zoom-in duration-300">
                         {scenario === 1 && (
-                          /* DAHA BÜYÜK VE CANLI YEŞİL ARAMA EKRANI */
+                          /* BÜYÜK VE CANLI YEŞİL ARAMA EKRANI (Butonlar kayboldu) */
                           <div className="bg-emerald-600 text-white p-3.5 rounded-2xl shadow-md space-y-2 animate-bounce">
                             <div className="flex items-center justify-between">
                               <span className="text-[9px] uppercase tracking-wider font-mono bg-emerald-700 px-2 py-0.5 rounded font-bold">Gelen Arama</span>
@@ -174,7 +178,7 @@ export default function MainPage() {
                         )}
 
                         {scenario === 2 && (
-                          /* WHATSAPP/SMS BİLDİRİMİ (SİYAH BAŞLIK) */
+                          /* WHATSAPP/SMS BİLDİRİMİ (SİYAH BAŞLIK - Butonlar kayboldu) */
                           <div className="bg-white border border-neutral-300 p-3 rounded-2xl shadow-sm space-y-1.5">
                             <div className="flex items-center justify-between text-[10px] text-neutral-900 font-bold">
                               <span className="flex items-center gap-1"><BellRing size={11} className="text-neutral-950" /> Whatsapp / SMS Mesajı</span>
