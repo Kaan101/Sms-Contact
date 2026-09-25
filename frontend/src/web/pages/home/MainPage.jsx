@@ -115,6 +115,39 @@ export default function MainPage({ onGoToLogin }) {
           </div>
         </div>
 
+        {/* ÖZELLİKLER (AÇIKLAYICI BİLGİLER) GRİDİ */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-32 relative z-10">
+          <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-slate-200 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:-translate-y-1 transition-all group">
+            <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <MapPin size={28} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-3 tracking-tight">Akıllı Konum & NLP</h3>
+            <p className="text-slate-600 font-medium leading-relaxed">
+              Talebinizi doğal dille yazın. Sistem ihtiyacınızı anlar ve haritadaki konumunuza en yakın, en uygun uzmanları anında tarar.
+            </p>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-slate-200 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:-translate-y-1 transition-all group">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <ShieldCheck size={28} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-3 tracking-tight">Çift Taraflı Onay</h3>
+            <p className="text-slate-600 font-medium leading-relaxed">
+              Sıraya giren adaylar arasından seçiminizi yapın. Uzman işi kabul edene kadar iletişim bilgileriniz kesinlikle gizli kalır.
+            </p>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-slate-200 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:-translate-y-1 transition-all group">
+            <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center mb-6 shadow-md group-hover:bg-blue-600 transition-colors">
+              <Zap size={28} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-3 tracking-tight">Anında Açık Havuz</h3>
+            <p className="text-slate-600 font-medium leading-relaxed">
+              Uzmanlar açık havuzdaki talepleri canlı olarak görür, uygun olanlara anında talip olur. Beklemek yok, zaman kaybı yok.
+            </p>
+          </div>
+        </div>
+
         {/* CANLI SENARYO SİMÜLASYONU */}
         <div className="mt-32 mb-20 relative z-10 max-w-4xl mx-auto">
           <div className="text-center mb-16">
@@ -280,7 +313,6 @@ export default function MainPage({ onGoToLogin }) {
                       <div className="bg-white p-5 rounded-2xl border-2 border-emerald-500 shadow-[0_10px_30px_rgba(16,185,129,0.15)] relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
                         <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm mb-4 mt-1">
-                          {/* "Düştü" kelimesi kaldırıldı */}
                           <Bell size={18} className="animate-[wiggle_1s_ease-in-out_infinite]" /> Yeni Talep!
                         </div>
                         <p className="text-slate-800 font-bold text-lg mb-6 leading-snug">"Tarabya 2+1 kiralık daire."</p>
