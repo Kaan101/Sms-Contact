@@ -12,6 +12,7 @@ export default function MainPage({ onGoToLogin }) {
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
+  // 1. FAZ: Daktilo Efekti
   useEffect(() => {
     setTypedText('');
     setPhase('TYPING');
@@ -30,6 +31,7 @@ export default function MainPage({ onGoToLogin }) {
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
+  // 2. FAZ: Kontrollü Akış
   useEffect(() => {
     let t1, t2, t3, t4, t5;
 
@@ -189,10 +191,11 @@ export default function MainPage({ onGoToLogin }) {
                     }`}>
                       <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                       
+                      {/* Telefon Arama Düğmesi (Hafif Transparan Aktif Durum) */}
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 1 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                              ? 'bg-sky-500 text-white border-sky-500 scale-98 shadow-inner' 
+                              ? 'bg-sky-50 text-sky-700 border-sky-300 scale-98 shadow-inner' 
                               : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed') 
                           : 'bg-transparent text-neutral-700 border-neutral-400 border-dashed'
                       }`}>
@@ -200,10 +203,11 @@ export default function MainPage({ onGoToLogin }) {
                         <span>Telefon arama</span>
                       </div>
 
+                      {/* Whatsapp/Sms Düğmesi (Hafif Transparan Aktif Durum) */}
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 2 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                              ? 'bg-emerald-600 text-white border-emerald-600 scale-98 shadow-inner' 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 scale-98 shadow-inner' 
                               : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed') 
                           : 'bg-transparent text-neutral-700 border-neutral-400 border-dashed'
                       }`}>
