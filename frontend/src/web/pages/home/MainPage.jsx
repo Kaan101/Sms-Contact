@@ -148,10 +148,8 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* Ekran - Daha ince (border-4) ve daha koyu (border-slate-800) çerçeve */}
               <div className={`w-full h-[420px] bg-slate-50 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
                 
-                {/* Üst Bar */}
                 <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
                   <span className="text-[11px] text-slate-600 font-mono uppercase tracking-widest flex items-center gap-2 font-bold">
                     <Smartphone size={14} className="text-slate-400" /> Müşteri Ekranı
@@ -221,7 +219,6 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* Ekran - Daha ince (border-4) ve daha koyu (border-slate-800) çerçeve */}
               <div className={`w-full h-[420px] bg-slate-50 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
                 
                 <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
@@ -277,13 +274,14 @@ export default function MainPage({ onGoToLogin }) {
                    </div>
                   )}
 
-                  {/* ADIM 2: YENİ TALEP DÜŞTÜ KARTI */}
+                  {/* ADIM 2: YENİ TALEP KARTI */}
                   {step === 2 && (
                     <div className="animate-in slide-in-from-right-8 duration-500 flex flex-col justify-center h-full">
                       <div className="bg-white p-5 rounded-2xl border-2 border-emerald-500 shadow-[0_10px_30px_rgba(16,185,129,0.15)] relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
                         <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm mb-4 mt-1">
-                          <Bell size={18} className="animate-[wiggle_1s_ease-in-out_infinite]" /> Yeni Talep Düştü!
+                          {/* "Düştü" kelimesi kaldırıldı */}
+                          <Bell size={18} className="animate-[wiggle_1s_ease-in-out_infinite]" /> Yeni Talep!
                         </div>
                         <p className="text-slate-800 font-bold text-lg mb-6 leading-snug">"Tarabya 2+1 kiralık daire."</p>
                         
