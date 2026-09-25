@@ -3,9 +3,8 @@ import { ShieldCheck, MapPin, Zap, User, Building2, CheckCircle2, ArrowRight } f
 
 export default function MainPage({ onGoToLogin }) {
   return (
-    {/* Arka planı hafif sıcak bir gri tonunda bırakıyoruz ki vişne ve mürekkep öne çıksın */}
     <div className="min-h-screen bg-[#FDFDFC] font-sans selection:bg-rose-900 selection:text-white">
-      
+      {/* Arka planı hafif sıcak bir gri tonunda bırakıyoruz ki vişne ve mürekkep öne çıksın */}
       {/* HEADER / NAVBAR */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-neutral-200/60">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
