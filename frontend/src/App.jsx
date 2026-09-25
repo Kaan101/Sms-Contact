@@ -1,8 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuth } from './core/context/AuthContext';
-// IMPORT YOLUNU DÜZELTTİK:
-import MainPage from './web/pages/home/MainPage'; 
+import MainPage from './web/pages/home/MainPage';
 
 // SADECE GEREKTİĞİNDE YÜKLENECEK BİLEŞENLER (LAZY LOADING)
 const Login = lazy(() => import('./web/pages/auth/Login'));
@@ -22,22 +21,15 @@ const FallbackLoader = () => (
 
 export default function App() {
   const { session, handleLogout } = useAuth();
-  
-  // ANA SAYFADAN GİRİŞ EKRANINA GEÇİŞ İÇİN KONTROL:
   const [showLogin, setShowLogin] = useState(false);
 
-  // --- YENİ EKLENEN BÖLÜM: TARAYICI GERİ TUŞU YÖNETİMİ ---
   useEffect(() => {
-    // Uygulama ilk yüklendiğinde mevcut durumu geçmişe yaz
     window.history.replaceState({ view: 'main' }, '', window.location.pathname);
 
-    // Tarayıcının Geri/İleri tuşlarına basıldığını dinle
     const handlePopState = (event) => {
-      // Eğer kullanıcı giriş yapmışsa (session varsa) yönlendirmelere karışma
       if (session) return; 
 
-      // Eğer url'in sonunda #login yoksa demek ki geri tuşuna basılıp ana sayfaya dönülmek isteniyor
-      if (window.location.hash !== '#login') {
+      if (!window.location.hash.includes('#login')) {
         setShowLogin(false);
       } else {
         setShowLogin(true);
@@ -46,19 +38,18 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     
-    // Temizlik
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [session]); // Session değiştiğinde hook'u güncel tut
+  }, [session]);
 
-  // Kullanıcı Giriş Yap butonuna tıkladığında çağrılacak fonksiyon
-  const handleGoToLogin = () => {
-    // Tarayıcı geçmişine yeni bir kayıt ekliyoruz ki "Geri" tuşu çalışabilsin
-    window.history.pushState({ view: 'login' }, '', '#login');
+  // YENİ EKLENEN ROL PARAMETRESİ (Müşteri vs Sağlayıcı yönlendirmesi)
+  const handleGoToLogin = (role = 'CUSTOMER') => {
+    // Rolü URL hash içerisine ekliyoruz (Örn: #login?role=PROVIDER)
+    const hash = `#login?role=${role}`;
+    window.history.pushState({ view: 'login', role }, '', hash);
     setShowLogin(true);
   };
-  // -------------------------------------------------------
 
   const renderDashboard = () => {
     switch (session.role) {
@@ -70,8 +61,6 @@ export default function App() {
     }
   };
 
-  // Eğer oturum yoksa ve kullanıcı henüz Giriş Yap'a basmadıysa Ana Sayfayı göster
-  // Artık tetikleyici olarak onGoToLogin'e setShowLogin yerine yazdığımız yeni handleGoToLogin fonksiyonunu veriyoruz.
   if (!session && !showLogin) {
     return <MainPage onGoToLogin={handleGoToLogin} />;
   }
@@ -84,7 +73,6 @@ export default function App() {
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { 
             if(session) handleLogout(); 
             setShowLogin(false);
-            // Logoya tıklayınca URL'deki #login kısmını temizle
             window.history.pushState({ view: 'main' }, '', window.location.pathname);
           }}>
             <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">MB</div>

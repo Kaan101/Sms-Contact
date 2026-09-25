@@ -75,12 +75,17 @@ export default function MainPage({ onGoToLogin }) {
           </div>
           <div className="flex items-center space-x-3">
             <button 
-              onClick={onGoToLogin} 
+              onClick={() => onGoToLogin('CUSTOMER')} 
               className="px-4 py-2 text-sm font-bold text-neutral-700 hover:text-neutral-950 transition"
             >
               Giriş Yap
             </button>
-            <button className="px-5 py-2 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm">Kayıt Ol</button>
+            <button 
+              onClick={() => onGoToLogin('CUSTOMER')}
+              className="px-5 py-2 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm"
+            >
+              Kayıt Ol
+            </button>
           </div>
         </div>
       </header>
@@ -109,12 +114,20 @@ export default function MainPage({ onGoToLogin }) {
             <p className="text-lg text-neutral-600 mb-8 leading-relaxed font-medium">
               Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefon arama mı, yoksa Whatsapp/Sms mi? Karar sizin.
             </p>
+            
+            {/* ROL YÖNLENDİRMELİ BUTONLAR */}
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <button className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2">
+              <button 
+                onClick={() => onGoToLogin('CUSTOMER')} 
+                className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2"
+              >
                 <span>Hemen Talep Oluştur</span>
                 <ArrowRight size={16} />
               </button>
-              <button className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-neutral-50 text-neutral-950 border border-neutral-200 rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center space-x-2">
+              <button 
+                onClick={() => onGoToLogin('PROVIDER')} 
+                className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-neutral-50 text-neutral-950 border border-neutral-200 rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center space-x-2"
+              >
                 <ShieldCheck size={16} className="text-neutral-500" />
                 <span>Hizmet Veren Olun</span>
               </button>
