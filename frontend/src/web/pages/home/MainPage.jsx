@@ -136,7 +136,7 @@ export default function MainPage({ onGoToLogin }) {
               </div>
             </div>
 
-            {/* SOL: MÜŞTERİ EKRANI (Sağlayıcı ile aynı tasarım) */}
+            {/* SOL: MÜŞTERİ EKRANI */}
             <div className="flex flex-col items-center gap-4 w-full max-w-[340px]">
               <div className="flex items-center gap-3 text-slate-700">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shadow-sm">
@@ -148,10 +148,10 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* Ekran - Sağlayıcı ile birebir aynı çerçeve (rounded-xl, border-slate-300) */}
-              <div className={`w-full h-[420px] bg-slate-50 rounded-xl border-[8px] border-slate-300 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
+              {/* Ekran - Daha ince (border-4) ve daha koyu (border-slate-800) çerçeve */}
+              <div className={`w-full h-[420px] bg-slate-50 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
                 
-                {/* Yeni Üst Bar */}
+                {/* Üst Bar */}
                 <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
                   <span className="text-[11px] text-slate-600 font-mono uppercase tracking-widest flex items-center gap-2 font-bold">
                     <Smartphone size={14} className="text-slate-400" /> Müşteri Ekranı
@@ -182,13 +182,13 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   )}
 
-                  {/* ADIM 2: AYŞE HANIM TALEBİ ALDI */}
+                  {/* ADIM 2: DANIŞMAN TALEBİ ALDI */}
                   {step === 2 && (
                     <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center h-full text-center space-y-3">
                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center shadow-sm border border-blue-100">
                         <UserCheck size={32} className="animate-pulse" />
                       </div>
-                      <p className="font-bold text-slate-800 text-xl">Ayşe Hanım Talebi Aldı!</p>
+                      <p className="font-bold text-slate-800 text-xl">Emlak Danışmanı Talebi Aldı!</p>
                       <p className="text-sm font-medium text-slate-500">Uzman eşleşmeyi onaylıyor...</p>
                     </div>
                   )}
@@ -209,7 +209,7 @@ export default function MainPage({ onGoToLogin }) {
               </div>
             </div>
 
-            {/* SAĞ: SAĞLAYICI / EMLAKÇI EKRANI (Açık Renk) */}
+            {/* SAĞ: SAĞLAYICI / EMLAKÇI EKRANI */}
             <div className="flex flex-col items-center gap-4 w-full max-w-[340px]">
               <div className="flex items-center gap-3 text-slate-700">
                 <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center shadow-sm">
@@ -221,7 +221,8 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              <div className={`w-full h-[420px] bg-slate-50 rounded-xl border-[8px] border-slate-300 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
+              {/* Ekran - Daha ince (border-4) ve daha koyu (border-slate-800) çerçeve */}
+              <div className={`w-full h-[420px] bg-slate-50 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
                 
                 <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
                   <span className="text-[11px] text-slate-600 font-mono uppercase tracking-widest flex items-center gap-2 font-bold">
