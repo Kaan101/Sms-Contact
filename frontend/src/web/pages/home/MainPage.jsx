@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, MessageSquare, ShieldCheck, Zap, User, 
   MapPin, CheckCircle2, ArrowRight, Search, Lock, 
-  Clock, Star, MessageCircle, Send, PhoneCall, BellRing 
+  Clock, Star, MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming 
 } from 'lucide-react';
 
 export default function MainPage() {
@@ -143,10 +143,13 @@ export default function MainPage() {
                   <div className="space-y-3">
                     <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                       <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-blue-600 text-white border-blue-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                      
+                      {/* ŞEFFAF / İÇİ BOŞ TELEFON ARAMA BUTONU */}
+                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-transparent text-neutral-950 border-neutral-950 ring-2 ring-neutral-950/20 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
                         <Phone size={12} />
                         <span>Telefon arama</span>
                       </div>
+
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
                         <MessageCircle size={12} />
                         <span>Whatsapp/Sms</span>
@@ -157,19 +160,27 @@ export default function MainPage() {
                     {step >= 3 && (
                       <div className="animate-in fade-in zoom-in duration-300 pt-2 border-t border-neutral-200/60">
                         {scenario === 1 && (
-                          <div className="bg-blue-600 text-white p-2.5 rounded-xl text-[11px] font-bold shadow-sm flex items-center space-x-2 animate-pulse">
-                            <PhoneCall size={14} className="shrink-0 animate-spin" />
-                            <span>Ayşe Hanım sizi arıyor...</span>
+                          /* DAHA BÜYÜK VE CANLI YEŞİL ARAMA EKRANI */
+                          <div className="bg-emerald-600 text-white p-3.5 rounded-2xl shadow-md space-y-2 animate-bounce">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] uppercase tracking-wider font-mono bg-emerald-700 px-2 py-0.5 rounded font-bold">Gelen Arama</span>
+                              <PhoneIncoming size={16} className="animate-pulse" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-extrabold">Ayşe Hanım (Tarabya Emlak)</p>
+                              <p className="text-[10px] text-emerald-100 font-mono mt-0.5">0532 555 44 33</p>
+                            </div>
                           </div>
                         )}
 
                         {scenario === 2 && (
-                          <div className="bg-white border border-emerald-300 p-2.5 rounded-xl text-[11px] text-neutral-800 shadow-sm space-y-1">
-                            <div className="flex items-center justify-between text-[9px] text-emerald-700 font-bold">
-                              <span className="flex items-center gap-1"><BellRing size={10} /> Yeni Whatsapp/SMS Mesajı</span>
-                              <span>Şimdi</span>
+                          /* WHATSAPP/SMS BİLDİRİMİ (SİYAH BAŞLIK) */
+                          <div className="bg-white border border-neutral-300 p-3 rounded-2xl shadow-sm space-y-1.5">
+                            <div className="flex items-center justify-between text-[10px] text-neutral-900 font-bold">
+                              <span className="flex items-center gap-1"><BellRing size={11} className="text-neutral-950" /> Whatsapp / SMS Mesajı</span>
+                              <span className="text-neutral-400 font-normal">Şimdi</span>
                             </div>
-                            <p className="font-medium text-[10px]">"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
+                            <p className="font-medium text-[11px] text-neutral-800 leading-tight">"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
                           </div>
                         )}
                       </div>
