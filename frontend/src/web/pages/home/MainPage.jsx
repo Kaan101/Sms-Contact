@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, MapPin, Zap, CheckCircle2, ArrowRight, Search, Smartphone, Monitor, PhoneCall, User, Bell } from 'lucide-react';
+import { ShieldCheck, MapPin, Zap, CheckCircle2, ArrowRight, Search, Smartphone, Monitor, PhoneCall, User, Bell, UserCheck } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
-  // Simülasyon Animasyon Durumu (0: Talep, 1: Harita Tarama, 2: Uzman Kabulü, 3: Görüşme)
+  // Simülasyon Animasyon Durumu (0: Talep, 1: Harita Tarama, 2: Uzman Talebi Gördü, 3: Görüşme)
   const [step, setStep] = useState(0);
   const [typedText, setTypedText] = useState("");
   const fullText = '"Tarabya 2+1 kiralık daire."';
@@ -122,11 +122,12 @@ export default function MainPage({ onGoToLogin }) {
             <p className="text-lg font-medium text-slate-500 mt-4">Saniyeler süren canlı eşleşme hikayesi</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 relative place-items-center">
+          {/* gap-6 ile kutular birbirine iyice yaklaştırıldı */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-6 relative place-items-center">
             
-            {/* CANLI İLETİŞİM HATTI */}
-            <div className="hidden md:flex absolute top-[180px] left-1/2 transform -translate-x-1/2 items-center justify-center w-24 h-4 z-20 overflow-hidden">
-              <div className="w-full h-[2px] bg-slate-300/50 relative flex items-center justify-center rounded-full">
+            {/* CANLI İLETİŞİM HATTI - Genişliği daraltıldı (w-16) */}
+            <div className="hidden md:flex absolute top-[180px] left-1/2 transform -translate-x-1/2 items-center justify-center w-16 h-4 z-20 overflow-hidden">
+              <div className="w-full h-[2px] bg-slate-300/80 relative flex items-center justify-center rounded-full">
                 {(step === 0 || step === 1 || step === 2) && (
                   <div className="w-4 h-1.5 bg-blue-500 rounded-full absolute animate-flow-right shadow-[0_0_8px_#3b82f6]"></div>
                 )}
@@ -143,7 +144,7 @@ export default function MainPage({ onGoToLogin }) {
                   <User size={24} className="text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="font-bold">Müşteri</h4>
+                  <h4 className="font-bold">Mehmet Bey (Müşteri)</h4>
                   <p className="text-xs text-slate-500 flex items-center gap-1"><Smartphone size={12}/> Mobilden arıyor</p>
                 </div>
               </div>
@@ -174,14 +175,14 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   )}
 
-                  {/* ADIM 2: EŞLEŞME BAŞARILI */}
+                  {/* ADIM 2: AYŞE HANIM TALEBİ ALDI */}
                   {step === 2 && (
                     <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center h-full text-center space-y-3">
-                      <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shadow-inner">
-                        <CheckCircle2 size={32} />
+                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center shadow-sm border border-blue-100">
+                        <UserCheck size={32} className="animate-pulse" />
                       </div>
-                      <p className="font-bold text-slate-800 text-lg">Eşleşme Sağlandı!</p>
-                      <p className="text-sm text-slate-500">Uzman çağrınızı kabul etti.</p>
+                      <p className="font-bold text-slate-800 text-xl">Ayşe Hanım Talebi Aldı!</p>
+                      <p className="text-sm font-medium text-slate-500">Uzman eşleşmeyi onaylıyor...</p>
                     </div>
                   )}
 
@@ -213,7 +214,6 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* Ekran - SABİT EN VE BOY - AÇIK RENK TASARIM */}
               <div className={`w-full max-w-[340px] h-[420px] bg-slate-50 rounded-xl border-[8px] border-slate-300 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
                 
                 <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
@@ -247,7 +247,6 @@ export default function MainPage({ onGoToLogin }) {
                        
                        {/* Zoomlanacak Konteynır */}
                        <div className="absolute inset-0 animate-map-zoom origin-center">
-                         {/* Diğer Talepler (Gri) */}
                          <div className="absolute top-[20%] left-[20%] animate-bounce text-slate-300 drop-shadow-sm delay-100">
                            <MapPin size={22} className="fill-white" />
                          </div>
@@ -255,7 +254,6 @@ export default function MainPage({ onGoToLogin }) {
                            <MapPin size={22} className="fill-white" />
                          </div>
                          
-                         {/* Size Gelen Talep (Yeşil & Parlayan) */}
                          <div className="absolute top-[55%] left-[55%] -translate-x-1/2 -translate-y-1/2 z-10 animate-in zoom-in duration-500 delay-500">
                            <div className="relative">
                              <MapPin size={32} className="text-emerald-500 fill-white drop-shadow-lg relative z-10" />
