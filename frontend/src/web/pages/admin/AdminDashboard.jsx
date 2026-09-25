@@ -337,18 +337,6 @@ export default function AdminDashboard() {
   const startTime = new Date(startTimeString).getTime();
   const now = new Date().getTime();
   
-  // Timeout değerini milisaniyeye çevir
-  const timeoutMs = unit === 'hours' 
-    ? timeoutValue * 60 * 60 * 1000 
-    : timeoutValue * 60 * 1000; // 'mins' varsayımı
-    
-  const deadline = startTime + timeoutMs;
-  const remainingMs = deadline - now;
-
-  if (remainingMs <= 0) return "Süresi Doldu";
-
-  const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
-  const remainingMins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
 
   if (unit === 'hours') {
      if (remainingHours > 0) return `${remainingHours} saat ${remainingMins} dk kaldı`;
