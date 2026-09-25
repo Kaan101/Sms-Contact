@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import useSWR from 'swr'; 
@@ -110,7 +110,20 @@ export default function AdminDashboard() {
   const features = safeArray(rawFeatures?.features);
   const tests = safeArray(rawTests?.tests);
   
-  const systemSettings = rawSettings?.settings || { pool_lifespan_hours: 72, customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48, customer_approval_timeout_hours: 24 };
+  // --- EKSİK OLAN YEREL AYARLAR (STATE) ---
+  const [localSettings, setLocalSettings] = useState({
+    pool_lifespan_hours: 72,
+    customer_selection_timeout_mins: 60,
+    provider_completion_timeout_hours: 48,
+    customer_approval_timeout_hours: 24
+  });
+
+  // DB'den gelen ayarları local state ile senkronize et
+  useEffect(() => {
+    if (rawSettings?.settings) {
+      setLocalSettings(prev => ({ ...prev, ...rawSettings.settings }));
+    }
+  }, [rawSettings]);
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
@@ -195,7 +208,15 @@ export default function AdminDashboard() {
     } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi. Telefon numarası zaten mevcut olabilir."); } 
   };
   
-  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); await mutateSettings(); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
+  const handleSaveSystemSetting = async (key, value) => { 
+    try { 
+      await axios.put(`${API_BASE}/settings`, { key, value }); 
+      await mutateSettings(); 
+      alert('Sistem parametresi başarıyla güncellendi!'); 
+    } catch (err) { 
+      alert('Hata oluştu.'); 
+    } 
+  };
   
   const filteredProviders = useMemo(() => safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(searchProviderText).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }), [providers, searchProviderText]);
   const filteredMatchedRequests = useMemo(() => safeArray(matchedRequests).filter(r => { if(!r) return false; const q = safeLower(searchMatchText).trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); }), [matchedRequests, searchMatchText, matchStatusFilter]);
@@ -480,11 +501,11 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3 text-neutral-600 leading-relaxed">Açık havuza düşen bir talep için hiçbir sağlayıcı sıraya girmezse, talep kaç <span className="font-bold">saat</span> sonra sistem tarafından otomatik iptal edilsin?</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-1">
-                        <input type="number" min="1" value={systemSettings.pool_lifespan_hours || 72} onChange={(e) => setSystemSettings({...systemSettings, pool_lifespan_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <input type="number" min="1" value={localSettings.pool_lifespan_hours} onChange={(e) => setLocalSettings({...localSettings, pool_lifespan_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
                         <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('pool_lifespan_hours', systemSettings.pool_lifespan_hours || 72)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('pool_lifespan_hours', localSettings.pool_lifespan_hours)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
                   </tr>
 
                   <tr className="hover:bg-neutral-50 transition">
@@ -492,11 +513,11 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcılar sıraya girdikten sonra, müşteri kaç <span className="font-bold">dakika</span> içinde seçim yapmazsa işlem askıya alınsın (veya düşürülsün)?</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-1">
-                        <input type="number" min="1" value={systemSettings.customer_selection_timeout_mins || 60} onChange={(e) => setSystemSettings({...systemSettings, customer_selection_timeout_mins: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <input type="number" min="1" value={localSettings.customer_selection_timeout_mins} onChange={(e) => setLocalSettings({...localSettings, customer_selection_timeout_mins: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
                         <span className="text-[10px] text-neutral-400 font-bold">Dk</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_selection_timeout_mins', systemSettings.customer_selection_timeout_mins || 60)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_selection_timeout_mins', localSettings.customer_selection_timeout_mins)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
                   </tr>
 
                   <tr className="hover:bg-neutral-50 transition">
@@ -504,11 +525,11 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcı işi onayladıktan (Kabul Et) sonra, işi fiilen teslim etmesi (Tamamla) için tanınan maksimum <span className="font-bold">saat</span> limiti.</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-1">
-                        <input type="number" min="1" value={systemSettings.provider_completion_timeout_hours || 48} onChange={(e) => setSystemSettings({...systemSettings, provider_completion_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <input type="number" min="1" value={localSettings.provider_completion_timeout_hours} onChange={(e) => setLocalSettings({...localSettings, provider_completion_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
                         <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('provider_completion_timeout_hours', systemSettings.provider_completion_timeout_hours || 48)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('provider_completion_timeout_hours', localSettings.provider_completion_timeout_hours)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
                   </tr>
 
                   <tr className="hover:bg-neutral-50 transition">
@@ -516,11 +537,11 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcı işi teslim ettikten sonra, müşteri onay butonuna basmazsa sistemin süreci otomatik tamamlaması için bekleyeceği <span className="font-bold">saat</span>.</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-1">
-                        <input type="number" min="1" value={systemSettings.customer_approval_timeout_hours || 24} onChange={(e) => setSystemSettings({...systemSettings, customer_approval_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <input type="number" min="1" value={localSettings.customer_approval_timeout_hours} onChange={(e) => setLocalSettings({...localSettings, customer_approval_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
                         <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_approval_timeout_hours', systemSettings.customer_approval_timeout_hours || 24)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_approval_timeout_hours', localSettings.customer_approval_timeout_hours)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
                   </tr>
 
                 </tbody>
