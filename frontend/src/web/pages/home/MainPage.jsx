@@ -155,10 +155,11 @@ export default function MainPage({ onGoToLogin }) {
             <p className="text-lg font-medium text-slate-500 mt-4">Saniyeler süren canlı eşleşme hikayesi</p>
           </div>
 
-          <div className="flex flex-col md:flex-row justify-center items-center gap-8 md:gap-3 relative">
+          {/* md:gap-3 olan degeri md:gap-8 yaparak kutulari birbirine binen (ring cakisilan) mesafeden uzaklastirdik */}
+          <div className="flex flex-col md:flex-row justify-center items-center gap-8 md:gap-8 relative">
             
-            {/* CANLI İLETİŞİM HATTI */}
-            <div className="hidden md:flex absolute top-[180px] left-1/2 transform -translate-x-1/2 items-center justify-center w-10 h-4 z-20 overflow-hidden">
+            {/* CANLI İLETİŞİM HATTI - Kutular açıldığı için veri köprüsü genişletildi (w-10'dan w-16'ya) */}
+            <div className="hidden md:flex absolute top-[180px] left-1/2 transform -translate-x-1/2 items-center justify-center w-16 h-4 z-20 overflow-hidden">
               <div className="w-full h-[2px] bg-slate-300/80 relative flex items-center justify-center rounded-full">
                 {(step === 0 || step === 1 || step === 2) && (
                   <div className="w-4 h-1.5 bg-blue-500 rounded-full absolute animate-flow-right shadow-[0_0_8px_#3b82f6]"></div>
