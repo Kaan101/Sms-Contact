@@ -360,18 +360,38 @@ export default function ProviderDashboard() {
                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                     {poolRequests.map((req) => {
                       const isActionLoading = actionLoadingId === req.id;
+                      
+                      // --- HAVUZ İÇİN SAYAÇ MANTIĞI EKLENDİ ---
+                      let timerDisplay = null;
+                      let isTimerCritical = false;
+                      const poolLimit = Number(systemSettings?.pool_lifespan_hours) || 72;
+                      const remaining = calculateRemainingTime(req.created_at, poolLimit, 'hours');
+                      
+                      if (remaining) {
+                        timerDisplay = `Kapanış: ${remaining}`;
+                        isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                      }
+
                       return (
-                        <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
-                          <div className="space-y-1">
-                            <div className="flex items-center space-x-2">
+                        <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                          <div className="space-y-1.5 w-full sm:w-auto flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                               {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
+                              
+                              {/* EKLENEN SAYAÇ GÖRÜNÜMÜ */}
+                              {timerDisplay && (
+                                 <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                    {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
+                                    <span>{timerDisplay}</span>
+                                 </div>
+                              )}
                             </div>
                             <h4 className="font-bold text-neutral-950 text-sm mt-0.5">"{req.raw_text}"</h4>
                             <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
                           </div>
                           
-                          <div className="flex items-center space-x-2 shrink-0">
+                          <div className="flex items-center space-x-2 shrink-0 mt-2 sm:mt-0">
                             <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
                               {isActionLoading && <Loader2 size={12} className="animate-spin" />}
                               <span>Sıraya Gir</span>
