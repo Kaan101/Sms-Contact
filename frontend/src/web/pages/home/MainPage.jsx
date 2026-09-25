@@ -12,7 +12,6 @@ export default function MainPage({ onGoToLogin }) {
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Daktilo Efekti
   useEffect(() => {
     setTypedText('');
     setPhase('TYPING');
@@ -31,7 +30,6 @@ export default function MainPage({ onGoToLogin }) {
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Kontrollü Akış
   useEffect(() => {
     let t1, t2, t3, t4, t5;
 
@@ -75,7 +73,7 @@ export default function MainPage({ onGoToLogin }) {
           </div>
           <div className="flex items-center space-x-3">
             <button 
-              onClick={() => onGoToLogin('CUSTOMER')} 
+              onClick={() => onGoToLogin('LOGIN')} 
               className="px-6 py-2.5 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm cursor-pointer"
             >
               Giriş Yap
@@ -93,7 +91,7 @@ export default function MainPage({ onGoToLogin }) {
 
         <div className="max-w-7xl mx-auto px-6 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
-          {/* Sol Taraf: Metinler (5 Kolon) */}
+          {/* Sol Taraf: Metinler */}
           <div className="lg:col-span-5 max-w-xl">
             <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-white border border-neutral-200 shadow-sm mb-6">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -139,13 +137,12 @@ export default function MainPage({ onGoToLogin }) {
             </div>
           </div>
 
-          {/* Sağ Taraf: İki Sütunlu Yan Yana Simülasyon (7 Kolon) */}
+          {/* Sağ Taraf: Simülasyon */}
           <div className="lg:col-span-7 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-neutral-100 to-white rounded-[2rem] transform rotate-1 scale-105 border border-neutral-200 shadow-xl" />
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col space-y-6">
               
-              {/* Üst Bilgi */}
               <div className="flex items-center justify-between border-b pb-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
@@ -160,10 +157,9 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* ÇİFT SÜTUNLU YAPI (SOL: MÜŞTERİ | SAĞ: AÇIK RENKLİ HARİTA) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative">
                 
-                {/* SOL TARAF: MÜŞTERİ (MEHMET BEY) */}
+                {/* SOL TARAF: MÜŞTERİ */}
                 <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs">
                   <div>
                     <div className="flex items-center space-x-2.5 mb-3">
@@ -174,7 +170,6 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
                     
-                    {/* Harf Harf Yazılan Canlı Mesaj Kutusu */}
                     <div className="bg-white border p-3 rounded-xl shadow-xs min-h-[46px] flex items-center">
                       <p className="text-xs font-medium text-neutral-800 leading-relaxed font-mono">
                         {typedText}
@@ -185,10 +180,8 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* Seçenekler, Gönder Tuşu ve Aksiyonlar */}
                   <div className="space-y-3">
                     
-                    {/* SEÇENEKLER VE GÖNDER TUŞU */}
                     <div className={`space-y-2 transition-all duration-700 transform ${
                       phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' 
                         ? 'opacity-0 scale-95 pointer-events-none h-0 overflow-hidden m-0' 
@@ -196,7 +189,6 @@ export default function MainPage({ onGoToLogin }) {
                     }`}>
                       <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                       
-                      {/* Telefon Arama Düğmesi */}
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 1 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
@@ -208,7 +200,6 @@ export default function MainPage({ onGoToLogin }) {
                         <span>Telefon arama</span>
                       </div>
 
-                      {/* Whatsapp/Sms Düğmesi */}
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 2 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
@@ -220,7 +211,6 @@ export default function MainPage({ onGoToLogin }) {
                         <span>Whatsapp/Sms</span>
                       </div>
 
-                      {/* Gönder Tuşu */}
                       <div className="pt-1 flex justify-end">
                         <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${
                           phase === 'CLICK_SEND' ? 'bg-emerald-700 text-white scale-95' : 'bg-neutral-950 text-white'
@@ -231,7 +221,6 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
 
-                    {/* FİNAL AKSİYONLARI (MÜŞTERİ EKRANI) */}
                     {phase === 'FINAL_ACTION' && (
                       <div className="animate-in fade-in zoom-in duration-500">
                         {scenario === 1 && (
@@ -276,14 +265,11 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                 </div>
 
-                {/* SAĞ TARAF: AÇIK RENKLİ GERÇEKÇİ HARİTA (GOOGLE MAPS TARZI) VE 3 PİN SİSTEMİ */}
+                {/* SAĞ TARAF: HARİTA */}
                 <div className="bg-[#EAE6DF] border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900">
-                  
-                  {/* Harita Sokak Yolları Izgarası (Açık Tema) */}
                   <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]" />
                   <div className="absolute inset-0 opacity-20 bg-gradient-to-r from-sky-100/50 via-transparent to-amber-100/40 pointer-events-none" />
 
-                  {/* Üst Bilgi / Sağlayıcı Durumu */}
                   <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3">
                     <div className="flex items-center space-x-2.5">
                       <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
@@ -306,7 +292,6 @@ export default function MainPage({ onGoToLogin }) {
                     </span>
                   </div>
 
-                  {/* ORTADAKİ AÇIK RENKLİ HARİTA VE 3 PİN GÖRSELİ */}
                   <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
                     {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
                       <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
@@ -314,15 +299,12 @@ export default function MainPage({ onGoToLogin }) {
                           <Compass size={13} className="animate-spin text-emerald-600" /> Bölgedeki Alternatifler Analiz Ediliyor
                         </span>
                         
-                        {/* Harita Üzerindeki 3 Pin Konumu */}
                         <div className="flex items-center justify-center space-x-8 relative my-2 w-full">
-                          {/* Pin 1 */}
                           <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
                             <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">1</div>
                             <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
                           </div>
 
-                          {/* Pin 2 (Aktif / Seçilen Uzman) */}
                           <div className="flex flex-col items-center transform scale-110">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-700 ${
                               phase === 'FINAL_ACTION' 
@@ -336,7 +318,6 @@ export default function MainPage({ onGoToLogin }) {
                             </span>
                           </div>
 
-                          {/* Pin 3 */}
                           <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
                             <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">3</div>
                             <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
@@ -350,7 +331,6 @@ export default function MainPage({ onGoToLogin }) {
                     )}
                   </div>
 
-                  {/* Sağlayıcı Alt Sonuç Paneli */}
                   <div className="relative z-10 pt-2 border-t border-neutral-300">
                     {phase !== 'FINAL_ACTION' ? (
                       <div className="text-center text-[11px] text-neutral-700 font-medium py-1">
