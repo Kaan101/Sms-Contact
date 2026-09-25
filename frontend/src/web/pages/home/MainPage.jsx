@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, ShieldCheck, Zap, User, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation, PhoneForwarded 
+  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation 
 } from 'lucide-react';
 
 export default function MainPage() {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
-  const [phase, setPhase] = useState('TYPING'); // TYPING -> SHOW_OPTIONS -> CLICK_SEND -> MAP_SCANNING -> FINAL_ACTION
+  const [phase, setPhase] = useState('TYPING'); 
+  // TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> FINAL_ACTION
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Yavaşlatılmış Daktilo Efekti
+  // 1. FAZ: Oldukça Sakin ve Yavaş Daktilo Efekti
   useEffect(() => {
     setTypedText('');
     setPhase('TYPING');
@@ -24,45 +25,51 @@ export default function MainPage() {
         currentIndex++;
       } else {
         clearInterval(typingInterval);
-        // Yazma bitti, butonları ve gönder tuşunu göster (Biraz gecikmeli)
-        setTimeout(() => setPhase('SHOW_OPTIONS'), 600);
+        // Yazma bittiikten sonra 1 saniye bekleyip çizgili butonları göster
+        setTimeout(() => setPhase('SHOW_OPTIONS'), 1000);
       }
-    }, 120); // Daha yavaş, okunabilir daktilo hızı
+    }, 150); // Çok daha yavaş ve okunabilir
 
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Kullanıcı Seçimi, Gönder Tuşu ve Harita Taraması Akışı
+  // 2. FAZ: Kontrollü Zaman Boşluklarıyla Akış (Seçim -> 1sn Bekleme -> Gönder -> Harita)
   useEffect(() => {
-    let timer1, timer2, timer3, timer4;
+    let t1, t2, t3, t4, t5;
 
     if (phase === 'SHOW_OPTIONS') {
-      // 2.5 saniye sonra kullanıcı "Gönder" tuşuna basar
-      timer1 = setTimeout(() => {
+      // Butonlar belirdikten 1.5 saniye sonra ilgili butona basılma efekti başlar
+      t1 = setTimeout(() => {
+        setPhase('CLICK_OPTION');
+      }, 1500);
+    } else if (phase === 'CLICK_OPTION') {
+      // Seçim yapıldıktan sonra tam 1 saniye boşluk bırakılır, ardından "Gönder" tuşuna basılır
+      t2 = setTimeout(() => {
         setPhase('CLICK_SEND');
-      }, 2500);
+      }, 1000);
     } else if (phase === 'CLICK_SEND') {
-      // Gönder tuşuna basıldıktan sonra seçenekler kaybolur, harita taraması başlar
-      timer2 = setTimeout(() => {
+      // Gönder tuşuna basıldıktan 1 saniye sonra harita taraması başlar
+      t3 = setTimeout(() => {
         setPhase('MAP_SCANNING');
       }, 1000);
     } else if (phase === 'MAP_SCANNING') {
-      // Haritada alternatifler taranır ve uygun sağlayıcı seçilip final aksiyonu tetiklenir
-      timer3 = setTimeout(() => {
+      // Harita taraması 3.5 saniye sürer, ardından final aksiyonuna geçilir
+      t4 = setTimeout(() => {
         setPhase('FINAL_ACTION');
-      }, 3000); // Harita taraması için yeterli süre
+      }, 3500);
     } else if (phase === 'FINAL_ACTION') {
-      // Final ekranı 6 saniye ekranda kalır, sonra diğer senaryoya geçer
-      timer4 = setTimeout(() => {
+      // Final ekranı 6 saniye ekranda kalır, sonra diğer senaryoya geçmek için başa sarar
+      t5 = setTimeout(() => {
         setScenario(prev => prev === 1 ? 2 : 1);
       }, 6000);
     }
 
     return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-      clearTimeout(timer4);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t5);
     };
   }, [phase]);
 
@@ -186,16 +193,18 @@ export default function MainPage() {
                   {/* Seçenekler, Gönder Tuşu ve Aksiyonlar */}
                   <div className="space-y-3">
                     
-                    {/* FAZ 2: İKİSİ DE ÇİZGİLİ SEÇENEK DÜĞMELERİ VE GÖNDER TUŞU */}
-                    {(phase === 'SHOW_OPTIONS' || phase === 'CLICK_SEND') && (
+                    {/* İKİSİ DE NET ÇİZGİLİ GÖRÜNEN SEÇENEKLER VE GÖNDER TUŞU */}
+                    {(phase === 'SHOW_OPTIONS' || phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') && (
                       <div className="space-y-2 animate-in fade-in duration-500">
-                        <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
+                        <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                         
-                        {/* Telefon Arama Düğmesi (Çizgili) */}
+                        {/* Telefon Arama Düğmesi (Çizgili, Açıq Mavi Basılma Efekti) */}
                         <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                           scenario === 1 
-                            ? (phase === 'CLICK_SEND' ? 'bg-neutral-950 text-white border-neutral-950 scale-98 shadow-inner' : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed scale-102') 
-                            : 'bg-white text-neutral-400 border-neutral-200 opacity-50'
+                            ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
+                                ? 'bg-sky-500 text-white border-sky-500 scale-98 shadow-inner' 
+                                : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed') 
+                            : 'bg-transparent text-neutral-700 border-neutral-400 border-dashed'
                         }`}>
                           <Phone size={12} />
                           <span>Telefon arama</span>
@@ -204,16 +213,20 @@ export default function MainPage() {
                         {/* Whatsapp/Sms Düğmesi (Çizgili) */}
                         <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                           scenario === 2 
-                            ? (phase === 'CLICK_SEND' ? 'bg-emerald-600 text-white border-emerald-600 scale-98 shadow-inner' : 'bg-transparent text-emerald-700 border-emerald-600 border-dashed scale-102') 
-                            : 'bg-white text-neutral-400 border-neutral-200 opacity-50'
+                            ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
+                                ? 'bg-emerald-600 text-white border-emerald-600 scale-98 shadow-inner' 
+                                : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed') 
+                            : 'bg-transparent text-neutral-700 border-neutral-400 border-dashed'
                         }`}>
                           <MessageCircle size={12} />
                           <span>Whatsapp/Sms</span>
                         </div>
 
-                        {/* Altına Eklenen Gönder Tuşu */}
+                        {/* Gönder Tuşu */}
                         <div className={`pt-1 flex justify-end transition-all duration-300 ${phase === 'CLICK_SEND' ? 'opacity-80 scale-95' : 'opacity-100'}`}>
-                          <div className="px-4 py-1.5 bg-neutral-950 text-white text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1">
+                          <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${
+                            phase === 'CLICK_SEND' ? 'bg-emerald-700 text-white' : 'bg-neutral-950 text-white'
+                          }`}>
                             <span>Gönder</span>
                             <Send size={10} />
                           </div>
@@ -221,11 +234,11 @@ export default function MainPage() {
                       </div>
                     )}
 
-                    {/* FAZ 4: FİNAL AKSİYONLARI (DÜĞMELER KAYBOLDU) */}
+                    {/* FİNAL AKSİYONLARI (DÜĞMELER KAYBOLDU) */}
                     {phase === 'FINAL_ACTION' && (
                       <div className="animate-in fade-in zoom-in duration-500">
                         {scenario === 1 && (
-                          /* GERÇEK AKILLI TELEFON GELEN ARAMA EKRANI SİMÜLASYONU */
+                          /* ŞIK AKILLI TELEFON GELEN ARAMA EKRANI */
                           <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
                             <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
                             <div className="relative z-10 flex flex-col items-center space-y-1">
@@ -294,7 +307,7 @@ export default function MainPage() {
                       </span>
                     </div>
 
-                    {/* HARİTA ALTERNATİFLERİ GÖRSELİ (Ortada Düğme Yok) */}
+                    {/* HARİTA ALTERNATİFLERİ GÖRSELİ */}
                     <div className="bg-neutral-900 rounded-xl p-3 text-white relative min-h-[90px] flex flex-col justify-center items-center overflow-hidden">
                       <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:12px_12px]" />
                       
