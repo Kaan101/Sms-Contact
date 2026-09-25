@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import useSWR from 'swr'; // --- SWR EKLENDİ ---
+import useSWR from 'swr'; 
 import { 
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
@@ -13,10 +13,8 @@ import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cl
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-// --- SWR İÇİN GLOBAL FETCHER FONKSİYONU ---
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
-// --- PERFORMANS OPTİMİZASYONU 1: BİLEŞENLERİ MEMO'LAMA ---
 const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig, handleRequestSort }) => {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
@@ -97,8 +95,6 @@ export default function AdminDashboard() {
   const { API_BASE } = useAuth();
   const [adminTab, setAdminTab] = useState('WOZ');
   
-  // --- SWR VERİ ÇEKME HOOK'LARI ---
-  // Uygulama sayfasına göre sadece gereken veriyi çeker ve arka planda (5sn) sessizce günceller.
   const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
   const { data: rawProviders, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
   const { data: rawMatchedRequests, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: adminTab === 'ALL_MATCHED' ? 5000 : 0 });
@@ -107,7 +103,6 @@ export default function AdminDashboard() {
   const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
   const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
 
-  // Gelen ham verileri (SWR Data) güvenli dizilere aktarma
   const pendingRequests = safeArray(rawPendingRequests?.requests);
   const providers = safeArray(rawProviders?.providers);
   const matchedRequests = safeArray(rawMatchedRequests?.requests);
@@ -115,8 +110,7 @@ export default function AdminDashboard() {
   const features = safeArray(rawFeatures?.features);
   const tests = safeArray(rawTests?.tests);
   
-  // Settings Default Değerleri
-  const systemSettings = rawSettings?.settings || { default_deadline_days: 10, timeout_matched_mins: 15, timeout_accepted_hours: 24 };
+  const systemSettings = rawSettings?.settings || { pool_lifespan_hours: 72, customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48, customer_approval_timeout_hours: 24 };
 
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
@@ -134,12 +128,10 @@ export default function AdminDashboard() {
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
 
-  // Tüm Mutate'leri aynı anda tetikleme (Örn. Excel upload sonrası)
   const mutateAllData = async () => {
     await Promise.all([mutatePending(), mutateProviders(), mutateMatched(), mutateSms(), mutateFeatures(), mutateTests(), mutateSettings()]);
   };
 
-  // --- useCallback İLE SARILMIŞ FONKSİYONLAR ---
   const handleDeleteRequest = useCallback(async (requestId) => { 
     if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; 
     try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); await mutateMatched(); } catch {} 
@@ -205,7 +197,6 @@ export default function AdminDashboard() {
   
   const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); await mutateSettings(); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
   
-  // Memoized Filtreler
   const filteredProviders = useMemo(() => safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(searchProviderText).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }), [providers, searchProviderText]);
   const filteredMatchedRequests = useMemo(() => safeArray(matchedRequests).filter(r => { if(!r) return false; const q = safeLower(searchMatchText).trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); }), [matchedRequests, searchMatchText, matchStatusFilter]);
   
@@ -242,7 +233,6 @@ export default function AdminDashboard() {
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  // EXCEL İŞLEMLERİ (Aynı kaldı, mutate eklendi)
   const handleExportExcel = () => {
     let exportData = [];
     let sheetName = "Veriler";
@@ -286,7 +276,7 @@ export default function AdminDashboard() {
           } else if (adminTab === 'PROJECT') {
             for (const item of importedData) { await axios.post(`${API_BASE}/features`, { title: item.TITLE || item.title || 'Yeni Özellik', description: item.DESCRIPTION || item.description || '', targetDate: new Date().toISOString().split('T')[0], status: item.STATUS || item.status || 'BEKLİYOR', priority: item.PRIORITY || item.priority || 'ORTA' }); }
           } else { alert("Bu sekme için Excel'den içe aktarma işlemi desteklenmiyor."); return; }
-          await mutateAllData(); // SWR ile verileri güncelle
+          await mutateAllData();
           alert("İşlem Başarılı! Veriler veritabanına kaydedildi.");
         } catch (dbError) { alert("Veriler okundu ancak kaydedilirken hata oluştu. Lütfen formatı kontrol edin."); }
       } catch (error) { alert("Dosya okunamadı. Lütfen formatını kontrol edin."); } finally { e.target.value = null; }
@@ -296,8 +286,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="w-full max-w-[100%] mx-auto px-6 py-8 flex-1 flex flex-col justify-start space-y-4">
-      
-      {/* BAŞLIK VE SEKMELER (TABS) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <h2 className="text-2xl font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
         <div className="flex flex-wrap items-center gap-1 bg-neutral-100 p-1.5 rounded-xl border text-xs font-semibold">
@@ -311,7 +299,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* EXCEL BUTONLARI */}
       <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
         <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
           <span>Şu anki görünüm:</span>
@@ -329,24 +316,6 @@ export default function AdminDashboard() {
           </label>
         </div>
       </div>
-
-      {/* İÇERİK BÖLÜMÜ */}
-// frontend/src/core/utils/helpers.js içine eklenecek
-
-
-  const startTime = new Date(startTimeString).getTime();
-  const now = new Date().getTime();
-  
-
-  if (unit === 'hours') {
-     if (remainingHours > 0) return `${remainingHours} saat ${remainingMins} dk kaldı`;
-     return `${remainingMins} dk kaldı`;
-  } else {
-     // Birim dakika ise
-     if (remainingHours > 0) return `${remainingHours} sa ${remainingMins} dk kaldı`;
-     return `${remainingMins} dk kaldı`;
-  }
-};
 
       {adminTab === 'WOZ' && (
         <div className="space-y-3">
@@ -483,6 +452,80 @@ export default function AdminDashboard() {
                 );
               })
             )}
+          </div>
+        </div>
+      )}
+
+      {adminTab === 'SETTINGS' && (
+        <div className="space-y-4">
+          <div className="bg-white p-5 rounded-2xl border shadow-sm">
+            <div className="flex items-center space-x-2 mb-4">
+              <Settings className="text-neutral-700" size={18} />
+              <h3 className="font-bold text-neutral-950">İş Akışı Zaman Aşımı (Timeout) Parametreleri</h3>
+            </div>
+            <div className="overflow-x-auto w-full border rounded-xl">
+              <table className="w-full text-left text-xs table-auto">
+                <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500">
+                  <tr>
+                    <th className="px-4 py-3 w-1/4">Parametre Adı</th>
+                    <th className="px-4 py-3 w-2/4">Açıklama / Senaryo</th>
+                    <th className="px-4 py-3 w-32 text-center">Değer</th>
+                    <th className="px-4 py-3 w-24 text-right">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 bg-white">
+                  
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">Havuz Yaşam Süresi <span className="text-[9px] text-neutral-400 block font-mono">pool_lifespan_hours</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Açık havuza düşen bir talep için hiçbir sağlayıcı sıraya girmezse, talep kaç <span className="font-bold">saat</span> sonra sistem tarafından otomatik iptal edilsin?</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.pool_lifespan_hours || 72} onChange={(e) => setSystemSettings({...systemSettings, pool_lifespan_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('pool_lifespan_hours', systemSettings.pool_lifespan_hours || 72)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">Müşteri Seçim Süresi <span className="text-[9px] text-neutral-400 block font-mono">customer_selection_timeout_mins</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcılar sıraya girdikten sonra, müşteri kaç <span className="font-bold">dakika</span> içinde seçim yapmazsa işlem askıya alınsın (veya düşürülsün)?</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.customer_selection_timeout_mins || 60} onChange={(e) => setSystemSettings({...systemSettings, customer_selection_timeout_mins: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Dk</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_selection_timeout_mins', systemSettings.customer_selection_timeout_mins || 60)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">İş Teslimat Süresi <span className="text-[9px] text-neutral-400 block font-mono">provider_completion_timeout_hours</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcı işi onayladıktan (Kabul Et) sonra, işi fiilen teslim etmesi (Tamamla) için tanınan maksimum <span className="font-bold">saat</span> limiti.</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.provider_completion_timeout_hours || 48} onChange={(e) => setSystemSettings({...systemSettings, provider_completion_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('provider_completion_timeout_hours', systemSettings.provider_completion_timeout_hours || 48)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
+                  <tr className="hover:bg-neutral-50 transition">
+                    <td className="px-4 py-3 font-bold text-neutral-900">Otomatik Onay Süresi <span className="text-[9px] text-neutral-400 block font-mono">customer_approval_timeout_hours</span></td>
+                    <td className="px-4 py-3 text-neutral-600 leading-relaxed">Sağlayıcı işi teslim ettikten sonra, müşteri onay butonuna basmazsa sistemin süreci otomatik tamamlaması için bekleyeceği <span className="font-bold">saat</span>.</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center space-x-1">
+                        <input type="number" min="1" value={systemSettings.customer_approval_timeout_hours || 24} onChange={(e) => setSystemSettings({...systemSettings, customer_approval_timeout_hours: e.target.value})} className="w-16 p-1.5 text-xs font-mono font-bold text-center rounded border outline-none focus:border-neutral-950" />
+                        <span className="text-[10px] text-neutral-400 font-bold">Saat</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => handleSaveSystemSetting('customer_approval_timeout_hours', systemSettings.customer_approval_timeout_hours || 24)} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-xs font-semibold hover:bg-neutral-800 transition">Kaydet</button></td>
+                  </tr>
+
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
