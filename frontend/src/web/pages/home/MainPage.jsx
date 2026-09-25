@@ -1,28 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Phone, MessageSquare, ShieldCheck, Zap, User, 
-  MapPin, CheckCircle2, ArrowRight, Search, Lock, 
-  Clock, Star, MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming 
+  Phone, ShieldCheck, Zap, User, 
+  MapPin, CheckCircle2, ArrowRight, Lock, 
+  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation 
 } from 'lucide-react';
 
 export default function MainPage() {
-  const [scenario, setScenario] = useState(1);
-  const [step, setStep] = useState(0);
+  const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
+  const [typedText, setTypedText] = useState('');
+  const [phase, setPhase] = useState('TYPING'); // TYPING -> SHOW_BUTTONS -> BUTTON_CLICKED -> MAP_SCANNING -> FINAL_ACTION
 
-  // Animasyon Döngüsü
+  const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
+
+  // 1. FAZ: Daktilo (Harf Harf Yazma) Efekti
   useEffect(() => {
-    let timer;
-    if (step === 0) timer = setTimeout(() => setStep(1), 2500); // Müşteri talebi yazdıktan 2.5s sonra butonlar çıkar
-    else if (step === 1) timer = setTimeout(() => setStep(2), 2000); // Seçim yapıldıktan 2s sonra sağlayıcıya düşer
-    else if (step === 2) timer = setTimeout(() => setStep(3), 2500); // Sağlayıcı kabul ettikten 2.5s sonra sonuç görünür
-    else if (step === 3) {
-      timer = setTimeout(() => {
-        setStep(0);
-        setScenario(prev => prev === 1 ? 2 : 1); // Senaryoyu değiştir ve başa sar
-      }, 5500); // 5.5 saniye sonucu göster, sonra diğer senaryoya geç
+    setTypedText('');
+    setPhase('TYPING');
+    let currentIndex = 0;
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex <= fullText.length) {
+        setTypedText(fullText.slice(0, currentIndex));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        // Yazma bitti, butonları göster
+        setTimeout(() => setPhase('SHOW_BUTTONS'), 300);
+      }
+    }, 90);
+
+    return () => clearInterval(typingInterval);
+  }, [scenario]);
+
+  // 2. FAZ: Butonların Belirmesinden Sonra Tıklama ve Sonraki Adımlar
+  useEffect(() => {
+    let timer1, timer2, timer3, timer4;
+
+    if (phase === 'SHOW_BUTTONS') {
+      // 1.5 saniye sonra kullanıcı ilgili düğmeye basar (Click Effect)
+      timer1 = setTimeout(() => {
+        setPhase('BUTTON_CLICKED');
+      }, 1500);
+    } else if (phase === 'BUTTON_CLICKED') {
+      // Düğme dolduktan sonra butonlar kaybolur, haritada tarama başlar
+      timer2 = setTimeout(() => {
+        setPhase('MAP_SCANNING');
+      }, 800);
+    } else if (phase === 'MAP_SCANNING') {
+      // Haritada alternatifler taranır, uygun sağlayıcı öne çıkar ve final aksiyonu (Arama / Mesaj) gerçekleşir
+      timer3 = setTimeout(() => {
+        setPhase('FINAL_ACTION');
+      }, 2000);
+    } else if (phase === 'FINAL_ACTION') {
+      // 5 saniye final ekranını göster, sonra diğer senaryoya geçmek için başa sar
+      timer4 = setTimeout(() => {
+        setScenario(prev => prev === 1 ? 2 : 1);
+      }, 5000);
     }
-    return () => clearTimeout(timer);
-  }, [step]);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
+    };
+  }, [phase]);
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans selection:bg-neutral-900 selection:text-white overflow-x-hidden">
@@ -116,7 +158,7 @@ export default function MainPage() {
                 </div>
               </div>
 
-              {/* ÇİFT SÜTUNLU YAPI (SOL: MÜŞTERİ | SAĞ: SAĞLAYICI) */}
+              {/* ÇİFT SÜTUNLU YAPI (SOL: MÜŞTERİ | SAĞ: SAĞLAYICI & HARİTA) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative">
                 
                 {/* SOL TARAF: MÜŞTERİ (MEHMET BEY) */}
@@ -130,41 +172,49 @@ export default function MainPage() {
                       </div>
                     </div>
                     
-                    <div className="bg-white border p-3 rounded-xl shadow-xs">
-                      <p className="text-xs font-medium text-neutral-800 leading-relaxed">
-                        {scenario === 1 
-                          ? "Tarabya'da 3+1 kiralık" 
-                          : "Bosch servis"}
+                    {/* Harf Harf Yazılan Canlı Mesaj Kutusu */}
+                    <div className="bg-white border p-3 rounded-xl shadow-xs min-h-[46px] flex items-center">
+                      <p className="text-xs font-medium text-neutral-800 leading-relaxed font-mono">
+                        {typedText}
+                        <span className="inline-block w-1.5 h-3 bg-neutral-900 ml-0.5 animate-pulse" />
                       </p>
                     </div>
                   </div>
 
-                  {/* Tercih Butonları & Müşteri Ekranı Reaksiyonu */}
+                  {/* Tercih Düğmeleri ve Sonuç Aksiyonları */}
                   <div className="space-y-3">
                     
-                    {/* ADIM 1 & 2: Butonlar Görüntülenir ve Seçim Simüle Edilir */}
-                    {step < 3 ? (
-                      <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-                        <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
+                    {/* FAZ 2: KENARLARI ÇİZGİLİ ŞEFFAF DÜĞMELER */}
+                    {(phase === 'SHOW_BUTTONS' || phase === 'BUTTON_CLICKED') && (
+                      <div className="space-y-1.5 animate-in fade-in duration-300">
+                        <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">İletişim Tercihi:</span>
                         
-                        {/* ŞEFFAF / İÇİ BOŞ TELEFON ARAMA BUTONU */}
-                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-transparent text-neutral-950 border-neutral-950 ring-2 ring-neutral-950/20 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                        {/* Telefon Arama Düğmesi */}
+                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
+                          scenario === 1 
+                            ? (phase === 'BUTTON_CLICKED' ? 'bg-neutral-950 text-white border-neutral-950 scale-95 shadow-inner' : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed scale-102') 
+                            : 'bg-white text-neutral-400 border-neutral-200 opacity-40'
+                        }`}>
                           <Phone size={12} />
                           <span>Telefon arama</span>
                         </div>
 
-                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                        {/* Whatsapp/Sms Düğmesi */}
+                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
+                          scenario === 2 
+                            ? (phase === 'BUTTON_CLICKED' ? 'bg-emerald-600 text-white border-emerald-600 scale-95 shadow-inner' : 'bg-transparent text-emerald-700 border-emerald-600 border-dashed scale-102') 
+                            : 'bg-white text-neutral-400 border-neutral-200 opacity-40'
+                        }`}>
                           <MessageCircle size={12} />
                           <span>Whatsapp/Sms</span>
                         </div>
                       </div>
-                    ) : null}
+                    )}
 
-                    {/* ADIM 3: İŞLEM TAMAMLANDIĞINDA ÜSTTEKİ DÜĞMELER KAYBOLUR, SONUÇ GÖRÜNÜR */}
-                    {step >= 3 && (
+                    {/* FAZ 4: FİNAL AKSİYONLARI (DÜĞMELER KAYBOLDU, BİLDİRİMLER GELDİ) */}
+                    {phase === 'FINAL_ACTION' && (
                       <div className="animate-in fade-in zoom-in duration-300">
                         {scenario === 1 && (
-                          /* BÜYÜK VE CANLI YEŞİL ARAMA EKRANI (Butonlar kayboldu) */
                           <div className="bg-emerald-600 text-white p-3.5 rounded-2xl shadow-md space-y-2 animate-bounce">
                             <div className="flex items-center justify-between">
                               <span className="text-[9px] uppercase tracking-wider font-mono bg-emerald-700 px-2 py-0.5 rounded font-bold">Gelen Arama</span>
@@ -178,7 +228,6 @@ export default function MainPage() {
                         )}
 
                         {scenario === 2 && (
-                          /* WHATSAPP/SMS BİLDİRİMİ (SİYAH BAŞLIK - Butonlar kayboldu) */
                           <div className="bg-white border border-neutral-300 p-3 rounded-2xl shadow-sm space-y-1.5">
                             <div className="flex items-center justify-between text-[10px] text-neutral-900 font-bold">
                               <span className="flex items-center gap-1"><BellRing size={11} className="text-neutral-950" /> Whatsapp / SMS Mesajı</span>
@@ -189,11 +238,14 @@ export default function MainPage() {
                         )}
                       </div>
                     )}
+
                   </div>
                 </div>
 
-                {/* SAĞ TARAF: SAĞLAYICI (AYŞE HANIM / MURAT USTA) */}
-                <div className={`bg-white border rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm transition-all duration-700 ${step >= 2 ? 'opacity-100 border-emerald-500 ring-2 ring-emerald-500/10' : 'opacity-40 border-neutral-200 pointer-events-none'}`}>
+                {/* SAĞ TARAF: SAĞLAYICI VE HARİTA TARAMA SİMÜLASYONU */}
+                <div className="bg-white border border-neutral-200 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden">
+                  
+                  {/* Üst Bilgi */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-2.5">
@@ -209,29 +261,53 @@ export default function MainPage() {
                           </span>
                         </div>
                       </div>
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-mono">
-                        {step >= 2 ? "Eşleşti" : "Bekliyor"}
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono transition-all ${
+                        phase === 'MAP_SCANNING' ? 'bg-amber-100 text-amber-800 animate-pulse' : 
+                        phase === 'FINAL_ACTION' ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-neutral-500'
+                      }`}>
+                        {phase === 'MAP_SCANNING' ? 'Harita Taranıyor...' : phase === 'FINAL_ACTION' ? 'Eşleşti' : 'Bekliyor'}
                       </span>
                     </div>
 
-                    <div className="bg-neutral-50 border p-3 rounded-xl text-xs font-medium text-neutral-700">
-                      {scenario === 1 ? "Talep: Tarabya'da 3+1 kiralık" : "Talep: Bosch servis"}
+                    {/* ORTADA DÜĞME YOK - HARİTA ALTERNATİFLERİ GÖRSELİ */}
+                    <div className="bg-neutral-900 rounded-xl p-3 text-white relative min-h-[90px] flex flex-col justify-center items-center overflow-hidden">
+                      {/* Arka Plan Harita Efekti */}
+                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:12px_12px]" />
+                      
+                      {phase === 'MAP_SCANNING' ? (
+                        <div className="relative z-10 flex flex-col items-center space-y-1.5 animate-pulse text-center">
+                          <Compass size={22} className="text-emerald-400 animate-spin" />
+                          <span className="text-[10px] font-mono text-emerald-300">Bölgedeki alternatifler taranıyor...</span>
+                        </div>
+                      ) : phase === 'FINAL_ACTION' ? (
+                        <div className="relative z-10 flex flex-col items-center space-y-1 text-center animate-in zoom-in duration-300">
+                          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute -top-1" />
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+                            <Navigation size={12} /> En Yakın Uzman Seçildi
+                          </span>
+                          <p className="text-xs font-extrabold text-white">
+                            {scenario === 1 ? "Tarabya Emlak (Ayşe H.)" : "Bosch Yetkili Servis (Murat U.)"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="relative z-10 text-center text-neutral-400 text-[10px] font-mono">
+                          Talep havuzda bekleniyor...
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Sonuç Alanı */}
+                  {/* Sağlayıcı Sonuç Paneli */}
                   <div>
-                    {step < 3 ? (
-                      <button className="w-full py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl animate-pulse">
-                        İşi Kabul Et
-                      </button>
+                    {phase !== 'FINAL_ACTION' ? (
+                      <div className="text-center text-[11px] text-neutral-400 font-medium py-1.5">
+                        {phase === 'MAP_SCANNING' ? 'Sistem en uygun uzayı buluyor...' : 'Müşteri tercihi bekleniyor...'}
+                      </div>
                     ) : (
-                      <div className="space-y-2.5 animate-in fade-in zoom-in duration-300">
-                        
-                        {/* Senaryo 1 Sonucu (Telefon Arama) */}
+                      <div className="space-y-2 animate-in fade-in duration-300">
                         {scenario === 1 && (
                           <>
-                            <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
+                            <div className="flex items-center justify-between text-[11px] border-b pb-1">
                               <span className="text-neutral-400 font-bold uppercase text-[9px]">Müşteri No</span>
                               <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
                             </div>
@@ -242,23 +318,21 @@ export default function MainPage() {
                           </>
                         )}
 
-                        {/* Senaryo 2 Sonucu (Whatsapp/Sms) */}
                         {scenario === 2 && (
                           <>
-                            <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
+                            <div className="flex items-center justify-between text-[11px] border-b pb-1">
                               <span className="text-neutral-400 font-bold uppercase text-[9px]">İletişim Kanalı</span>
                               <div className="flex items-center space-x-1 text-emerald-600 font-bold">
                                 <MessageCircle size={11} />
                                 <span className="text-[10px]">Whatsapp/Sms</span>
                               </div>
                             </div>
-                            <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl text-[11px] font-medium text-emerald-950 shadow-xs flex items-start space-x-2">
+                            <div className="bg-emerald-50 border border-emerald-100 p-2 rounded-xl text-[11px] font-medium text-emerald-950 flex items-start space-x-1.5">
                               <Send size={12} className="text-emerald-600 shrink-0 mt-0.5" />
                               <p>"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
                             </div>
                           </>
                         )}
-
                       </div>
                     )}
                   </div>
