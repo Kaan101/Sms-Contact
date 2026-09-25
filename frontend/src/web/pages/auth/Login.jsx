@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { User, Wrench, Shield, KeyRound, Map as MapIcon, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
@@ -6,13 +6,40 @@ import { useAuth } from '../../../core/context/AuthContext';
 export default function Login() {
   const { setSession, API_BASE } = useAuth();
   
-  const [selectedRole, setSelectedRole] = useState('CUSTOMER');
+  // URL'den role parametresini okuyup varsayılan state'i belirliyoruz
+  const [selectedRole, setSelectedRole] = useState(() => {
+    try {
+      const hash = window.location.hash;
+      if (hash.includes('role=PROVIDER')) return 'PROVIDER';
+      if (hash.includes('role=ADMIN')) return 'ADMIN';
+      if (hash.includes('role=TRACKER')) return 'TRACKER';
+      return 'CUSTOMER';
+    } catch {
+      return 'CUSTOMER';
+    }
+  });
+
   const [authStep, setAuthStep] = useState('PHONE');
   const [inputPhone, setInputPhone] = useState(() => { try { return localStorage.getItem('sc_last_phone') || ''; } catch { return ''; }});
   const [inputOtp, setInputOtp] = useState('');
   const [simulatedCode, setSimulatedCode] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Eğer sayfa açıkken URL değişirse (kullanıcı geri/ileri yaparsa) sekmeyi de güncelle
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.includes('role=PROVIDER')) setSelectedRole('PROVIDER');
+      else if (hash.includes('role=ADMIN')) setSelectedRole('ADMIN');
+      else if (hash.includes('role=TRACKER')) setSelectedRole('TRACKER');
+      else setSelectedRole('CUSTOMER');
+    };
+    
+    // Geçmiş API'si ile (pushState/replaceState) değişen URL'leri dinlemek için özel event veya popstate
+    window.addEventListener('popstate', handleHashChange);
+    return () => window.removeEventListener('popstate', handleHashChange);
+  }, []);
 
   const handleSendOtp = async (e) => { 
     e.preventDefault(); if (!inputPhone.trim()) return; setAuthLoading(true); setErrorMessage(''); 
