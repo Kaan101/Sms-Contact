@@ -2,19 +2,61 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, MapPin, Zap, CheckCircle2, ArrowRight, Search, Smartphone, Monitor, PhoneCall, User, Bell } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
-  // Simülasyon Animasyon Durumu (0: Talep Gönderiliyor, 1: Uzman Kabul Ediyor, 2: Telefonla Görüşülüyor)
+  // Simülasyon Animasyon Durumu (0: Talep, 1: Kabul, 2: Görüşme)
   const [step, setStep] = useState(0);
+  // Daktilo efekti için state
+  const [typedText, setTypedText] = useState("");
+  const fullText = '"Tarabya 2+1 kiralık daire."';
 
+  // Adım değiştirici (Her 4 saniyede bir)
   useEffect(() => {
     const interval = setInterval(() => {
       setStep((prev) => (prev + 1) % 3);
-    }, 4000); // Her adım 4 saniye sürer
+    }, 4500); 
     return () => clearInterval(interval);
   }, []);
+
+  // Harf harf yazma efekti (Adım 0 olduğunda tetiklenir)
+  useEffect(() => {
+    if (step === 0) {
+      setTypedText("");
+      let i = 0;
+      const typingInterval = setInterval(() => {
+        if (i < fullText.length) {
+          setTypedText(fullText.slice(0, i + 1));
+          i++;
+        } else {
+          clearInterval(typingInterval);
+        }
+      }, 70); // Her harf 70ms'de yazılır
+      return () => clearInterval(typingInterval);
+    } else {
+      // Diğer adımlarda metin tam görünür kalsın
+      setTypedText(fullText);
+    }
+  }, [step]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-500 selection:text-white relative overflow-hidden">
       
+      {/* Özel Animasyonlar için Style */}
+      <style>{`
+        @keyframes flow-right {
+          0% { transform: translateX(-200%); opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateX(200%); opacity: 0; }
+        }
+        @keyframes flow-left {
+          0% { transform: translateX(200%); opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateX(-200%); opacity: 0; }
+        }
+        .animate-flow-right { animation: flow-right 1.2s linear infinite; }
+        .animate-flow-left { animation: flow-left 1.2s linear infinite; }
+      `}</style>
+
       {/* DEKORATİF ARKA PLAN */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000010_1px,transparent_1px),linear-gradient(to_bottom,#00000010_1px,transparent_1px)] bg-[size:40px_40px]"></div>
@@ -70,19 +112,27 @@ export default function MainPage({ onGoToLogin }) {
         </div>
 
         {/* CANLI SENARYO SİMÜLASYONU */}
-        <div className="mt-32 mb-20 relative z-10 max-w-5xl mx-auto">
+        {/* max-w-4xl yaparak kutuları merkeze yaklaştırdık */}
+        <div className="mt-32 mb-20 relative z-10 max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-black text-slate-900 tracking-tight">Sistem Nasıl İşliyor?</h2>
             <p className="text-lg font-medium text-slate-500 mt-4">Saniyeler süren canlı eşleşme hikayesi</p>
           </div>
 
-          {/* grid içine place-items-center ekleyerek çerçeveleri mükemmel hizaladık */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 relative place-items-center">
+          {/* gap-10 ile kutu aralığı daraltıldı */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 relative place-items-center">
             
-            {/* Bağlantı Oku */}
-            <div className="hidden md:flex absolute top-[150px] left-1/2 transform -translate-x-1/2 items-center justify-center w-16 h-8 z-20">
-              <div className="w-full h-1 bg-slate-300 relative overflow-hidden">
-                <div className={`absolute h-full bg-blue-500 transition-all duration-1000 ${step >= 1 ? 'w-full' : 'w-0'}`}></div>
+            {/* CANLI İLETİŞİM HATTI (Kutuların Ortasında) */}
+            <div className="hidden md:flex absolute top-[180px] left-1/2 transform -translate-x-1/2 items-center justify-center w-24 h-4 z-20 overflow-hidden">
+              <div className="w-full h-[2px] bg-slate-300/50 relative flex items-center justify-center rounded-full">
+                {/* 0. ve 1. Adım: Sağa giden Mavi Veri */}
+                {(step === 0 || step === 1) && (
+                  <div className="w-4 h-1.5 bg-blue-500 rounded-full absolute animate-flow-right shadow-[0_0_8px_#3b82f6]"></div>
+                )}
+                {/* 2. Adım: Sola giden Yeşil Veri (Arama) */}
+                {step === 2 && (
+                  <div className="w-4 h-1.5 bg-emerald-500 rounded-full absolute animate-flow-left shadow-[0_0_8px_#10b981]"></div>
+                )}
               </div>
             </div>
 
@@ -107,17 +157,22 @@ export default function MainPage({ onGoToLogin }) {
                 
                 <div className="p-5 flex-1 flex flex-col justify-center">
                   {step === 0 && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-5">
-                      {/* GÜNCELLENEN MESAJ: Mavi arka plan kalktı, hafif çizgi içinde siyah yazı */}
-                      <div className="bg-white border border-slate-300 text-slate-900 p-5 rounded-2xl rounded-tr-sm shadow-sm relative">
-                        <p className="font-semibold text-[17px] leading-snug">"Tarabya 2+1 kiralık daire."</p>
-                        {/* Mesaj kuyruğu detayı */}
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-5 w-full">
+                      <div className="bg-white border border-slate-300 text-slate-900 p-5 rounded-2xl rounded-tr-sm shadow-sm relative min-h-[80px]">
+                        {/* TYPEWRITER (Harf Harf Yazı) */}
+                        <p className="font-semibold text-[17px] leading-snug">
+                          {typedText}
+                          <span className="animate-pulse ml-0.5 border-r-2 border-slate-400 h-4 inline-block align-middle"></span>
+                        </p>
                         <div className="absolute top-0 right-[-6px] w-3 h-3 bg-white border-r border-t border-slate-300 transform rotate-45 mt-2"></div>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-blue-600 text-sm font-bold pl-2 bg-blue-50 py-2 px-3 rounded-xl w-max">
-                        <Search size={16} className="animate-spin" /> Uzmanlara iletiliyor...
-                      </div>
+                      {/* Harfler bitince arama başlıyor hissi vermek için gecikmeli ikon */}
+                      {typedText === fullText && (
+                        <div className="flex items-center gap-2 text-blue-600 text-sm font-bold pl-2 bg-blue-50 py-2 px-3 rounded-xl w-max animate-in fade-in duration-300">
+                          <Search size={16} className="animate-spin" /> Uzmanlara iletiliyor...
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -159,15 +214,17 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* Ekran - SABİT EN VE BOY (Diğeriyle Birebir Aynı) */}
+              {/* Ekran - SABİT EN VE BOY */}
               <div className={`w-full max-w-[340px] h-[420px] bg-slate-900 rounded-xl border-[8px] border-slate-700 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 2 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
-                <div className="bg-slate-800 px-4 py-2 flex items-center gap-2 border-b border-slate-700/50">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  </div>
-                  <span className="text-[11px] text-slate-400 font-mono ml-4 uppercase tracking-widest">Mobool Sistem</span>
+                
+                {/* YENİ ÜST BAR: Apple ikonları yerine profesyonel panel başlığı */}
+                <div className="bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-700/50">
+                  <span className="text-[11px] text-slate-400 font-mono uppercase tracking-widest flex items-center gap-2">
+                    <Monitor size={14}/> Sistem Paneli
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Aktif
+                  </span>
                 </div>
                 
                 <div className="p-6 flex-1 flex flex-col justify-center">
@@ -186,12 +243,9 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                         <p className="text-white font-medium text-lg mb-6 leading-snug">"Tarabya 2+1 kiralık daire."</p>
                         
-                        {/* DAHA CANLI KABUL ET BUTONU */}
                         <div className="relative mt-2">
-                          {/* Butonun arkasındaki yayılma/dalga efekti (Ripple) */}
                           <div className="absolute inset-0 bg-emerald-500 rounded-xl animate-ping opacity-75"></div>
-                          
-                          <button className="relative w-full py-3.5 bg-emerald-500 text-slate-900 font-black rounded-xl shadow-[0_0_25px_rgba(16,185,129,0.6)] animate-[pulse_1.5s_ease-in-out_infinite] scale-105 hover:scale-110 transition-transform">
+                          <button className="relative w-full py-3.5 bg-emerald-500 text-slate-900 font-black rounded-xl shadow-[0_0_25px_rgba(16,185,129,0.6)] animate-[pulse_1.5s_ease-in-out_infinite] scale-105 transition-transform">
                             Hemen Kabul Et
                           </button>
                         </div>
