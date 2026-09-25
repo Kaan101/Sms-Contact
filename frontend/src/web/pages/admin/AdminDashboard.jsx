@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import * as XLSX from 'xlsx'; // exceljs yerine xlsx (SheetJS) kullanıyoruz
-//import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+import useSWR from 'swr'; // --- SWR EKLENDİ ---
 import { 
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
-  ArrowUpDown, X, ChevronUp, ChevronDown 
+  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2 
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
@@ -13,7 +13,11 @@ import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cl
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequestSort }) {
+// --- SWR İÇİN GLOBAL FETCHER FONKSİYONU ---
+const fetcher = (url) => axios.get(url).then(res => res.data);
+
+// --- PERFORMANS OPTİMİZASYONU 1: BİLEŞENLERİ MEMO'LAMA ---
+const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig, handleRequestSort }) => {
   if (!sortConfig) return null;
   const isActive = sortConfig.key === sortKey;
   const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
@@ -29,18 +33,91 @@ function SortableHeader({ label, sortKey, align = "left", sortConfig, handleRequ
       </div>
     </th>
   );
-}
+});
+
+const MatchedRequestRow = React.memo(({ req, onDelete }) => (
+  <tr className="hover:bg-neutral-50 transition">
+    <td className="px-4 py-3 font-mono text-neutral-900">
+      <span className="font-bold">#REQ-{req.id}</span>
+      {req.created_at && <div className="text-[10px] text-neutral-400 mt-0.5">{safeDateTime(req.created_at)}</div>}
+    </td>
+    <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
+    <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
+    <td className="px-4 py-3 font-mono text-neutral-800">{cleanContact(req.contact_value)}</td>
+    <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
+    <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
+    <td className="px-4 py-3 text-right">
+      <button onClick={() => onDelete(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button>
+    </td>
+  </tr>
+));
+
+const ProviderCard = React.memo(({ prov, onEdit, onDelete, onConnect }) => (
+  <div className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
+    <h3 className="font-bold text-neutral-900">{prov.name}</h3>
+    <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+    <div className="mt-2 pt-2 border-t flex items-center justify-between">
+      <div className="flex space-x-2">
+        <button onClick={() => onEdit(prov)} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
+        <button onClick={() => onDelete(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button>
+      </div>
+      <button onClick={() => onConnect(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap">
+        <ExternalLink size={12} /><span>Bağlan</span>
+      </button>
+    </div>
+  </div>
+));
+
+const WozCard = React.memo(({ req, onAssign }) => (
+  <div className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+        {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
+        {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
+      </div>
+      <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
+      <span className="text-[11px] text-neutral-500 block">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
+    </div>
+    <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0">Sağlayıcı Seç & Ata</button>
+  </div>
+));
+
+const SmsLogCard = React.memo(({ log }) => (
+  <div className="p-3 bg-neutral-50 rounded-xl border space-y-1">
+    <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono">
+      <span className="font-semibold text-neutral-900">{log.recipient_phone}</span>
+      <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span>
+    </div>
+    <p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed text-neutral-800">{log.message_body}</p>
+  </div>
+));
 
 export default function AdminDashboard() {
   const { API_BASE } = useAuth();
-
   const [adminTab, setAdminTab] = useState('WOZ');
-  const [matchedRequests, setMatchedRequests] = useState([]);
-  const [smsLogs, setSmsLogs] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [providers, setProviders] = useState([]);
-  const [selectedProviderMap, setSelectedProviderMap] = useState({});
-  const [systemSettings, setSystemSettings] = useState({ default_deadline_days: 10, timeout_matched_mins: 15, timeout_accepted_hours: 24 });
+  
+  // --- SWR VERİ ÇEKME HOOK'LARI ---
+  // Uygulama sayfasına göre sadece gereken veriyi çeker ve arka planda (5sn) sessizce günceller.
+  const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
+  const { data: rawProviders, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
+  const { data: rawMatchedRequests, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: adminTab === 'ALL_MATCHED' ? 5000 : 0 });
+  const { data: rawSmsLogs, mutate: mutateSms } = useSWR(`${API_BASE}/notifications`, fetcher, { refreshInterval: adminTab === 'SMS_LOGS' ? 5000 : 0 });
+  const { data: rawSettings, mutate: mutateSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: adminTab === 'SETTINGS' ? 60000 : 0 });
+  const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
+  const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
+
+  // Gelen ham verileri (SWR Data) güvenli dizilere aktarma
+  const pendingRequests = safeArray(rawPendingRequests?.requests);
+  const providers = safeArray(rawProviders?.providers);
+  const matchedRequests = safeArray(rawMatchedRequests?.requests);
+  const smsLogs = safeArray(rawSmsLogs?.notifications);
+  const features = safeArray(rawFeatures?.features);
+  const tests = safeArray(rawTests?.tests);
+  
+  // Settings Default Değerleri
+  const systemSettings = rawSettings?.settings || { default_deadline_days: 10, timeout_matched_mins: 15, timeout_accepted_hours: 24 };
+
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
@@ -49,105 +126,88 @@ export default function AdminDashboard() {
   const [matchStatusFilter, setMatchStatusFilter] = useState('ALL');
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
-  
-  const [features, setFeatures] = useState([]);
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
   const [newFeature, setNewFeature] = useState({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' });
-  
-  const [tests, setTests] = useState([]);
   const [expandedTestId, setExpandedTestId] = useState(null);
   const [newTest, setNewTest] = useState({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' });
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [modalFormData, setModalFormData] = useState({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 });
 
-  const fetchFeatures = async () => { try { const res = await axios.get(`${API_BASE}/features`); setFeatures(safeArray(res?.data?.features)); } catch (err) {} };
-  const fetchTests = async () => { try { const res = await axios.get(`${API_BASE}/tests`); setTests(safeArray(res?.data?.tests)); } catch (err) {} };
-  
-  const fetchAdminData = async () => {
-    try {
-      const [reqRes, provRes, matchRes, logRes] = await Promise.all([
-        axios.get(`${API_BASE}/requests/pending`),
-        axios.get(`${API_BASE}/providers`),
-        axios.get(`${API_BASE}/requests/matched`),
-        axios.get(`${API_BASE}/notifications`)
-      ]);
-      
-      const sortedPending = safeArray(reqRes?.data?.requests).sort((a, b) => {
-        const dateA = new Date(a?.created_at || 0).getTime();
-        const dateB = new Date(b?.created_at || 0).getTime();
-        if (dateB !== dateA) return dateB - dateA;
-        return (b?.id || 0) - (a?.id || 0);
-      });
-      setPendingRequests(sortedPending); 
-      setProviders(safeArray(provRes?.data?.providers));
-      setMatchedRequests(safeArray(matchRes?.data?.requests)); 
-      setSmsLogs(safeArray(logRes?.data?.notifications));
-      await fetchFeatures(); 
-      await fetchTests();
-      try { const setRes = await axios.get(`${API_BASE}/settings`); if (setRes?.data?.settings) setSystemSettings(setRes.data.settings); } catch (e) {}
-    } catch (err) {}
+  // Tüm Mutate'leri aynı anda tetikleme (Örn. Excel upload sonrası)
+  const mutateAllData = async () => {
+    await Promise.all([mutatePending(), mutateProviders(), mutateMatched(), mutateSms(), mutateFeatures(), mutateTests(), mutateSettings()]);
   };
 
-  useEffect(() => {
-    fetchAdminData();
-    const interval = setInterval(() => {
-      if (adminTab === 'SMS_LOGS' || adminTab === 'ALL_MATCHED' || adminTab === 'WOZ') fetchAdminData();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [adminTab]);
+  // --- useCallback İLE SARILMIŞ FONKSİYONLAR ---
+  const handleDeleteRequest = useCallback(async (requestId) => { 
+    if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; 
+    try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); await mutateMatched(); } catch {} 
+  }, [API_BASE, mutateMatched]);
 
-  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await fetchTests(); } catch (err) {} };
-  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await fetchTests(); } catch (err) {} };
-  const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await fetchTests(); } catch {} };
+  const handleEditProviderClick = useCallback((prov) => {
+    setEditingProviderId(prov.id); 
+    setModalFormData({ 
+      name: prov.name, phone: prov.phone, email: prov.email || '', 
+      serviceKeywords: safeArray(prov.service_keywords).join(', '), 
+      communicationChannels: safeArray(prov.communication_channels).length ? prov.communication_channels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], 
+      priorityScore: prov.priority_score || 100 
+    }); 
+    setIsModalOpen(true);
+  }, []);
+
+  const handleAdminDeleteProvider = useCallback(async (id) => { 
+    if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return; 
+    try { await axios.delete(`${API_BASE}/providers/${id}`); await mutateProviders(); alert("Sağlayıcı başarıyla silindi."); } 
+    catch (err) { alert("Silme işlemi başarısız oldu."); } 
+  }, [API_BASE, mutateProviders]);
+
+  const handleOpenProviderDirectSession = useCallback((provPhone) => {
+    if (!provPhone) return;
+    const cleanPhone = encodeURIComponent(safeString(provPhone).trim());
+    const directUrl = `${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`;
+    window.open(directUrl, '_blank');
+  }, []);
+
+  const handleWozAssignClick = useCallback((req) => {
+    setWozAssignModalReq(req); setWozProviderSearch('');
+  }, []);
+
+  const handleRequestSort = useCallback((key) => { 
+    setSortConfig(prevConfig => {
+      let direction = 'asc'; 
+      if (prevConfig.key === key && prevConfig.direction === 'asc') direction = 'desc'; 
+      return { key, direction };
+    });
+  }, []);
+
+  const handleCreateTest = async (e) => { e.preventDefault(); if (!newTest.title.trim()) return; try { await axios.post(`${API_BASE}/tests`, newTest); setNewTest({ title: '', description: '', testerName: 'İTÜ Test Ekibi', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); await mutateTests(); } catch (err) {} };
+  const handleUpdateTest = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/tests/${id}`, updatedFields); await mutateTests(); } catch (err) {} };
+  const handleDeleteTest = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/tests/${id}`); await mutateTests(); } catch {} };
   
-  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await fetchFeatures(); } catch (err) {} };
-  const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await fetchFeatures(); } catch (err) {} };
-  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await fetchFeatures(); } catch {} };
+  const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await mutateFeatures(); } catch (err) {} };
+  const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await mutateFeatures(); } catch (err) {} };
+  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await mutateFeatures(); } catch {} };
 
-  const handleAdminAssign = async (requestId, providerId) => { const pId = providerId || selectedProviderMap[requestId]; if (!pId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(pId, 10) }); setWozAssignModalReq(null); await fetchAdminData(); } catch {} };
+  const handleAdminAssign = async (requestId, providerId) => { if (!providerId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(providerId, 10) }); setWozAssignModalReq(null); await mutatePending(); await mutateMatched(); } catch {} };
   
   const handleAdminSaveProvider = async (e) => { 
     if (e && e.preventDefault) e.preventDefault(); 
-    if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) {
-       alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun."); return;
-    }
+    if (!modalFormData.name?.trim() || !modalFormData.phone?.trim() || !modalFormData.serviceKeywords?.trim()) { alert("Lütfen Firma Adı, Telefon ve Anahtar Kelimeler alanlarını eksiksiz doldurun."); return; }
     const keywordsArray = safeString(modalFormData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean); 
     const payload = { name: modalFormData.name.trim(), phone: modalFormData.phone.trim(), email: modalFormData.email ? modalFormData.email.trim() : null, serviceKeywords: keywordsArray.slice(0, MAX_KEYWORD_COUNT), communicationChannels: safeArray(modalFormData.communicationChannels).length ? modalFormData.communicationChannels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(modalFormData.priorityScore, 10) || 100 }; 
     try { 
       if (editingProviderId) { await axios.put(`${API_BASE}/providers/${editingProviderId}`, payload); } 
       else { await axios.post(`${API_BASE}/providers`, payload); }
-      setIsModalOpen(false); await fetchAdminData(); alert("Sağlayıcı başarıyla kaydedildi!");
+      setIsModalOpen(false); await mutateProviders(); alert("Sağlayıcı başarıyla kaydedildi!");
     } catch (err) { alert(err.response?.data?.message || "Sağlayıcı kaydedilemedi. Telefon numarası zaten mevcut olabilir."); } 
   };
   
-  const handleAdminDeleteProvider = async (id) => { 
-    if (!window.confirm('Sağlayıcıyı silmek istediğinize emin misiniz?')) return; 
-    try { await axios.delete(`${API_BASE}/providers/${id}`); await fetchAdminData(); alert("Sağlayıcı başarıyla silindi."); } 
-    catch (err) { alert("Silme işlemi başarısız oldu."); } 
-  };
+  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); await mutateSettings(); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
   
-  const handleSaveSystemSetting = async (key, value) => { try { await axios.put(`${API_BASE}/settings`, { key, value }); alert('Sistem parametresi başarıyla güncellendi!'); } catch (err) { alert('Hata oluştu.'); } };
-  
-  const handleDeleteRequest = async (requestId) => { if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); await fetchAdminData(); } catch {} };
-
-  const handleOpenProviderDirectSession = (provPhone) => {
-    if (!provPhone) return;
-    const cleanPhone = encodeURIComponent(safeString(provPhone).trim());
-    const directUrl = `${window.location.origin}${window.location.pathname}?role=PROVIDER&phone=${cleanPhone}`;
-    window.open(directUrl, '_blank');
-  };
-
-  const filteredProviders = useMemo(() => 
-    safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(searchProviderText).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }),
-  [providers, searchProviderText]);
-  
-  const filteredMatchedRequests = useMemo(() => 
-    safeArray(matchedRequests).filter(r => { if(!r) return false; const q = safeLower(searchMatchText).trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); }),
-  [matchedRequests, searchMatchText, matchStatusFilter]);
-
-  const handleRequestSort = (key) => { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
+  // Memoized Filtreler
+  const filteredProviders = useMemo(() => safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(searchProviderText).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }), [providers, searchProviderText]);
+  const filteredMatchedRequests = useMemo(() => safeArray(matchedRequests).filter(r => { if(!r) return false; const q = safeLower(searchMatchText).trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); }), [matchedRequests, searchMatchText, matchStatusFilter]);
   
   const sortedMatchedRequests = useMemo(() => { 
     let sortableItems = [...filteredMatchedRequests]; 
@@ -160,7 +220,6 @@ export default function AdminDashboard() {
         else if (sortConfig.key === 'raw_text') { valA = a.raw_text || ''; valB = b.raw_text || ''; } 
         else if (sortConfig.key === 'contact_value') { valA = a.contact_value || ''; valB = b.contact_value || ''; } 
         else if (sortConfig.key === 'status') { valA = a.status || ''; valB = b.status || ''; } 
-        
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; 
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; 
         return 0; 
@@ -178,130 +237,60 @@ export default function AdminDashboard() {
     });
   }, [pendingRequests]);
   
-  const filteredSmsLogs = useMemo(() => 
-    safeArray(smsLogs).filter(log => { if(!log) return false; const q = safeLower(searchSmsText).trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return safeLower(log.recipient_phone).includes(q) || safeLower(log.message_body).includes(q); }),
-  [smsLogs, searchSmsText, smsRecipientFilter]);
-  
-  const filteredWozProviders = useMemo(() => 
-    safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(wozProviderSearch).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }),
-  [providers, wozProviderSearch]);
+  const filteredSmsLogs = useMemo(() => safeArray(smsLogs).filter(log => { if(!log) return false; const q = safeLower(searchSmsText).trim(); const recipientMatch = smsRecipientFilter === 'ALL' || log.recipient_type === smsRecipientFilter; if (!recipientMatch) return false; if (!q) return true; return safeLower(log.recipient_phone).includes(q) || safeLower(log.message_body).includes(q); }), [smsLogs, searchSmsText, smsRecipientFilter]);
+  const filteredWozProviders = useMemo(() => safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(wozProviderSearch).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }), [providers, wozProviderSearch]);
 
   const modalKwMetrics = getKeywordMetrics(modalFormData.serviceKeywords);
 
-  // ==========================================
-  // EXCEL DIŞA AKTARMA (SheetJS)
-  // ==========================================
+  // EXCEL İŞLEMLERİ (Aynı kaldı, mutate eklendi)
   const handleExportExcel = () => {
     let exportData = [];
     let sheetName = "Veriler";
-
     if (adminTab === 'WOZ') { exportData = pendingRequests; sheetName = "WoZ_Havuzu"; }
     else if (adminTab === 'PROVIDERS') { exportData = providers; sheetName = "Saglayicilar"; }
     else if (adminTab === 'ALL_MATCHED') { exportData = matchedRequests; sheetName = "Eslesmeler"; }
     else if (adminTab === 'SMS_LOGS') { exportData = smsLogs; sheetName = "SMS_Loglari"; }
     else if (adminTab === 'TESTS') { exportData = tests; sheetName = "Test_Senaryolari"; }
     else if (adminTab === 'PROJECT') { exportData = features; sheetName = "Proje_Yol_Haritasi"; }
-
-    if (!exportData || exportData.length === 0) {
-      alert(`Şu an "${sheetName}" sekmesinde indirilecek herhangi bir veri bulunamadı!`);
-      return;
-    }
-
+    if (!exportData || exportData.length === 0) { alert(`Şu an "${sheetName}" sekmesinde indirilecek herhangi bir veri bulunamadı!`); return; }
     try {
-      // SheetJS (XLSX) formatına dönüştürme
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-      
-      // Dosyayı oluştur ve indir
       XLSX.writeFile(workbook, `Admin_${sheetName}_${new Date().getTime()}.xlsx`);
-    } catch (error) {
-      console.error("Dışa Aktarma Hatası:", error);
-      alert("Excel dosyası oluşturulurken bir hata oluştu.");
-    }
+    } catch (error) { alert("Excel dosyası oluşturulurken bir hata oluştu."); }
   };
 
-  // ==========================================
-  // EXCEL İÇE AKTARMA & BACKEND ENTEGRASYONU (SheetJS)
-  // ==========================================
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     alert("Excel dosyası alındı. Veriler okunuyor ve kaydediliyor...");
-    
     const reader = new FileReader();
-    
     reader.onload = async (event) => {
       try {
         const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        
-        // İlk çalışma sayfasını al
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        
-        // Veriyi JSON formatına dönüştür (ilk satırı başlık kabul eder)
         const importedData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-
-        if (!importedData || importedData.length === 0) {
-          alert("Excel dosyası boş veya formatı hatalı.");
-          return;
-        }
-
-        // BACKEND KAYIT İŞLEMİ
+        if (!importedData || importedData.length === 0) { alert("Excel dosyası boş veya formatı hatalı."); return; }
         try {
           if (adminTab === 'PROVIDERS') {
             for (const item of importedData) {
               await axios.post(`${API_BASE}/providers`, {
-                // Büyük-küçük harf duyarlılığı olmadan anahtar bulma
-                name: item.NAME || item.name || item.isim || 'İsimsiz Firma',
-                phone: String(item.PHONE || item.phone || item.telefon || ''),
-                email: item.EMAIL || item.email || item.eposta || null,
-                serviceKeywords: String(item.SERVICEKEYWORDS || item.serviceKeywords || item.anahtarkelime || '').split(','),
-                communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
-                priorityScore: parseInt(item.PRIORITYSCORE || item.priorityScore || 100, 10)
+                name: item.NAME || item.name || item.isim || 'İsimsiz Firma', phone: String(item.PHONE || item.phone || item.telefon || ''), email: item.EMAIL || item.email || item.eposta || null, serviceKeywords: String(item.SERVICEKEYWORDS || item.serviceKeywords || item.anahtarkelime || '').split(','), communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: parseInt(item.PRIORITYSCORE || item.priorityScore || 100, 10)
               });
             }
           } else if (adminTab === 'TESTS') {
-            for (const item of importedData) {
-              await axios.post(`${API_BASE}/tests`, {
-                title: item.TITLE || item.title || 'Yeni Test',
-                description: item.DESCRIPTION || item.description || '',
-                testerName: item.TESTERNAME || item.testerName || 'Sistem',
-                testDate: new Date().toISOString().split('T')[0],
-                status: 'BEKLİYOR'
-              });
-            }
+            for (const item of importedData) { await axios.post(`${API_BASE}/tests`, { title: item.TITLE || item.title || 'Yeni Test', description: item.DESCRIPTION || item.description || '', testerName: item.TESTERNAME || item.testerName || 'Sistem', testDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR' }); }
           } else if (adminTab === 'PROJECT') {
-            for (const item of importedData) {
-              await axios.post(`${API_BASE}/features`, {
-                title: item.TITLE || item.title || 'Yeni Özellik',
-                description: item.DESCRIPTION || item.description || '',
-                targetDate: new Date().toISOString().split('T')[0],
-                status: item.STATUS || item.status || 'BEKLİYOR',
-                priority: item.PRIORITY || item.priority || 'ORTA'
-              });
-            }
-          } else {
-             alert("Bu sekme için Excel'den içe aktarma işlemi desteklenmiyor.");
-             return;
-          }
-          await fetchAdminData();
+            for (const item of importedData) { await axios.post(`${API_BASE}/features`, { title: item.TITLE || item.title || 'Yeni Özellik', description: item.DESCRIPTION || item.description || '', targetDate: new Date().toISOString().split('T')[0], status: item.STATUS || item.status || 'BEKLİYOR', priority: item.PRIORITY || item.priority || 'ORTA' }); }
+          } else { alert("Bu sekme için Excel'den içe aktarma işlemi desteklenmiyor."); return; }
+          await mutateAllData(); // SWR ile verileri güncelle
           alert("İşlem Başarılı! Veriler veritabanına kaydedildi.");
-        } catch (dbError) {
-          console.error("Veritabanı Kayıt Hatası:", dbError);
-          alert("Veriler okundu ancak kaydedilirken hata oluştu. Lütfen formatı kontrol edin.");
-        }
-
-      } catch (error) {
-        console.error("Excel Okuma Hatası:", error);
-        alert("Dosya okunamadı. Lütfen formatını kontrol edin.");
-      } finally {
-        e.target.value = null; // Aynı dosyayı tekrar seçebilmek için inputu sıfırla
-      }
+        } catch (dbError) { alert("Veriler okundu ancak kaydedilirken hata oluştu. Lütfen formatı kontrol edin."); }
+      } catch (error) { alert("Dosya okunamadı. Lütfen formatını kontrol edin."); } finally { e.target.value = null; }
     };
-
     reader.readAsArrayBuffer(file);
   };
 
@@ -316,13 +305,13 @@ export default function AdminDashboard() {
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
           <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Layers size={14} /><span>Tüm Eşleşmeler</span></button>
           <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>İşlem Log ({filteredSmsLogs.length})</button>
-          <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FileCheck2 size={14} /><span>Test Senaryoları ({tests.length})</span></button>
-          <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Proje Adımları ({features.length})</span></button>
+          <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FileCheck2 size={14} /><span>Test Senaryolar ({tests.length})</span></button>
+          <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Proje ({features.length})</span></button>
           <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Settings size={14} /><span>Ayarlar</span></button>
         </div>
       </div>
 
-      {/* EXCEL BUTONLARI - KENDİNE AİT ŞIK SATIR */}
+      {/* EXCEL BUTONLARI */}
       <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
         <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
           <span>Şu anki görünüm:</span>
@@ -335,7 +324,7 @@ export default function AdminDashboard() {
           </button>
           <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
             <Upload size={18} />
-            <span>Excel'den Veri Yükle</span>
+            <span>Excel'den Yükle</span>
             <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} onClick={(e) => { e.target.value = null; }} />
           </label>
         </div>
@@ -372,23 +361,13 @@ export default function AdminDashboard() {
               <Plus size={13} /><span>Yeni Sağlayıcı Ekle</span>
             </button>
           </div>
-          <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3">
-            {sortedWozRequests.length === 0 ? (
+          <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3 relative">
+            {!rawPendingRequests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {sortedWozRequests.length === 0 && rawPendingRequests ? (
                <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
             ) : (
               sortedWozRequests.map((req) => (
-                <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                      {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
-                      {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
-                    </div>
-                    <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
-                    <span className="text-[11px] text-neutral-500 block">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
-                  </div>
-                  <button onClick={() => { setWozAssignModalReq(req); setWozProviderSearch(''); }} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0">Sağlayıcı Seç & Ata</button>
-                </div>
+                <WozCard key={req.id} req={req} onAssign={handleWozAssignClick} />
               ))
             )}
           </div>
@@ -402,15 +381,10 @@ export default function AdminDashboard() {
              <button type="button" onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5"><Plus size={13} /><span>Yeni Ekle</span></button>
           </div>
           <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
+              {!rawProviders && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {filteredProviders.map((prov) => (
-                  <div key={prov.id} className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
-                    <h3 className="font-bold text-neutral-900">{prov.name}</h3><p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
-                    <div className="mt-2 pt-2 border-t flex items-center justify-between">
-                       <div className="flex space-x-2"><button onClick={() => { setEditingProviderId(prov.id); setModalFormData({ name: prov.name, phone: prov.phone, email: prov.email || '', serviceKeywords: safeArray(prov.service_keywords).join(', '), communicationChannels: safeArray(prov.communication_channels).length ? prov.communication_channels : ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: prov.priority_score || 100 }); setIsModalOpen(true); }} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button><button onClick={() => handleAdminDeleteProvider(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button></div>
-                       <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap"><ExternalLink size={12} /><span>Bağlan</span></button>
-                    </div>
-                  </div>
+                  <ProviderCard key={prov.id} prov={prov} onEdit={handleEditProviderClick} onDelete={handleAdminDeleteProvider} onConnect={handleOpenProviderDirectSession} />
                 ))}
               </div>
           </div>
@@ -419,6 +393,7 @@ export default function AdminDashboard() {
 
       {adminTab === 'ALL_MATCHED' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm max-h-[650px] overflow-y-auto">
+            {!rawMatchedRequests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm">
                 <tr>
@@ -433,15 +408,7 @@ export default function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {sortedMatchedRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-neutral-50 transition">
-                    <td className="px-4 py-3 font-mono text-neutral-900"><span className="font-bold">#REQ-{req.id}</span>{req.created_at && <div className="text-[10px] text-neutral-400 mt-0.5">{safeDateTime(req.created_at)}</div>}</td>
-                    <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
-                    <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
-                    <td className="px-4 py-3 font-mono text-neutral-800">{cleanContact(req.contact_value)}</td>
-                    <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
-                    <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
-                    <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteRequest(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button></td>
-                  </tr>
+                  <MatchedRequestRow key={req.id} req={req} onDelete={handleDeleteRequest} />
                 ))}
               </tbody>
             </table>
@@ -450,8 +417,9 @@ export default function AdminDashboard() {
 
       {adminTab === 'SMS_LOGS' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
+          {!rawSmsLogs && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
           {filteredSmsLogs.map((log) => (
-            <div key={log.id} className="p-3 bg-neutral-50 rounded-xl border space-y-1"><div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono"><span className="font-semibold text-neutral-900">{log.recipient_phone}</span><span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{log.sent_status}</span></div><p className="text-xs font-mono bg-white p-2 rounded border leading-relaxed text-neutral-800">{log.message_body}</p></div>
+            <SmsLogCard key={log.id} log={log} />
           ))}
         </div>
       )}
@@ -464,7 +432,8 @@ export default function AdminDashboard() {
             <div><textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
           </form>
           <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
-            {tests.length === 0 ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir test senaryosu bulunmuyor.</div>) : (
+            {!rawTests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {tests.length === 0 && rawTests ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir test senaryosu bulunmuyor.</div>) : (
               tests.map((testItem) => {
                 const isExpanded = expandedTestId === testItem.id;
                 return (
@@ -498,7 +467,8 @@ export default function AdminDashboard() {
             <div><textarea rows={4} value={newFeature.description} onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })} placeholder="Özelliğin detaylı açıklaması (opsiyonel)..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none" /></div>
           </form>
           <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
-            {features.length === 0 ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.</div>) : (
+            {!rawFeatures && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {features.length === 0 && rawFeatures ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.</div>) : (
               features.map((feat) => {
                 const isExpanded = expandedFeatureId === feat.id;
                 return (
