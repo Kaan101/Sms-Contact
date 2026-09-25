@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import useSWR from 'swr'; // --- SWR EKLENDİ ---
+import useSWR from 'swr';
 import { Briefcase, Phone, Mail, Tag, Save, CheckCircle2, Clock, Trash2, X, AlertTriangle, ShieldCheck, PhoneCall, Loader2, MessageCircle, ChevronDown, ChevronUp, History, Timer, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
-import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime, calculateRemainingTime } from '../../../core/utils/helpers'; // calculateRemainingTime eklendi
+import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime, calculateRemainingTime } from '../../../core/utils/helpers';
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-// --- SWR İÇİN GLOBAL FETCHER FONKSİYONU ---
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
 export default function ProviderDashboard() {
   const { session, API_BASE } = useAuth();
   
-  // --- YENİ EKLENEN: SİSTEM AYARLARI SWR İLE ÇEKİLİYOR ---
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { pool_lifespan_hours: 72, customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48, customer_approval_timeout_hours: 24 };
 
@@ -35,7 +33,6 @@ export default function ProviderDashboard() {
     communicationChannels: ['PHONE', 'SMS', 'WHATSAPP', 'EMAIL']
   });
 
-  // --- SWR VERİ ÇEKME HOOK'LARI ---
   const providerPhoneQuery = session?.phone ? `phone=${encodeURIComponent(session.phone)}` : null;
   const { data: providerRes, mutate: mutateProvider } = useSWR(providerPhoneQuery ? `${API_BASE}/providers/by-phone?${providerPhoneQuery}` : null, fetcher);
   
@@ -68,7 +65,6 @@ export default function ProviderDashboard() {
      { refreshInterval: 5000 }
   );
 
-  // Verileri Düzenleme
   const allProviderReqs = useMemo(() => safeArray(providerReqsRes?.requests), [providerReqsRes]);
   
   const activeRequests = useMemo(() => 
@@ -245,7 +241,6 @@ export default function ProviderDashboard() {
                       
                       const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !isHiddenPreference);
 
-                      // --- SAYAÇ HESAPLAMA (Müşteri Seçimi Bekleme & İşi Teslim Etme) ---
                       let timerDisplay = null;
                       let isTimerCritical = false;
                       const refDate = req.updated_at || req.created_at || new Date().toISOString();
@@ -360,50 +355,87 @@ export default function ProviderDashboard() {
                 {!providerProfile ? (
                   <div className="text-center text-xs text-neutral-400 py-6">Uygun havuz işlerini görebilmek için önce profilinizi kaydetmelisiniz.</div>
                 ) : poolRequests.length === 0 ? (
-                  <div className="text-center text-Your `ProviderDashboard` component provides a robust foundation for managing provider workflows, fitting perfectly into a service tracking architecture like SMS KONTAK. The UI is well-structured with Tailwind CSS, and the state management for accordions and task handling is straightforward.
+                  <div className="text-center text-xs text-neutral-400 py-6">Şu an anahtar kelimelerinizle eşleşen açık havuz talebi bulunmuyor.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {poolRequests.map((req) => {
+                      const isActionLoading = actionLoadingId === req.id;
+                      return (
+                        <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                              {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
+                            </div>
+                            <h4 className="font-bold text-neutral-950 text-sm mt-0.5">"{req.raw_text}"</h4>
+                            <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <button disabled={isActionLoading} onClick={() => handleJoinPool(req.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
+                              {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                              <span>Sıraya Gir</span>
+                            </button>
+                            <button disabled={isActionLoading} onClick={() => handlePoolSkip(req.id)} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
+                              Pas Geç
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-Here is a quick review of the component's architecture, along with a few areas where you can optimize performance and error handling:
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
+            <div onClick={() => setIsPastTasksOpen(!isPastTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
+              <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
+                <History size={16} className="text-neutral-600" />
+                <span>Geçmiş Talepler ({pastRequests.length})</span>
+              </h3>
+              <div className="text-neutral-400">{isPastTasksOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
+            </div>
 
-**Strengths**
-*   **Clear State Management:** You have cleanly separated UI states (`isProfileOpen`, `isActiveTasksOpen`, etc.) from data states (`activeRequests`, `poolRequests`).
-*   **Intuitive UI/UX:** The accordion-style sections prevent information overload, and the conditionally rendered badges/buttons provide clear visual cues for the provider's next steps.
-*   **Helper Utilities:** Utilizing utility functions like `safeArray`, `safeUpper`, and `extractAddress` keeps the JSX clean and prevents runtime crashes from malformed data.
+            {isPastTasksOpen && (
+              <div className="p-6 animate-in fade-in duration-200">
+                {!providerProfile ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Geçmiş talepleri görebilmek için önce profilinizi kaydetmelisiniz.</div>
+                ) : pastRequests.length === 0 ? (
+                  <div className="text-center text-xs text-neutral-400 py-6">Henüz geçmiş bir talebiniz bulunmuyor.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {pastRequests.map((req) => {
+                      const reqStatus = safeUpper(req.status);
+                      return (
+                        <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border space-y-2 text-xs">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                {req.created_at && <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-semibold">⏰ {safeDateTime(req.created_at)}</span>}
+                              </div>
+                              <h4 className="font-semibold text-neutral-900 text-sm mt-1">"{req.raw_text}"</h4>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : reqStatus === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-700'}`}>
+                              {reqStatus === 'PROVIDER_SKIPPED' ? 'PAS GEÇİLDİ' : reqStatus}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-200">
+                            <span>📍 {extractAddress(req.location)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-**Areas for Improvement**
-*   **Silent Failures in API Calls:** 
-    Currently, your `catch` blocks are completely empty (e.g., `catch (err) {}`). If the API fails or a token expires, the user won't know why the action didn't complete. 
-    *Fix:* Implement a toast notification system or set an error state to display feedback to the user when `axios` throws an error.
-*   **Polling Race Conditions:** 
-    You are using a `setInterval` of 5000ms to poll `fetchProviderData`. If a network request takes longer than 5 seconds to resolve, you risk overlapping requests and race conditions updating the state.
-    *Fix:* Instead of `setInterval`, consider using a recursive `setTimeout` that only triggers the next fetch *after* the previous one has completely resolved. Alternatively, migrating to WebSockets or Server-Sent Events (SSE) would eliminate the need for polling entirely.
-*   **`useEffect` Dependency Warning:** 
-    `fetchProviderData` is defined outside the `useEffect` but used inside it, and it depends on `session`. This can lead to stale closures or unnecessary re-renders if not carefully managed.
-    *Fix:* Wrap `fetchProviderData` in a `useCallback`, or move its definition directly inside the `useEffect`.
-
-**Example Optimization for the Polling Logic:**
-```javascript
-useEffect(() => {
-  let isMounted = true;
-  let timeoutId;
-
-  const pollData = async () => {
-    if (!session?.phone || !isMounted) return;
-    
-    try {
-      await fetchProviderData();
-    } catch (error) {
-      console.error("Polling error:", error);
-    } finally {
-      if (isMounted) {
-        timeoutId = setTimeout(pollData, 5000);
-      }
-    }
-  };
-
-  pollData();
-
-  return () => {
-    isMounted = false;
-    clearTimeout(timeoutId);
-  };
-}, [session?.phone]); // Depend specifically on the phone to prevent unnecessary rebuilds
+        </div>
+      </div>
+    </div>
+  );
+}

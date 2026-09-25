@@ -333,8 +333,6 @@ export default function AdminDashboard() {
       {/* İÇERİK BÖLÜMÜ */}
 // frontend/src/core/utils/helpers.js içine eklenecek
 
-export const calculateRemainingTime = (startTimeString, timeoutValue, unit = 'hours') => {
-  if (!startTimeString || !timeoutValue) return null;
 
   const startTime = new Date(startTimeString).getTime();
   const now = new Date().getTime();
