@@ -1,8 +1,7 @@
 import React from 'react';
-import { ShieldCheck, MapPin, Zap, ArrowRight, User, Building2, CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom'; // Eğer a etiketi kullanıyorsan bunu kaldırabilirsin
+import { ShieldCheck, MapPin, Zap, User, Building2, CheckCircle2 } from 'lucide-react';
 
-export default function MainPage() {
+export default function MainPage({ onGoToLogin }) {
   return (
     <div className="min-h-screen bg-[#FAFBFD] font-sans selection:bg-neutral-900 selection:text-white">
       
@@ -16,8 +15,8 @@ export default function MainPage() {
             <span className="text-xl font-extrabold tracking-tight text-neutral-950">Mobool</span>
           </div>
           <div className="flex items-center gap-4 text-sm font-bold">
-            <Link to="/login" className="text-neutral-500 hover:text-neutral-900 transition">Giriş Yap</Link>
-            <Link to="/register" className="px-4 py-2 bg-neutral-950 text-white rounded-lg hover:bg-neutral-800 transition shadow-sm">Kayıt Ol</Link>
+            <button onClick={onGoToLogin} className="text-neutral-500 hover:text-neutral-900 transition cursor-pointer">Giriş Yap</button>
+            <button onClick={onGoToLogin} className="px-4 py-2 bg-neutral-950 text-white rounded-lg hover:bg-neutral-800 transition shadow-sm cursor-pointer">Kayıt Ol</button>
           </div>
         </div>
       </nav>
@@ -40,21 +39,19 @@ export default function MainPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-            <Link to="/customer" className="w-full sm:w-auto px-8 py-3.5 bg-neutral-950 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 transition shadow-sm">
+            <button onClick={onGoToLogin} className="w-full sm:w-auto px-8 py-3.5 bg-neutral-950 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 transition shadow-sm cursor-pointer">
               <User size={18} />
               Hizmet Almak İstiyorum
-            </Link>
-            <Link to="/provider" className="w-full sm:w-auto px-8 py-3.5 bg-white border border-neutral-200 text-neutral-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-50 transition shadow-sm">
+            </button>
+            <button onClick={onGoToLogin} className="w-full sm:w-auto px-8 py-3.5 bg-white border border-neutral-200 text-neutral-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-50 transition shadow-sm cursor-pointer">
               <Building2 size={18} />
               Hizmet Vermek İstiyorum
-            </Link>
+            </button>
           </div>
         </div>
 
         {/* FEATURES GRID */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-24">
-          
-          {/* Feature 1 */}
           <div className="bg-white p-8 rounded-3xl border border-neutral-200/80 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 border border-blue-100">
               <MapPin size={24} />
@@ -65,7 +62,6 @@ export default function MainPage() {
             </p>
           </div>
 
-          {/* Feature 2 */}
           <div className="bg-white p-8 rounded-3xl border border-neutral-200/80 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 border border-emerald-100">
               <ShieldCheck size={24} />
@@ -76,7 +72,6 @@ export default function MainPage() {
             </p>
           </div>
 
-          {/* Feature 3 */}
           <div className="bg-white p-8 rounded-3xl border border-neutral-200/80 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-6 border border-amber-100">
               <Zap size={24} />
@@ -86,31 +81,27 @@ export default function MainPage() {
               Uzmanlar açık havuzdaki talepleri canlı olarak görür, uygun olanlara anında talip olur. Beklemek yok, zaman kaybı yok.
             </p>
           </div>
-
         </div>
 
-        {/* HOW IT WORKS (NASIL ÇALIŞIR) */}
+        {/* HOW IT WORKS */}
         <div className="mt-32 mb-16">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-extrabold text-neutral-950 tracking-tight">Sistem Nasıl İşliyor?</h2>
           </div>
           
           <div className="flex flex-col md:flex-row justify-center gap-8 md:gap-4 relative">
-            {/* Adım 1 */}
             <div className="flex-1 text-center relative z-10">
               <div className="w-16 h-16 bg-neutral-950 text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">1</div>
               <h4 className="font-bold text-neutral-950 mb-2">Talep Oluştur</h4>
               <p className="text-xs text-neutral-500 px-4">İhtiyacını yaz, konumunu seç ve havaza gönder.</p>
             </div>
             
-            {/* Adım 2 */}
             <div className="flex-1 text-center relative z-10">
               <div className="w-16 h-16 bg-white border-2 border-neutral-950 text-neutral-950 rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-sm">2</div>
               <h4 className="font-bold text-neutral-950 mb-2">Uzmanını Seç</h4>
               <p className="text-xs text-neutral-500 px-4">Talip olan uzmanları incele ve sana en uygun olanı seç.</p>
             </div>
             
-            {/* Adım 3 */}
             <div className="flex-1 text-center relative z-10">
               <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md"><CheckCircle2 size={32} /></div>
               <h4 className="font-bold text-neutral-950 mb-2">Güvenle Görüş</h4>
@@ -118,17 +109,12 @@ export default function MainPage() {
             </div>
           </div>
         </div>
-
       </main>
       
       {/* FOOTER */}
       <footer className="border-t border-neutral-200 bg-white py-8">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-xs font-medium text-neutral-500">
           <p>© 2026 Mobool. Tüm hakları saklıdır.</p>
-          <div className="flex gap-4 mt-4 sm:mt-0">
-            <a href="#" className="hover:text-neutral-950 transition">Gizlilik Politikası</a>
-            <a href="#" className="hover:text-neutral-950 transition">Kullanım Koşulları</a>
-          </div>
         </div>
       </footer>
     </div>
