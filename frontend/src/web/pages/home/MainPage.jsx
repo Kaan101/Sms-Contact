@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, ShieldCheck, Zap, User, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation 
+  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation, PhoneForwarded 
 } from 'lucide-react';
 
 export default function MainPage() {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
-  const [phase, setPhase] = useState('TYPING'); // TYPING -> SHOW_BUTTONS -> BUTTON_CLICKED -> MAP_SCANNING -> FINAL_ACTION
+  const [phase, setPhase] = useState('TYPING'); // TYPING -> SHOW_OPTIONS -> CLICK_SEND -> MAP_SCANNING -> FINAL_ACTION
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Daktilo (Harf Harf Yazma) Efekti
+  // 1. FAZ: Yavaşlatılmış Daktilo Efekti
   useEffect(() => {
     setTypedText('');
     setPhase('TYPING');
@@ -24,38 +24,38 @@ export default function MainPage() {
         currentIndex++;
       } else {
         clearInterval(typingInterval);
-        // Yazma bitti, butonları göster
-        setTimeout(() => setPhase('SHOW_BUTTONS'), 300);
+        // Yazma bitti, butonları ve gönder tuşunu göster (Biraz gecikmeli)
+        setTimeout(() => setPhase('SHOW_OPTIONS'), 600);
       }
-    }, 90);
+    }, 120); // Daha yavaş, okunabilir daktilo hızı
 
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Butonların Belirmesinden Sonra Tıklama ve Sonraki Adımlar
+  // 2. FAZ: Kullanıcı Seçimi, Gönder Tuşu ve Harita Taraması Akışı
   useEffect(() => {
     let timer1, timer2, timer3, timer4;
 
-    if (phase === 'SHOW_BUTTONS') {
-      // 1.5 saniye sonra kullanıcı ilgili düğmeye basar (Click Effect)
+    if (phase === 'SHOW_OPTIONS') {
+      // 2.5 saniye sonra kullanıcı "Gönder" tuşuna basar
       timer1 = setTimeout(() => {
-        setPhase('BUTTON_CLICKED');
-      }, 1500);
-    } else if (phase === 'BUTTON_CLICKED') {
-      // Düğme dolduktan sonra butonlar kaybolur, haritada tarama başlar
+        setPhase('CLICK_SEND');
+      }, 2500);
+    } else if (phase === 'CLICK_SEND') {
+      // Gönder tuşuna basıldıktan sonra seçenekler kaybolur, harita taraması başlar
       timer2 = setTimeout(() => {
         setPhase('MAP_SCANNING');
-      }, 800);
+      }, 1000);
     } else if (phase === 'MAP_SCANNING') {
-      // Haritada alternatifler taranır, uygun sağlayıcı öne çıkar ve final aksiyonu (Arama / Mesaj) gerçekleşir
+      // Haritada alternatifler taranır ve uygun sağlayıcı seçilip final aksiyonu tetiklenir
       timer3 = setTimeout(() => {
         setPhase('FINAL_ACTION');
-      }, 2000);
+      }, 3000); // Harita taraması için yeterli süre
     } else if (phase === 'FINAL_ACTION') {
-      // 5 saniye final ekranını göster, sonra diğer senaryoya geçmek için başa sar
+      // Final ekranı 6 saniye ekranda kalır, sonra diğer senaryoya geçer
       timer4 = setTimeout(() => {
         setScenario(prev => prev === 1 ? 2 : 1);
-      }, 5000);
+      }, 6000);
     }
 
     return () => {
@@ -176,59 +176,84 @@ export default function MainPage() {
                     <div className="bg-white border p-3 rounded-xl shadow-xs min-h-[46px] flex items-center">
                       <p className="text-xs font-medium text-neutral-800 leading-relaxed font-mono">
                         {typedText}
-                        <span className="inline-block w-1.5 h-3 bg-neutral-900 ml-0.5 animate-pulse" />
+                        {(phase === 'TYPING') && (
+                          <span className="inline-block w-1.5 h-3 bg-neutral-900 ml-0.5 animate-pulse" />
+                        )}
                       </p>
                     </div>
                   </div>
 
-                  {/* Tercih Düğmeleri ve Sonuç Aksiyonları */}
+                  {/* Seçenekler, Gönder Tuşu ve Aksiyonlar */}
                   <div className="space-y-3">
                     
-                    {/* FAZ 2: KENARLARI ÇİZGİLİ ŞEFFAF DÜĞMELER */}
-                    {(phase === 'SHOW_BUTTONS' || phase === 'BUTTON_CLICKED') && (
-                      <div className="space-y-1.5 animate-in fade-in duration-300">
-                        <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">İletişim Tercihi:</span>
+                    {/* FAZ 2: İKİSİ DE ÇİZGİLİ SEÇENEK DÜĞMELERİ VE GÖNDER TUŞU */}
+                    {(phase === 'SHOW_OPTIONS' || phase === 'CLICK_SEND') && (
+                      <div className="space-y-2 animate-in fade-in duration-500">
+                        <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                         
-                        {/* Telefon Arama Düğmesi */}
+                        {/* Telefon Arama Düğmesi (Çizgili) */}
                         <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                           scenario === 1 
-                            ? (phase === 'BUTTON_CLICKED' ? 'bg-neutral-950 text-white border-neutral-950 scale-95 shadow-inner' : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed scale-102') 
-                            : 'bg-white text-neutral-400 border-neutral-200 opacity-40'
+                            ? (phase === 'CLICK_SEND' ? 'bg-neutral-950 text-white border-neutral-950 scale-98 shadow-inner' : 'bg-transparent text-neutral-950 border-neutral-950 border-dashed scale-102') 
+                            : 'bg-white text-neutral-400 border-neutral-200 opacity-50'
                         }`}>
                           <Phone size={12} />
                           <span>Telefon arama</span>
                         </div>
 
-                        {/* Whatsapp/Sms Düğmesi */}
+                        {/* Whatsapp/Sms Düğmesi (Çizgili) */}
                         <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all duration-300 ${
                           scenario === 2 
-                            ? (phase === 'BUTTON_CLICKED' ? 'bg-emerald-600 text-white border-emerald-600 scale-95 shadow-inner' : 'bg-transparent text-emerald-700 border-emerald-600 border-dashed scale-102') 
-                            : 'bg-white text-neutral-400 border-neutral-200 opacity-40'
+                            ? (phase === 'CLICK_SEND' ? 'bg-emerald-600 text-white border-emerald-600 scale-98 shadow-inner' : 'bg-transparent text-emerald-700 border-emerald-600 border-dashed scale-102') 
+                            : 'bg-white text-neutral-400 border-neutral-200 opacity-50'
                         }`}>
                           <MessageCircle size={12} />
                           <span>Whatsapp/Sms</span>
                         </div>
+
+                        {/* Altına Eklenen Gönder Tuşu */}
+                        <div className={`pt-1 flex justify-end transition-all duration-300 ${phase === 'CLICK_SEND' ? 'opacity-80 scale-95' : 'opacity-100'}`}>
+                          <div className="px-4 py-1.5 bg-neutral-950 text-white text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1">
+                            <span>Gönder</span>
+                            <Send size={10} />
+                          </div>
+                        </div>
                       </div>
                     )}
 
-                    {/* FAZ 4: FİNAL AKSİYONLARI (DÜĞMELER KAYBOLDU, BİLDİRİMLER GELDİ) */}
+                    {/* FAZ 4: FİNAL AKSİYONLARI (DÜĞMELER KAYBOLDU) */}
                     {phase === 'FINAL_ACTION' && (
-                      <div className="animate-in fade-in zoom-in duration-300">
+                      <div className="animate-in fade-in zoom-in duration-500">
                         {scenario === 1 && (
-                          <div className="bg-emerald-600 text-white p-3.5 rounded-2xl shadow-md space-y-2 animate-bounce">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] uppercase tracking-wider font-mono bg-emerald-700 px-2 py-0.5 rounded font-bold">Gelen Arama</span>
-                              <PhoneIncoming size={16} className="animate-pulse" />
+                          /* GERÇEK AKILLI TELEFON GELEN ARAMA EKRANI SİMÜLASYONU */
+                          <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
+                            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
+                            <div className="relative z-10 flex flex-col items-center space-y-1">
+                              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-1 animate-ping absolute top-3" />
+                              <PhoneIncoming size={20} className="animate-bounce mb-1 text-emerald-200" />
+                              <span className="text-[9px] uppercase tracking-widest font-mono text-emerald-200 font-bold">Gelen Telefon Araması</span>
+                              <h5 className="text-sm font-extrabold tracking-tight mt-1">Ayşe Hanım (Tarabya Emlak)</h5>
+                              <p className="text-[11px] text-emerald-100 font-mono">0532 555 44 33</p>
                             </div>
-                            <div>
-                              <p className="text-xs font-extrabold">Ayşe Hanım (Tarabya Emlak)</p>
-                              <p className="text-[10px] text-emerald-100 font-mono mt-0.5">0532 555 44 33</p>
+                            <div className="relative z-10 flex items-center justify-center space-x-8 pt-2">
+                              <div className="flex flex-col items-center space-y-1">
+                                <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
+                                  <Phone size={14} className="rotate-[135deg]" />
+                                </div>
+                                <span className="text-[8px] opacity-80">Reddet</span>
+                              </div>
+                              <div className="flex flex-col items-center space-y-1">
+                                <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-neutral-950 shadow-md animate-pulse">
+                                  <Phone size={14} />
+                                </div>
+                                <span className="text-[8px] opacity-80 font-bold">Yanıtla</span>
+                              </div>
                             </div>
                           </div>
                         )}
 
                         {scenario === 2 && (
-                          <div className="bg-white border border-neutral-300 p-3 rounded-2xl shadow-sm space-y-1.5">
+                          <div className="bg-white border border-neutral-300 p-3.5 rounded-2xl shadow-sm space-y-1.5">
                             <div className="flex items-center justify-between text-[10px] text-neutral-900 font-bold">
                               <span className="flex items-center gap-1"><BellRing size={11} className="text-neutral-950" /> Whatsapp / SMS Mesajı</span>
                               <span className="text-neutral-400 font-normal">Şimdi</span>
@@ -269,9 +294,8 @@ export default function MainPage() {
                       </span>
                     </div>
 
-                    {/* ORTADA DÜĞME YOK - HARİTA ALTERNATİFLERİ GÖRSELİ */}
+                    {/* HARİTA ALTERNATİFLERİ GÖRSELİ (Ortada Düğme Yok) */}
                     <div className="bg-neutral-900 rounded-xl p-3 text-white relative min-h-[90px] flex flex-col justify-center items-center overflow-hidden">
-                      {/* Arka Plan Harita Efekti */}
                       <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:12px_12px]" />
                       
                       {phase === 'MAP_SCANNING' ? (
