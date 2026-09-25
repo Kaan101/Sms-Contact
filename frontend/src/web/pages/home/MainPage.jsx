@@ -66,8 +66,9 @@ export default function MainPage({ onGoToLogin }) {
             </span> yolu.
           </h1>
           
+          {/* GÜNCELLENEN HIZ VE AKSİYON ODAKLI MESAJ */}
           <p className="text-xl font-medium text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            İhtiyacınızı kendi kelimelerinizle anlatın, konumunuzu seçin. Mobool sizi en uygun uzmanlarla eşleştirsin. İletişim bilgileriniz sadece siz onayladığınızda paylaşılır.
+            Sen sadece talebini gir ve gerisine karışma. Mobool, ihtiyacını en iyi anlayan uzmanları anında bulsun; <strong className="text-slate-900 font-black">saniyeler içinde hizmet veren seni arasın.</strong>
           </p>
 
           <div className="flex items-center justify-center pt-8 relative">
