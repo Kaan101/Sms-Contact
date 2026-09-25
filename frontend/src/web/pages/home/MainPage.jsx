@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, MessageSquare, ShieldCheck, Zap, User, 
   MapPin, CheckCircle2, ArrowRight, Search, Lock, 
-  Clock, Star, MessageCircle, Send 
+  Clock, Star, MessageCircle, Send, PhoneCall, BellRing 
 } from 'lucide-react';
 
 export default function MainPage() {
@@ -19,7 +19,7 @@ export default function MainPage() {
       timer = setTimeout(() => {
         setStep(0);
         setScenario(prev => prev === 1 ? 2 : 1); // Senaryoyu değiştir ve başa sar
-      }, 5000); // 5 saniye sonucu göster, sonra diğer senaryoya geç
+      }, 5500); // 5.5 saniye sonucu göster, sonra diğer senaryoya geç
     }
     return () => clearTimeout(timer);
   }, [step]);
@@ -70,7 +70,7 @@ export default function MainPage() {
               </span>
             </h1>
             <p className="text-lg text-neutral-600 mb-8 leading-relaxed font-medium">
-              Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefon mu, yoksa SMS mi? Karar sizin.
+              Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefon arama mı, yoksa Whatsapp/Sms mi? Karar sizin.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <button className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg shadow-neutral-900/20 flex items-center justify-center space-x-2">
@@ -108,7 +108,7 @@ export default function MainPage() {
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">Canlı Akış Simülasyonu</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-mono font-bold text-neutral-400">Senaryo {scenario}/2 ({scenario === 1 ? "Telefon" : "SMS"})</span>
+                  <span className="text-[11px] font-mono font-bold text-neutral-400">Senaryo {scenario}/2 ({scenario === 1 ? "Telefon arama" : "Whatsapp/Sms"})</span>
                   <div className="flex space-x-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full transition-all ${scenario === 1 ? 'w-4 bg-neutral-900' : 'bg-neutral-300'}`} />
                     <div className={`w-1.5 h-1.5 rounded-full transition-all ${scenario === 2 ? 'w-4 bg-neutral-900' : 'bg-neutral-300'}`} />
@@ -139,17 +139,41 @@ export default function MainPage() {
                     </div>
                   </div>
 
-                  {/* Tercih Butonları */}
-                  <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-                    <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
-                    <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-blue-600 text-white border-blue-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
-                      <Phone size={12} />
-                      <span>Telefon</span>
+                  {/* Tercih Butonları & Müşteri Ekranı Reaksiyonu */}
+                  <div className="space-y-3">
+                    <div className={`space-y-1.5 transition-all duration-500 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                      <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase block">Tercih Edilen İletişim:</span>
+                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 1 ? 'bg-blue-600 text-white border-blue-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                        <Phone size={12} />
+                        <span>Telefon arama</span>
+                      </div>
+                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
+                        <MessageCircle size={12} />
+                        <span>Whatsapp/Sms</span>
+                      </div>
                     </div>
-                    <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border text-[11px] font-bold shadow-xs transition-all ${scenario === 2 ? 'bg-emerald-600 text-white border-emerald-600 scale-102' : 'bg-white text-neutral-400 border-neutral-200 opacity-40'}`}>
-                      <MessageCircle size={12} />
-                      <span>SMS</span>
-                    </div>
+
+                    {/* Müşteri Ekranına Düşen Simülasyon Bildirimleri */}
+                    {step >= 3 && (
+                      <div className="animate-in fade-in zoom-in duration-300 pt-2 border-t border-neutral-200/60">
+                        {scenario === 1 && (
+                          <div className="bg-blue-600 text-white p-2.5 rounded-xl text-[11px] font-bold shadow-sm flex items-center space-x-2 animate-pulse">
+                            <PhoneCall size={14} className="shrink-0 animate-spin" />
+                            <span>Ayşe Hanım sizi arıyor...</span>
+                          </div>
+                        )}
+
+                        {scenario === 2 && (
+                          <div className="bg-white border border-emerald-300 p-2.5 rounded-xl text-[11px] text-neutral-800 shadow-sm space-y-1">
+                            <div className="flex items-center justify-between text-[9px] text-emerald-700 font-bold">
+                              <span className="flex items-center gap-1"><BellRing size={10} /> Yeni Whatsapp/SMS Mesajı</span>
+                              <span>Şimdi</span>
+                            </div>
+                            <p className="font-medium text-[10px]">"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -189,7 +213,7 @@ export default function MainPage() {
                     ) : (
                       <div className="space-y-2.5 animate-in fade-in zoom-in duration-300">
                         
-                        {/* Senaryo 1 Sonucu (Telefon) */}
+                        {/* Senaryo 1 Sonucu (Telefon Arama) */}
                         {scenario === 1 && (
                           <>
                             <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
@@ -197,25 +221,25 @@ export default function MainPage() {
                               <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
                             </div>
                             <div className="flex items-center justify-center space-x-1.5 text-emerald-700 bg-emerald-50 p-2 rounded-xl text-[11px] font-bold">
-                              <Phone size={12} className="animate-bounce" />
+                              <PhoneCall size={12} className="animate-bounce" />
                               <span>Telefon Araması Başlatıldı</span>
                             </div>
                           </>
                         )}
 
-                        {/* Senaryo 2 Sonucu (SMS) */}
+                        {/* Senaryo 2 Sonucu (Whatsapp/Sms) */}
                         {scenario === 2 && (
                           <>
                             <div className="flex items-center justify-between text-[11px] border-b pb-1.5">
                               <span className="text-neutral-400 font-bold uppercase text-[9px]">İletişim Kanalı</span>
                               <div className="flex items-center space-x-1 text-emerald-600 font-bold">
                                 <MessageCircle size={11} />
-                                <span className="text-[10px]">SMS</span>
+                                <span className="text-[10px]">Whatsapp/Sms</span>
                               </div>
                             </div>
                             <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl text-[11px] font-medium text-emerald-950 shadow-xs flex items-start space-x-2">
                               <Send size={12} className="text-emerald-600 shrink-0 mt-0.5" />
-                              <p>"Merhaba Mehmet Bey, Bosch yetkili servisiyim. Size nasıl yardımcı olabilirim?"</p>
+                              <p>"Merhaba Mehmet Bey, Bosch servisiyim. Size nasıl yardımcı olabilirim?"</p>
                             </div>
                           </>
                         )}
@@ -261,7 +285,7 @@ export default function MainPage() {
                 <ShieldCheck size={20} />
               </div>
               <h3 className="text-lg font-bold text-neutral-950 mb-2">Seçim Özgürlüğü</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">İster telefonla aranarak hızlı çözüm bulun, isterseniz SMS ile mesajlaşarak fiyat tekliflerini toplayın.</p>
+              <p className="text-sm text-neutral-600 leading-relaxed">İster telefon arama ile hızlı çözüm bulun, isterseniz Whatsapp/Sms ile mesajlaşarak fiyat tekliflerini toplayın.</p>
             </div>
           </div>
         </div>
