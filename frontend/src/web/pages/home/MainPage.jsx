@@ -3,9 +3,9 @@ import { ShieldCheck, MapPin, Zap, CheckCircle2, ArrowRight } from 'lucide-react
 
 export default function MainPage({ onGoToLogin }) {
   return (
-    <div className="min-h-screen bg-slate-50 font-sans selection:bg-blue-600 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-500 selection:text-white relative overflow-hidden">
       
-      {/* DEKORATİF ARKA PLAN (Sadece modern grid desen bırakıldı, parlamalar kaldırıldı) */}
+      {/* DEKORATİF ARKA PLAN */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03]"></div>
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
@@ -21,9 +21,9 @@ export default function MainPage({ onGoToLogin }) {
             <span className="text-2xl font-black tracking-tighter text-slate-900">Mobool</span>
           </div>
           <div className="flex items-center gap-4 text-sm font-bold">
-            <button onClick={onGoToLogin} className="text-slate-500 hover:text-blue-700 transition cursor-pointer">Giriş Yap</button>
-            <button onClick={onGoToLogin} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm cursor-pointer">
-              Kayıt Ol
+            {/* Siyah renkli Giriş Yap butonu */}
+            <button onClick={onGoToLogin} className="text-slate-900 hover:text-black hover:underline underline-offset-4 transition cursor-pointer px-4 py-2">
+              Giriş Yap
             </button>
           </div>
         </div>
@@ -40,7 +40,6 @@ export default function MainPage({ onGoToLogin }) {
           
           <h1 className="text-6xl sm:text-7xl font-black tracking-tighter text-slate-900 leading-[1.05]">
             Hizmet bulmanın <br className="hidden sm:block" />
-            {/* Düz Renk - Gradient Kaldırıldı */}
             <span className="text-blue-600">
               en güvenli ve hızlı
             </span> yolu.
@@ -51,8 +50,8 @@ export default function MainPage({ onGoToLogin }) {
           </p>
 
           <div className="flex items-center justify-center pt-8">
-            {/* Kalın Çerçeveli İçi Boş Buton */}
-            <button onClick={onGoToLogin} className="px-10 py-4 border-4 border-blue-600 text-blue-600 bg-transparent rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-700 transition-all shadow-sm cursor-pointer transform hover:-translate-y-1">
+            {/* Kalın Çerçeveli İçi Boş Yeşil Buton */}
+            <button onClick={onGoToLogin} className="px-10 py-4 border-4 border-emerald-600 text-emerald-600 bg-transparent rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-700 transition-all shadow-sm cursor-pointer transform hover:-translate-y-1">
               <span>Hemen Başla</span>
               <ArrowRight size={20} strokeWidth={3} />
             </button>
@@ -99,7 +98,7 @@ export default function MainPage({ onGoToLogin }) {
           </div>
           
           <div className="flex flex-col md:flex-row justify-center gap-10 md:gap-6 relative">
-            {/* Düz Çizgi - Gradient Kaldırıldı */}
+            {/* Düz Çizgi */}
             <div className="hidden md:block absolute top-10 left-[15%] right-[15%] h-1 bg-slate-200 z-0"></div>
 
             <div className="flex-1 text-center relative z-10">
@@ -115,7 +114,6 @@ export default function MainPage({ onGoToLogin }) {
             </div>
             
             <div className="flex-1 text-center relative z-10">
-              {/* Düz Yeşil - Gradient Kaldırıldı */}
               <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-md"><CheckCircle2 size={36} strokeWidth={3} /></div>
               <h4 className="text-xl font-black text-slate-900 mb-3">Güvenle Görüş</h4>
               <p className="font-medium text-slate-500 px-4">Uzman işi kabul ettiğinde maskeler kalkar, hizmet başlar.</p>
