@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuth } from './core/context/AuthContext';
+import MainPage from './pages/home/MainPage';
 
 // SADECE GEREKTİĞİNDE YÜKLENECEK BİLEŞENLER (LAZY LOADING)
 const Login = lazy(() => import('./web/pages/auth/Login'));
@@ -33,10 +34,16 @@ export default function App() {
     }
   };
 
+  // Eğer oturum yoksa, direkt Ana Sayfayı (Landing Page) döndür.
+  // Bu sayede MainPage kendi tasarımını (Header vb.) özgürce kullanabilir.
+  if (!session) {
+    return <MainPage />;
+  }
+
   return (
     <div className={`min-h-screen bg-[#FBFBFC] text-neutral-900 flex flex-col font-sans ${session?.role === 'TRACKER' ? 'overflow-hidden' : ''}`}>
       
-      {/* GLOBAL HEADER (ÜST MENÜ) */}
+      {/* GLOBAL HEADER (ÜST MENÜ) - Sadece giriş yapmış kullanıcılar görür */}
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-[500]">
         <div className={`${session?.role === 'ADMIN' || session?.role === 'TRACKER' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { if(session) handleLogout(); }}>
@@ -47,26 +54,24 @@ export default function App() {
             </div>
           </div>
 
-          {session && (
-            <div className="flex items-center space-x-3">
-              <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase border ${
-                session.role === 'CUSTOMER' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                session.role === 'PROVIDER' ? 'bg-purple-50 text-purple-800 border-purple-200' :
-                session.role === 'TRACKER' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
-                'bg-neutral-900 text-white border-neutral-900'
-              }`}>
-                {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : session.role === 'TRACKER' ? '🗺️ Takip' : '⚙️ Admin'}
-              </span>
-              <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
-              <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
-            </div>
-          )}
+          <div className="flex items-center space-x-3">
+            <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase border ${
+              session.role === 'CUSTOMER' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+              session.role === 'PROVIDER' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+              session.role === 'TRACKER' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
+              'bg-neutral-900 text-white border-neutral-900'
+            }`}>
+              {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : session.role === 'TRACKER' ? '🗺️ Takip' : '⚙️ Admin'}
+            </span>
+            <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
+            <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
+          </div>
         </div>
       </header>
 
       {/* DİNAMİK İÇERİK ALANI (Suspense ile Korunuyor) */}
       <Suspense fallback={<FallbackLoader />}>
-        {session ? renderDashboard() : <Login />}
+        {renderDashboard()}
       </Suspense>
 
     </div>
