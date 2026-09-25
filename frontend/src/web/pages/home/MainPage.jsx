@@ -7,7 +7,7 @@ export default function MainPage({ onGoToLogin }) {
   const [typedText, setTypedText] = useState("");
   const fullText = '"Tarabya 2+1 kiralık daire."';
 
-  // Adım değiştirici (Her 4 saniyede bir, toplam 4 adım)
+  // Adım değiştirici
   useEffect(() => {
     const interval = setInterval(() => {
       setStep((prev) => (prev + 1) % 4);
@@ -15,7 +15,7 @@ export default function MainPage({ onGoToLogin }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Harf harf yazma efekti (Adım 0'da tetiklenir)
+  // Harf harf yazma efekti
   useEffect(() => {
     if (step === 0) {
       setTypedText("");
@@ -37,7 +37,7 @@ export default function MainPage({ onGoToLogin }) {
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-500 selection:text-white relative overflow-hidden">
       
-      {/* Özel Animasyonlar (Akış ve Harita Zoom) */}
+      {/* Özel Animasyonlar */}
       <style>{`
         @keyframes flow-right {
           0% { transform: translateX(-200%); opacity: 0; }
@@ -155,8 +155,8 @@ export default function MainPage({ onGoToLogin }) {
                 
                 <div className="p-5 flex-1 flex flex-col justify-center relative">
                   
-                  {/* ADIM 0: MESAJ YAZIMI */}
-                  {step === 0 && (
+                  {/* ADIM 0 VE 1: MÜŞTERİ BEKLEMEDE */}
+                  {(step === 0 || step === 1) && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-5 w-full">
                       <div className="bg-white border border-slate-300 text-slate-900 p-5 rounded-2xl rounded-tr-sm shadow-sm relative min-h-[80px]">
                         <p className="font-semibold text-[17px] leading-snug">
@@ -171,48 +171,6 @@ export default function MainPage({ onGoToLogin }) {
                           <Search size={16} className="animate-spin" /> Uzmanlara iletiliyor...
                         </div>
                       )}
-                    </div>
-                  )}
-
-                  {/* ADIM 1: YENİ HARİTA & ODAKLANMA AŞAMASI */}
-                  {step === 1 && (
-                    <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center h-full w-full space-y-4">
-                      
-                      <div className="relative w-full h-48 bg-[#e5e7eb] rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner">
-                        {/* Harita Zemin Çizgileri */}
-                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "linear-gradient(#9ca3af 1px, transparent 1px), linear-gradient(90deg, #9ca3af 1px, transparent 1px)", backgroundSize: "20px 20px" }}></div>
-                        
-                        {/* Radar Tarama Efekti */}
-                        <div className="absolute top-1/2 left-1/2 w-32 h-32 border-2 border-blue-400/50 rounded-full animate-ping -translate-x-1/2 -translate-y-1/2"></div>
-                        
-                        {/* Zoomlanacak Konteynır */}
-                        <div className="absolute inset-0 animate-map-zoom origin-center">
-                          {/* Sağlayıcı 1 (Gri) */}
-                          <div className="absolute top-[20%] left-[20%] animate-bounce text-slate-400 drop-shadow-md delay-100">
-                            <MapPin size={22} className="fill-white" />
-                          </div>
-                          {/* Sağlayıcı 2 (Gri) */}
-                          <div className="absolute bottom-[20%] right-[20%] animate-bounce text-slate-400 drop-shadow-md delay-300">
-                            <MapPin size={22} className="fill-white" />
-                          </div>
-                          
-                          {/* Asıl Odaklanılan Sağlayıcı (Yeşil & Parlayan) */}
-                          <div className="absolute top-[55%] left-[55%] -translate-x-1/2 -translate-y-1/2 z-10 animate-in zoom-in duration-500 delay-500">
-                            <div className="relative">
-                              <MapPin size={32} className="text-emerald-500 fill-white drop-shadow-xl relative z-10" />
-                              <span className="absolute top-1 right-1 flex h-3 w-3 -mt-1 -mr-1 z-20">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="font-bold text-slate-800">3 Uzman Bulundu</p>
-                        <p className="text-xs font-semibold text-blue-600 mt-1 animate-pulse">En uygun profile odaklanılıyor...</p>
-                      </div>
                     </div>
                   )}
 
@@ -243,7 +201,7 @@ export default function MainPage({ onGoToLogin }) {
               </div>
             </div>
 
-            {/* SAĞ: SAĞLAYICI / EMLAKÇI (Bilgisayar Ekranı) */}
+            {/* SAĞ: SAĞLAYICI / EMLAKÇI (Bilgisayar Ekranı - Açık Renk) */}
             <div className="flex flex-col items-center gap-4 w-full">
               <div className="flex items-center gap-3 text-slate-700">
                 <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center shadow-sm">
@@ -255,39 +213,80 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              <div className={`w-full max-w-[340px] h-[420px] bg-slate-900 rounded-xl border-[8px] border-slate-700 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
+              {/* Ekran - SABİT EN VE BOY - AÇIK RENK TASARIM */}
+              <div className={`w-full max-w-[340px] h-[420px] bg-slate-50 rounded-xl border-[8px] border-slate-300 shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ${step === 3 ? 'ring-4 ring-emerald-400 ring-offset-4' : ''}`}>
                 
-                <div className="bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-700/50">
-                  <span className="text-[11px] text-slate-400 font-mono uppercase tracking-widest flex items-center gap-2">
-                    <Monitor size={14}/> Sistem Paneli
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
+                  <span className="text-[11px] text-slate-600 font-mono uppercase tracking-widest flex items-center gap-2 font-bold">
+                    <Monitor size={14} className="text-slate-400" /> Sistem Paneli
                   </span>
-                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Aktif
                   </span>
                 </div>
                 
-                <div className="p-6 flex-1 flex flex-col justify-center">
+                <div className="p-6 flex-1 flex flex-col justify-center bg-white">
                   
-                  {/* ADIM 0 ve 1: BEKLEME */}
-                  {(step === 0 || step === 1) && (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4 opacity-60">
-                      <Search size={40} className="animate-pulse" />
+                  {/* ADIM 0: BEKLEME */}
+                  {step === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
+                      <Search size={40} className="animate-pulse text-slate-300" />
                       <p className="text-sm font-medium text-center px-4">Bölgenizdeki yeni talepler taranıyor...</p>
                     </div>
                   )}
 
-                  {/* ADIM 2: YENİ TALEP DÜŞTÜ */}
+                  {/* ADIM 1: HARİTA VE ODAKLANMA (Sağlayıcı Tarafında) */}
+                  {step === 1 && (
+                     <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center h-full w-full space-y-4">
+                     <div className="relative w-full h-48 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner">
+                       {/* Harita Zemin Çizgileri */}
+                       <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)", backgroundSize: "20px 20px" }}></div>
+                       
+                       {/* Radar Tarama Efekti */}
+                       <div className="absolute top-1/2 left-1/2 w-32 h-32 border-2 border-emerald-400/50 rounded-full animate-ping -translate-x-1/2 -translate-y-1/2"></div>
+                       
+                       {/* Zoomlanacak Konteynır */}
+                       <div className="absolute inset-0 animate-map-zoom origin-center">
+                         {/* Diğer Talepler (Gri) */}
+                         <div className="absolute top-[20%] left-[20%] animate-bounce text-slate-300 drop-shadow-sm delay-100">
+                           <MapPin size={22} className="fill-white" />
+                         </div>
+                         <div className="absolute bottom-[20%] right-[20%] animate-bounce text-slate-300 drop-shadow-sm delay-300">
+                           <MapPin size={22} className="fill-white" />
+                         </div>
+                         
+                         {/* Size Gelen Talep (Yeşil & Parlayan) */}
+                         <div className="absolute top-[55%] left-[55%] -translate-x-1/2 -translate-y-1/2 z-10 animate-in zoom-in duration-500 delay-500">
+                           <div className="relative">
+                             <MapPin size={32} className="text-emerald-500 fill-white drop-shadow-lg relative z-10" />
+                             <span className="absolute top-1 right-1 flex h-3 w-3 -mt-1 -mr-1 z-20">
+                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                             </span>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                     <div className="text-center">
+                       <p className="font-bold text-slate-800">Sistem Tarıyor...</p>
+                       <p className="text-xs font-semibold text-emerald-600 mt-1 animate-pulse">Yeni bir talep bölgenizde!</p>
+                     </div>
+                   </div>
+                  )}
+
+                  {/* ADIM 2: YENİ TALEP DÜŞTÜ KARTI (Ön Planda Açık Renkli) */}
                   {step === 2 && (
                     <div className="animate-in slide-in-from-right-8 duration-500 flex flex-col justify-center h-full">
-                      <div className="bg-slate-800 p-5 rounded-2xl border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-                        <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-4">
+                      <div className="bg-white p-5 rounded-2xl border-2 border-emerald-500 shadow-[0_10px_30px_rgba(16,185,129,0.15)] relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+                        <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm mb-4 mt-1">
                           <Bell size={18} className="animate-[wiggle_1s_ease-in-out_infinite]" /> Yeni Talep Düştü!
                         </div>
-                        <p className="text-white font-medium text-lg mb-6 leading-snug">"Tarabya 2+1 kiralık daire."</p>
+                        <p className="text-slate-800 font-bold text-lg mb-6 leading-snug">"Tarabya 2+1 kiralık daire."</p>
                         
                         <div className="relative mt-2">
-                          <div className="absolute inset-0 bg-emerald-500 rounded-xl animate-ping opacity-75"></div>
-                          <button className="relative w-full py-3.5 bg-emerald-500 text-slate-900 font-black rounded-xl shadow-[0_0_25px_rgba(16,185,129,0.6)] animate-[pulse_1.5s_ease-in-out_infinite] scale-105 transition-transform">
+                          <div className="absolute inset-0 bg-emerald-500 rounded-xl animate-ping opacity-40"></div>
+                          <button className="relative w-full py-3.5 bg-emerald-500 text-white font-black rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.4)] animate-[pulse_1.5s_ease-in-out_infinite] scale-105 transition-transform">
                             Hemen Kabul Et
                           </button>
                         </div>
@@ -298,15 +297,15 @@ export default function MainPage({ onGoToLogin }) {
                   {/* ADIM 3: TELEFON GÖRÜŞMESİ */}
                   {step === 3 && (
                     <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center h-full">
-                       <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 w-full text-center space-y-4">
-                         <div className="inline-flex w-20 h-20 bg-slate-700 text-emerald-400 rounded-full items-center justify-center mb-2 shadow-inner">
+                       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 w-full text-center space-y-4">
+                         <div className="inline-flex w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full items-center justify-center mb-2 shadow-inner">
                            <PhoneCall size={32} className="animate-pulse" />
                          </div>
                          <div>
-                           <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Müşteri Numarası</p>
-                           <p className="text-2xl font-mono font-bold text-white">0555 123 4567</p>
+                           <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Müşteri Numarası</p>
+                           <p className="text-2xl font-mono font-bold text-slate-800">0555 123 4567</p>
                          </div>
-                         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-sm font-bold mt-2">
+                         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold mt-2 border border-emerald-200">
                            <CheckCircle2 size={16} /> Görüşme Başladı
                          </div>
                        </div>
