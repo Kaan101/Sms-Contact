@@ -68,11 +68,7 @@ export default function MainPage({ onGoToLogin }) {
             </div>
             <span>SMS KONTAK</span>
           </div>
-          <div className="hidden md:flex items-center space-x-8 text-sm font-semibold text-neutral-600">
-            <a href="#" className="hover:text-neutral-950 transition cursor-pointer">Nasıl Çalışır?</a>
-            <a href="#" className="hover:text-neutral-950 transition cursor-pointer">Hizmet Alanlar</a>
-            <a href="#" className="hover:text-neutral-950 transition cursor-pointer">Sağlayıcılar</a>
-          </div>
+          {/* Ortadaki menü kaldırıldı */}
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => onGoToLogin('LOGIN')} 
@@ -191,7 +187,7 @@ export default function MainPage({ onGoToLogin }) {
                     }`}>
                       <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                       
-                      {/* Telefon Arama Düğmesi (Renksiz, Kalın Gri Çerçeveli) */}
+                      {/* Telefon Arama Düğmesi */}
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 1 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
@@ -203,7 +199,7 @@ export default function MainPage({ onGoToLogin }) {
                         <span>Telefon arama</span>
                       </div>
 
-                      {/* Whatsapp/Sms Düğmesi (Renksiz, Kalın Gri Çerçeveli) */}
+                      {/* Whatsapp/Sms Düğmesi */}
                       <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
                         scenario === 2 
                           ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
