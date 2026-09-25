@@ -5,7 +5,7 @@ import {
   MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation 
 } from 'lucide-react';
 
-export default function MainPage() {
+export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   const [phase, setPhase] = useState('TYPING'); 
@@ -74,7 +74,12 @@ export default function MainPage() {
             <a href="#" className="hover:text-neutral-950 transition">Sağlayıcılar</a>
           </div>
           <div className="flex items-center space-x-3">
-            <button className="px-4 py-2 text-sm font-bold text-neutral-700 hover:text-neutral-950 transition">Giriş Yap</button>
+            <button 
+              onClick={onGoToLogin} 
+              className="px-4 py-2 text-sm font-bold text-neutral-700 hover:text-neutral-950 transition"
+            >
+              Giriş Yap
+            </button>
             <button className="px-5 py-2 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm">Kayıt Ol</button>
           </div>
         </div>
