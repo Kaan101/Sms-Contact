@@ -5,22 +5,32 @@ export default function MainPage({ onGoToLogin }) {
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-500 selection:text-white relative overflow-hidden">
       
-      {/* DEKORATİF ARKA PLAN (CANLI, ÇİZGİSEL VE GEOMETRİK) */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* İnce Çizgisel Topografik/Dalga deseni (SVG Base64 Data URI) */}
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,100 C150,200 350,0 500,100 C650,200 850,0 1000,100' fill='none' stroke='%23000' stroke-width='1'/%3E%3Cpath d='M0,150 C150,250 350,50 500,150 C650,250 850,50 1000,150' fill='none' stroke='%23000' stroke-width='1'/%3E%3Cpath d='M0,200 C150,300 350,100 500,200 C650,300 850,100 1000,200' fill='none' stroke='%23000' stroke-width='1'/%3E%3Cpath d='M0,250 C150,350 350,150 500,250 C650,350 850,150 1000,250' fill='none' stroke='%23000' stroke-width='1'/%3E%3Cpath d='M0,300 C150,400 350,200 500,300 C650,400 850,200 1000,300' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E\")", backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat' }}></div>
+      {/* GARANTİLİ DEKORATİF ARKA PLAN */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
         
-        {/* İnce Grid Sistemi */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000008_1px,transparent_1px),linear-gradient(to_bottom,#00000008_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+        {/* 1. Belirgin Izgara (Grid) Sistemi */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000010_1px,transparent_1px),linear-gradient(to_bottom,#00000010_1px,transparent_1px)] bg-[size:40px_40px]"></div>
 
-        {/* Dinamik Geometrik Çizgiler (SVG) */}
-        <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full border border-emerald-500/20 opacity-40"></div>
-        <div className="absolute top-[10%] right-[5%] w-[400px] h-[400px] rounded-full border border-blue-500/20 opacity-30"></div>
-        <div className="absolute bottom-[-15%] left-[-10%] w-[800px] h-[800px] rounded-full border border-blue-500/10 opacity-50"></div>
+        {/* 2. Canlı Geometrik Çizgiler (Saf SVG ile) */}
+        <svg className="absolute top-0 right-0 w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <path d="M0 100 C 20 0 50 0 100 100" fill="none" stroke="#10b981" strokeWidth="0.2" />
+          <path d="M0 100 C 30 10 70 10 100 100" fill="none" stroke="#3b82f6" strokeWidth="0.2" />
+          <path d="M0 100 C 40 20 80 20 100 100" fill="none" stroke="#10b981" strokeWidth="0.1" />
+          <path d="M-20 50 C 30 -20 70 120 120 50" fill="none" stroke="#3b82f6" strokeWidth="0.1" />
+        </svg>
+
+        {/* 3. Dinamik Çemberler (Teknoloji Radarı Hissi) */}
+        <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full border-[1px] border-emerald-500/20 opacity-60"></div>
+        <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full border-[1px] border-blue-500/20 opacity-60"></div>
+        <div className="absolute top-[0%] right-[0%] w-[400px] h-[400px] rounded-full border-[1px] border-emerald-500/30 opacity-60"></div>
         
-        {/* Hafif Renkli Glow Efektleri (Sadece köşe noktalarda, canlılık versin diye) */}
-        <div className="absolute top-[0%] right-[0%] w-[40%] h-[40%] bg-emerald-400/10 blur-[140px] rounded-full"></div>
-        <div className="absolute bottom-[0%] left-[0%] w-[40%] h-[40%] bg-blue-500/10 blur-[140px] rounded-full"></div>
+        {/* 4. Alt kısımdaki çemberler */}
+        <div className="absolute bottom-[-30%] left-[-20%] w-[1000px] h-[1000px] rounded-full border-[1px] border-blue-500/15 opacity-80"></div>
+        <div className="absolute bottom-[-15%] left-[-10%] w-[700px] h-[700px] rounded-full border-[1px] border-emerald-500/15 opacity-80"></div>
+        
+        {/* Glow (Parlaklık) Efektleri - Köşelerde */}
+        <div className="absolute top-[-5%] right-[10%] w-[30%] h-[30%] bg-emerald-400/15 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[10%] left-[-5%] w-[40%] h-[40%] bg-blue-500/15 blur-[120px] rounded-full"></div>
       </div>
       
       {/* HEADER / NAVBAR */}
@@ -66,7 +76,7 @@ export default function MainPage({ onGoToLogin }) {
               <span>Hemen Başla</span>
               <ArrowRight size={20} strokeWidth={3} />
             </button>
-            {/* Buton arkasında hafif vurgu */}
+            {/* Buton arkasında sevdiğin vurgu */}
             <div className="absolute inset-0 bg-emerald-400/20 blur-xl rounded-full scale-[1.2] opacity-50 z-0 pointer-events-none"></div>
           </div>
         </div>
