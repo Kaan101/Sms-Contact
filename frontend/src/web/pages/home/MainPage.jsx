@@ -51,8 +51,6 @@ export default function MainPage({ onGoToLogin }) {
     } else if (phase === 'MAP_SCANNING') {
       t4 = setTimeout(() => setPhase('FINAL_ACTION'), 4500); 
     } else if (phase === 'FINAL_ACTION') {
-      // Senaryo 1 (Telefon) 7 saniye sürer.
-      // Senaryo 2 (WhatsApp) Chat + Success Mark toplam 16 saniye.
       const delay = scenario === 1 ? 7000 : 16000; 
       
       t5 = setTimeout(() => {
@@ -98,8 +96,8 @@ export default function MainPage({ onGoToLogin }) {
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
 
-  // Şık bir SVG Sokak/Harita Deseni
-  const mapPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83 43.409-54.8 11.233L0 55.42l55.932-11.465L55.05 0h-.423zM25.32 0l-1.07 19.865-17.65-4.57 2.073-15.295h-.436l-2.074 15.295L0 13.68V14.1l6.096 1.579L4.022 30.985l-.426-.11 2.074-15.305 17.65 4.57 1.07-19.865h.423l-1.07 19.865 24.237 6.276L55.05 0h-.423L27.674 26.24 25.32 0z' fill='%2394a3b8' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E")`;
+  // Harita Desenini Belirginleştirdik (Koyu gri ton ve daha yüksek opaklık)
+  const mapPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83 43.409-54.8 11.233L0 55.42l55.932-11.465L55.05 0h-.423zM25.32 0l-1.07 19.865-17.65-4.57 2.073-15.295h-.436l-2.074 15.295L0 13.68V14.1l6.096 1.579L4.022 30.985l-.426-.11 2.074-15.305 17.65 4.57 1.07-19.865h.423l-1.07 19.865 24.237 6.276L55.05 0h-.423L27.674 26.24 25.32 0z' fill='%2364748b' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E")`;
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans selection:bg-neutral-900 selection:text-white overflow-x-hidden">
@@ -302,10 +300,10 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                 )}
 
-                {/* SAĞ TARAF: SAĞLAYICI (Harita Deseni ve Arama Gizliliği) */}
+                {/* SAĞ TARAF: SAĞLAYICI VE HARİTA (Belirginleştirilmiş Desen ve Müşteri Aramadan Önce "Hazır" durumu) */}
                 {phase === 'FINAL_ACTION' && scenario === 2 ? (
                   <div className="flex flex-col h-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-md bg-white">
-                    <div className="flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000">
+                    <div className="flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000 delay-150">
                       <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
                         <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">M</div>
                         <div className="leading-tight flex-1">
@@ -350,7 +348,8 @@ export default function MainPage({ onGoToLogin }) {
                     className="bg-white border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full"
                     style={{ backgroundImage: mapPattern, backgroundSize: '120px 120px' }}
                   >
-                    <div className="absolute inset-0 bg-white/60 pointer-events-none" />
+                    {/* Harita arka planının opaklığı kısıldı ki çizimler daha çok belli olsun */}
+                    <div className="absolute inset-0 bg-white/30 pointer-events-none" />
 
                     <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3 bg-white/90 p-2 rounded-xl shadow-xs">
                       <div className="flex items-center space-x-2.5">
@@ -359,10 +358,16 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-neutral-900">
-                            {phase === 'FINAL_ACTION' ? (scenario === 1 ? "Ayşe Hanım" : "Murat Usta") : "Sistem Taranıyor..."}
+                            {phase === 'FINAL_ACTION' 
+                              ? (scenario === 1 ? "Ayşe Hanım" : "Murat Usta") 
+                              : (phase === 'MAP_SCANNING' ? "Sistem Taranıyor..." : "Sistem Hazır")}
                           </h4>
                           <span className="text-[10px] text-neutral-600">
-                            {phase === 'FINAL_ACTION' ? (scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis") : "Uygun uzman aranıyor"}
+                            {phase === 'FINAL_ACTION' 
+                              ? (scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis") 
+                              : (phase === 'MAP_SCANNING' 
+                                  ? (scenario === 1 ? "En uygun emlakçı aranıyor..." : "En uygun servis aranıyor...") 
+                                  : "Talep bekleniyor...")}
                           </span>
                         </div>
                       </div>
@@ -378,7 +383,8 @@ export default function MainPage({ onGoToLogin }) {
                       {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
                         <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
                           <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/95 px-3 py-1.5 rounded-full border border-neutral-300 shadow-md">
-                            <Compass size={13} className="animate-spin text-neutral-600" /> En uygun uzman haritada işaretleniyor...
+                            <Compass size={13} className="animate-spin text-neutral-600" /> 
+                            {scenario === 1 ? "En uygun Emlakçı aranıyor..." : "En uygun Servis aranıyor..."}
                           </span>
                         </div>
                       ) : (
