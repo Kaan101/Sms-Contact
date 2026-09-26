@@ -68,8 +68,8 @@ export default function CustomerDashboard() {
   
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
+  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null); // YENİ: Akordiyon State
 
-  // YENİ: Detaylı Rating State'i
   const [reviewRatingsMap, setReviewRatingsMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
@@ -247,7 +247,6 @@ export default function CustomerDashboard() {
     }
   };
 
-  // YENİ: Detaylı Rating Gönderimi
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { 
     setActionLoadingId(requestId);
     try { 
@@ -263,7 +262,6 @@ export default function CustomerDashboard() {
     }
   };
 
-  // Rating State Yönetimi Yardımcıları
   const getRatingsForReq = (id) => reviewRatingsMap[id] || { knowledge: 5, communication: 5, timing: 5, cost: 5 };
   const updateSpecificRating = (id, field, value) => {
       setReviewRatingsMap(prev => ({ ...prev, [id]: { ...getRatingsForReq(id), [field]: value } }));
@@ -403,7 +401,7 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ (Kodun önceki haliyle aynı) */}
+      {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ */}
       {activeCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -474,76 +472,104 @@ export default function CustomerDashboard() {
                           </div>
                         </div>
 
-                        {(req.provider_name || (safeArray(req.queuedProviders).length > 0)) && (
+                        {/* YENİ: Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
+                        {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
-                            <div onClick={() => { if (safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) { setExpandedCustomerQueueReqId(expandedCustomerQueueReqId === req.id ? null : req.id); } }} className={`p-3 flex items-center justify-between ${(safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1)) ? 'cursor-pointer hover:bg-emerald-50/50 select-none' : ''}`}>
-                              <div className="space-y-1.5 w-full">
-                                <div className="text-[10px] font-mono font-bold text-emerald-700">
-                                   {reqStatus === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'AKTİF SAĞLAYICI YOK (HAVUZDA)')}
-                                </div>
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center space-x-1.5">
-                                    <Building2 size={14} className="text-neutral-700" />
-                                    {req.provider_name ? (<><span className={`font-bold ${reqStatus === 'PROVIDER_SKIPPED' ? 'text-neutral-400 line-through' : 'text-neutral-950'}`}>{req.provider_name}</span><span className={`font-mono font-semibold px-1.5 py-0.5 rounded border ${reqStatus === 'PROVIDER_SKIPPED' ? 'bg-neutral-100 text-neutral-400 border-neutral-200' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>📞 {req.provider_phone}</span></>) : (<span className="font-bold text-neutral-500 italic">Sıradaki sağlayıcı bekleniyor...</span>)}
-                                  </div>
-                                  {safeArray(req.queuedProviders).length > 0 && !(req.provider_name && safeArray(req.queuedProviders).length === 1) && (
-                                    <div className="flex items-center space-x-1 text-neutral-400"><span className="text-[10px] font-bold">{req.provider_name ? `Diğer Adaylar (${safeArray(req.queuedProviders).length - 1})` : `Tüm Adaylar (${safeArray(req.queuedProviders).length})`}</span>{expandedCustomerQueueReqId === req.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
-                                  )}
-                                </div>
+                            
+                            <div className="p-3 flex items-center justify-between border-b border-emerald-100/50">
+                              <div className="text-[10px] font-mono font-bold text-emerald-700">
+                                 {reqStatus === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'SİRAYA GİREN SAĞLAYICILAR')}
                               </div>
                             </div>
-                            
-                            {reqStatus === 'PROVIDER_SKIPPED' && !expandedCustomerQueueReqId && (
-                              <div className="px-3 pb-3"><div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 bg-rose-50 border border-rose-200 text-rose-950"><div className="flex items-center space-x-1.5"><AlertTriangle size={13} className="text-rose-700 shrink-0" /><span>Bu sağlayıcı talebinizi <strong>pas geçti</strong>. Lütfen listeden başka birini seçin.</span></div><button onClick={() => setExpandedCustomerQueueReqId(req.id)} className="px-2.5 py-1 bg-rose-600 text-white rounded text-[10px] font-bold shadow-sm cursor-pointer">Seçenekleri Gör</button></div></div>
-                            )}
 
-                            {reqStatus === 'MATCHED' && !expandedCustomerQueueReqId && (
-                              safeString(req.contact_value).includes('|HIDDEN') ? (
-                                <div className="px-3 pb-3"><button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="w-full py-2.5 bg-neutral-950 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer disabled:opacity-50">{isActionLoading && <Loader2 size={13} className="animate-spin" />}<span>Sağlayıcıyı Onayla & İletişim Bilgimi Paylaş</span></button></div>
-                              ) : (
-                                <div className="px-3 pb-3"><div className="p-2.5 rounded-lg text-[11px] font-medium flex items-center space-x-1.5 bg-blue-50 border border-blue-200 text-blue-950"><PhoneCall size={13} className="text-blue-700 animate-pulse shrink-0" /><span>Sağlayıcı atandı ve numaranızı görebiliyor. Sizinle iletişime geçmesi bekleniyor...</span></div></div>
-                              )
-                            )}
-
-                            {(reqStatus === 'ACCEPTED' || reqStatus === 'PROVIDER_COMPLETED') && !expandedCustomerQueueReqId && (
-                              <div className="px-3 pb-3">
-                                 <div className={`p-2.5 rounded-lg text-[11px] font-medium flex items-center justify-between space-x-1.5 ${reqStatus === 'PROVIDER_COMPLETED' ? 'bg-purple-50 border border-purple-200 text-purple-950' : 'bg-emerald-50 border border-emerald-200 text-emerald-950'}`}>
-                                   <div className="flex items-center space-x-1.5">
-                                      {reqStatus === 'PROVIDER_COMPLETED' ? <ShieldCheck size={13} className="text-purple-700 shrink-0" /> : <PhoneCall size={13} className="text-emerald-700 animate-bounce shrink-0" />}
-                                      <span>{reqStatus === 'PROVIDER_COMPLETED' ? <>Sağlayıcı işlemi tamamladığını bildirdi. Onayınız bekleniyor: <strong>{req.provider_phone}</strong></> : <>Görüşme aktif. Sağlayıcı iletişim numarası: <strong>{req.provider_phone}</strong></>}</span>
-                                   </div>
-                                   {safeString(req.preferred_channel).includes('WHATSAPP') && req.provider_phone && (
-                                      <a href={`https://wa.me/${extractPhoneForWa(req.provider_phone)}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer"><MessageCircle size={12} /><span>WhatsApp'tan Yaz</span></a>
-                                   )}
-                                 </div>
-                              </div>
-                            )}
-                            
-                            {expandedCustomerQueueReqId === req.id && safeArray(req.queuedProviders).length > 0 && (
-                              <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50">
-                                <div className="space-y-2">
-                                  {req.queuedProviders.map((qProv, idx) => {
-                                    const isCurrent = req.matched_provider_id === qProv.id;
-                                    const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
-                                    return (
-                                      <div key={qProv.id} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? (isSkippedByThis ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm') : 'bg-white border-neutral-200'}`}>
-                                        <div>
-                                          <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
-                                            <span>#{idx + 1} {qProv.name}</span>
-                                            {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}{isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}{qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
-                                          </p>
-                                          <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {qProv.phone}</p>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50"><ShieldCheck size={10} /><span>Onayla</span></button>)}
-                                            {!isCurrent && (<button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"><Check size={10} /><span>Bunu Seç</span></button>)}
+                            <div className="bg-neutral-50/30">
+                              {safeArray(req.queuedProviders).map((qProv, idx) => {
+                                const isCurrent = String(req.matched_provider_id) === String(qProv.id);
+                                const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
+                                const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
+                                
+                                return (
+                                  <div key={qProv.id} className={`border-b border-neutral-100 last:border-b-0 text-xs flex flex-col transition overflow-hidden shadow-sm ${isCurrent ? (isSkippedByThis ? 'bg-rose-50' : 'bg-emerald-50') : 'bg-white'}`}>
+                                    
+                                    {/* Header Row (Tıklanabilir Alan) */}
+                                    <div 
+                                      onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
+                                      className="p-3 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50"
+                                    >
+                                      <div>
+                                        <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
+                                          <span>#{idx + 1} {qProv.name}</span>
+                                          {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
+                                          {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
+                                          {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                        </p>
+                                        <div className="flex items-center space-x-2 mt-1.5">
+                                          <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
+                                          
+                                          {/* Sağlayıcı Skoru & Puanı */}
+                                          {qProv.avg_rating && (
+                                            <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                              <Star size={8} fill="#f59e0b" /> {parseFloat(qProv.avg_rating).toFixed(1)} ({qProv.review_count} Yorum)
+                                            </span>
+                                          )}
+                                          {qProv.avg_score && (
+                                            <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
+                                              Sistem Skoru: {parseFloat(qProv.avg_score).toFixed(0)}/100
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
+                                      
+                                      {/* Eylem Butonları */}
+                                      <div className="flex items-center space-x-2 shrink-0 ml-2">
+                                          {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
+                                              <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><ShieldCheck size={10} className="mr-1 inline-block"/>Onayla</button>
+                                          )}
+                                          {!isCurrent && (
+                                              <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><Check size={10} className="mr-1 inline-block"/>Bunu Seç</button>
+                                          )}
+                                          <div className="text-neutral-400 p-1 bg-white border border-neutral-200 rounded ml-1 transition hover:bg-neutral-50 shadow-xs">
+                                              {isProvExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                                          </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Akordiyon İçi: Tüm Geçmiş Müşteri Yorumları */}
+                                    {isProvExpanded && (
+                                      <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
+                                        {safeArray(qProv.reviews).length > 0 ? (
+                                           <div className="space-y-2.5">
+                                             <h5 className="text-[10px] font-bold text-neutral-500 uppercase mb-2 flex items-center"><History size={12} className="mr-1"/> Önceki Müşteri Değerlendirmeleri</h5>
+                                             {qProv.reviews.map((rev, revIdx) => (
+                                                <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
+                                                  <div className="flex justify-between items-center mb-1.5">
+                                                     <div className="flex items-center gap-1.5 text-amber-500">
+                                                       <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{parseFloat(rev.rating).toFixed(1)}</span>
+                                                       {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {parseFloat(rev.score).toFixed(0)}</span>}
+                                                     </div>
+                                                     <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
+                                                  </div>
+                                                  {rev.comment && <p className="text-[11px] text-neutral-700 italic mb-2.5 leading-relaxed bg-neutral-50 p-2 rounded">"{rev.comment}"</p>}
+                                                  
+                                                  <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
+                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{rev.rating_knowledge}/5</span></div>
+                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{rev.rating_communication}/5</span></div>
+                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{rev.rating_timing}/5</span></div>
+                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{rev.rating_cost}/5</span></div>
+                                                  </div>
+                                                </div>
+                                             ))}
+                                           </div>
+                                        ) : (
+                                           <div className="text-center text-[10px] text-neutral-400 py-3 italic bg-white border border-neutral-100 rounded-lg">Bu sağlayıcı için henüz geçmiş bir müşteri değerlendirmesi bulunmuyor.</div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2"><span>📍 {extractAddress(req.location)}</span>{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}</div>
@@ -567,7 +593,7 @@ export default function CustomerDashboard() {
          </div>
       )}
 
-      {/* YENİ: DETAYLI DEĞERLENDİRME EKRANI */}
+      {/* DETAYLI DEĞERLENDİRME EKRANI */}
       {pendingReviewCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
