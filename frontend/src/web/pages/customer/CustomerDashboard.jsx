@@ -8,7 +8,8 @@ import {
   Phone, MessageSquare, Mail, MessageCircle, MapPin, Clock, Shield, Tag, 
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
-  ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle 
+  ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
+  FileText, Bell // Yeni eklenen ikonlar
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -32,6 +33,8 @@ export default function CustomerDashboard() {
   const [step, setStep] = useState('INPUT');
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
+  
+  const [requestType, setRequestType] = useState('TALEP'); // YENİ: Kayıt Türü State'i
   
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
@@ -175,8 +178,10 @@ export default function CustomerDashboard() {
     if (companyCode.trim()) backendLocation += isCodeHidden ? ` [HIDDENCODE: ${companyCode.trim()}]` : ` [CODE: ${companyCode.trim()}]`;
 
     try {
-      await axios.post(`${API_BASE}/requests`, { rawText: queryText, disambiguationChoice, contactValue: flaggedContactValue, preferredChannel: channelString, location: backendLocation, isUrgent, deadlineDatetime: deadlineDatetimeISO });
-      setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false);
+      // YENİ: requestType backend'e gönderiliyor
+      await axios.post(`${API_BASE}/requests`, { rawText: queryText, disambiguationChoice, contactValue: flaggedContactValue, preferredChannel: channelString, location: backendLocation, isUrgent, deadlineDatetime: deadlineDatetimeISO, requestType });
+      
+      setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
       await mutateCustomerReqs();
     } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
@@ -272,13 +277,22 @@ export default function CustomerDashboard() {
           <div className="text-center space-y-1 mb-2"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
           <form onSubmit={handleCustomerCombinedSubmit} className="space-y-4">
             <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
+              
               <div className="flex gap-2">
                 <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleCustomerCombinedSubmit(e); }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" required />
                 <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit cursor-pointer"><ChevronDown size={16} /></button>
               </div>
+              
               <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                 <div className="flex flex-col leading-tight"><span className="flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span></span>{coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}</div>
                 <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
+                  
+                  {/* YENİ: Seçili Kayıt Türünü Gösteren Rozet */}
+                  <span className="font-bold px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm text-neutral-800 border-neutral-200">
+                    {requestType === 'TALEP' ? <FileText size={11} className="text-blue-600" /> : <Bell size={11} className="text-amber-500" />}
+                    {requestType === 'TALEP' ? 'Talep' : 'Bildirim'}
+                  </span>
+                  
                   {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
                   {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
                   {companyCode && (<span className={`font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${isCodeHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>{isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {companyCode} {isCodeHidden ? '(Gizli)' : ''}</span>)}
@@ -293,14 +307,35 @@ export default function CustomerDashboard() {
                 </div>
               </div>
               
-              {/* Gönder butonu artık detayların üstünde. Menü açılınca aşağı kaymayacak! */}
-              <div className="flex items-center justify-end pt-1 pb-1 px-1">
+              <div className="flex items-center justify-end pt-1 pb-1 px-1 relative z-10">
                 <button type="submit" disabled={loading || !queryText.trim()} className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center space-x-1.5 cursor-pointer disabled:opacity-50">{loading ? <><span>Gönderiliyor...</span><Loader2 size={14} className="animate-spin" /></> : <><span>Talebi Gönder</span><ArrowRight size={14} /></>}</button>
               </div>
 
               {!isDetailsCollapsed && (
                  <div className="mt-3 pt-5 border-t border-neutral-200/70 flex flex-col md:flex-row gap-6">
                     <div className="w-full md:w-5/12 space-y-5">
+                       
+                       {/* YENİ: Kayıt Türü Seçimi */}
+                       <div className="space-y-2">
+                         <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">Kayıt Türü</label>
+                         <div className="flex bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60">
+                           {[
+                             { id: 'TALEP', label: 'Talep', icon: FileText },
+                             { id: 'BILDIRIM', label: 'Bildirim', icon: Bell }
+                           ].map(item => (
+                             <button
+                               key={item.id}
+                               type="button"
+                               onClick={() => setRequestType(item.id)}
+                               className={`flex-1 flex items-center justify-center space-x-1.5 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${requestType === item.id ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'}`}
+                             >
+                               <item.icon size={14} className={requestType === item.id ? (item.id === 'TALEP' ? 'text-blue-600' : 'text-amber-500') : ''} />
+                               <span>{item.label}</span>
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+
                        <div>
                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>{deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase cursor-pointer">temizle</button>}</label>
                            <div className="flex items-center gap-2"><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" /><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" /></div>
@@ -378,7 +413,6 @@ export default function CustomerDashboard() {
                     const isHidden = isCodeHiddenReq(req.location);
                     const isActionLoading = actionLoadingId === req.id;
                     
-                    // --- SAYAÇ (TIMER) HESAPLAMALARI ---
                     let timerDisplay = null;
                     let isTimerCritical = false;
                     const refDate = req.updated_at || req.created_at || new Date().toISOString();
