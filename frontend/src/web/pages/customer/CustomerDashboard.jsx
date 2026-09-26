@@ -68,7 +68,7 @@ export default function CustomerDashboard() {
   
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
-  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null); // YENİ: Akordiyon State
+  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null); 
 
   const [reviewRatingsMap, setReviewRatingsMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
@@ -539,7 +539,6 @@ export default function CustomerDashboard() {
                                       <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
                                         {safeArray(qProv.reviews).length > 0 ? (
                                            <div className="space-y-2.5">
-                                             <h5 className="text-[10px] font-bold text-neutral-500 uppercase mb-2 flex items-center"><History size={12} className="mr-1"/> Önceki Müşteri Değerlendirmeleri</h5>
                                              {qProv.reviews.map((rev, revIdx) => (
                                                 <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
                                                   <div className="flex justify-between items-center mb-1.5">
