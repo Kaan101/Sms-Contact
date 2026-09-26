@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck 
+  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck, User, Wrench
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
+  
+  // Fazlar: TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION
   const [phase, setPhase] = useState('TYPING'); 
   
-  // WhatsApp senaryosu alt fazları
-  const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); // CHATTING, SUCCESS_MARK
+  const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); 
   const [chatStep, setChatStep] = useState(0); 
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -38,9 +39,9 @@ export default function MainPage({ onGoToLogin }) {
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Kontrollü ve Yavaşlatılmış Akış
+  // 2. FAZ: Kontrollü Akış (MATCH_FOUND fazı eklendi)
   useEffect(() => {
-    let t1, t2, t3, t4, t5;
+    let t1, t2, t3, t4, t5, t6;
 
     if (phase === 'SHOW_OPTIONS') {
       t1 = setTimeout(() => setPhase('CLICK_OPTION'), 1800); 
@@ -49,11 +50,15 @@ export default function MainPage({ onGoToLogin }) {
     } else if (phase === 'CLICK_SEND') {
       t3 = setTimeout(() => setPhase('MAP_SCANNING'), 1500); 
     } else if (phase === 'MAP_SCANNING') {
-      t4 = setTimeout(() => setPhase('FINAL_ACTION'), 4500); 
+      // Harita taranıyor...
+      t4 = setTimeout(() => setPhase('MATCH_FOUND'), 4000); 
+    } else if (phase === 'MATCH_FOUND') {
+      // Bulundu! Bekleme süresi
+      t5 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
     } else if (phase === 'FINAL_ACTION') {
       const delay = scenario === 1 ? 7000 : 16000; 
       
-      t5 = setTimeout(() => {
+      t6 = setTimeout(() => {
         setPhase('TYPING'); 
         setScenario(prev => prev === 1 ? 2 : 1);
         setChatStep(0);
@@ -67,10 +72,11 @@ export default function MainPage({ onGoToLogin }) {
       clearTimeout(t3);
       clearTimeout(t4);
       clearTimeout(t5);
+      clearTimeout(t6);
     };
   }, [phase, scenario]);
 
-  // 3. FAZ: WhatsApp Chat Adımları ve Tekli Yeşil Ok Kurgusu
+  // 3. FAZ: WhatsApp Chat Adımları
   useEffect(() => {
     let timers = [];
     if (phase === 'FINAL_ACTION' && scenario === 2) {
@@ -96,8 +102,9 @@ export default function MainPage({ onGoToLogin }) {
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
 
-  // Harita Desenini Belirginleştirdik (Koyu gri ton ve daha yüksek opaklık)
-  const mapPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83 43.409-54.8 11.233L0 55.42l55.932-11.465L55.05 0h-.423zM25.32 0l-1.07 19.865-17.65-4.57 2.073-15.295h-.436l-2.074 15.295L0 13.68V14.1l6.096 1.579L4.022 30.985l-.426-.11 2.074-15.305 17.65 4.57 1.07-19.865h.423l-1.07 19.865 24.237 6.276L55.05 0h-.423L27.674 26.24 25.32 0z' fill='%2364748b' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E")`;
+  // MOBOOL: Senin verdiğin gerçek harita görüntüsünü buraya entegre etmek için hazırlanan URL. 
+  // Projene eklediğinde url('/images/image_8bc057.png') şeklinde değiştirebilirsin.
+  const mapBackgroundImage = `url('https://api.mapbox.com/styles/v1/mapbox/light-v11/static/29.0713,41.0827,14/600x400?access_token=pk.eyJ1IjoibW9ib29sIiwiYSI6ImNsbG1qanVlZjA0MjkzZXA1YjhkZmc3bXoifQ.xx_xxxx_xxxx')`;
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans selection:bg-neutral-900 selection:text-white overflow-x-hidden">
@@ -188,7 +195,7 @@ export default function MainPage({ onGoToLogin }) {
               {/* İkili Ekranların Bulunduğu GRID */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative flex-1">
                 
-                {/* TEK VE DEV YEŞİL ONAY İŞARETİ - Tüm grid'in üzerini kaplar */}
+                {/* TEK VE DEV YEŞİL ONAY İŞARETİ */}
                 <div className={`absolute inset-0 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out rounded-[2rem] ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 bg-white/70 backdrop-blur-sm scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
                   <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center shadow-2xl">
                     <CheckCircle2 size={72} className="text-emerald-500" />
@@ -239,7 +246,18 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs h-full">
+                  <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs h-full relative">
+                    {/* MACTH FOUND (BULUNDU) EKRANI - Sadece Müşteri Tarafı Kararır */}
+                    {phase === 'MATCH_FOUND' && (
+                      <div className="absolute inset-0 bg-neutral-900/90 rounded-2xl z-20 flex flex-col items-center justify-center text-center animate-in fade-in duration-500 px-4">
+                         <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center mb-3 shadow-lg ring-4 ring-emerald-500/30">
+                           <CheckCircle2 size={32} className="text-white" />
+                         </div>
+                         <h3 className="text-white font-bold text-sm mb-1">{scenario === 1 ? 'Emlakçı Bulundu!' : 'Servis Bulundu!'}</h3>
+                         <p className="text-neutral-300 text-[10px] font-medium">Uzman ile iletişim başlatılıyor...</p>
+                      </div>
+                    )}
+
                     <div>
                       <div className="flex items-center space-x-2.5 mb-3">
                         <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
@@ -261,7 +279,7 @@ export default function MainPage({ onGoToLogin }) {
 
                     <div className="space-y-3">
                       <div className={`space-y-2 transition-all duration-1000 transform ${
-                        phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' 
+                        phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION' 
                           ? 'opacity-0 scale-95 pointer-events-none h-0 overflow-hidden m-0' 
                           : 'opacity-100 scale-100'
                       }`}>
@@ -300,7 +318,7 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                 )}
 
-                {/* SAĞ TARAF: SAĞLAYICI VE HARİTA (Belirginleştirilmiş Desen ve Müşteri Aramadan Önce "Hazır" durumu) */}
+                {/* SAĞ TARAF: SAĞLAYICI VE HARİTA (Belirgin Harita) */}
                 {phase === 'FINAL_ACTION' && scenario === 2 ? (
                   <div className="flex flex-col h-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-md bg-white">
                     <div className="flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000 delay-150">
@@ -346,52 +364,81 @@ export default function MainPage({ onGoToLogin }) {
                 ) : (
                   <div 
                     className="bg-white border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full"
-                    style={{ backgroundImage: mapPattern, backgroundSize: '120px 120px' }}
+                    style={{ 
+                      // MOBOOL: Harita Arka Planı (URL olarak gerçek harita)
+                      backgroundImage: mapBackgroundImage, 
+                      backgroundSize: 'cover', 
+                      backgroundPosition: 'center' 
+                    }}
                   >
-                    {/* Harita arka planının opaklığı kısıldı ki çizimler daha çok belli olsun */}
-                    <div className="absolute inset-0 bg-white/30 pointer-events-none" />
+                    {/* Harita daha belirgin, beyaz perde inceltildi */}
+                    <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] pointer-events-none" />
 
-                    <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3 bg-white/90 p-2 rounded-xl shadow-xs">
+                    {/* MATCH FOUND EKRANI - Sağlayıcı Tarafı */}
+                    {phase === 'MATCH_FOUND' && (
+                      <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 p-6">
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 text-white shadow-xl ${scenario === 1 ? 'bg-rose-500' : 'bg-blue-600'}`}>
+                          {scenario === 1 ? <User size={40} /> : <Wrench size={40} />}
+                        </div>
+                        <h2 className="font-extrabold text-2xl text-neutral-900 mb-2">
+                          {scenario === 1 ? 'Ayşe Hanım' : 'Murat Usta'}
+                        </h2>
+                        <span className="text-xs font-bold px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full border">
+                          {scenario === 1 ? 'Tarabya Emlak Uzmanı' : 'Bosch Yetkili Servis'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Üst Header (Sistem Taranıyor...) */}
+                    <div className="relative z-10 flex items-center justify-between border-b border-neutral-300/50 pb-3 bg-white/95 p-2 rounded-xl shadow-md">
                       <div className="flex items-center space-x-2.5">
                         <div className="w-7 h-7 rounded-full bg-neutral-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
                           {phase === 'FINAL_ACTION' ? (scenario === 1 ? "A" : "M") : "?"}
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-neutral-900">
-                            {phase === 'FINAL_ACTION' 
+                            {phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND'
                               ? (scenario === 1 ? "Ayşe Hanım" : "Murat Usta") 
                               : (phase === 'MAP_SCANNING' ? "Sistem Taranıyor..." : "Sistem Hazır")}
                           </h4>
                           <span className="text-[10px] text-neutral-600">
-                            {phase === 'FINAL_ACTION' 
+                            {phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND'
                               ? (scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis") 
                               : (phase === 'MAP_SCANNING' 
-                                  ? (scenario === 1 ? "En uygun emlakçı aranıyor..." : "En uygun servis aranıyor...") 
+                                  ? "Veritabanı kontrol ediliyor" 
                                   : "Talep bekleniyor...")}
                           </span>
                         </div>
                       </div>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono transition-all duration-700 ${
-                        phase === 'MAP_SCANNING' ? 'bg-neutral-200 text-neutral-700 border border-neutral-300 animate-pulse' : 
-                        phase === 'FINAL_ACTION' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
+                        phase === 'MAP_SCANNING' ? 'bg-amber-100 text-amber-700 border border-amber-300 animate-pulse' : 
+                        phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
                       }`}>
-                        {phase === 'MAP_SCANNING' ? 'Harita Taranıyor...' : phase === 'FINAL_ACTION' ? 'Eşleşti' : 'Bekliyor'}
+                        {phase === 'MAP_SCANNING' ? 'Taranıyor' : (phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND') ? 'Bulundu' : 'Bekliyor'}
                       </span>
                     </div>
 
+                    {/* Orta Alan (En Uygun Emlakçı/Servis Aranıyor Vurgusu) */}
                     <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
-                      {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
-                          <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/95 px-3 py-1.5 rounded-full border border-neutral-300 shadow-md">
-                            <Compass size={13} className="animate-spin text-neutral-600" /> 
-                            {scenario === 1 ? "En uygun Emlakçı aranıyor..." : "En uygun Servis aranıyor..."}
-                          </span>
+                      {phase === 'MAP_SCANNING' ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
+                          {/* DİKKAT ÇEKİCİ ARAMA BALONCUĞU */}
+                          <div className="animate-bounce bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center space-y-2">
+                            <Compass size={24} className="animate-spin text-emerald-400" /> 
+                            <span className="text-xs font-bold text-center tracking-wide leading-relaxed">
+                              {scenario === 1 ? (
+                                <>En Uygun <span className="text-emerald-400">Emlakçı</span><br/>Aranıyor...</>
+                              ) : (
+                                <>En Uygun <span className="text-emerald-400">Servis</span><br/>Aranıyor...</>
+                              )}
+                            </span>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-center text-neutral-600 text-xs font-mono bg-white/90 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-xs">
+                      ) : (phase !== 'FINAL_ACTION' && phase !== 'MATCH_FOUND') ? (
+                        <div className="text-center text-neutral-600 text-xs font-mono bg-white/95 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-md">
                           Talep gönderildiğinde harita taranacak...
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 )}
