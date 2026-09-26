@@ -9,30 +9,34 @@ export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
-  // Genişletilmiş Fazlar: SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
+  // Fazlar: SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
   const [phase, setPhase] = useState('SCENARIO_INTRO'); 
   
   const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); 
   const [chatStep, setChatStep] = useState(0); 
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // WhatsApp'ta son mesaja kaydırmak için referans
-  const messagesEndRef = useRef(null);
+  // Outro ekranındaki daktilo efektleri için state'ler
+  const [outroTitle, setOutroTitle] = useState('');
+  const [outroText, setOutroText] = useState('');
+  const fullOutroTitle = "MOBOOL";
+  const fullOutroText = "Evinizin rahatlığında siz isteyin, en iyi servis ve hizmet veren size ulaşsın.";
+
+  // Sadece WhatsApp mesaj alanını kaydırmak için referans
+  const chatContainerRef = useRef(null);
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // WhatsApp ekranı her chat adımı değiştiğinde en alta kaysın
+  // WhatsApp ekranında yeni mesaj gelince sadece mesaj kutusunu en alta kaydır (Sayfayı değil!)
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatStep, phase]);
 
   // 1. FAZ: İntro ve Daktilo Yönetimi
   useEffect(() => {
-    // Sadece SCENARIO_INTRO veya TYPING fazında bu blok çalışır
     if (phase === 'SCENARIO_INTRO') {
-      // Slayt ekranda 3 saniye kalır, sonra typing'e geçer
       const t = setTimeout(() => setPhase('TYPING'), 3000);
       return () => clearTimeout(t);
     }
@@ -55,6 +59,36 @@ export default function MainPage({ onGoToLogin }) {
       return () => clearInterval(t);
     }
   }, [phase, fullText]);
+
+  // MOBOOL_OUTRO Daktilo Efekti
+  useEffect(() => {
+    if (phase === 'MOBOOL_OUTRO') {
+      setOutroTitle('');
+      setOutroText('');
+      let titleIdx = 0;
+      let textIdx = 0;
+      
+      const titleInterval = setInterval(() => {
+        if (titleIdx <= fullOutroTitle.length) {
+          setOutroTitle(fullOutroTitle.slice(0, titleIdx));
+          titleIdx++;
+        } else {
+          clearInterval(titleInterval);
+          // Başlık bittikten sonra metne geç
+          const textInterval = setInterval(() => {
+            if (textIdx <= fullOutroText.length) {
+              setOutroText(fullOutroText.slice(0, textIdx));
+              textIdx++;
+            } else {
+              clearInterval(textInterval);
+            }
+          }, 40); // Alt metin biraz daha hızlı aksın
+        }
+      }, 150); // MOBOOL harfleri arası bekleme
+      
+      return () => clearInterval(titleInterval);
+    }
+  }, [phase]);
 
   // 2. FAZ: Durum Makinesi (State Machine)
   useEffect(() => {
@@ -89,11 +123,11 @@ export default function MainPage({ onGoToLogin }) {
         }, delay); 
         break;
       case 'MOBOOL_OUTRO':
-        // Outro ekranda 3.5 saniye kalır, sonra 1. Senaryo'nun İntro'suna döner
+        // Daktilo efekti olduğu için süreyi uzattık (6 saniye)
         t1 = setTimeout(() => {
           setScenario(1);
           setPhase('SCENARIO_INTRO');
-        }, 3500);
+        }, 6000);
         break;
       default: break;
     }
@@ -186,8 +220,6 @@ export default function MainPage({ onGoToLogin }) {
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col min-h-[480px] overflow-hidden">
               
-              {/* ONAY EKRANLARI VE GEÇİŞ SLAYTLARI (Üst üste binen z-index katmanları) */}
-              
               {/* 1. SCENARIO_INTRO (Senaryolara özel giriş slaytları) */}
               <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
                 phase === 'SCENARIO_INTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
@@ -213,16 +245,20 @@ export default function MainPage({ onGoToLogin }) {
                 )}
               </div>
 
-              {/* 2. MOBOOL_OUTRO (Simülasyon bitişi) */}
+              {/* 2. MOBOOL_OUTRO (Simülasyon bitişi - Daktilo Efektli) */}
               <div className={`absolute inset-0 z-[80] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
                 phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
               }`}>
                 <div className="w-20 h-20 bg-neutral-950 rounded-3xl flex items-center justify-center shadow-2xl mb-6">
                   <Zap size={40} className="text-white" />
                 </div>
-                <h2 className="text-4xl font-extrabold text-neutral-950 mb-3 tracking-tight">MOBOOL</h2>
-                <p className="text-base font-medium text-neutral-600 text-center px-8 leading-relaxed max-w-sm">
-                  Evinizin rahatlığında siz isteyin, en iyi servis ve hizmet veren size ulaşsın.
+                <h2 className="text-4xl font-extrabold text-neutral-950 mb-3 tracking-tight h-10">
+                  {outroTitle}
+                  {outroTitle.length < fullOutroTitle.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse">|</span>}
+                </h2>
+                <p className="text-base font-medium text-neutral-600 text-center px-8 leading-relaxed max-w-sm h-12">
+                  {outroText}
+                  {outroTitle.length === fullOutroTitle.length && outroText.length < fullOutroText.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse">|</span>}
                 </p>
               </div>
 
@@ -269,7 +305,7 @@ export default function MainPage({ onGoToLogin }) {
                     <span className="text-[10px] font-mono text-neutral-500 font-bold uppercase block mb-2">İletişim Tercihinizi Seçin:</span>
                     <div className="grid grid-cols-2 gap-2">
                       <div className={`flex items-center justify-center space-x-1.5 py-3 px-2 rounded-xl text-[11px] font-bold shadow-sm transition-all duration-300 ${
-                        scenario === 1 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS'
+                        scenario === 1 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS' && phase !== 'SCENARIO_INTRO'
                           ? 'bg-neutral-100 text-neutral-900 border-2 border-neutral-800 border-solid shadow-inner scale-95' 
                           : 'bg-white text-neutral-500 border border-neutral-300'
                       }`}>
@@ -277,7 +313,7 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
 
                       <div className={`flex items-center justify-center space-x-1.5 py-3 px-2 rounded-xl text-[11px] font-bold shadow-sm transition-all duration-300 ${
-                        scenario === 2 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS'
+                        scenario === 2 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS' && phase !== 'SCENARIO_INTRO'
                           ? 'bg-neutral-100 text-neutral-900 border-2 border-neutral-800 border-solid shadow-inner scale-95' 
                           : 'bg-white text-neutral-500 border border-neutral-300'
                       }`}>
@@ -355,7 +391,7 @@ export default function MainPage({ onGoToLogin }) {
                     ) : null}
                   </div>
 
-                  {/* MATCH FOUND OVERLAY (Sadece Sağ Ekranda) */}
+                  {/* MATCH FOUND OVERLAY */}
                   {phase === 'MATCH_FOUND' && (
                     <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 p-6">
                       <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 text-white shadow-xl ${scenario === 1 ? 'bg-rose-500' : 'bg-blue-600'}`}>
@@ -373,7 +409,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   )}
 
-                  {/* TELEFON ARAMASI (Senaryo 1) OVERLAY (Sadece Sağ Ekranda) */}
+                  {/* TELEFON ARAMASI (Senaryo 1) OVERLAY */}
                   {phase === 'FINAL_ACTION' && scenario === 1 && (
                     <div className="absolute inset-0 z-40 bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-6 rounded-2xl shadow-2xl flex flex-col justify-between animate-in slide-in-from-bottom-8 duration-700">
                       <div className="flex flex-col items-center pt-6">
@@ -407,7 +443,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   )}
 
-                  {/* WHATSAPP CHAT (Senaryo 2) OVERLAY (Sadece Sağ Ekranda) */}
+                  {/* WHATSAPP CHAT (Senaryo 2) OVERLAY */}
                   {phase === 'FINAL_ACTION' && scenario === 2 && (
                     <div className="absolute inset-0 z-40 bg-[#EFEAE2] flex flex-col rounded-2xl border-[6px] border-neutral-900 overflow-hidden animate-in slide-in-from-bottom-8 duration-700">
                       
@@ -426,9 +462,8 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL YAPI */}
-                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth">
-                        
+                      {/* Büyütülmüş Fontlu Chat Alanı - SADECE BURASI KAYAR */}
+                      <div ref={chatContainerRef} className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth pb-4">
                         {chatStep >= 2 && (
                           <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500 mt-2">
                             <span className="text-[10px] font-bold text-neutral-500/80 mb-1 ml-1 block tracking-wider uppercase">Murat Usta</span>
@@ -461,9 +496,6 @@ export default function MainPage({ onGoToLogin }) {
                             </div>
                           </div>
                         )}
-
-                        {/* Boş div - Her mesaj geldiğinde buraya otomatik kaydırılacak */}
-                        <div ref={messagesEndRef} className="h-1" />
                       </div>
 
                       <div className="bg-[#f0f2f5] p-3 flex items-center space-x-3 z-10 border-t border-neutral-200 w-full shrink-0">
