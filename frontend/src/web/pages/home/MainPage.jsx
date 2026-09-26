@@ -9,8 +9,8 @@ export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
-  // Fazlar: MOBOOL_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
-  const [phase, setPhase] = useState('MOBOOL_INTRO'); 
+  // Fazlar: TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
+  const [phase, setPhase] = useState('TYPING'); 
   
   const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); 
   const [chatStep, setChatStep] = useState(0); 
@@ -18,33 +18,30 @@ export default function MainPage({ onGoToLogin }) {
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Daktilo Efekti ve MOBOOL İntro
+  // 1. FAZ: Daktilo Efekti
   useEffect(() => {
+    if (phase === 'MOBOOL_OUTRO') return; // Outro ekranındaysa typing'e geçme
+
     setTypedText('');
-    setPhase('MOBOOL_INTRO');
+    setPhase('TYPING');
     setWhatsappPhase('CHATTING');
     setShowSuccess(false);
     
-    // MOBOOL yazısı 2.5 saniye ekranda kalıp sonra typing fazına geçiyor
-    const introTimer = setTimeout(() => {
-      setPhase('TYPING');
-      let currentIndex = 0;
-      const typingInterval = setInterval(() => {
-        if (currentIndex <= fullText.length) {
-          setTypedText(fullText.slice(0, currentIndex));
-          currentIndex++;
-        } else {
-          clearInterval(typingInterval);
-          setTimeout(() => setPhase('SHOW_OPTIONS'), 1500); 
-        }
-      }, 150);
-      return () => clearInterval(typingInterval);
-    }, 2500);
+    let currentIndex = 0;
+    const typingInterval = setInterval(() => {
+      if (currentIndex <= fullText.length) {
+        setTypedText(fullText.slice(0, currentIndex));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        setTimeout(() => setPhase('SHOW_OPTIONS'), 1500); 
+      }
+    }, 150);
 
-    return () => clearTimeout(introTimer);
+    return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Kontrollü ve Ekstra Yavaşlatılmış Akış
+  // 2. FAZ: Kontrollü ve Yavaşlatılmış Akış
   useEffect(() => {
     let t1, t2, t3, t4, t5, t6, t7;
 
@@ -60,18 +57,27 @@ export default function MainPage({ onGoToLogin }) {
       t5 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
     } else if (phase === 'FINAL_ACTION') {
       // Senaryo 1: 7sn Telefon araması
-      // Senaryo 2: 12sn Chat + 2.5sn bekleme + 4sn Success Mark = 18.5sn
-      const delay = scenario === 1 ? 7000 : 18500; 
+      // Senaryo 2: 14.5sn Chat + Success Mark = 14.5sn
+      const delay = scenario === 1 ? 7000 : 14500; 
       
       t6 = setTimeout(() => {
-        setPhase('MOBOOL_OUTRO');
-        
-        t7 = setTimeout(() => {
-           setScenario(prev => prev === 1 ? 2 : 1);
-           setChatStep(0);
-           setShowSuccess(false);
-        }, 3500); // Outro yazısı ekranda kalma süresi
-
+        if (scenario === 2) {
+          // İkinci senaryo bittiğinde Outro yazısını göster
+          setPhase('MOBOOL_OUTRO');
+          t7 = setTimeout(() => {
+            // Outro yazısından sonra 1. senaryoya dön
+            setScenario(1);
+            setChatStep(0);
+            setShowSuccess(false);
+            setPhase('TYPING'); // Typing'i tetikle
+          }, 3500);
+        } else {
+          // Birinci senaryo bittiyse direkt ikinci senaryoya geç
+          setScenario(2);
+          setChatStep(0);
+          setShowSuccess(false);
+          setPhase('TYPING'); // Typing'i tetikle
+        }
       }, delay);
     }
 
@@ -86,7 +92,7 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase, scenario]);
 
-  // 3. FAZ: WhatsApp Chat Adımları (Chat bitince bekleme payı eklendi)
+  // 3. FAZ: WhatsApp Chat Adımları
   useEffect(() => {
     let timers = [];
     if (phase === 'FINAL_ACTION' && scenario === 2) {
@@ -99,16 +105,15 @@ export default function MainPage({ onGoToLogin }) {
         { step: 3, delay: 5000 },
         { step: 4, delay: 7500 },
         { step: 5, delay: 9000 },
-        { step: 6, delay: 12000 } // Chat burada biter.
+        { step: 6, delay: 12000 }
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
 
-      // Chat bitimi (12sn) ile Onay (14.5sn) arasına 2.5 saniye okuma/nefes payı bırakıldı.
       timers.push(setTimeout(() => {
         setWhatsappPhase('SUCCESS_MARK');
         setTimeout(() => setShowSuccess(true), 100);
-        setTimeout(() => setShowSuccess(false), 3800); 
-      }, 14500));
+        setTimeout(() => setShowSuccess(false), 2000); 
+      }, 12500));
     }
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
@@ -187,16 +192,16 @@ export default function MainPage({ onGoToLogin }) {
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col space-y-6 min-h-[460px] overflow-hidden">
               
-              {/* MOBOOL INTRO/OUTRO GEÇİŞ EKRANI (Tüm simülasyonun üzerine biner) */}
+              {/* MOBOOL OUTRO GEÇİŞ EKRANI (İki senaryo bittikten sonra çıkar) */}
               <div className={`absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
-                phase === 'MOBOOL_INTRO' || phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+                phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
               }`}>
                 <div className="w-16 h-16 bg-neutral-950 rounded-2xl flex items-center justify-center shadow-2xl mb-6">
                   <Zap size={32} className="text-white" />
                 </div>
                 <h2 className="text-3xl font-extrabold text-neutral-950 mb-3 tracking-tight">MOBOOL</h2>
                 <p className="text-sm font-medium text-neutral-500 text-center px-8 leading-relaxed max-w-sm">
-                  {scenario === 1 ? 'Evinizin rahatlığında siz isteyin, en iyi uzmanlar anında size ulaşsın.' : 'Sorunlarınızı yazın, işin ehli ustalar kapınıza kadar gelsin.'}
+                  Evinizin rahatlığında siz isteyin, en iyi servis ve hizmet veren size ulaşsın.
                 </p>
               </div>
 
@@ -394,7 +399,7 @@ export default function MainPage({ onGoToLogin }) {
                       <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] pointer-events-none" />
 
                       {/* MATCH FOUND EKRANI */}
-                      {phase === 'MATCH_FOUND' && (
+                      {(phase === 'MATCH_FOUND' || (phase === 'FINAL_ACTION' && scenario === 1)) && (
                         <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 p-6">
                           <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 text-white shadow-xl ${scenario === 1 ? 'bg-rose-500' : 'bg-blue-600'}`}>
                             {scenario === 1 ? <User size={40} /> : <Wrench size={40} />}
@@ -414,7 +419,7 @@ export default function MainPage({ onGoToLogin }) {
                       <div className="relative z-10 flex items-center justify-between border-b border-neutral-300/50 pb-3 bg-white/95 p-2 rounded-xl shadow-md">
                         <div className="flex items-center space-x-2.5">
                           <div className="w-7 h-7 rounded-full bg-neutral-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                            {phase === 'FINAL_ACTION' ? (scenario === 1 ? "A" : "M") : "?"}
+                            {phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND' ? (scenario === 1 ? "A" : "M") : "?"}
                           </div>
                           <div>
                             <h4 className="text-xs font-bold text-neutral-900">
