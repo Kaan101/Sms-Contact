@@ -3,19 +3,19 @@ import axios from 'axios';
 import { MapContainer, TileLayer, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import useSWR from 'swr'; 
+import useSWR from 'swr';
 import { 
   Phone, MessageSquare, Mail, MessageCircle, MapPin, Clock, Shield, Tag, 
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
   ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
-  FileText, Bell // Yeni eklenen ikonlar
+  FileText, Bell
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
   safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, 
   extractCode, isCodeHiddenReq, cleanContact, extractPhoneForWa, safeDateTime, calculateRemainingTime 
-} from '../../../core/utils/helpers'; 
+} from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
@@ -34,7 +34,7 @@ export default function CustomerDashboard() {
   const [queryText, setQueryText] = useState('');
   const [disambiguationData, setDisambiguationData] = useState(null);
   
-  const [requestType, setRequestType] = useState('TALEP'); // YENİ: Kayıt Türü State'i
+  const [requestType, setRequestType] = useState('TALEP');
   
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
@@ -69,7 +69,8 @@ export default function CustomerDashboard() {
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
 
-  const [reviewRatingMap, setReviewRatingMap] = useState({});
+  // YENİ: Detaylı Rating State'i
+  const [reviewRatingsMap, setReviewRatingsMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
 
@@ -178,7 +179,6 @@ export default function CustomerDashboard() {
     if (companyCode.trim()) backendLocation += isCodeHidden ? ` [HIDDENCODE: ${companyCode.trim()}]` : ` [CODE: ${companyCode.trim()}]`;
 
     try {
-      // YENİ: requestType backend'e gönderiliyor
       await axios.post(`${API_BASE}/requests`, { rawText: queryText, disambiguationChoice, contactValue: flaggedContactValue, preferredChannel: channelString, location: backendLocation, isUrgent, deadlineDatetime: deadlineDatetimeISO, requestType });
       
       setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
@@ -247,12 +247,13 @@ export default function CustomerDashboard() {
     }
   };
 
+  // YENİ: Detaylı Rating Gönderimi
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { 
     setActionLoadingId(requestId);
     try { 
-      const rating = isSkip ? null : (reviewRatingMap[requestId] || 5); 
+      const currentRatings = isSkip ? null : (reviewRatingsMap[requestId] || { knowledge: 5, communication: 5, timing: 5, cost: 5 }); 
       const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); 
-      await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, rating, comment }); 
+      await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, ratings: currentRatings, comment }); 
       setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); 
       await mutateCustomerReqs(); 
     } catch (err) {
@@ -260,6 +261,12 @@ export default function CustomerDashboard() {
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  // Rating State Yönetimi Yardımcıları
+  const getRatingsForReq = (id) => reviewRatingsMap[id] || { knowledge: 5, communication: 5, timing: 5, cost: 5 };
+  const updateSpecificRating = (id, field, value) => {
+      setReviewRatingsMap(prev => ({ ...prev, [id]: { ...getRatingsForReq(id), [field]: value } }));
   };
 
   const activeCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status))), [myCustomerRequests]);
@@ -287,7 +294,6 @@ export default function CustomerDashboard() {
                 <div className="flex flex-col leading-tight"><span className="flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span></span>{coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}</div>
                 <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
                   
-                  {/* YENİ: Seçili Kayıt Türünü Gösteren Rozet */}
                   <span className="font-bold px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm text-neutral-800 border-neutral-200">
                     {requestType === 'TALEP' ? <FileText size={11} className="text-blue-600" /> : <Bell size={11} className="text-amber-500" />}
                     {requestType === 'TALEP' ? 'Talep' : 'Bildirim'}
@@ -315,7 +321,6 @@ export default function CustomerDashboard() {
                  <div className="mt-3 pt-5 border-t border-neutral-200/70 flex flex-col md:flex-row gap-6">
                     <div className="w-full md:w-5/12 space-y-5">
                        
-                       {/* YENİ: Kayıt Türü Seçimi */}
                        <div className="space-y-2">
                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">Kayıt Türü</label>
                          <div className="flex bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60">
@@ -368,7 +373,7 @@ export default function CustomerDashboard() {
                              <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input ref={mapSearchInputRef} type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" /></div>
                              {mapSuggestions.length > 0 && (
                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
-                                 {mapSuggestions.map((sug, idx) => (<div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); }}><MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>))}
+                                  {mapSuggestions.map((sug, idx) => (<div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); }}><MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>))}
                                </div>
                              )}
                           </div>
@@ -398,7 +403,7 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ */}
+      {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ (Kodun önceki haliyle aynı) */}
       {activeCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -562,7 +567,7 @@ export default function CustomerDashboard() {
          </div>
       )}
 
-      {/* DEĞERLENDİRME BEKLEYENLER */}
+      {/* YENİ: DETAYLI DEĞERLENDİRME EKRANI */}
       {pendingReviewCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -570,23 +575,76 @@ export default function CustomerDashboard() {
                 <div className="text-neutral-400">{isPendingReviewsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
              </div>
              {isPendingReviewsOpen && (
-               <div className="space-y-3">
+               <div className="space-y-4">
                  {pendingReviewCustomerRequests.map((req) => {
                     const isActionLoading = actionLoadingId === req.id;
+                    const ratings = getRatingsForReq(req.id);
+                    const avg = ((ratings.knowledge + ratings.communication + ratings.timing + ratings.cost) / 4).toFixed(1);
+                    
+                    const ratingCriteria = [
+                      { id: 'knowledge', label: 'Uzmanlık ve Bilgi' },
+                      { id: 'communication', label: 'İletişim ve Nezaket' },
+                      { id: 'timing', label: 'Hız ve Zamanlama' },
+                      { id: 'cost', label: 'Fiyat / Performans' }
+                    ];
+
                     return (
                       <div key={req.id} className="bg-emerald-50/40 rounded-xl border border-emerald-200 p-4 shadow-sm space-y-3">
-                        <div className="flex items-start justify-between"><div><span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span><p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p><p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span></div>
-                        <div className="p-3 bg-white rounded-lg border border-neutral-200/90 space-y-2.5">
-                          <div className="flex items-center justify-between"><span className="font-bold text-neutral-800 text-xs">Hizmet Deneyiminizi Puanlayın:</span><div className="flex items-center space-x-1">{[1, 2, 3, 4, 5].map((star) => (<button key={star} type="button" onClick={() => setReviewRatingMap({ ...reviewRatingMap, [req.id]: star })} className={`p-0.5 transition cursor-pointer ${star <= (reviewRatingMap[req.id] || 5) ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}><Star size={18} fill={star <= (reviewRatingMap[req.id] || 5) ? '#f59e0b' : 'none'} /></button>))}</div></div>
-                          <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Açıklama veya yorumunuzu yazın (opsiyonel)..." className="w-full p-2.5 text-xs rounded-lg border outline-none bg-neutral-50 focus:border-neutral-950" />
-                          <div className="flex items-center justify-end space-x-2 pt-1">
-                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-1.5 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50">Yorum Yapmadan Geç</button>
-                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1">
-                              {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                              <span>Puanı Gönder</span>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
+                            <p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p>
+                            <p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span>
+                        </div>
+                        
+                        <div className="p-4 bg-white rounded-xl border border-neutral-200/90 shadow-xs space-y-4">
+                          
+                          <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
+                              <span className="font-extrabold text-neutral-900 text-xs uppercase tracking-wide">Hizmet Deneyimini Puanla</span>
+                              <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
+                                <span className="text-[10px] font-bold text-emerald-800">Genel Ortalama:</span>
+                                <span className="text-xs font-black text-emerald-700">{avg}</span>
+                              </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                            {ratingCriteria.map(criteria => (
+                              <div key={criteria.id} className="flex flex-col space-y-1 bg-neutral-50 p-2 rounded-lg border border-neutral-100">
+                                <span className="text-[10px] font-bold text-neutral-600 uppercase">{criteria.label}</span>
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center space-x-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button 
+                                        key={star} 
+                                        type="button" 
+                                        onClick={() => updateSpecificRating(req.id, criteria.id, star)} 
+                                        className={`p-1 transition cursor-pointer hover:scale-110 ${star <= ratings[criteria.id] ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
+                                      >
+                                        <Star size={16} fill={star <= ratings[criteria.id] ? '#f59e0b' : 'none'} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold text-neutral-400">{ratings[criteria.id]}/5</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="pt-2">
+                             <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Bu deneyiminizle ilgili eklemek istediğiniz yorumunuz (opsiyonel)..." className="w-full p-3 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition" />
+                          </div>
+
+                          <div className="flex items-center justify-end space-x-3 pt-2">
+                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-2 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition">Yorum Yapmadan Geç</button>
+                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
+                              {isActionLoading && <Loader2 size={13} className="animate-spin" />}
+                              <span>Değerlendirmeyi Gönder</span>
                             </button>
                           </div>
                         </div>
+
                       </div>
                     );
                  })}

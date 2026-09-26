@@ -199,6 +199,20 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('test_cases', 'id'), COALESCE((SELECT MAX(id) FROM test_cases), 1), true);
     `);
 
+    // YENİ: Detaylı Değerlendirme ve Skor Kolonları
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+          BEGIN ALTER TABLE reviews ADD COLUMN rating_knowledge NUMERIC(3,2); EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE reviews ADD COLUMN rating_communication NUMERIC(3,2); EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE reviews ADD COLUMN rating_timing NUMERIC(3,2); EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE reviews ADD COLUMN rating_cost NUMERIC(3,2); EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE reviews ADD COLUMN score NUMERIC(5,2); EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE reviews ADD COLUMN rating_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP; EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE reviews ADD COLUMN score_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP; EXCEPTION WHEN duplicate_column THEN END;
+      END $$;
+    `);
+
     console.log('✅ Veritabanı ve Marketplace/Havuz Mimarisi Hazır.');
   } catch (error) {
     console.error('❌ Tablo başlatma hatası:', error.message);
