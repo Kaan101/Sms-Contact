@@ -522,7 +522,7 @@ export default function TrackerDashboard() {
         {isTrackerAddModalOpen && (
            <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-xl">
-                <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Operasyon Ekle</h3><button onClick={() => setIsTrackerAddModalOpen(false)} className="hover:text-rose-600 transition cursor-pointer"><X size={18}/></button></div>
+                <div className="flex justify-between items-center mb-4 border-b pb-3"><h3 className="font-bold text-lg">Yeni Talep</h3><button onClick={() => setIsTrackerAddModalOpen(false)} className="hover:text-rose-600 transition cursor-pointer"><X size={18}/></button></div>
                 <form onSubmit={submitWoZRequest} className="space-y-4">
                   <textarea rows={2} required value={queryText} onChange={(e) => setQueryText(e.target.value)} placeholder="Talebi girin..." className="w-full p-3 border rounded-xl outline-none focus:border-neutral-900" />
                   
@@ -531,7 +531,7 @@ export default function TrackerDashboard() {
                      <input type="text" value={coordinates} onChange={(e) => setCoordinates(e.target.value)} placeholder="Koordinat (Haritadan seçin veya girin)" className="w-full p-2.5 border rounded-xl outline-none focus:border-neutral-900 text-xs font-mono bg-neutral-50 text-neutral-600" />
                   </div>
 
-                  <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-xl font-bold cursor-pointer disabled:opacity-50">Operasyonu Başlat</button>
+                  <button type="submit" disabled={loading || !queryText.trim()} className="w-full py-2.5 bg-neutral-950 hover:bg-neutral-800 transition text-white rounded-xl font-bold cursor-pointer disabled:opacity-50">Gönder</button>
                 </form>
              </div>
            </div>
