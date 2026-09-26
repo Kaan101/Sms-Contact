@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Phone, ShieldCheck, Zap, User, 
+  Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, Navigation 
+  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, CheckCheck 
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   const [phase, setPhase] = useState('TYPING'); 
+  
+  // MOBOOL: WhatsApp senaryosu için mesajlaşma adımlarını takip eden state
+  const [chatStep, setChatStep] = useState(0); 
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
@@ -31,7 +34,7 @@ export default function MainPage({ onGoToLogin }) {
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Kontrollü Akış
+  // 2. FAZ: Kontrollü Akış (Zamanlamalar Senaryo 2'nin yeni akışına göre güncellendi)
   useEffect(() => {
     let t1, t2, t3, t4, t5;
 
@@ -44,7 +47,12 @@ export default function MainPage({ onGoToLogin }) {
     } else if (phase === 'MAP_SCANNING') {
       t4 = setTimeout(() => setPhase('FINAL_ACTION'), 4000);
     } else if (phase === 'FINAL_ACTION') {
-      t5 = setTimeout(() => setScenario(prev => prev === 1 ? 2 : 1), 6000);
+      // Senaryo 2 (WhatsApp) daha uzun sürdüğü için bekleme süresini 13 saniyeye çıkarttık
+      const delay = scenario === 1 ? 6000 : 13000;
+      t5 = setTimeout(() => {
+        setScenario(prev => prev === 1 ? 2 : 1);
+        setChatStep(0); // Döngü sıfırlanırken chat adımlarını da sıfırla
+      }, delay);
     }
 
     return () => {
@@ -54,7 +62,25 @@ export default function MainPage({ onGoToLogin }) {
       clearTimeout(t4);
       clearTimeout(t5);
     };
-  }, [phase]);
+  }, [phase, scenario]);
+
+  // 3. FAZ: MOBOOL WhatsApp Gerçek Zamanlı Chat Simülasyonu
+  useEffect(() => {
+    let timers = [];
+    if (phase === 'FINAL_ACTION' && scenario === 2) {
+      setChatStep(0);
+      const steps = [
+        { step: 1, delay: 1000 },  // Bosch servis yazmaya başlar
+        { step: 2, delay: 2500 },  // Bosch servis ilk mesajı atar
+        { step: 3, delay: 4000 },  // Mehmet Bey yazmaya başlar
+        { step: 4, delay: 6500 },  // Mehmet Bey sorunu yazar
+        { step: 5, delay: 8000 },  // Bosch servis cevap yazmaya başlar
+        { step: 6, delay: 10500 }  // Bosch servis randevuyu onaylar
+      ];
+      timers = steps.map(s => setTimeout(() => setChatStep(s.step), s.delay));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [phase, scenario]);
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans selection:bg-neutral-900 selection:text-white overflow-x-hidden">
@@ -68,7 +94,6 @@ export default function MainPage({ onGoToLogin }) {
             </div>
             <span>SMS KONTAK</span>
           </div>
-          {/* Ortadaki menü kaldırıldı */}
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => onGoToLogin('LOGIN')} 
@@ -105,7 +130,6 @@ export default function MainPage({ onGoToLogin }) {
               Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefon arama mı, yoksa Whatsapp/Sms mi? Karar sizin.
             </p>
             
-            {/* ROL YÖNLENDİRMELİ BUTONLAR */}
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <button 
                 onClick={() => onGoToLogin('CUSTOMER')} 
@@ -157,74 +181,116 @@ export default function MainPage({ onGoToLogin }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative">
                 
-                {/* SOL TARAF: MÜŞTERİ */}
-                <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs">
-                  <div>
-                    <div className="flex items-center space-x-2.5 mb-3">
-                      <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
-                      <div>
-                        <h4 className="text-xs font-bold text-neutral-900">Mehmet Bey</h4>
-                        <span className="text-[10px] text-neutral-500 flex items-center"><MapPin size={9} className="mr-0.5" /> Tarabya, İstanbul</span>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-white border p-3 rounded-xl shadow-xs min-h-[46px] flex items-center">
-                      <p className="text-xs font-medium text-neutral-800 leading-relaxed font-mono">
-                        {typedText}
-                        {(phase === 'TYPING') && (
-                          <span className="inline-block w-1.5 h-3 bg-neutral-900 ml-0.5 animate-pulse" />
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    
-                    <div className={`space-y-2 transition-all duration-700 transform ${
-                      phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' 
-                        ? 'opacity-0 scale-95 pointer-events-none h-0 overflow-hidden m-0' 
-                        : 'opacity-100 scale-100'
-                    }`}>
-                      <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
-                      
-                      {/* Telefon Arama Düğmesi */}
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
-                        scenario === 1 
-                          ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                              ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
-                              : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
-                          : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
-                      }`}>
-                        <Phone size={12} />
-                        <span>Telefon arama</span>
-                      </div>
-
-                      {/* Whatsapp/Sms Düğmesi */}
-                      <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
-                        scenario === 2 
-                          ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                              ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
-                              : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
-                          : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
-                      }`}>
-                        <MessageCircle size={12} />
-                        <span>Whatsapp/Sms</span>
-                      </div>
-
-                      <div className="pt-1 flex justify-end">
-                        <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${
-                          phase === 'CLICK_SEND' ? 'bg-neutral-700 text-white scale-95' : 'bg-neutral-950 text-white'
-                        }`}>
-                          <span>Gönder</span>
-                          <Send size={10} />
+                {/* SOL TARAF: MÜŞTERİ VEYA MÜŞTERİ TELEFONU (Senaryo 2 Final) */}
+                {phase === 'FINAL_ACTION' && scenario === 2 ? (
+                  <div className="bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] flex flex-col justify-between shadow-2xl relative overflow-hidden h-[380px] animate-in zoom-in duration-500">
+                    {/* Header */}
+                    <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
+                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">MU</div>
+                      <div className="leading-tight flex-1">
+                        <div className="font-bold text-[13px] whitespace-nowrap">Murat Usta (Bosch)</div>
+                        <div className="text-[10px] text-white/90 font-medium">
+                          {(chatStep === 1 || chatStep === 5) ? 'yazıyor...' : 'çevrimiçi'}
                         </div>
                       </div>
                     </div>
+                    {/* Chat Area */}
+                    <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
+                      {chatStep >= 2 && (
+                        <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
+                          Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
+                          <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:41</span>
+                        </div>
+                      )}
+                      {chatStep >= 4 && (
+                        <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
+                          Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
+                          <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:42</span>
+                        </div>
+                      )}
+                      {chatStep >= 6 && (
+                        <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
+                          Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
+                          <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:43</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Input */}
+                    <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200">
+                      <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm">
+                        {chatStep === 3 ? 'Yazıyorsunuz...' : 'Mesaj yazın'}
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <Send size={12} className="-ml-0.5" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs">
+                    <div>
+                      <div className="flex items-center space-x-2.5 mb-3">
+                        <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
+                        <div>
+                          <h4 className="text-xs font-bold text-neutral-900">Mehmet Bey</h4>
+                          <span className="text-[10px] text-neutral-500 flex items-center"><MapPin size={9} className="mr-0.5" /> Tarabya, İstanbul</span>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white border p-3 rounded-xl shadow-xs min-h-[46px] flex items-center">
+                        <p className="text-xs font-medium text-neutral-800 leading-relaxed font-mono">
+                          {typedText}
+                          {(phase === 'TYPING') && (
+                            <span className="inline-block w-1.5 h-3 bg-neutral-900 ml-0.5 animate-pulse" />
+                          )}
+                        </p>
+                      </div>
+                    </div>
 
-                    {/* FİNAL AKSİYONLARI (MÜŞTERİ EKRANI) */}
-                    {phase === 'FINAL_ACTION' && (
-                      <div className="animate-in fade-in zoom-in duration-500">
-                        {scenario === 1 && (
+                    <div className="space-y-3">
+                      <div className={`space-y-2 transition-all duration-700 transform ${
+                        phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' 
+                          ? 'opacity-0 scale-95 pointer-events-none h-0 overflow-hidden m-0' 
+                          : 'opacity-100 scale-100'
+                      }`}>
+                        <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
+                        
+                        {/* Telefon Arama Düğmesi */}
+                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
+                          scenario === 1 
+                            ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
+                                ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
+                                : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
+                            : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
+                        }`}>
+                          <Phone size={12} />
+                          <span>Telefon arama</span>
+                        </div>
+
+                        {/* Whatsapp/Sms Düğmesi */}
+                        <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
+                          scenario === 2 
+                            ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
+                                ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
+                                : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
+                            : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
+                        }`}>
+                          <MessageCircle size={12} />
+                          <span>Whatsapp/Sms</span>
+                        </div>
+
+                        <div className="pt-1 flex justify-end">
+                          <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${
+                            phase === 'CLICK_SEND' ? 'bg-neutral-700 text-white scale-95' : 'bg-neutral-950 text-white'
+                          }`}>
+                            <span>Gönder</span>
+                            <Send size={10} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Senaryo 1 İçin Orijinal Final Aksiyonu */}
+                      {phase === 'FINAL_ACTION' && scenario === 1 && (
+                        <div className="animate-in fade-in zoom-in duration-500">
                           <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
                             <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
                             <div className="relative z-10 flex flex-col items-center space-y-1">
@@ -249,135 +315,149 @@ export default function MainPage({ onGoToLogin }) {
                               </div>
                             </div>
                           </div>
-                        )}
-
-                        {scenario === 2 && (
-                          <div className="bg-white border border-neutral-300 p-3.5 rounded-2xl shadow-sm space-y-1.5">
-                            <div className="flex items-center justify-between text-[10px] text-neutral-900 font-bold">
-                              <span className="flex items-center gap-1"><BellRing size={11} className="text-neutral-950" /> Whatsapp / SMS Mesajı</span>
-                              <span className="text-neutral-400 font-normal">Şimdi</span>
-                            </div>
-                            <p className="font-medium text-[11px] text-neutral-800 leading-tight">Bosch servis arıyor. "Size nasıl yardımcı olabilirim?"</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-
-                {/* SAĞ TARAF: HARİTA */}
-                <div className="bg-[#EAE6DF] border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900">
-                  <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]" />
-                  <div className="absolute inset-0 opacity-20 bg-gradient-to-r from-sky-100/50 via-transparent to-amber-100/40 pointer-events-none" />
-
-                  <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-7 h-7 rounded-full bg-neutral-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                        {scenario === 1 ? "A" : "M"}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-neutral-900">
-                          {scenario === 1 ? "Ayşe Hanım" : "Murat Usta"}
-                        </h4>
-                        <span className="text-[10px] text-neutral-600">
-                          {scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis"}
-                        </span>
-                      </div>
+                        </div>
+                      )}
                     </div>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono transition-all ${
-                      phase === 'MAP_SCANNING' ? 'bg-neutral-200 text-neutral-700 border border-neutral-300 animate-pulse' : 
-                      phase === 'FINAL_ACTION' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
-                    }`}>
-                      {phase === 'MAP_SCANNING' ? 'Harita Taranıyor...' : phase === 'FINAL_ACTION' ? 'Eşleşti' : 'Bekliyor'}
-                    </span>
                   </div>
+                )}
 
-                  <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
-                    {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
-                        <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/90 px-2.5 py-1 rounded-full border border-neutral-300 shadow-xs">
-                          <Compass size={13} className="animate-spin text-neutral-600" /> Bölgedeki Alternatifler Analiz Ediliyor
-                        </span>
-                        
-                        <div className="flex items-center justify-center space-x-8 relative my-2 w-full">
-                          <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
-                            <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">1</div>
-                            <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
-                          </div>
-
-                          <div className="flex flex-col items-center transform scale-110">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-700 ${
-                              phase === 'FINAL_ACTION' 
-                                ? 'bg-neutral-800 text-white ring-4 ring-neutral-800/30 scale-125' 
-                                : 'bg-neutral-300 text-neutral-800 animate-bounce ring-2 ring-neutral-300/50'
-                            }`}>
-                              <MapPin size={16} />
-                            </div>
-                            <span className="text-[10px] text-neutral-900 font-extrabold mt-1 bg-white px-2 py-0.5 rounded border border-neutral-300 shadow-xs">
-                              {scenario === 1 ? "Ayşe H." : "Murat U."}
-                            </span>
-                          </div>
-
-                          <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
-                            <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">3</div>
-                            <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
-                          </div>
+                {/* SAĞ TARAF: HARİTA VEYA SAĞLAYICI TELEFONU (Senaryo 2 Final) */}
+                {phase === 'FINAL_ACTION' && scenario === 2 ? (
+                  <div className="bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] flex flex-col justify-between shadow-2xl relative overflow-hidden h-[380px] animate-in zoom-in duration-500 delay-100">
+                    {/* Header */}
+                    <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
+                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">M</div>
+                      <div className="leading-tight flex-1">
+                        <div className="font-bold text-[13px]">Mehmet Bey</div>
+                        <div className="text-[10px] text-white/90 font-medium">
+                          {chatStep === 3 ? 'yazıyor...' : 'çevrimiçi'}
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-center text-neutral-600 text-xs font-mono bg-white/60 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-xs">
-                        Talep gönderildiğinde harita taranacak...
+                    </div>
+                    {/* Chat Area */}
+                    <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
+                      {chatStep >= 2 && (
+                        <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
+                          Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
+                          <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:41</span>
+                        </div>
+                      )}
+                      {chatStep >= 4 && (
+                        <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
+                          Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
+                          <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:42</span>
+                        </div>
+                      )}
+                      {chatStep >= 6 && (
+                        <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
+                          Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
+                          <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:43</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Input */}
+                    <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200">
+                      <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm">
+                        {(chatStep === 1 || chatStep === 5) ? 'Yazıyorsunuz...' : 'Mesaj yazın'}
                       </div>
-                    )}
+                      <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <Send size={12} className="-ml-0.5" />
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <div className="bg-[#EAE6DF] border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full">
+                    <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]" />
+                    <div className="absolute inset-0 opacity-20 bg-gradient-to-r from-sky-100/50 via-transparent to-amber-100/40 pointer-events-none" />
 
-                  <div className="relative z-10 pt-2 border-t border-neutral-300">
-                    {phase !== 'FINAL_ACTION' ? (
-                      <div className="text-center text-[11px] text-neutral-700 font-medium py-1">
-                        {phase === 'MAP_SCANNING' ? 'En yakın uzman haritada işaretleniyor...' : 'Müşteri tercihi bekleniyor...'}
+                    <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-full bg-neutral-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {scenario === 1 ? "A" : "M"}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-neutral-900">
+                            {scenario === 1 ? "Ayşe Hanım" : "Murat Usta"}
+                          </h4>
+                          <span className="text-[10px] text-neutral-600">
+                            {scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis"}
+                          </span>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="space-y-2 animate-in fade-in duration-300">
-                        {scenario === 1 && (
-                          <>
-                            <div className="flex items-center justify-between text-[11px] border-b border-neutral-300 pb-1">
-                              <span className="text-neutral-600 font-bold uppercase text-[9px]">Müşteri No</span>
-                              <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
-                            </div>
-                            <div className="flex items-center justify-center space-x-1.5 text-neutral-800 bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-bold shadow-xs">
-                              <PhoneCall size={12} className="animate-bounce" />
-                              <span>Telefon Araması Başlatıldı</span>
-                            </div>
-                          </>
-                        )}
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono transition-all ${
+                        phase === 'MAP_SCANNING' ? 'bg-neutral-200 text-neutral-700 border border-neutral-300 animate-pulse' : 
+                        phase === 'FINAL_ACTION' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
+                      }`}>
+                        {phase === 'MAP_SCANNING' ? 'Harita Taranıyor...' : phase === 'FINAL_ACTION' ? 'Eşleşti' : 'Bekliyor'}
+                      </span>
+                    </div>
 
-                        {scenario === 2 && (
-                          <>
-                            <div className="flex items-center justify-between text-[11px] border-b border-neutral-300 pb-1">
-                              <span className="text-neutral-600 font-bold uppercase text-[9px]">İletişim Kanalı</span>
-                              <div className="flex items-center space-x-1 text-neutral-800 font-bold">
-                                <MessageCircle size={11} />
-                                <span className="text-[10px]">Whatsapp/Sms</span>
+                    <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
+                      {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
+                          <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/90 px-2.5 py-1 rounded-full border border-neutral-300 shadow-xs">
+                            <Compass size={13} className="animate-spin text-neutral-600" /> Bölgedeki Alternatifler Analiz Ediliyor
+                          </span>
+                          
+                          <div className="flex items-center justify-center space-x-8 relative my-2 w-full">
+                            <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
+                              <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">1</div>
+                              <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
+                            </div>
+
+                            <div className="flex flex-col items-center transform scale-110">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-700 ${
+                                phase === 'FINAL_ACTION' 
+                                  ? 'bg-neutral-800 text-white ring-4 ring-neutral-800/30 scale-125' 
+                                  : 'bg-neutral-300 text-neutral-800 animate-bounce ring-2 ring-neutral-300/50'
+                              }`}>
+                                <MapPin size={16} />
                               </div>
+                              <span className="text-[10px] text-neutral-900 font-extrabold mt-1 bg-white px-2 py-0.5 rounded border border-neutral-300 shadow-xs">
+                                {scenario === 1 ? "Ayşe H." : "Murat U."}
+                              </span>
                             </div>
-                            <div className="bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-medium text-neutral-900 flex items-start space-x-1.5 shadow-xs">
-                              <Send size={12} className="text-neutral-700 shrink-0 mt-0.5" />
-                              <p>Bosch servis arıyor. "Size nasıl yardımcı olabilirim?"</p>
+
+                            <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
+                              <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">3</div>
+                              <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
                             </div>
-                          </>
-                        )}
-                      </div>
-                    )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center text-neutral-600 text-xs font-mono bg-white/60 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-xs">
+                          Talep gönderildiğinde harita taranacak...
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative z-10 pt-2 border-t border-neutral-300">
+                      {phase !== 'FINAL_ACTION' ? (
+                        <div className="text-center text-[11px] text-neutral-700 font-medium py-1">
+                          {phase === 'MAP_SCANNING' ? 'En yakın uzman haritada işaretleniyor...' : 'Müşteri tercihi bekleniyor...'}
+                        </div>
+                      ) : (
+                        <div className="space-y-2 animate-in fade-in duration-300">
+                          {scenario === 1 && (
+                            <>
+                              <div className="flex items-center justify-between text-[11px] border-b border-neutral-300 pb-1">
+                                <span className="text-neutral-600 font-bold uppercase text-[9px]">Müşteri No</span>
+                                <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-1.5 text-neutral-800 bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-bold shadow-xs">
+                                <PhoneCall size={12} className="animate-bounce" />
+                                <span>Telefon Araması Başlatıldı</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                </div>
-
+                )}
               </div>
-
             </div>
           </div>
-
         </div>
       </section>
 
