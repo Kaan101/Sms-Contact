@@ -9,12 +9,12 @@ export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
-  // Fazlar: SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
-  const [phase, setPhase] = useState('SCENARIO_INTRO'); 
+  // Fazlar: MOBOOL_START -> SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
+  const [phase, setPhase] = useState('MOBOOL_START'); 
   
   const [chatStep, setChatStep] = useState(0); 
 
-  // Outro ekranındaki daktilo efektleri için state'ler
+  // Intro ve Outro ekranlarındaki daktilo efektleri için state'ler
   const [outroTitle, setOutroTitle] = useState('');
   const [outroText, setOutroText] = useState('');
   const fullOutroTitle = "MOBOOL";
@@ -34,14 +34,10 @@ export default function MainPage({ onGoToLogin }) {
     }
   }, [chatStep, phase]);
 
-  // 1. FAZ: İntro ve Daktilo Yönetimi
+  // 1. FAZ: Talep Daktilo Yönetimi
   useEffect(() => {
     let t;
-    let timeoutId;
-    
-    if (phase === 'SCENARIO_INTRO') {
-      timeoutId = setTimeout(() => setPhase('TYPING'), 4000);
-    } else if (phase === 'TYPING') {
+    if (phase === 'TYPING') {
       setTypedText('');
       setChatStep(0);
       let idx = 0;
@@ -52,23 +48,20 @@ export default function MainPage({ onGoToLogin }) {
           idx++;
         } else {
           clearInterval(t);
-          timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 2200);
+          // Yazı bittikten sonra 2.2 saniye bekle ve seçenekleri göster
+          setTimeout(() => setPhase('SHOW_OPTIONS'), 2200);
         }
       }, 70); 
     }
-
-    return () => {
-      clearInterval(t);
-      clearTimeout(timeoutId);
-    };
+    return () => clearInterval(t);
   }, [phase, fullText]);
 
-  // MOBOOL_OUTRO Daktilo Efekti
+  // MOBOOL_START ve MOBOOL_OUTRO Daktilo Efekti
   useEffect(() => {
     let titleInterval;
     let textInterval;
     
-    if (phase === 'MOBOOL_OUTRO') {
+    if (phase === 'MOBOOL_START' || phase === 'MOBOOL_OUTRO') {
       setOutroTitle('');
       setOutroText('');
       let titleIdx = 0;
@@ -80,14 +73,17 @@ export default function MainPage({ onGoToLogin }) {
           titleIdx++;
         } else {
           clearInterval(titleInterval);
-          textInterval = setInterval(() => {
-            if (textIdx <= fullOutroText.length) {
-              setOutroText(fullOutroText.slice(0, textIdx));
-              textIdx++;
-            } else {
-              clearInterval(textInterval);
-            }
-          }, 40);
+          // EĞER OUTRO İSE ALT METNİ DE YAZ (Start ekranında sadece MOBOOL yazar)
+          if (phase === 'MOBOOL_OUTRO') {
+            textInterval = setInterval(() => {
+              if (textIdx <= fullOutroText.length) {
+                setOutroText(fullOutroText.slice(0, textIdx));
+                textIdx++;
+              } else {
+                clearInterval(textInterval);
+              }
+            }, 40);
+          }
         }
       }, 150);
     }
@@ -98,10 +94,18 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase]);
 
-  // 2. FAZ: Durum Makinesi (State Machine)
+  // 2. FAZ: Ana Durum Makinesi (State Machine) - Tüm Geçişler ve Süreler
   useEffect(() => {
     let t1;
     switch(phase) {
+      case 'MOBOOL_START':
+        // Başlangıç MOBOOL yazısı ekranda 4 saniye kalır
+        t1 = setTimeout(() => setPhase('SCENARIO_INTRO'), 4000);
+        break;
+      case 'SCENARIO_INTRO':
+        // Senaryo öncesi metin bekleme süresi 2 saniye ARTIRILDI (Toplam 6 saniye)
+        t1 = setTimeout(() => setPhase('TYPING'), 6000); 
+        break;
       case 'SHOW_OPTIONS': 
         t1 = setTimeout(() => setPhase('CLICK_OPTION'), 2000); 
         break;
@@ -118,7 +122,9 @@ export default function MainPage({ onGoToLogin }) {
         t1 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
         break;
       case 'FINAL_ACTION': 
-        const delay = scenario === 1 ? 7000 : 16000;
+        // 1. Senaryo (Telefon): 7 Saniye
+        // 2. Senaryo (WhatsApp): 12sn (Mesajlar) + 2sn (Okuma Süresi) = 14 Saniye
+        const delay = scenario === 1 ? 7000 : 14000;
         t1 = setTimeout(() => {
           if (scenario === 2) {
             setPhase('MOBOOL_OUTRO');
@@ -129,6 +135,7 @@ export default function MainPage({ onGoToLogin }) {
         }, delay); 
         break;
       case 'MOBOOL_OUTRO':
+        // Outro tamamlandıktan sonra Senaryo 1'in İntro'suna döner (Sonsuz Döngü)
         t1 = setTimeout(() => {
           setScenario(1);
           setPhase('SCENARIO_INTRO');
@@ -149,7 +156,7 @@ export default function MainPage({ onGoToLogin }) {
         { step: 3, delay: 5000 },
         { step: 4, delay: 7500 },
         { step: 5, delay: 9000 },
-        { step: 6, delay: 12000 } 
+        { step: 6, delay: 12000 } // Son mesaj 12. saniyede biter.
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
     }
@@ -216,7 +223,7 @@ export default function MainPage({ onGoToLogin }) {
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col min-h-[480px] overflow-hidden">
               
-              {/* 1. SCENARIO_INTRO */}
+              {/* 1. SCENARIO_INTRO (Her ikisi de açık yeşil arka plan, özel bold metinler) */}
               <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-emerald-50 ${
                 phase === 'SCENARIO_INTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
               }`}>
@@ -241,11 +248,11 @@ export default function MainPage({ onGoToLogin }) {
                 )}
               </div>
 
-              {/* 2. MOBOOL_OUTRO (Açık, Ferah ve Modern Grafik Zemin) */}
+              {/* 2. MOBOOL_START ve MOBOOL_OUTRO (Modern Grafik Zemin & Daktilo) */}
               <div className={`absolute inset-0 z-[80] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-neutral-50 ${
-                phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                (phase === 'MOBOOL_START' || phase === 'MOBOOL_OUTRO') ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
               }`}>
-                {/* Modern Network Arka Plan Efektleri (Açık Tema) */}
+                {/* Modern Network Arka Plan Efektleri */}
                 <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px]"></div>
                 <div className="absolute left-[-10%] top-[-10%] z-0 h-[400px] w-[400px] rounded-full bg-emerald-300 opacity-20 blur-[100px]"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] z-0 h-[300px] w-[300px] rounded-full bg-blue-300 opacity-20 blur-[100px]"></div>
@@ -257,12 +264,16 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                   <h2 className="text-4xl font-extrabold text-neutral-900 mb-3 tracking-tight h-10">
                     {outroTitle}
-                    {outroTitle.length < fullOutroTitle.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse text-emerald-500">|</span>}
+                    {outroTitle.length < fullOutroTitle.length && (phase === 'MOBOOL_START' || phase === 'MOBOOL_OUTRO') && <span className="animate-pulse text-emerald-500">|</span>}
                   </h2>
-                  <p className="text-base font-medium text-neutral-600 text-center px-8 leading-relaxed max-w-sm h-12">
-                    {outroText}
-                    {outroTitle.length === fullOutroTitle.length && outroText.length < fullOutroText.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse text-emerald-500">|</span>}
-                  </p>
+                  
+                  {/* Alt metin sadece OUTRO fazında gösterilir */}
+                  {phase === 'MOBOOL_OUTRO' && (
+                    <p className="text-base font-medium text-neutral-600 text-center px-8 leading-relaxed max-w-sm h-12">
+                      {outroText}
+                      {outroTitle.length === fullOutroTitle.length && outroText.length < fullOutroText.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse text-emerald-500">|</span>}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -307,7 +318,7 @@ export default function MainPage({ onGoToLogin }) {
                     <span className="text-[10px] font-mono text-neutral-500 font-bold uppercase block mb-2">İletişim Tercihinizi Seçin:</span>
                     <div className="grid grid-cols-2 gap-2">
                       <div className={`flex items-center justify-center space-x-1.5 py-3 px-2 rounded-xl text-[11px] font-bold shadow-sm transition-all duration-300 ${
-                        scenario === 1 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS' && phase !== 'SCENARIO_INTRO'
+                        scenario === 1 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS' && phase !== 'SCENARIO_INTRO' && phase !== 'MOBOOL_START'
                           ? 'bg-neutral-100 text-neutral-900 border-2 border-neutral-800 border-solid shadow-inner scale-95' 
                           : 'bg-white text-neutral-500 border border-neutral-300'
                       }`}>
@@ -315,7 +326,7 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
 
                       <div className={`flex items-center justify-center space-x-1.5 py-3 px-2 rounded-xl text-[11px] font-bold shadow-sm transition-all duration-300 ${
-                        scenario === 2 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS' && phase !== 'SCENARIO_INTRO'
+                        scenario === 2 && phase !== 'TYPING' && phase !== 'SHOW_OPTIONS' && phase !== 'SCENARIO_INTRO' && phase !== 'MOBOOL_START'
                           ? 'bg-neutral-100 text-neutral-900 border-2 border-neutral-800 border-solid shadow-inner scale-95' 
                           : 'bg-white text-neutral-500 border border-neutral-300'
                       }`}>
@@ -325,6 +336,7 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
 
                   <div className="mt-4 pt-4 flex justify-end border-t border-neutral-200/60">
+                    {/* GÖNDERİLDİ Durumu */}
                     <div className={`px-6 py-3 rounded-xl flex items-center space-x-2 transition-all duration-500 ${
                       (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-none scale-95 opacity-50' 
@@ -513,6 +525,7 @@ export default function MainPage({ onGoToLogin }) {
                           <Send size={14} className="-ml-0.5" />
                         </div>
                       </div>
+
                     </div>
                   )}
 
