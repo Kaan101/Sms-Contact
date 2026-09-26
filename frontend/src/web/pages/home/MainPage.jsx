@@ -24,7 +24,10 @@ export default function MainPage({ onGoToLogin }) {
 
   const chatContainerRef = useRef(null);
 
-  const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
+  // Daha doğal ve canlı daktilo metinleri
+  const fullText = scenario === 1 
+    ? "Tarabya sahile yakın, 3+1 kiralık daire." 
+    : "Bosch çamaşır makinesi su almıyor, acil servis.";
 
   // WhatsApp ekranında yeni mesaj gelince mesaj kutusunu alta kaydırır
   useEffect(() => {
@@ -33,7 +36,7 @@ export default function MainPage({ onGoToLogin }) {
     }
   }, [chatStep, phase]);
 
-  // 1. FAZ: İntro ve Daktilo Yönetimi (Memory Leak Engellendi)
+  // 1. FAZ: İntro ve Daktilo Yönetimi
   useEffect(() => {
     let t;
     let timeoutId;
@@ -54,7 +57,7 @@ export default function MainPage({ onGoToLogin }) {
           clearInterval(t);
           timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 1200);
         }
-      }, 100);
+      }, 70); // Daha akıcı bir daktilo hızı
     }
 
     return () => {
@@ -63,7 +66,7 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase, fullText]);
 
-  // MOBOOL_OUTRO Daktilo Efekti (Beyaz Ekran / Çökme Sorunu Çözümü)
+  // MOBOOL_OUTRO Daktilo Efekti
   useEffect(() => {
     let titleInterval;
     let textInterval;
@@ -92,7 +95,6 @@ export default function MainPage({ onGoToLogin }) {
       }, 150);
     }
     
-    // Bileşen unmount olduğunda veya faz değiştiğinde HER İKİ interval da temizlenmeli
     return () => {
       clearInterval(titleInterval);
       clearInterval(textInterval);
@@ -119,7 +121,9 @@ export default function MainPage({ onGoToLogin }) {
         t1 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
         break;
       case 'FINAL_ACTION': 
-        const delay = scenario === 1 ? 7000 : 15500;
+        // 1. Senaryo (Telefon): 7 Saniye
+        // 2. Senaryo (WhatsApp): 12sn (Mesajlar) + 3sn (Okuma Süresi) + 2.5sn (Onay) = 17.5 Saniye
+        const delay = scenario === 1 ? 7000 : 17500;
         t1 = setTimeout(() => {
           if (scenario === 2) {
             setPhase('MOBOOL_OUTRO');
@@ -153,15 +157,16 @@ export default function MainPage({ onGoToLogin }) {
         { step: 3, delay: 5000 },
         { step: 4, delay: 7500 },
         { step: 5, delay: 9000 },
-        { step: 6, delay: 12000 }
+        { step: 6, delay: 12000 } // Son mesaj 12. saniyede biter
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
 
+      // Son mesajdan sonra TAM 3 SANİYE okuma/bekleme süresi
       timers.push(setTimeout(() => {
         setWhatsappPhase('SUCCESS_MARK');
         setTimeout(() => setShowSuccess(true), 100);
         setTimeout(() => setShowSuccess(false), 2000); 
-      }, 13000));
+      }, 15000));
     }
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
@@ -226,26 +231,26 @@ export default function MainPage({ onGoToLogin }) {
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col min-h-[480px] overflow-hidden">
               
-              {/* 1. SCENARIO_INTRO */}
-              <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
+              {/* 1. SCENARIO_INTRO (Her ikisi de açık yeşil arka plan, özel bold metinler) */}
+              <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-emerald-50 ${
                 phase === 'SCENARIO_INTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
-              } ${scenario === 1 ? 'bg-emerald-50' : 'bg-neutral-100'}`}>
+              }`}>
                 {scenario === 1 ? (
                   <div className="flex flex-col items-center px-10 text-center animate-in slide-in-from-bottom-4 duration-700">
                     <div className="w-16 h-16 bg-emerald-200 rounded-full flex items-center justify-center mb-6 shadow-sm">
                       <Phone size={28} className="text-emerald-700" />
                     </div>
                     <h3 className="text-2xl font-bold text-emerald-900 leading-tight">
-                      İhtiyacınızı kısaca yazın ve gönderin, en uygun hizmet veren sizi arasın.
+                      İhtiyacınızı kısaca yazın ve gönderin, en uygun hizmet veren sizi <span className="font-extrabold text-emerald-700">arasın.</span>
                     </h3>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center px-10 text-center animate-in slide-in-from-bottom-4 duration-700">
-                    <div className="w-16 h-16 bg-neutral-300 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                      <MessageCircle size={28} className="text-neutral-700" />
+                    <div className="w-16 h-16 bg-emerald-200 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                      <MessageCircle size={28} className="text-emerald-700" />
                     </div>
-                    <h3 className="text-2xl font-bold text-neutral-900 leading-tight">
-                      İhtiyacınızı kısaca yazın ve gönderin, en uygun servis sağlayan size mesaj atsın.
+                    <h3 className="text-2xl font-bold text-emerald-900 leading-tight">
+                      İhtiyacınızı kısaca yazın ve gönderin, en uygun servis sağlayan size <span className="font-extrabold text-emerald-700">mesaj atsın.</span>
                     </h3>
                   </div>
                 )}
@@ -327,10 +332,11 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
 
                   <div className="mt-4 pt-4 flex justify-end border-t border-neutral-200/60">
-                    <div className={`px-6 py-3 rounded-xl shadow-lg flex items-center space-x-2 transition-all duration-500 ${
+                    {/* GÖNDERİLDİ Durumu Revize Edildi (Açık Yeşil, Soluk) */}
+                    <div className={`px-6 py-3 rounded-xl flex items-center space-x-2 transition-all duration-500 ${
                       (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
-                        ? 'bg-neutral-700 text-white scale-95 opacity-90' 
-                        : 'bg-neutral-950 text-white transform hover:scale-105 cursor-pointer'
+                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-none scale-95 opacity-70' 
+                        : 'bg-neutral-950 text-white shadow-lg transform hover:scale-105 cursor-pointer'
                     }`}>
                       <span className="text-xs font-extrabold tracking-wide uppercase">
                         {(phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') ? 'Gönderildi' : 'Gönder'}
@@ -465,7 +471,7 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL */}
+                      {/* Canlandırılmış ve Doğal WhatsApp İçeriği */}
                       <div ref={chatContainerRef} className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth pb-4">
                         
                         {chatStep >= 2 && (
@@ -482,7 +488,7 @@ export default function MainPage({ onGoToLogin }) {
                           <div className="self-end max-w-[85%] animate-in slide-in-from-right-2 fade-in duration-500">
                             <span className="text-[10px] font-bold text-neutral-500/80 mb-1 mr-1 block text-right tracking-wider uppercase">Mehmet Bey (Siz)</span>
                             <div className="bg-[#D9FDD3] text-neutral-900 p-3 rounded-xl rounded-tr-none text-xs leading-relaxed shadow-sm relative flex flex-col">
-                              <span className="break-words whitespace-normal">Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?</span>
+                              <span className="break-words whitespace-normal">Kolay gelsin Murat Usta. Çamaşır makinesi su almıyor, ekranda E18 hatası var. Bugün bakma şansınız var mı?</span>
                               <div className="flex items-center justify-end mt-1 shrink-0">
                                 <span className="text-[9px] text-neutral-500">10:42</span>
                                 <CheckCheck size={12} className="text-blue-500 ml-1"/> 
@@ -495,7 +501,7 @@ export default function MainPage({ onGoToLogin }) {
                           <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500">
                              <span className="text-[10px] font-bold text-neutral-500/80 mb-1 ml-1 block tracking-wider uppercase">Murat Usta</span>
                             <div className="bg-white text-neutral-900 p-3 rounded-xl rounded-tl-none text-xs leading-relaxed shadow-sm relative flex flex-col">
-                              <span className="break-words whitespace-normal">Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.</span>
+                              <span className="break-words whitespace-normal">Tabii, E18 genelde pompa arızasıdır. Saat 14:00 - 16:00 arası o bölgedeyiz. Ekibimle gelip yerinde çözeceğiz, hiç merak etmeyin.</span>
                               <span className="text-[9px] text-neutral-400 self-end mt-1 shrink-0">10:43</span>
                             </div>
                           </div>
