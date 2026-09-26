@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck, User, Wrench
+  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck, User, Wrench, X
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
@@ -50,14 +50,10 @@ export default function MainPage({ onGoToLogin }) {
     } else if (phase === 'CLICK_SEND') {
       t3 = setTimeout(() => setPhase('MAP_SCANNING'), 1500); 
     } else if (phase === 'MAP_SCANNING') {
-      // Harita taranıyor...
       t4 = setTimeout(() => setPhase('MATCH_FOUND'), 4000); 
     } else if (phase === 'MATCH_FOUND') {
-      // Sadece SAĞ ekranda Bulundu! uyarısı (3.5 saniye)
       t5 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
     } else if (phase === 'FINAL_ACTION') {
-      // Senaryo 1 (Telefon) 7 saniye. 
-      // Senaryo 2 (WhatsApp) Tek ekran chat döngüsü yaklaşık 14 saniye sürecek.
       const delay = scenario === 1 ? 7000 : 15000; 
       
       t6 = setTimeout(() => {
@@ -78,7 +74,7 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase, scenario]);
 
-  // 3. FAZ: WhatsApp Chat Adımları (Tek Ekran İçin Optimize Edildi)
+  // 3. FAZ: WhatsApp Chat Adımları
   useEffect(() => {
     let timers = [];
     if (phase === 'FINAL_ACTION' && scenario === 2) {
@@ -103,6 +99,8 @@ export default function MainPage({ onGoToLogin }) {
     }
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
+
+  const mapBackgroundImage = `url('/images/map_bg.png')`;
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans selection:bg-neutral-900 selection:text-white overflow-x-hidden">
@@ -190,14 +188,12 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* GRID YAPISI: WhatsApp aşamasında tek ekran (ortalanmış), diğerlerinde iki ekran */}
               <div className={`grid items-stretch relative flex-1 ${
                   (phase === 'FINAL_ACTION' && scenario === 2) 
                     ? 'grid-cols-1 max-w-sm mx-auto w-full' 
                     : 'grid-cols-1 md:grid-cols-2 gap-6'
                 }`}>
                 
-                {/* TEK VE DEV YEŞİL ONAY İŞARETİ (WhatsApp Final Ekranında) */}
                 <div className={`absolute inset-0 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out rounded-[2rem] ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 bg-white/70 backdrop-blur-sm scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
                   <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center shadow-2xl">
                     <CheckCircle2 size={72} className="text-emerald-500" />
@@ -206,7 +202,6 @@ export default function MainPage({ onGoToLogin }) {
 
                 {/* SENARYO 2 FINAL: WHATSAPP TEK EKRAN */}
                 {(phase === 'FINAL_ACTION' && scenario === 2) ? (
-                  // MOBOOL: overflow-hidden ve h-full ile taşmalar engellendi
                   <div className="flex flex-col h-[400px] w-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-xl bg-white mx-auto">
                     <div className="flex flex-col h-full w-full bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] overflow-hidden transition-opacity duration-1000">
                       
@@ -225,12 +220,11 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      {/* MOBOOL: overflow-x-hidden ve break-words ile yatay taşmalar tamamen engellendi */}
                       <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full">
-                        <div className="text-center my-1"><span className="bg-[#E1F3FB] text-neutral-600 text-[9px] font-bold px-2 py-1 rounded-lg">SMS KONTAK Eşleşmesi Sağlandı</span></div>
+                        {/* Bilgi Balonu Kaldırıldı */}
 
                         {chatStep >= 2 && (
-                          <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500">
+                          <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500 mt-2">
                             <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 ml-1 block">Murat Usta</span>
                             <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative flex flex-col">
                               <span className="break-words whitespace-normal">Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?</span>
@@ -321,15 +315,36 @@ export default function MainPage({ onGoToLogin }) {
 
                         {phase === 'FINAL_ACTION' && scenario === 1 && (
                           <div className="animate-in fade-in zoom-in duration-1000">
-                            <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
-                              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
-                              <div className="relative z-10 flex flex-col items-center space-y-1">
-                                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-1 animate-ping absolute top-3" />
-                                <PhoneIncoming size={20} className="animate-bounce mb-1 text-emerald-200" />
-                                <span className="text-[9px] uppercase tracking-widest font-mono text-emerald-200 font-bold">Gelen Telefon Araması</span>
-                                <h5 className="text-sm font-extrabold tracking-tight mt-1">Emlakçı (Ayşe Hanım) arıyor.</h5>
-                                <p className="text-[11px] text-emerald-100 font-mono">0532 555 44 33</p>
+                            {/* GERÇEKÇİ ARAMA EKRANI (Senaryo 1) */}
+                            <div className="bg-gradient-to-b from-neutral-800 to-neutral-900 text-white p-5 rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col justify-between h-[280px]">
+                              
+                              <div className="flex flex-col items-center pt-2">
+                                <div className="w-14 h-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+                                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+                                    <User size={20} className="text-white" />
+                                  </div>
+                                </div>
+                                <h5 className="text-lg font-medium tracking-tight mb-1">Ayşe Hanım</h5>
+                                <p className="text-xs text-neutral-400">Tarabya Emlak Uzmanı</p>
                               </div>
+
+                              <div className="text-center text-sm font-medium text-emerald-400 mb-2 animate-pulse">
+                                Gelen Arama...
+                              </div>
+
+                              <div className="flex justify-between items-center px-4 pb-2 w-full max-w-[200px] mx-auto">
+                                <div className="flex flex-col items-center">
+                                  <button className="w-14 h-14 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center text-white transition transform hover:scale-105 shadow-lg shadow-rose-500/30">
+                                    <Phone size={24} className="rotate-[135deg]" />
+                                  </button>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                  <button className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center text-white transition transform hover:scale-105 shadow-lg shadow-emerald-500/30 animate-bounce">
+                                    <Phone size={24} />
+                                  </button>
+                                </div>
+                              </div>
+
                             </div>
                           </div>
                         )}
@@ -340,16 +355,14 @@ export default function MainPage({ onGoToLogin }) {
                     <div 
                       className="bg-white border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full"
                       style={{ 
-                        // Projedeki yerel harita arka planı çağrılıyor
-                        backgroundImage: "url('/images/map_bg.png')", 
+                        backgroundImage: mapBackgroundImage, 
                         backgroundSize: 'cover', 
                         backgroundPosition: 'center' 
                       }}
                     >
-                      {/* Harita üzerine çok hafif bir beyaz perde atıyoruz ki metinler okunsun */}
                       <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] pointer-events-none" />
 
-                      {/* MATCH FOUND EKRANI - Sadece Sağ Tarafın Üstünü Kaplar */}
+                      {/* MATCH FOUND EKRANI */}
                       {phase === 'MATCH_FOUND' && (
                         <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 p-6">
                           <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 text-white shadow-xl ${scenario === 1 ? 'bg-rose-500' : 'bg-blue-600'}`}>
