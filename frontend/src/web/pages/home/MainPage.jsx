@@ -9,7 +9,7 @@ export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
-  // Genişletilmiş Fazlar: SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
+  // Fazlar: SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
   const [phase, setPhase] = useState('SCENARIO_INTRO'); 
   
   const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); 
@@ -22,59 +22,65 @@ export default function MainPage({ onGoToLogin }) {
   const fullOutroTitle = "MOBOOL";
   const fullOutroText = "Evinizin rahatlığında siz isteyin, en iyi servis ve hizmet veren size ulaşsın.";
 
-  // Sadece WhatsApp mesaj alanını kaydırmak için referans
   const chatContainerRef = useRef(null);
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // WhatsApp ekranında yeni mesaj gelince sadece mesaj kutusunu en alta kaydır
+  // WhatsApp ekranında yeni mesaj gelince mesaj kutusunu alta kaydırır
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatStep, phase]);
 
-  // 1. FAZ: İntro ve Daktilo Yönetimi
+  // 1. FAZ: İntro ve Daktilo Yönetimi (Memory Leak Engellendi)
   useEffect(() => {
-    if (phase === 'SCENARIO_INTRO') {
-      const t = setTimeout(() => setPhase('TYPING'), 3000);
-      return () => clearTimeout(t);
-    }
+    let t;
+    let timeoutId;
     
-    if (phase === 'TYPING') {
+    if (phase === 'SCENARIO_INTRO') {
+      timeoutId = setTimeout(() => setPhase('TYPING'), 3000);
+    } else if (phase === 'TYPING') {
       setTypedText('');
       setChatStep(0);
       setShowSuccess(false);
       let idx = 0;
       
-      const t = setInterval(() => {
+      t = setInterval(() => {
         if (idx <= fullText.length) {
           setTypedText(fullText.slice(0, idx));
           idx++;
         } else {
           clearInterval(t);
-          setTimeout(() => setPhase('SHOW_OPTIONS'), 1200);
+          timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 1200);
         }
       }, 100);
-      return () => clearInterval(t);
     }
+
+    return () => {
+      clearInterval(t);
+      clearTimeout(timeoutId);
+    };
   }, [phase, fullText]);
 
-  // MOBOOL_OUTRO Daktilo Efekti
+  // MOBOOL_OUTRO Daktilo Efekti (Beyaz Ekran / Çökme Sorunu Çözümü)
   useEffect(() => {
+    let titleInterval;
+    let textInterval;
+    
     if (phase === 'MOBOOL_OUTRO') {
       setOutroTitle('');
       setOutroText('');
       let titleIdx = 0;
       let textIdx = 0;
       
-      const titleInterval = setInterval(() => {
+      titleInterval = setInterval(() => {
         if (titleIdx <= fullOutroTitle.length) {
           setOutroTitle(fullOutroTitle.slice(0, titleIdx));
           titleIdx++;
         } else {
           clearInterval(titleInterval);
-          const textInterval = setInterval(() => {
+          textInterval = setInterval(() => {
             if (textIdx <= fullOutroText.length) {
               setOutroText(fullOutroText.slice(0, textIdx));
               textIdx++;
@@ -84,9 +90,13 @@ export default function MainPage({ onGoToLogin }) {
           }, 40);
         }
       }, 150);
-      
-      return () => clearInterval(titleInterval);
     }
+    
+    // Bileşen unmount olduğunda veya faz değiştiğinde HER İKİ interval da temizlenmeli
+    return () => {
+      clearInterval(titleInterval);
+      clearInterval(textInterval);
+    };
   }, [phase]);
 
   // 2. FAZ: Durum Makinesi (State Machine)
@@ -109,7 +119,6 @@ export default function MainPage({ onGoToLogin }) {
         t1 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
         break;
       case 'FINAL_ACTION': 
-        // MOBOOL: Senaryo 2'nin bitiş süresi 15.5 saniyeye uzatıldı (1sn OK beklemesi eklendiği için)
         const delay = scenario === 1 ? 7000 : 15500;
         t1 = setTimeout(() => {
           if (scenario === 2) {
@@ -144,11 +153,10 @@ export default function MainPage({ onGoToLogin }) {
         { step: 3, delay: 5000 },
         { step: 4, delay: 7500 },
         { step: 5, delay: 9000 },
-        { step: 6, delay: 12000 } // Son mesaj 12. saniyede geliyor
+        { step: 6, delay: 12000 }
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
 
-      // MOBOOL: Son mesajdan sonra tam 1 SANİYE BEKLE (12000 + 1000 = 13000)
       timers.push(setTimeout(() => {
         setWhatsappPhase('SUCCESS_MARK');
         setTimeout(() => setShowSuccess(true), 100);
@@ -243,7 +251,7 @@ export default function MainPage({ onGoToLogin }) {
                 )}
               </div>
 
-              {/* 2. MOBOOL_OUTRO (Daktilo) */}
+              {/* 2. MOBOOL_OUTRO (Daktilo Efektli) */}
               <div className={`absolute inset-0 z-[80] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
                 phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
               }`}>
@@ -457,7 +465,7 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL YAPI */}
+                      {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL */}
                       <div ref={chatContainerRef} className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth pb-4">
                         
                         {chatStep >= 2 && (
@@ -493,8 +501,7 @@ export default function MainPage({ onGoToLogin }) {
                           </div>
                         )}
 
-                        {/* Otomatik kaydırma hedefi */}
-                        <div ref={messagesEndRef} className="h-1" />
+                        <div className="h-1" />
                       </div>
 
                       <div className="bg-[#f0f2f5] p-3 flex items-center space-x-3 z-10 border-t border-neutral-200 w-full shrink-0">
