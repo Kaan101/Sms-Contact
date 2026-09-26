@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck, User, Wrench, X
+  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck, User, Wrench
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
@@ -50,10 +50,14 @@ export default function MainPage({ onGoToLogin }) {
     } else if (phase === 'CLICK_SEND') {
       t3 = setTimeout(() => setPhase('MAP_SCANNING'), 1500); 
     } else if (phase === 'MAP_SCANNING') {
+      // Harita taranıyor...
       t4 = setTimeout(() => setPhase('MATCH_FOUND'), 4000); 
     } else if (phase === 'MATCH_FOUND') {
+      // Sadece SAĞ ekranda Bulundu! uyarısı (3.5 saniye)
       t5 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
     } else if (phase === 'FINAL_ACTION') {
+      // Senaryo 1 (Telefon) 7 saniye. 
+      // Senaryo 2 (WhatsApp) Tek ekran chat döngüsü yaklaşık 14 saniye sürecek.
       const delay = scenario === 1 ? 7000 : 15000; 
       
       t6 = setTimeout(() => {
@@ -188,12 +192,14 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
+              {/* GRID YAPISI: WhatsApp aşamasında tek ekran, diğerlerinde iki ekran */}
               <div className={`grid items-stretch relative flex-1 ${
                   (phase === 'FINAL_ACTION' && scenario === 2) 
                     ? 'grid-cols-1 max-w-sm mx-auto w-full' 
                     : 'grid-cols-1 md:grid-cols-2 gap-6'
                 }`}>
                 
+                {/* TEK VE DEV YEŞİL ONAY İŞARETİ */}
                 <div className={`absolute inset-0 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out rounded-[2rem] ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 bg-white/70 backdrop-blur-sm scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
                   <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center shadow-2xl">
                     <CheckCircle2 size={72} className="text-emerald-500" />
@@ -220,48 +226,52 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full">
-                        {/* Bilgi Balonu Kaldırıldı */}
+                      {/* WhatsApp Mesajları (Küçültülmüş Fontlar ve Sıfır Taşma) */}
+                      <div className="flex-1 p-2 space-y-2 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full">
+                        
+                        <div className="text-center my-1"><span className="bg-[#E1F3FB] text-neutral-600 text-[8px] font-bold px-2 py-1 rounded-lg">SMS KONTAK Eşleşmesi Sağlandı</span></div>
 
                         {chatStep >= 2 && (
-                          <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500 mt-2">
-                            <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 ml-1 block">Murat Usta</span>
-                            <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative flex flex-col">
+                          <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500">
+                            <span className="text-[8px] font-bold text-neutral-500/80 mb-0.5 ml-1 block tracking-wider uppercase">Murat Usta</span>
+                            <div className="bg-white text-neutral-900 p-2 rounded-xl rounded-tl-none text-[10px] leading-relaxed shadow-sm relative flex flex-col">
                               <span className="break-words whitespace-normal">Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?</span>
-                              <span className="text-[8px] text-neutral-400 self-end mt-1 shrink-0">10:41</span>
+                              <span className="text-[7px] text-neutral-400 self-end mt-1 shrink-0">10:41</span>
                             </div>
                           </div>
                         )}
+                        
                         {chatStep >= 4 && (
                           <div className="self-end max-w-[85%] animate-in slide-in-from-right-2 fade-in duration-500">
-                            <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 mr-1 block text-right">Mehmet Bey (Siz)</span>
-                            <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium shadow-sm relative flex flex-col">
+                            <span className="text-[8px] font-bold text-neutral-500/80 mb-0.5 mr-1 block text-right tracking-wider uppercase">Mehmet Bey (Siz)</span>
+                            <div className="bg-[#D9FDD3] text-neutral-900 p-2 rounded-xl rounded-tr-none text-[10px] leading-relaxed shadow-sm relative flex flex-col">
                               <span className="break-words whitespace-normal">Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?</span>
                               <div className="flex items-center justify-end mt-1 shrink-0">
-                                <span className="text-[8px] text-neutral-500">10:42</span>
-                                <CheckCheck size={12} className="text-blue-500 ml-1"/> 
+                                <span className="text-[7px] text-neutral-500">10:42</span>
+                                <CheckCheck size={10} className="text-blue-500 ml-1"/> 
                               </div>
                             </div>
                           </div>
                         )}
+                        
                         {chatStep >= 6 && (
                           <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500">
-                             <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 ml-1 block">Murat Usta</span>
-                            <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative flex flex-col">
+                             <span className="text-[8px] font-bold text-neutral-500/80 mb-0.5 ml-1 block tracking-wider uppercase">Murat Usta</span>
+                            <div className="bg-white text-neutral-900 p-2 rounded-xl rounded-tl-none text-[10px] leading-relaxed shadow-sm relative flex flex-col">
                               <span className="break-words whitespace-normal">Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.</span>
-                              <span className="text-[8px] text-neutral-400 self-end mt-1 shrink-0">10:43</span>
+                              <span className="text-[7px] text-neutral-400 self-end mt-1 shrink-0">10:43</span>
                             </div>
                           </div>
                         )}
                       </div>
 
                       <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200 w-full shrink-0">
-                        <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm flex items-center space-x-2 overflow-hidden">
-                          <MessageCircle size={14} className="text-neutral-400 shrink-0" />
+                        <div className="bg-white rounded-full flex-1 px-3 py-1.5 text-[10px] text-neutral-400 shadow-sm flex items-center space-x-2 overflow-hidden">
+                          <MessageCircle size={12} className="text-neutral-400 shrink-0" />
                           <span className="truncate">Mesaj yazın</span>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
-                          <Send size={12} className="-ml-0.5" />
+                        <div className="w-7 h-7 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Send size={10} className="-ml-0.5" />
                         </div>
                       </div>
                     </div>
@@ -315,33 +325,35 @@ export default function MainPage({ onGoToLogin }) {
 
                         {phase === 'FINAL_ACTION' && scenario === 1 && (
                           <div className="animate-in fade-in zoom-in duration-1000">
-                            {/* GERÇEKÇİ ARAMA EKRANI (Senaryo 1) */}
-                            <div className="bg-gradient-to-b from-neutral-800 to-neutral-900 text-white p-5 rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col justify-between h-[280px]">
+                            {/* GERÇEKÇİ ARAMA EKRANI (Arkası Yeşil) */}
+                            <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-5 rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col justify-between h-[280px]">
                               
                               <div className="flex flex-col items-center pt-2">
-                                <div className="w-14 h-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
-                                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
-                                    <User size={20} className="text-white" />
+                                <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
+                                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg">
+                                    <User size={20} className="text-emerald-600" />
                                   </div>
                                 </div>
                                 <h5 className="text-lg font-medium tracking-tight mb-1">Ayşe Hanım</h5>
-                                <p className="text-xs text-neutral-400">Tarabya Emlak Uzmanı</p>
+                                <p className="text-xs text-emerald-100">Tarabya Emlak Uzmanı</p>
                               </div>
 
-                              <div className="text-center text-sm font-medium text-emerald-400 mb-2 animate-pulse">
+                              <div className="text-center text-sm font-bold text-white mb-2 animate-pulse tracking-wide">
                                 Gelen Arama...
                               </div>
 
                               <div className="flex justify-between items-center px-4 pb-2 w-full max-w-[200px] mx-auto">
-                                <div className="flex flex-col items-center">
-                                  <button className="w-14 h-14 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center text-white transition transform hover:scale-105 shadow-lg shadow-rose-500/30">
+                                <div className="flex flex-col items-center space-y-1.5">
+                                  <button className="w-14 h-14 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center text-white transition transform hover:scale-105 shadow-lg shadow-rose-500/40">
                                     <Phone size={24} className="rotate-[135deg]" />
                                   </button>
+                                  <span className="text-[10px] font-medium text-emerald-50">Reddet</span>
                                 </div>
-                                <div className="flex flex-col items-center">
-                                  <button className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center text-white transition transform hover:scale-105 shadow-lg shadow-emerald-500/30 animate-bounce">
+                                <div className="flex flex-col items-center space-y-1.5">
+                                  <button className="w-14 h-14 rounded-full bg-emerald-500 border-[3px] border-emerald-400 hover:bg-emerald-400 flex items-center justify-center text-white transition transform hover:scale-105 shadow-lg shadow-emerald-900/50 animate-bounce">
                                     <Phone size={24} />
                                   </button>
+                                  <span className="text-[10px] font-bold text-white">Kabul Et</span>
                                 </div>
                               </div>
 
