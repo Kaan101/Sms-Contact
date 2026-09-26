@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, Compass, CheckCheck, User, Wrench
+  MessageCircle, Send, PhoneIncoming, Compass, CheckCheck, User, Wrench
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
@@ -40,7 +40,8 @@ export default function MainPage({ onGoToLogin }) {
     let timeoutId;
     
     if (phase === 'SCENARIO_INTRO') {
-      timeoutId = setTimeout(() => setPhase('TYPING'), 3000);
+      // İntro ekranı bekleme süresi 1 saniye artırıldı (3000 -> 4000)
+      timeoutId = setTimeout(() => setPhase('TYPING'), 4000);
     } else if (phase === 'TYPING') {
       setTypedText('');
       setChatStep(0);
@@ -52,8 +53,8 @@ export default function MainPage({ onGoToLogin }) {
           idx++;
         } else {
           clearInterval(t);
-          // Yazı bittikten sonra 3.2 saniye (eski 1.2 + 2 saniye ekleme) bekle ve seçenekleri göster
-          timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 3200);
+          // Yazı bittikten sonraki boşluk 1 saniye azaltıldı (3200 -> 2200)
+          timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 2200);
         }
       }, 70); 
     }
@@ -120,8 +121,8 @@ export default function MainPage({ onGoToLogin }) {
         break;
       case 'FINAL_ACTION': 
         // 1. Senaryo (Telefon): 7 Saniye
-        // 2. Senaryo (WhatsApp): 12sn (Mesajlar) + 2sn (Okuma Süresi) = 14 Saniye
-        const delay = scenario === 1 ? 7000 : 14000;
+        // 2. Senaryo (WhatsApp): 12sn (Mesajlar) + 4sn (Okuma Süresi) = 16 Saniye (14'ten 16'ya uzatıldı)
+        const delay = scenario === 1 ? 7000 : 16000;
         t1 = setTimeout(() => {
           if (scenario === 2) {
             setPhase('MOBOOL_OUTRO');
@@ -152,7 +153,7 @@ export default function MainPage({ onGoToLogin }) {
         { step: 3, delay: 5000 },
         { step: 4, delay: 7500 },
         { step: 5, delay: 9000 },
-        { step: 6, delay: 12000 } // Son mesaj 12. saniyede biter. Sonrasında state machine 2 saniye daha bekletir.
+        { step: 6, delay: 12000 } // Son mesaj 12. saniyede biter. Sonrasında phase geçişi 4 saniye daha bekletir.
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
     }
@@ -219,7 +220,7 @@ export default function MainPage({ onGoToLogin }) {
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col min-h-[480px] overflow-hidden">
               
-              {/* 1. SCENARIO_INTRO (Her ikisi de açık yeşil arka plan) */}
+              {/* 1. SCENARIO_INTRO (Her ikisi de açık yeşil arka plan, özel bold metinler) */}
               <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-emerald-50 ${
                 phase === 'SCENARIO_INTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
               }`}>
@@ -328,7 +329,6 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
 
                   <div className="mt-4 pt-4 flex justify-end border-t border-neutral-200/60">
-                    {/* GÖNDERİLDİ Durumu: Bold kaldırıldı, Opacity düşürüldü, Pastel Yeşil yapıldı */}
                     <div className={`px-6 py-3 rounded-xl flex items-center space-x-2 transition-all duration-500 ${
                       (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-none scale-95 opacity-50' 
