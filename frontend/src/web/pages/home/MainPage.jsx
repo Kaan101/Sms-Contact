@@ -473,7 +473,7 @@ export default function MainPage({ onGoToLogin }) {
                           <User size={24} className="text-emerald-600" />
                         </div>
                       </div>
-                      <h5 className="text-xl font-medium tracking-tight mb-1">Ayşe Hanım</h5>
+                      <h5 className="text-xl font-medium tracking-tight mb-1">Emlakçı(Ayşe Hanım)</h5>
                       <p className="text-sm text-emerald-100">Tarabya Emlak Uzmanı</p>
                     </div>
 
