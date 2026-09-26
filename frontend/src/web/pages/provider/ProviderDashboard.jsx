@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import useSWR from 'swr';
-import { Briefcase, Phone, Mail, Tag, Save, CheckCircle2, Clock, Trash2, X, AlertTriangle, ShieldCheck, PhoneCall, Loader2, MessageCircle, ChevronDown, ChevronUp, History, Timer, AlertCircle } from 'lucide-react';
+import { 
+  Briefcase, Phone, Mail, Tag, Save, CheckCircle2, Clock, Trash2, X, 
+  AlertTriangle, ShieldCheck, PhoneCall, Loader2, MessageCircle, 
+  ChevronDown, ChevronUp, History, Timer, AlertCircle,
+  FileText, Bell // YENİ EKLENEN İKONLAR
+} from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime, calculateRemainingTime } from '../../../core/utils/helpers';
 
@@ -271,14 +276,22 @@ export default function ProviderDashboard() {
                         <div key={req.id} className="p-4 bg-neutral-50 rounded-xl border space-y-3 text-xs">
                           <div className="flex items-start justify-between">
                             <div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-2 flex-wrap">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                
+                                {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
+                                {req.request_type === 'BILDIRIM' ? (
+                                  <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
+                                ) : (
+                                  <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
+                                )}
+
                                 {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
                               </div>
-                              <h4 className="font-bold text-neutral-950 text-sm mt-1">"{req.raw_text}"</h4>
+                              <h4 className="font-bold text-neutral-950 text-sm mt-1.5">"{req.raw_text}"</h4>
                             </div>
                             
-                            <div className="flex flex-col items-end space-y-1.5">
+                            <div className="flex flex-col items-end space-y-1.5 shrink-0 pl-2">
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{reqStatus}</span>
                                 {timerDisplay && (
                                    <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
@@ -361,7 +374,6 @@ export default function ProviderDashboard() {
                     {poolRequests.map((req) => {
                       const isActionLoading = actionLoadingId === req.id;
                       
-                      // --- HAVUZ İÇİN SAYAÇ MANTIĞI EKLENDİ ---
                       let timerDisplay = null;
                       let isTimerCritical = false;
                       const poolLimit = Number(systemSettings?.pool_lifespan_hours) || 72;
@@ -377,9 +389,16 @@ export default function ProviderDashboard() {
                           <div className="space-y-1.5 w-full sm:w-auto flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                              
+                              {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
+                              {req.request_type === 'BILDIRIM' ? (
+                                <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
+                              ) : (
+                                <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
+                              )}
+
                               {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
                               
-                              {/* EKLENEN SAYAÇ GÖRÜNÜMÜ */}
                               {timerDisplay && (
                                  <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                                     {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
@@ -387,7 +406,7 @@ export default function ProviderDashboard() {
                                  </div>
                               )}
                             </div>
-                            <h4 className="font-bold text-neutral-950 text-sm mt-0.5">"{req.raw_text}"</h4>
+                            <h4 className="font-bold text-neutral-950 text-sm mt-1">"{req.raw_text}"</h4>
                             <span className="text-[10px] font-mono text-neutral-500 block">📍 {extractAddress(req.location)}</span>
                           </div>
                           
@@ -432,13 +451,21 @@ export default function ProviderDashboard() {
                         <div key={req.id} className="p-3.5 bg-neutral-50 rounded-xl border space-y-2 text-xs">
                           <div className="flex items-start justify-between">
                             <div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-2 flex-wrap">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+                                
+                                {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
+                                {req.request_type === 'BILDIRIM' ? (
+                                  <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
+                                ) : (
+                                  <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
+                                )}
+
                                 {req.created_at && <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-semibold">⏰ {safeDateTime(req.created_at)}</span>}
                               </div>
-                              <h4 className="font-semibold text-neutral-900 text-sm mt-1">"{req.raw_text}"</h4>
+                              <h4 className="font-semibold text-neutral-900 text-sm mt-1.5">"{req.raw_text}"</h4>
                             </div>
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${reqStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : reqStatus === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-700'}`}>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono shrink-0 ${reqStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : reqStatus === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-700'}`}>
                               {reqStatus === 'PROVIDER_SKIPPED' ? 'PAS GEÇİLDİ' : reqStatus}
                             </span>
                           </div>

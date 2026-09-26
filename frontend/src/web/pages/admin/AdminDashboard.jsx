@@ -6,7 +6,8 @@ import useSWR from 'swr';
 import { 
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
-  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer
+  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer,
+  FileText, Bell // Rozet ikonları
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
@@ -34,7 +35,7 @@ const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig,
   );
 });
 
-// YENİ: ZAMAN AŞIMI (TIMEOUT) CANLI SAYACI EKLENMİŞ SATIR BİLEŞENİ
+// ZAMAN AŞIMI (TIMEOUT) CANLI SAYACI EKLENMİŞ SATIR BİLEŞENİ
 const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTimeout, setIsTimeout] = useState(req.status === 'TIMEOUT');
@@ -45,13 +46,12 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
       return;
     }
 
-    // Ayarlara göre zaman aşımı süresini dakika cinsinden belirliyoruz
-    let timeoutMins = 15; // Fallback varsayılan süre
+    let timeoutMins = 15; 
     if (localSettings) {
       if (req.status === 'WAITING') {
-        timeoutMins = localSettings.pool_lifespan_hours * 60; // 72 Saat
+        timeoutMins = localSettings.pool_lifespan_hours * 60; 
       } else if (req.status === 'MATCHED') {
-        timeoutMins = localSettings.customer_selection_timeout_mins; // 60 Dk veya 15 Dk
+        timeoutMins = localSettings.customer_selection_timeout_mins; 
       }
     }
 
@@ -64,10 +64,10 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
       if (diff <= 0) {
         setTimeLeft(0);
         setIsTimeout(true);
-        return false; // Sayaç durdurulsun
+        return false; 
       } else {
         setTimeLeft(diff);
-        return true; // Sayaç devam etsin
+        return true; 
       }
     };
 
@@ -80,7 +80,6 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
     return () => clearInterval(timer);
   }, [req.created_at, req.status, localSettings]);
 
-  // Milisaniyeyi formatlayıp 72 sa, 15 dk, veya 14:59 gibi gösteren yardımcı
   const formatTime = (ms) => {
     if (ms <= 0) return "00:00";
     const totalSeconds = Math.floor(ms / 1000);
@@ -96,16 +95,22 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   return (
     <tr className="hover:bg-neutral-50 transition">
       <td className="px-4 py-3 font-mono text-neutral-900">
-        <span className="font-bold">#REQ-{req.id}</span>
-        {req.created_at && <div className="text-[10px] text-neutral-400 mt-0.5">{safeDateTime(req.created_at)}</div>}
+        {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="font-bold">#REQ-{req.id}</span>
+          {req.request_type === 'BILDIRIM' ? (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Bildirim"><Bell size={10} /> BİLDİRİM</span>
+          ) : (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-100 text-blue-800 border border-blue-200" title="Talep"><FileText size={10} /> TALEP</span>
+          )}
+        </div>
+        {req.created_at && <div className="text-[10px] text-neutral-400">{safeDateTime(req.created_at)}</div>}
       </td>
       <td className="px-4 py-3">
         <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${displayStatus === 'TIMEOUT' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-800'}`}>
           {displayStatus}
         </span>
       </td>
-
-      {/* YENİ ZAMAN AŞIMI SÜTUNU */}
       <td className="px-4 py-3 font-mono text-[11px] font-bold">
         {isTimeout ? (
            <span className="text-rose-600">00:00</span>
@@ -116,7 +121,6 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
            </span>
         )}
       </td>
-
       <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
       <td className="px-4 py-3 font-mono text-neutral-800">{cleanContact(req.contact_value)}</td>
       <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
@@ -147,12 +151,20 @@ const ProviderCard = React.memo(({ prov, onEdit, onDelete, onConnect }) => (
 const WozCard = React.memo(({ req, onAssign }) => (
   <div className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+        
+        {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
+        {req.request_type === 'BILDIRIM' ? (
+          <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
+        ) : (
+          <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
+        )}
+
         {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
         {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
       </div>
-      <p className="font-semibold text-neutral-950 text-sm">"{req.raw_text}"</p>
+      <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
       <span className="text-[11px] text-neutral-500 block">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
     </div>
     <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0">Sağlayıcı Seç & Ata</button>
@@ -390,7 +402,6 @@ export default function AdminDashboard() {
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
           <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Layers size={14} /><span>Tüm Eşleşmeler</span></button>
           
-          {/* TimeoutTracker sekmen aynen korunuyor */}
           <button onClick={() => setAdminTab('TIMEOUT_TRACKER')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TIMEOUT_TRACKER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Timer size={14} /><span>Timeout Takibi</span></button>
           
           <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>İşlem Log ({filteredSmsLogs.length})</button>
@@ -459,7 +470,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TÜM EŞLEŞMELER KISMINDA ZAMAN AŞIMI BAŞLIĞI EKLENDİ */}
       {adminTab === 'ALL_MATCHED' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm max-h-[650px] overflow-y-auto">
             {!rawMatchedRequests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
@@ -484,7 +494,7 @@ export default function AdminDashboard() {
                     key={req.id} 
                     req={req} 
                     onDelete={handleDeleteRequest} 
-                    localSettings={localSettings} /* Ayarları Row'a gönderiyoruz */
+                    localSettings={localSettings} 
                   />
                 ))}
               </tbody>

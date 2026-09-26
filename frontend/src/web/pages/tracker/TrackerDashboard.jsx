@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leafl
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import useSWR from 'swr';
-import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, MessageCircle, Loader2, Timer, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, MessageCircle, Loader2, Timer, AlertCircle, FileText, Bell } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, extractPhoneForWa, calculateRemainingTime } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
@@ -87,8 +87,16 @@ const TaskCard = React.memo(({
         }
     }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
       <div className="flex items-start justify-between mb-1.5 flex-wrap gap-y-1">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
            <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+           
+           {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
+           {req.request_type === 'BILDIRIM' ? (
+             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 border border-amber-200 text-amber-700"><Bell size={10} /> BİLDİRİM</span>
+           ) : (
+             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-50 border border-blue-200 text-blue-700"><FileText size={10} /> TALEP</span>
+           )}
+
            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{reqStatus || 'POOL'}</span>
         </div>
         
@@ -137,16 +145,16 @@ const TaskCard = React.memo(({
            {providerProfile && isMyTask && (
              <div className="flex flex-col gap-2">
                <div className="bg-neutral-50 border border-neutral-200 p-2.5 rounded-lg flex items-center justify-between mb-1">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
-                    <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-neutral-900' : 'text-neutral-400'}`}>{displayContact}</span>
-                  </div>
-                  {showWhatsApp && (
-                     <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
-                       <MessageCircle size={12} />
-                       <span>Yaz</span>
-                     </a>
-                  )}
+                 <div className="flex flex-col">
+                   <span className="text-[10px] font-mono text-neutral-500 uppercase font-semibold">Müşteri İletişim</span>
+                   <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-neutral-900' : 'text-neutral-400'}`}>{displayContact}</span>
+                 </div>
+                 {showWhatsApp && (
+                    <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+                      <MessageCircle size={12} />
+                      <span>Yaz</span>
+                    </a>
+                 )}
                </div>
 
                {reqStatus === 'MATCHED' && (
@@ -462,7 +470,26 @@ export default function TrackerDashboard() {
                 if (coords && mapIcons) {
                   return (
                     <Marker position={coords} icon={req.is_urgent ? mapIcons.urgent : mapIcons.custom} key={req.id}>
-                      <Popup className="custom-popup"><div className="w-48 p-1"><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${reqStatus === 'POOL' ? 'bg-blue-100 text-blue-800' : reqStatus === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{reqStatus || 'POOL'}</span></div><p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p><div className="text-[10px] font-mono text-neutral-500 space-y-0.5">{req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}<p>📍 {extractAddress(req.location)}</p></div></div></Popup>
+                      <Popup className="custom-popup">
+                        <div className="w-48 p-1">
+                          <div className="flex justify-between items-center mb-1 flex-wrap gap-1">
+                            <div className="flex items-center gap-1">
+                               <span className="text-[10px] font-mono font-bold bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600">#REQ-{req.id}</span>
+                               {req.request_type === 'BILDIRIM' ? (
+                                  <span className="text-[8px] font-bold bg-amber-100 text-amber-800 px-1 rounded flex items-center gap-0.5"><Bell size={8} /> BİLDİRİM</span>
+                               ) : (
+                                  <span className="text-[8px] font-bold bg-blue-100 text-blue-800 px-1 rounded flex items-center gap-0.5"><FileText size={8} /> TALEP</span>
+                               )}
+                            </div>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${reqStatus === 'POOL' ? 'bg-blue-100 text-blue-800' : reqStatus === 'MATCHED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{reqStatus || 'POOL'}</span>
+                          </div>
+                          <p className="text-xs font-bold text-neutral-900 leading-tight mb-1.5">"{req.raw_text}"</p>
+                          <div className="text-[10px] font-mono text-neutral-500 space-y-0.5">
+                            {req.created_at && <p>⏰ {safeDateTime(req.created_at)}</p>}
+                            <p>📍 {extractAddress(req.location)}</p>
+                          </div>
+                        </div>
+                      </Popup>
                     </Marker>
                   );
                 }
