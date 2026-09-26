@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneIncoming, Compass, CheckCheck, User, Wrench
+  MessageCircle, Send, PhoneIncoming, Compass, CheckCheck, User, Wrench, Loader2
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
@@ -52,7 +52,8 @@ export default function MainPage({ onGoToLogin }) {
           idx++;
         } else {
           clearInterval(t);
-          timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 1200);
+          // Yazı bittikten sonraki boşluk KISALTILDI (1.2 saniyeden 0.8 saniyeye)
+          timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 800);
         }
       }, 70); 
     }
@@ -100,7 +101,7 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase]);
 
-  // 2. FAZ: Durum Makinesi (State Machine) - Tüm Geçişler ve Süreler
+  // 2. FAZ: Durum Makinesi (State Machine)
   useEffect(() => {
     let t1;
     switch(phase) {
@@ -117,7 +118,7 @@ export default function MainPage({ onGoToLogin }) {
         t1 = setTimeout(() => setPhase('CLICK_SEND'), 1500); 
         break;
       case 'CLICK_SEND': 
-        // 1 saniye daha eklendi: Gönder tuşunda bekleme süresi 1000'den 2000'e çıkarıldı
+        // Gönderiliyor aşaması (2 Saniye)
         t1 = setTimeout(() => setPhase('MAP_SCANNING'), 2000); 
         break;
       case 'MAP_SCANNING': 
@@ -231,8 +232,9 @@ export default function MainPage({ onGoToLogin }) {
               }`}>
                 {scenario === 1 ? (
                   <div className="flex flex-col items-center px-10 text-center animate-in slide-in-from-bottom-4 duration-700">
-                    <div className="w-16 h-16 bg-emerald-200 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                      <Phone size={28} className="text-emerald-700" />
+                    <div className="flex items-center space-x-2 text-emerald-700 bg-emerald-200/50 px-5 py-2 rounded-full mb-8 shadow-sm">
+                      <Phone size={18} />
+                      <span className="font-extrabold text-[13px] uppercase tracking-widest">Telefon Araması</span>
                     </div>
                     <h3 className="text-2xl font-bold text-emerald-900 leading-tight">
                       İhtiyacınızı kısaca yazın ve gönderin, en uygun hizmet veren sizi <span className="font-extrabold text-emerald-700">arasın.</span>
@@ -240,8 +242,9 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center px-10 text-center animate-in slide-in-from-bottom-4 duration-700">
-                    <div className="w-16 h-16 bg-emerald-200 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                      <MessageCircle size={28} className="text-emerald-700" />
+                    <div className="flex items-center space-x-2 text-emerald-700 bg-emerald-200/50 px-5 py-2 rounded-full mb-8 shadow-sm">
+                      <MessageCircle size={18} />
+                      <span className="font-extrabold text-[13px] uppercase tracking-widest">Whatsapp Mesaj</span>
                     </div>
                     <h3 className="text-2xl font-bold text-emerald-900 leading-tight">
                       İhtiyacınızı kısaca yazın ve gönderin, en uygun servis sağlayan size <span className="font-extrabold text-emerald-700">mesaj atsın.</span>
@@ -336,31 +339,47 @@ export default function MainPage({ onGoToLogin }) {
 
                   <div className="mt-4 pt-4 flex justify-end border-t border-neutral-200/60">
                     
-                    {/* YAVAŞ VE PÜRÜZSÜZ GEÇİŞ YAPAN GÖNDER BUTONU */}
-                    <div className={`rounded-xl flex items-center justify-center relative overflow-hidden transition-all duration-[1500ms] ease-in-out ${
+                    {/* 3 AŞAMALI GÖNDER BUTONU */}
+                    <div className={`rounded-xl flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out ${
                       (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
-                        ? 'bg-emerald-50 border border-emerald-100 shadow-none scale-95 w-32 h-11 opacity-60' 
+                        ? 'bg-emerald-50 border border-emerald-100 shadow-none scale-95 w-32 h-11 opacity-50' 
+                        : phase === 'CLICK_SEND'
+                        ? 'bg-neutral-800 border border-transparent shadow-md w-36 h-11' // Gönderiliyor durumu
                         : 'bg-neutral-950 border border-transparent shadow-lg transform hover:scale-105 cursor-pointer w-28 h-11'
                     }`}>
-                      {/* Normal Durum (GÖNDER) */}
-                      <div className={`absolute flex items-center space-x-2 transition-all duration-[1500ms] ease-in-out ${
-                        (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
-                          ? 'opacity-0 translate-y-4' 
-                          : 'opacity-100 translate-y-0 text-white'
+                      
+                      {/* 1. Durum: GÖNDER */}
+                      <div className={`absolute flex items-center space-x-2 transition-all duration-500 ease-in-out ${
+                        (phase === 'SHOW_OPTIONS' || phase === 'CLICK_OPTION' || phase === 'TYPING' || phase === 'SCENARIO_INTRO' || phase === 'MOBOOL_START') 
+                          ? 'opacity-100 translate-y-0 text-white' 
+                          : 'opacity-0 -translate-y-4 text-white'
                       }`}>
                         <span className="text-xs font-extrabold tracking-wide uppercase">Gönder</span>
                         <Send size={14} />
                       </div>
+
+                      {/* 2. Durum: GÖNDERİLİYOR (Spinner) */}
+                      <div className={`absolute flex items-center space-x-2 transition-all duration-500 ease-in-out ${
+                        phase === 'CLICK_SEND'
+                          ? 'opacity-100 translate-y-0 text-white' 
+                          : (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION')
+                            ? 'opacity-0 -translate-y-4 text-white'
+                            : 'opacity-0 translate-y-4 text-white'
+                      }`}>
+                        <span className="text-xs font-bold tracking-wide uppercase">Gönderiliyor</span>
+                        <Loader2 size={14} className="animate-spin" />
+                      </div>
                       
-                      {/* Onay Durumu (GÖNDERİLDİ) */}
-                      <div className={`absolute flex items-center space-x-2 transition-all duration-[1500ms] ease-in-out ${
+                      {/* 3. Durum: GÖNDERİLDİ (Onay) */}
+                      <div className={`absolute flex items-center space-x-2 transition-all duration-500 ease-in-out ${
                         (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
                           ? 'opacity-100 translate-y-0 text-emerald-600' 
-                          : 'opacity-0 -translate-y-4 text-emerald-600'
+                          : 'opacity-0 translate-y-4 text-emerald-600'
                       }`}>
                         <span className="text-[11px] font-medium tracking-wide uppercase">Gönderildi</span>
                         <CheckCircle2 size={14} />
                       </div>
+
                     </div>
 
                   </div>
@@ -400,7 +419,7 @@ export default function MainPage({ onGoToLogin }) {
                     </span>
                   </div>
 
-                  {/* BAŞLANGIÇ/BEKLEME EKRANI YAZISI (Yumuşak Geçiş) */}
+                  {/* BAŞLANGIÇ/BEKLEME EKRANI YAZISI */}
                   <div className={`absolute inset-0 flex items-center justify-center transition-all duration-1000 ease-in-out z-10 ${
                     (phase === 'SCENARIO_INTRO' || phase === 'TYPING' || phase === 'SHOW_OPTIONS' || phase === 'CLICK_OPTION' || phase === 'CLICK_SEND' || phase === 'MOBOOL_START') 
                       ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -410,7 +429,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* MAP SCANNING OVERLAY (Yumuşak Fade In/Out) */}
+                  {/* MAP SCANNING OVERLAY */}
                   <div className={`absolute inset-0 flex flex-col items-center justify-center p-4 transition-all duration-[1500ms] ease-in-out z-20 ${
                     phase === 'MAP_SCANNING' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
                   }`}>
@@ -426,7 +445,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* MATCH FOUND OVERLAY (Yumuşak Fade In/Out) */}
+                  {/* MATCH FOUND OVERLAY */}
                   <div className={`absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center text-center transition-all duration-[1500ms] ease-in-out p-6 ${
                     phase === 'MATCH_FOUND' ? 'opacity-100 scale-100' : 'opacity-0 scale-110 pointer-events-none'
                   }`}>
@@ -444,7 +463,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* TELEFON ARAMASI (Senaryo 1) OVERLAY (Yumuşak Süzülme Geçişi) */}
+                  {/* TELEFON ARAMASI (Senaryo 1) OVERLAY */}
                   <div className={`absolute inset-0 z-40 bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-6 rounded-2xl shadow-2xl flex flex-col justify-between transition-all duration-[1500ms] ease-in-out ${
                     (phase === 'FINAL_ACTION' && scenario === 1) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
                   }`}>
@@ -478,7 +497,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* WHATSAPP CHAT (Senaryo 2) OVERLAY (Yumuşak Süzülme Geçişi) */}
+                  {/* WHATSAPP CHAT (Senaryo 2) OVERLAY */}
                   <div className={`absolute inset-0 z-40 bg-[#EFEAE2] flex flex-col rounded-2xl border-[6px] border-neutral-900 overflow-hidden transition-all duration-[1500ms] ease-in-out ${
                     (phase === 'FINAL_ACTION' && scenario === 2) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
                   }`}>
@@ -498,7 +517,7 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
                     
-                    {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL YAPI */}
+                    {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL */}
                     <div ref={chatContainerRef} className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth pb-4">
                       
                       {chatStep >= 2 && (
