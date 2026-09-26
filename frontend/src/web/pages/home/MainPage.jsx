@@ -1,27 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, Compass, CheckCheck, User, Wrench
+  MessageCircle, Send, PhoneIncoming, Compass, CheckCheck, User, Wrench
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
-  // Fazlar: MOBOOL_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
-  const [phase, setPhase] = useState('MOBOOL_INTRO'); 
+  // Genişletilmiş Fazlar: SCENARIO_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
+  const [phase, setPhase] = useState('SCENARIO_INTRO'); 
   
   const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); 
   const [chatStep, setChatStep] = useState(0); 
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // WhatsApp'ta son mesaja kaydırmak için referans
+  const messagesEndRef = useRef(null);
+
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Daktilo ve Intro/Outro Yönetimi
+  // WhatsApp ekranı her chat adımı değiştiğinde en alta kaysın
   useEffect(() => {
-    if (phase === 'MOBOOL_INTRO') {
-      const t = setTimeout(() => setPhase('TYPING'), 2500);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatStep, phase]);
+
+  // 1. FAZ: İntro ve Daktilo Yönetimi
+  useEffect(() => {
+    // Sadece SCENARIO_INTRO veya TYPING fazında bu blok çalışır
+    if (phase === 'SCENARIO_INTRO') {
+      // Slayt ekranda 3 saniye kalır, sonra typing'e geçer
+      const t = setTimeout(() => setPhase('TYPING'), 3000);
       return () => clearTimeout(t);
     }
     
@@ -30,6 +42,7 @@ export default function MainPage({ onGoToLogin }) {
       setChatStep(0);
       setShowSuccess(false);
       let idx = 0;
+      
       const t = setInterval(() => {
         if (idx <= fullText.length) {
           setTypedText(fullText.slice(0, idx));
@@ -43,7 +56,7 @@ export default function MainPage({ onGoToLogin }) {
     }
   }, [phase, fullText]);
 
-  // 2. FAZ: Kusursuz Zamanlanmış Durum Makinesi (State Machine)
+  // 2. FAZ: Durum Makinesi (State Machine)
   useEffect(() => {
     let t1;
     switch(phase) {
@@ -64,13 +77,22 @@ export default function MainPage({ onGoToLogin }) {
         break;
       case 'FINAL_ACTION': 
         const delay = scenario === 1 ? 7000 : 15000;
-        t1 = setTimeout(() => setPhase('MOBOOL_OUTRO'), delay); 
+        t1 = setTimeout(() => {
+          if (scenario === 2) {
+            // WhatsApp (2) bitince Outro'ya geç
+            setPhase('MOBOOL_OUTRO');
+          } else {
+            // Telefon (1) bitince doğrudan 2. Senaryo'nun İntro'suna geç
+            setScenario(2);
+            setPhase('SCENARIO_INTRO');
+          }
+        }, delay); 
         break;
       case 'MOBOOL_OUTRO':
+        // Outro ekranda 3.5 saniye kalır, sonra 1. Senaryo'nun İntro'suna döner
         t1 = setTimeout(() => {
-          // Döngü başa sarıyor
-          setScenario(prev => prev === 1 ? 2 : 1);
-          setPhase('MOBOOL_INTRO');
+          setScenario(1);
+          setPhase('SCENARIO_INTRO');
         }, 3500);
         break;
       default: break;
@@ -158,22 +180,49 @@ export default function MainPage({ onGoToLogin }) {
             </div>
           </div>
 
-          {/* Sağ Taraf: Simülasyon */}
+          {/* Sağ Taraf: Simülasyon Ekranı */}
           <div className="lg:col-span-7 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-neutral-100 to-white rounded-[2rem] transform rotate-1 scale-105 border border-neutral-200 shadow-xl" />
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col min-h-[480px] overflow-hidden">
               
-              {/* MOBOOL INTRO/OUTRO EKRANI */}
-              <div className={`absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
-                phase === 'MOBOOL_INTRO' || phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+              {/* ONAY EKRANLARI VE GEÇİŞ SLAYTLARI (Üst üste binen z-index katmanları) */}
+              
+              {/* 1. SCENARIO_INTRO (Senaryolara özel giriş slaytları) */}
+              <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
+                phase === 'SCENARIO_INTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+              } ${scenario === 1 ? 'bg-emerald-50' : 'bg-neutral-100'}`}>
+                {scenario === 1 ? (
+                  <div className="flex flex-col items-center px-10 text-center animate-in slide-in-from-bottom-4 duration-700">
+                    <div className="w-16 h-16 bg-emerald-200 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                      <Phone size={28} className="text-emerald-700" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-emerald-900 leading-tight">
+                      İhtiyacınızı kısaca yazın ve gönderin, en uygun hizmet veren sizi arasın.
+                    </h3>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center px-10 text-center animate-in slide-in-from-bottom-4 duration-700">
+                    <div className="w-16 h-16 bg-neutral-300 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                      <MessageCircle size={28} className="text-neutral-700" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-neutral-900 leading-tight">
+                      İhtiyacınızı kısaca yazın ve gönderin, en uygun servis sağlayan size mesaj atsın.
+                    </h3>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. MOBOOL_OUTRO (Simülasyon bitişi) */}
+              <div className={`absolute inset-0 z-[80] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
+                phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
               }`}>
                 <div className="w-20 h-20 bg-neutral-950 rounded-3xl flex items-center justify-center shadow-2xl mb-6">
                   <Zap size={40} className="text-white" />
                 </div>
                 <h2 className="text-4xl font-extrabold text-neutral-950 mb-3 tracking-tight">MOBOOL</h2>
-                <p className="text-base font-medium text-neutral-500 text-center px-8 leading-relaxed max-w-sm">
-                  {scenario === 1 ? 'Evinizin rahatlığında siz isteyin, en iyi uzmanlar anında size ulaşsın.' : 'Sorunlarınızı yazın, işin ehli ustalar kapınıza kadar gelsin.'}
+                <p className="text-base font-medium text-neutral-600 text-center px-8 leading-relaxed max-w-sm">
+                  Evinizin rahatlığında siz isteyin, en iyi servis ve hizmet veren size ulaşsın.
                 </p>
               </div>
 
@@ -195,7 +244,7 @@ export default function MainPage({ onGoToLogin }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative flex-1">
                 
                 {/* 1. SOL EKRAN (Müşteri - TAMAMEN SABİT) */}
-                <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col h-full shadow-xs relative z-10">
+                <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col h-[400px] shadow-xs relative z-10 transition-all duration-1000">
                   
                   {/* Kullanıcı Profili ve Mesaj */}
                   <div className="mb-4">
@@ -207,7 +256,6 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
                     
-                    {/* Büyütülmüş Daktilo Metni */}
                     <div className="bg-white border border-neutral-200/80 p-4 rounded-xl shadow-xs min-h-[64px] flex items-center">
                       <p className="text-[13px] font-semibold text-neutral-800 leading-relaxed font-mono">
                         {typedText}
@@ -216,7 +264,7 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* Seçenekler (Mesajın hemen altına kaydırıldı) */}
+                  {/* Seçenekler */}
                   <div className="mb-auto mt-2">
                     <span className="text-[10px] font-mono text-neutral-500 font-bold uppercase block mb-2">İletişim Tercihinizi Seçin:</span>
                     <div className="grid grid-cols-2 gap-2">
@@ -238,12 +286,12 @@ export default function MainPage({ onGoToLogin }) {
                     </div>
                   </div>
 
-                  {/* Gönder Butonu (Boşluk artırıldı, CTA büyütüldü) */}
-                  <div className="mt-8 pt-4 flex justify-end border-t border-neutral-200/60">
+                  {/* Gönder Butonu */}
+                  <div className="mt-4 pt-4 flex justify-end border-t border-neutral-200/60">
                     <div className={`px-6 py-3 rounded-xl shadow-lg flex items-center space-x-2 transition-all duration-500 ${
                       (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
                         ? 'bg-neutral-700 text-white scale-95 opacity-90' 
-                        : 'bg-neutral-950 text-white transform hover:scale-105'
+                        : 'bg-neutral-950 text-white transform hover:scale-105 cursor-pointer'
                     }`}>
                       <span className="text-xs font-extrabold tracking-wide uppercase">
                         {(phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') ? 'Gönderildi' : 'Gönder'}
@@ -255,10 +303,10 @@ export default function MainPage({ onGoToLogin }) {
 
                 {/* 2. SAĞ EKRAN (Aksiyon Merkezi: Harita / Telefon / WhatsApp) */}
                 <div 
-                  className="bg-white border border-neutral-300 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden text-neutral-900 h-full"
+                  className="bg-white border border-neutral-300 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden text-neutral-900 h-[400px]"
                   style={{ backgroundImage: mapBackgroundImage, backgroundSize: 'cover', backgroundPosition: 'center' }}
                 >
-                  <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] pointer-events-none z-0" />
+                  <div className="absolute inset-0 bg-white/30 backdrop-blur-[1px] pointer-events-none z-0" />
 
                   {/* Sağ Ekran Üst Bar */}
                   <div className="relative z-10 flex items-center justify-between border-b border-neutral-300/50 pb-3 bg-white/95 p-3 rounded-t-2xl shadow-sm">
@@ -378,8 +426,9 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      {/* Büyütülmüş Fontlu Chat Alanı */}
-                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full">
+                      {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL YAPI */}
+                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth">
+                        
                         {chatStep >= 2 && (
                           <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500 mt-2">
                             <span className="text-[10px] font-bold text-neutral-500/80 mb-1 ml-1 block tracking-wider uppercase">Murat Usta</span>
@@ -412,6 +461,9 @@ export default function MainPage({ onGoToLogin }) {
                             </div>
                           </div>
                         )}
+
+                        {/* Boş div - Her mesaj geldiğinde buraya otomatik kaydırılacak */}
+                        <div ref={messagesEndRef} className="h-1" />
                       </div>
 
                       <div className="bg-[#f0f2f5] p-3 flex items-center space-x-3 z-10 border-t border-neutral-200 w-full shrink-0">
@@ -443,7 +495,35 @@ export default function MainPage({ onGoToLogin }) {
 
       {/* ÖZELLİKLER BÖLÜMÜ */}
       <section className="py-20 bg-white border-t border-neutral-100">
-        {/* ... Properties section remains the same ... */}
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl font-extrabold text-neutral-950 mb-4">Neden SMS KONTAK?</h2>
+            <p className="text-neutral-600">Geleneksel ilan sitelerinin aksine, ihtiyaçlarınıza anında ve güvenle çözüm bulmanız için tasarlandı.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-6 bg-neutral-50 rounded-2xl border border-neutral-100">
+              <div className="w-12 h-12 bg-white rounded-xl shadow-sm border flex items-center justify-center text-neutral-900 mb-4">
+                <Lock size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-neutral-950 mb-2">Tam Gizlilik</h3>
+              <p className="text-sm text-neutral-600 leading-relaxed">Siz izin vermedikçe kimse telefon numaranızı göremez. Güvenmediğiniz kişilerle iletişimi anında kesebilirsiniz.</p>
+            </div>
+            <div className="p-6 bg-neutral-50 rounded-2xl border border-neutral-100">
+              <div className="w-12 h-12 bg-white rounded-xl shadow-sm border flex items-center justify-center text-neutral-900 mb-4">
+                <Zap size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-neutral-950 mb-2">Anında Eşleşme</h3>
+              <p className="text-sm text-neutral-600 leading-relaxed">Talebiniz, seçtiğiniz kelimelere göre saniyeler içinde bölgenizdeki en uygun uzmanların ekranına düşer.</p>
+            </div>
+            <div className="p-6 bg-neutral-50 rounded-2xl border border-neutral-100">
+              <div className="w-12 h-12 bg-white rounded-xl shadow-sm border flex items-center justify-center text-neutral-900 mb-4">
+                <ShieldCheck size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-neutral-950 mb-2">Seçim Özgürlüğü</h3>
+              <p className="text-sm text-neutral-600 leading-relaxed">İster telefon arama ile hızlı çözüm bulun, isterseniz Whatsapp/Sms ile mesajlaşarak fiyat tekliflerini toplayın.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
     </div>
