@@ -149,14 +149,22 @@ const initDatabase = async () => {
       );
     `);
 
-    // 7. Değerlendirme & Yorum Tablosu
+// 7. Değerlendirme & Yorum Tablosu (ONDALIKLI SAYI DESTEKLİ GÜNCEL HALİ)
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS reviews (
+      DROP TABLE IF EXISTS reviews CASCADE; -- Eski hatalı tabloyu temizler
+      CREATE TABLE reviews (
         id SERIAL PRIMARY KEY,
         request_id INTEGER NOT NULL,
         reviewer_type VARCHAR(20) NOT NULL,
-        rating INTEGER,
+        rating_knowledge NUMERIC(3,2),
+        rating_communication NUMERIC(3,2),
+        rating_timing NUMERIC(3,2),
+        rating_cost NUMERIC(3,2),
+        rating NUMERIC(3,2), -- Eski INTEGER yerine NUMERIC yapıldı (Örn: 4.25)
+        score NUMERIC(5,2),
         comment TEXT,
+        rating_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        score_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_req_reviewer ON reviews (request_id, reviewer_type);

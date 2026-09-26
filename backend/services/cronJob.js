@@ -1,5 +1,5 @@
 // backend/services/cronJob.js
-const pool = require('../config/db');
+ const { pool } = require('../config/db');
 
 // Mevcut sıradaki sağlayıcıyı düşürüp, kuyrukta başkası varsa ona geçiren, yoksa havuza atan mantık
 const passProviderLogic = async (requestId, currentProviderId) => {
