@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneCall, BellRing, PhoneIncoming, Compass, CheckCheck 
+  MessageCircle, Send, PhoneCall, PhoneIncoming, Compass, CheckCheck, User, Wrench
 } from 'lucide-react';
 
 export default function MainPage({ onGoToLogin }) {
@@ -10,7 +10,8 @@ export default function MainPage({ onGoToLogin }) {
   const [typedText, setTypedText] = useState('');
   const [phase, setPhase] = useState('TYPING'); 
   
-  // MOBOOL: WhatsApp senaryosu için mesajlaşma adımlarını takip eden state
+  // MOBOOL: WhatsApp senaryosu alt fazları ve chat adımları
+  const [whatsappPhase, setWhatsappPhase] = useState('PRE_CHAT'); // PRE_CHAT, CHATTING, POST_CHAT
   const [chatStep, setChatStep] = useState(0); 
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
@@ -19,6 +20,7 @@ export default function MainPage({ onGoToLogin }) {
   useEffect(() => {
     setTypedText('');
     setPhase('TYPING');
+    setWhatsappPhase('PRE_CHAT');
     let currentIndex = 0;
 
     const typingInterval = setInterval(() => {
@@ -34,7 +36,7 @@ export default function MainPage({ onGoToLogin }) {
     return () => clearInterval(typingInterval);
   }, [scenario]);
 
-  // 2. FAZ: Kontrollü Akış (Zamanlamalar Senaryo 2'nin yeni akışına göre güncellendi)
+  // 2. FAZ: Kontrollü Akış
   useEffect(() => {
     let t1, t2, t3, t4, t5;
 
@@ -47,11 +49,13 @@ export default function MainPage({ onGoToLogin }) {
     } else if (phase === 'MAP_SCANNING') {
       t4 = setTimeout(() => setPhase('FINAL_ACTION'), 4000);
     } else if (phase === 'FINAL_ACTION') {
-      // Senaryo 2 (WhatsApp) daha uzun sürdüğü için bekleme süresini 13 saniyeye çıkarttık
-      const delay = scenario === 1 ? 6000 : 13000;
+      // Senaryo 1 (Telefon) 6 saniye sürer ve döner.
+      // Senaryo 2 (WhatsApp) alt fazlar barındırdığı için ana döngüyü 18 saniyeye uzattık.
+      const delay = scenario === 1 ? 6000 : 18000;
       t5 = setTimeout(() => {
         setScenario(prev => prev === 1 ? 2 : 1);
-        setChatStep(0); // Döngü sıfırlanırken chat adımlarını da sıfırla
+        setChatStep(0);
+        setWhatsappPhase('PRE_CHAT');
       }, delay);
     }
 
@@ -64,20 +68,27 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase, scenario]);
 
-  // 3. FAZ: MOBOOL WhatsApp Gerçek Zamanlı Chat Simülasyonu
+  // 3. FAZ: WhatsApp Senaryosu Alt Zamanlamaları (Karakter Gösterimi -> Chat -> Sonuç)
   useEffect(() => {
     let timers = [];
     if (phase === 'FINAL_ACTION' && scenario === 2) {
-      setChatStep(0);
-      const steps = [
-        { step: 1, delay: 1000 },  // Bosch servis yazmaya başlar
-        { step: 2, delay: 2500 },  // Bosch servis ilk mesajı atar
-        { step: 3, delay: 4000 },  // Mehmet Bey yazmaya başlar
-        { step: 4, delay: 6500 },  // Mehmet Bey sorunu yazar
-        { step: 5, delay: 8000 },  // Bosch servis cevap yazmaya başlar
-        { step: 6, delay: 10500 }  // Bosch servis randevuyu onaylar
+      
+      // 1. Karakterleri göster (PRE_CHAT) -> 2.5 saniye sonra Chat'e geç
+      timers.push(setTimeout(() => setWhatsappPhase('CHATTING'), 2500));
+
+      // 2. Chat adımları
+      const chatSteps = [
+        { step: 1, delay: 3500 },  // Bosch servis yazmaya başlar
+        { step: 2, delay: 5000 },  // Bosch servis ilk mesajı atar
+        { step: 3, delay: 6500 },  // Mehmet Bey yazmaya başlar
+        { step: 4, delay: 9000 },  // Mehmet Bey sorunu yazar
+        { step: 5, delay: 10500 }, // Bosch servis cevap yazmaya başlar
+        { step: 6, delay: 13000 }  // Bosch servis randevuyu onaylar
       ];
-      timers = steps.map(s => setTimeout(() => setChatStep(s.step), s.delay));
+      chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
+
+      // 3. Chat bittikten 2 saniye sonra sonuç görsellerine geç (POST_CHAT)
+      timers.push(setTimeout(() => setWhatsappPhase('POST_CHAT'), 15000));
     }
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
@@ -146,24 +157,13 @@ export default function MainPage({ onGoToLogin }) {
                 <span>Hizmet Veren Olun</span>
               </button>
             </div>
-            
-            <div className="mt-10 flex items-center space-x-6 text-sm font-semibold text-neutral-500">
-              <div className="flex items-center space-x-2">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span>Ücretsiz</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span>%100 Gizlilik Odaklı</span>
-              </div>
-            </div>
           </div>
 
           {/* Sağ Taraf: Simülasyon */}
           <div className="lg:col-span-7 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-neutral-100 to-white rounded-[2rem] transform rotate-1 scale-105 border border-neutral-200 shadow-xl" />
             
-            <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col space-y-6">
+            <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col space-y-6 min-h-[460px]">
               
               <div className="flex items-center justify-between border-b pb-4">
                 <div className="flex items-center space-x-2">
@@ -179,54 +179,80 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative flex-1">
                 
-                {/* SOL TARAF: MÜŞTERİ VEYA MÜŞTERİ TELEFONU (Senaryo 2 Final) */}
+                {/* SOL TARAF: MÜŞTERİ VEYA MÜŞTERİ TELEFONU */}
                 {phase === 'FINAL_ACTION' && scenario === 2 ? (
-                  <div className="bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] flex flex-col justify-between shadow-2xl relative overflow-hidden h-[380px] animate-in zoom-in duration-500">
-                    {/* Header */}
-                    <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
-                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">MU</div>
-                      <div className="leading-tight flex-1">
-                        <div className="font-bold text-[13px] whitespace-nowrap">Murat Usta (Bosch)</div>
-                        <div className="text-[10px] text-white/90 font-medium">
-                          {(chatStep === 1 || chatStep === 5) ? 'yazıyor...' : 'çevrimiçi'}
+                  <div className="flex flex-col h-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-md">
+                    
+                    {/* 1. Karakter Tanıtımı (Mehmet Bey Endişeli) */}
+                    <div className={`absolute inset-0 bg-white z-20 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500 ${whatsappPhase === 'PRE_CHAT' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                      <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mb-4 text-rose-500 relative">
+                        <User size={40} />
+                        <div className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-full shadow-sm">
+                          <MessageCircle size={16} className="text-neutral-900" />
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-neutral-900">Mehmet Bey</h3>
+                      <p className="text-xs text-neutral-500 mt-2 font-medium">Telefonu elinde endişeli bir şekilde makine arızasına çözüm arıyor...</p>
+                    </div>
+
+                    {/* 2. Gerçek Zamanlı Chat */}
+                    <div className={`flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-500 ${whatsappPhase === 'CHATTING' ? 'opacity-100 relative z-30' : 'opacity-0 pointer-events-none absolute inset-0'}`}>
+                      <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
+                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">MU</div>
+                        <div className="leading-tight flex-1">
+                          <div className="font-bold text-[13px] whitespace-nowrap">Murat Usta (Bosch)</div>
+                          <div className="text-[10px] text-white/90 font-medium">
+                            {(chatStep === 1 || chatStep === 5) ? 'yazıyor...' : 'çevrimiçi'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
+                        {chatStep >= 2 && (
+                          <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
+                            Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
+                            <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:41</span>
+                          </div>
+                        )}
+                        {chatStep >= 4 && (
+                          <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
+                            Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
+                            <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:42</span>
+                          </div>
+                        )}
+                        {chatStep >= 6 && (
+                          <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
+                            Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
+                            <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:43</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200">
+                        <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm">
+                          {chatStep === 3 ? 'Yazıyorsunuz...' : 'Mesaj yazın'}
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Send size={12} className="-ml-0.5" />
                         </div>
                       </div>
                     </div>
-                    {/* Chat Area */}
-                    <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
-                      {chatStep >= 2 && (
-                        <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
-                          Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
-                          <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:41</span>
+
+                    {/* 3. Sonuç Görseli (Mehmet Bey Rahatlamış) */}
+                    <div className={`absolute inset-0 bg-white z-40 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500 ${whatsappPhase === 'POST_CHAT' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                       <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-4 text-emerald-500 relative">
+                        <User size={40} />
+                        <div className="absolute -top-2 -right-2 bg-white p-1 rounded-full shadow-sm">
+                          <CheckCircle2 size={24} className="text-emerald-500" />
                         </div>
-                      )}
-                      {chatStep >= 4 && (
-                        <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
-                          Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
-                          <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:42</span>
-                        </div>
-                      )}
-                      {chatStep >= 6 && (
-                        <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
-                          Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
-                          <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:43</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Input */}
-                    <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200">
-                      <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm">
-                        {chatStep === 3 ? 'Yazıyorsunuz...' : 'Mesaj yazın'}
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
-                        <Send size={12} className="-ml-0.5" />
-                      </div>
+                      <h3 className="font-bold text-neutral-900">Sorun Çözüldü</h3>
+                      <p className="text-xs text-neutral-500 mt-2 font-medium">Mehmet Bey derin bir nefes aldı. İşin ehli yola çıktı bile.</p>
                     </div>
+
                   </div>
                 ) : (
-                  <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs">
+                  <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs h-full">
                     <div>
                       <div className="flex items-center space-x-2.5 mb-3">
                         <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
@@ -235,7 +261,6 @@ export default function MainPage({ onGoToLogin }) {
                           <span className="text-[10px] text-neutral-500 flex items-center"><MapPin size={9} className="mr-0.5" /> Tarabya, İstanbul</span>
                         </div>
                       </div>
-                      
                       <div className="bg-white border p-3 rounded-xl shadow-xs min-h-[46px] flex items-center">
                         <p className="text-xs font-medium text-neutral-800 leading-relaxed font-mono">
                           {typedText}
@@ -254,41 +279,21 @@ export default function MainPage({ onGoToLogin }) {
                       }`}>
                         <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase block">İletişim Tercihinizi Seçin:</span>
                         
-                        {/* Telefon Arama Düğmesi */}
                         <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
-                          scenario === 1 
-                            ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                                ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
-                                : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
-                            : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
-                        }`}>
-                          <Phone size={12} />
-                          <span>Telefon arama</span>
-                        </div>
+                          scenario === 1 ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
+                        }`}><Phone size={12} /><span>Telefon arama</span></div>
 
-                        {/* Whatsapp/Sms Düğmesi */}
                         <div className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-[11px] font-bold shadow-xs transition-all duration-300 ${
-                          scenario === 2 
-                            ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') 
-                                ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' 
-                                : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') 
-                            : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
-                        }`}>
-                          <MessageCircle size={12} />
-                          <span>Whatsapp/Sms</span>
-                        </div>
+                          scenario === 2 ? ((phase === 'CLICK_OPTION' || phase === 'CLICK_SEND') ? 'bg-neutral-100 text-neutral-800 border-2 border-neutral-600 border-solid scale-98 shadow-inner' : 'bg-transparent text-neutral-500 border border-neutral-400 border-dashed') : 'bg-transparent text-neutral-400 border border-neutral-300 border-dashed opacity-70'
+                        }`}><MessageCircle size={12} /><span>Whatsapp/Sms</span></div>
 
                         <div className="pt-1 flex justify-end">
-                          <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${
-                            phase === 'CLICK_SEND' ? 'bg-neutral-700 text-white scale-95' : 'bg-neutral-950 text-white'
-                          }`}>
-                            <span>Gönder</span>
-                            <Send size={10} />
+                          <div className={`px-4 py-1.5 text-[10px] font-bold rounded-lg shadow-sm flex items-center space-x-1 transition-all ${phase === 'CLICK_SEND' ? 'bg-neutral-700 text-white scale-95' : 'bg-neutral-950 text-white'}`}>
+                            <span>Gönder</span><Send size={10} />
                           </div>
                         </div>
                       </div>
 
-                      {/* Senaryo 1 İçin Orijinal Final Aksiyonu */}
                       {phase === 'FINAL_ACTION' && scenario === 1 && (
                         <div className="animate-in fade-in zoom-in duration-500">
                           <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-4 rounded-2xl shadow-xl space-y-4 text-center relative overflow-hidden">
@@ -300,20 +305,6 @@ export default function MainPage({ onGoToLogin }) {
                               <h5 className="text-sm font-extrabold tracking-tight mt-1">Emlakçı (Ayşe Hanım) arıyor.</h5>
                               <p className="text-[11px] text-emerald-100 font-mono">0532 555 44 33</p>
                             </div>
-                            <div className="relative z-10 flex items-center justify-center space-x-8 pt-2">
-                              <div className="flex flex-col items-center space-y-1">
-                                <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
-                                  <Phone size={14} className="rotate-[135deg]" />
-                                </div>
-                                <span className="text-[8px] opacity-80">Reddet</span>
-                              </div>
-                              <div className="flex flex-col items-center space-y-1">
-                                <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-neutral-950 shadow-md animate-pulse">
-                                  <Phone size={14} />
-                                </div>
-                                <span className="text-[8px] opacity-80 font-bold">Yanıtla</span>
-                              </div>
-                            </div>
                           </div>
                         </div>
                       )}
@@ -321,49 +312,75 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                 )}
 
-                {/* SAĞ TARAF: HARİTA VEYA SAĞLAYICI TELEFONU (Senaryo 2 Final) */}
+                {/* SAĞ TARAF: HARİTA VEYA SAĞLAYICI TELEFONU */}
                 {phase === 'FINAL_ACTION' && scenario === 2 ? (
-                  <div className="bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] flex flex-col justify-between shadow-2xl relative overflow-hidden h-[380px] animate-in zoom-in duration-500 delay-100">
-                    {/* Header */}
-                    <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
-                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">M</div>
-                      <div className="leading-tight flex-1">
-                        <div className="font-bold text-[13px]">Mehmet Bey</div>
-                        <div className="text-[10px] text-white/90 font-medium">
-                          {chatStep === 3 ? 'yazıyor...' : 'çevrimiçi'}
+                  <div className="flex flex-col h-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-md">
+                    
+                    {/* 1. Karakter Tanıtımı (Murat Usta Hazırlanıyor) */}
+                    <div className={`absolute inset-0 bg-white z-20 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500 ${whatsappPhase === 'PRE_CHAT' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                      <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-600 relative">
+                        <Wrench size={40} />
+                        <div className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-full shadow-sm">
+                          <MessageCircle size={16} className="text-neutral-900" />
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-neutral-900">Murat Usta</h3>
+                      <p className="text-xs text-neutral-500 mt-2 font-medium">Müşterisinin çağrısını gördü, hızla çözüm sunmak için telefona sarıldı...</p>
+                    </div>
+
+                    {/* 2. Gerçek Zamanlı Chat */}
+                    <div className={`flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-500 delay-100 ${whatsappPhase === 'CHATTING' ? 'opacity-100 relative z-30' : 'opacity-0 pointer-events-none absolute inset-0'}`}>
+                      <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
+                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">M</div>
+                        <div className="leading-tight flex-1">
+                          <div className="font-bold text-[13px]">Mehmet Bey</div>
+                          <div className="text-[10px] text-white/90 font-medium">
+                            {chatStep === 3 ? 'yazıyor...' : 'çevrimiçi'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
+                        {chatStep >= 2 && (
+                          <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
+                            Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
+                            <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:41</span>
+                          </div>
+                        )}
+                        {chatStep >= 4 && (
+                          <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
+                            Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
+                            <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:42</span>
+                          </div>
+                        )}
+                        {chatStep >= 6 && (
+                          <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
+                            Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
+                            <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:43</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200">
+                        <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm">
+                          {(chatStep === 1 || chatStep === 5) ? 'Yazıyorsunuz...' : 'Mesaj yazın'}
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Send size={12} className="-ml-0.5" />
                         </div>
                       </div>
                     </div>
-                    {/* Chat Area */}
-                    <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
-                      {chatStep >= 2 && (
-                        <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
-                          Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
-                          <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:41</span>
+
+                    {/* 3. Sonuç Görseli (Murat Usta Yola Çıkıyor) */}
+                    <div className={`absolute inset-0 bg-white z-40 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500 ${whatsappPhase === 'POST_CHAT' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                       <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-600 relative">
+                        <Wrench size={40} />
+                        <div className="absolute -top-2 -right-2 bg-white p-1 rounded-full shadow-sm">
+                           <MapPin size={24} className="text-blue-500 animate-bounce" />
                         </div>
-                      )}
-                      {chatStep >= 4 && (
-                        <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium self-start max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-left-2 fade-in">
-                          Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
-                          <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:42</span>
-                        </div>
-                      )}
-                      {chatStep >= 6 && (
-                        <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium self-end max-w-[85%] shadow-sm relative z-10 animate-in slide-in-from-right-2 fade-in">
-                          Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
-                          <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:43</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Input */}
-                    <div className="bg-[#f0f2f5] p-2 flex items-center space-x-2 z-10 border-t border-neutral-200">
-                      <div className="bg-white rounded-full flex-1 px-3 py-2 text-[11px] text-neutral-400 shadow-sm">
-                        {(chatStep === 1 || chatStep === 5) ? 'Yazıyorsunuz...' : 'Mesaj yazın'}
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0 shadow-sm">
-                        <Send size={12} className="-ml-0.5" />
-                      </div>
+                      <h3 className="font-bold text-neutral-900">Yola Çıkıldı</h3>
+                      <p className="text-xs text-neutral-500 mt-2 font-medium">Murat Usta takım çantasını aldı. Hedefe doğru harekete geçti.</p>
                     </div>
+
                   </div>
                 ) : (
                   <div className="bg-[#EAE6DF] border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full">
@@ -398,31 +415,6 @@ export default function MainPage({ onGoToLogin }) {
                           <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/90 px-2.5 py-1 rounded-full border border-neutral-300 shadow-xs">
                             <Compass size={13} className="animate-spin text-neutral-600" /> Bölgedeki Alternatifler Analiz Ediliyor
                           </span>
-                          
-                          <div className="flex items-center justify-center space-x-8 relative my-2 w-full">
-                            <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
-                              <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">1</div>
-                              <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
-                            </div>
-
-                            <div className="flex flex-col items-center transform scale-110">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-700 ${
-                                phase === 'FINAL_ACTION' 
-                                  ? 'bg-neutral-800 text-white ring-4 ring-neutral-800/30 scale-125' 
-                                  : 'bg-neutral-300 text-neutral-800 animate-bounce ring-2 ring-neutral-300/50'
-                              }`}>
-                                <MapPin size={16} />
-                              </div>
-                              <span className="text-[10px] text-neutral-900 font-extrabold mt-1 bg-white px-2 py-0.5 rounded border border-neutral-300 shadow-xs">
-                                {scenario === 1 ? "Ayşe H." : "Murat U."}
-                              </span>
-                            </div>
-
-                            <div className={`flex flex-col items-center transition-all duration-500 ${phase === 'FINAL_ACTION' ? 'opacity-40 scale-90' : 'opacity-70'}`}>
-                              <div className="w-6 h-6 rounded-full bg-white border border-neutral-400 flex items-center justify-center text-[10px] text-neutral-700 font-bold shadow-xs">3</div>
-                              <span className="text-[9px] text-neutral-600 mt-1">Alternatif</span>
-                            </div>
-                          </div>
                         </div>
                       ) : (
                         <div className="text-center text-neutral-600 text-xs font-mono bg-white/60 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-xs">
@@ -430,65 +422,9 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       )}
                     </div>
-
-                    <div className="relative z-10 pt-2 border-t border-neutral-300">
-                      {phase !== 'FINAL_ACTION' ? (
-                        <div className="text-center text-[11px] text-neutral-700 font-medium py-1">
-                          {phase === 'MAP_SCANNING' ? 'En yakın uzman haritada işaretleniyor...' : 'Müşteri tercihi bekleniyor...'}
-                        </div>
-                      ) : (
-                        <div className="space-y-2 animate-in fade-in duration-300">
-                          {scenario === 1 && (
-                            <>
-                              <div className="flex items-center justify-between text-[11px] border-b border-neutral-300 pb-1">
-                                <span className="text-neutral-600 font-bold uppercase text-[9px]">Müşteri No</span>
-                                <span className="font-extrabold text-neutral-950 font-mono">0532 123 45 67</span>
-                              </div>
-                              <div className="flex items-center justify-center space-x-1.5 text-neutral-800 bg-neutral-100 border border-neutral-300 p-2 rounded-xl text-[11px] font-bold shadow-xs">
-                                <PhoneCall size={12} className="animate-bounce" />
-                                <span>Telefon Araması Başlatıldı</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ÖZELLİKLER BÖLÜMÜ */}
-      <section className="py-20 bg-white border-t border-neutral-100">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-extrabold text-neutral-950 mb-4">Neden SMS KONTAK?</h2>
-            <p className="text-neutral-600">Geleneksel ilan sitelerinin aksine, ihtiyaçlarınıza anında ve güvenle çözüm bulmanız için tasarlandı.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 bg-neutral-50 rounded-2xl border border-neutral-100">
-              <div className="w-12 h-12 bg-white rounded-xl shadow-sm border flex items-center justify-center text-neutral-900 mb-4">
-                <Lock size={20} />
-              </div>
-              <h3 className="text-lg font-bold text-neutral-950 mb-2">Tam Gizlilik</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">Siz izin vermedikçe kimse telefon numaranızı göremez. Güvenmediğiniz kişilerle iletişimi anında kesebilirsiniz.</p>
-            </div>
-            <div className="p-6 bg-neutral-50 rounded-2xl border border-neutral-100">
-              <div className="w-12 h-12 bg-white rounded-xl shadow-sm border flex items-center justify-center text-neutral-900 mb-4">
-                <Zap size={20} />
-              </div>
-              <h3 className="text-lg font-bold text-neutral-950 mb-2">Anında Eşleşme</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">Talebiniz, seçtiğiniz kelimelere göre saniyeler içinde bölgenizdeki en uygun uzmanların ekranına düşer.</p>
-            </div>
-            <div className="p-6 bg-neutral-50 rounded-2xl border border-neutral-100">
-              <div className="w-12 h-12 bg-white rounded-xl shadow-sm border flex items-center justify-center text-neutral-900 mb-4">
-                <ShieldCheck size={20} />
-              </div>
-              <h3 className="text-lg font-bold text-neutral-950 mb-2">Seçim Özgürlüğü</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">İster telefon arama ile hızlı çözüm bulun, isterseniz Whatsapp/Sms ile mesajlaşarak fiyat tekliflerini toplayın.</p>
             </div>
           </div>
         </div>
