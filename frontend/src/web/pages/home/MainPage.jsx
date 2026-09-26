@@ -104,7 +104,7 @@ export default function MainPage({ onGoToLogin }) {
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
 
-  // Harita Arka Planı (Senin sağladığın dosya üzerinden)
+  // Harita Arka Planı
   const mapBackgroundImage = `url('image_8bc057.png')`;
 
   return (
@@ -227,33 +227,34 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto">
+                      {/* Taşma sorunu çözülen mesajlaşma alanı */}
+                      <div className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full">
                         <div className="text-center my-1"><span className="bg-[#E1F3FB] text-neutral-600 text-[9px] font-bold px-2 py-1 rounded-lg">SMS KONTAK Eşleşmesi Sağlandı</span></div>
 
                         {chatStep >= 2 && (
-                          <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500">
+                          <div className="self-start max-w-[85%] w-fit animate-in slide-in-from-left-2 fade-in duration-500">
                             <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 ml-1 block">Murat Usta</span>
-                            <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative">
-                              Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?
-                              <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:41</span>
+                            <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative break-words flex flex-col">
+                              <span>Merhaba, Bosch yetkili servisinden Murat ben. Size nasıl yardımcı olabilirim?</span>
+                              <span className="text-[8px] text-neutral-400 self-end mt-1">10:41</span>
                             </div>
                           </div>
                         )}
                         {chatStep >= 4 && (
-                          <div className="self-end max-w-[85%] animate-in slide-in-from-right-2 fade-in duration-500">
+                          <div className="self-end max-w-[85%] w-fit animate-in slide-in-from-right-2 fade-in duration-500">
                             <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 mr-1 block text-right">Mehmet Bey (Siz)</span>
-                            <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium shadow-sm relative">
-                              Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?
-                              <span className="text-[8px] text-neutral-500 float-right ml-2 mt-1.5 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5"/> 10:42</span>
+                            <div className="bg-[#D9FDD3] text-neutral-900 p-2.5 rounded-xl rounded-tr-none text-[11px] font-medium shadow-sm relative break-words flex flex-col">
+                              <span>Merhaba Murat Usta, makine su almıyor, E18 hatası veriyor. Bugün bakabilir misiniz?</span>
+                              <span className="text-[8px] text-neutral-500 self-end mt-1 flex items-center"><CheckCheck size={10} className="text-blue-500 ml-0.5 mr-0.5"/> 10:42</span>
                             </div>
                           </div>
                         )}
                         {chatStep >= 6 && (
-                          <div className="self-start max-w-[85%] animate-in slide-in-from-left-2 fade-in duration-500">
+                          <div className="self-start max-w-[85%] w-fit animate-in slide-in-from-left-2 fade-in duration-500">
                              <span className="text-[9px] font-bold text-neutral-500/80 mb-0.5 ml-1 block">Murat Usta</span>
-                            <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative">
-                              Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.
-                              <span className="text-[8px] text-neutral-400 float-right ml-2 mt-1.5">10:43</span>
+                            <div className="bg-white text-neutral-900 p-2.5 rounded-xl rounded-tl-none text-[11px] font-medium shadow-sm relative break-words flex flex-col">
+                              <span>Tabii, saat 14:00-16:00 arası bölgenizdeyiz. Ekip arkadaşlarımla gelip kontrol edeceğiz.</span>
+                              <span className="text-[8px] text-neutral-400 self-end mt-1">10:43</span>
                             </div>
                           </div>
                         )}
@@ -274,7 +275,16 @@ export default function MainPage({ onGoToLogin }) {
                   <>
                     {/* NORMAL DURUM SOL TARAF (Müşteri) */}
                     <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs h-full relative">
-                      
+                      {phase === 'MATCH_FOUND' && (
+                        <div className="absolute inset-0 bg-neutral-900/90 rounded-2xl z-20 flex flex-col items-center justify-center text-center animate-in fade-in duration-500 px-4">
+                           <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center mb-3 shadow-lg ring-4 ring-emerald-500/30">
+                             <CheckCircle2 size={32} className="text-white" />
+                           </div>
+                           <h3 className="text-white font-bold text-sm mb-1">{scenario === 1 ? 'Emlakçı Bulundu!' : 'Servis Bulundu!'}</h3>
+                           <p className="text-neutral-300 text-[10px] font-medium">Uzman ile iletişim başlatılıyor...</p>
+                        </div>
+                      )}
+
                       <div>
                         <div className="flex items-center space-x-2.5 mb-3">
                           <div className="w-7 h-7 rounded-full bg-neutral-900 text-white font-bold text-xs flex items-center justify-center shrink-0">M</div>
@@ -295,7 +305,7 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
 
                       <div className="space-y-3">
-                        {/* MOBOOL: Sol ekran opsiyonları, FINAL_ACTION'a kadar hep görünür */}
+                        {/* Sol ekran opsiyonları */}
                         <div className={`space-y-2 transition-all duration-1000 transform ${
                           phase === 'FINAL_ACTION' 
                             ? 'opacity-0 scale-95 pointer-events-none h-0 overflow-hidden m-0' 
@@ -344,23 +354,20 @@ export default function MainPage({ onGoToLogin }) {
                         backgroundPosition: 'center' 
                       }}
                     >
-                      <div className="absolute inset-0 bg-white/30 backdrop-blur-[1px] pointer-events-none" />
+                      <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] pointer-events-none" />
 
-                      {/* MATCH FOUND EKRANI - Sadece Sağ Tarafın Üstünü Kaplar */}
+                      {/* MATCH FOUND EKRANI */}
                       {phase === 'MATCH_FOUND' && (
                         <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 p-6">
                           <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 text-white shadow-xl ${scenario === 1 ? 'bg-rose-500' : 'bg-blue-600'}`}>
-                            <CheckCircle2 size={40} />
+                            {scenario === 1 ? <User size={40} /> : <Wrench size={40} />}
                           </div>
                           <h2 className="font-extrabold text-2xl text-neutral-900 mb-2">
-                            {scenario === 1 ? 'Emlakçı Bulundu!' : 'Servis Bulundu!'}
+                            {scenario === 1 ? 'Ayşe Hanım' : 'Murat Usta'}
                           </h2>
-                          <div className="flex items-center space-x-2 mt-2 px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-full border border-neutral-200">
-                            {scenario === 1 ? <User size={14} /> : <Wrench size={14} />}
-                            <span className="text-xs font-bold">
-                              {scenario === 1 ? 'Ayşe Hanım - Tarabya Emlak' : 'Murat Usta - Bosch Servis'}
-                            </span>
-                          </div>
+                          <span className="text-xs font-bold px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full border">
+                            {scenario === 1 ? 'Tarabya Emlak Uzmanı' : 'Bosch Yetkili Servis'}
+                          </span>
                         </div>
                       )}
 
@@ -371,12 +378,12 @@ export default function MainPage({ onGoToLogin }) {
                           </div>
                           <div>
                             <h4 className="text-xs font-bold text-neutral-900">
-                              {phase === 'FINAL_ACTION'
+                              {phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND'
                                 ? (scenario === 1 ? "Ayşe Hanım" : "Murat Usta") 
                                 : (phase === 'MAP_SCANNING' ? "Sistem Taranıyor..." : "Sistem Hazır")}
                             </h4>
                             <span className="text-[10px] text-neutral-600">
-                              {phase === 'FINAL_ACTION'
+                              {phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND'
                                 ? (scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis") 
                                 : (phase === 'MAP_SCANNING' 
                                     ? "Veritabanı kontrol ediliyor" 
@@ -386,16 +393,15 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono transition-all duration-700 ${
                           phase === 'MAP_SCANNING' ? 'bg-amber-100 text-amber-700 border border-amber-300 animate-pulse' : 
-                          phase === 'FINAL_ACTION' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
+                          phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND' ? 'bg-neutral-800 text-white border border-neutral-900' : 'bg-neutral-200 text-neutral-600'
                         }`}>
-                          {phase === 'MAP_SCANNING' ? 'Taranıyor' : phase === 'FINAL_ACTION' ? 'Bulundu' : 'Bekliyor'}
+                          {phase === 'MAP_SCANNING' ? 'Taranıyor' : (phase === 'FINAL_ACTION' || phase === 'MATCH_FOUND') ? 'Bulundu' : 'Bekliyor'}
                         </span>
                       </div>
 
                       <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
                         {phase === 'MAP_SCANNING' ? (
                           <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
-                            {/* DİKKAT ÇEKİCİ ARAMA BALONCUĞU */}
                             <div className="animate-bounce bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center space-y-2">
                               <Compass size={24} className="animate-spin text-emerald-400" /> 
                               <span className="text-xs font-bold text-center tracking-wide leading-relaxed">
