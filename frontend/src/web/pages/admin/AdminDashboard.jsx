@@ -5,10 +5,11 @@ import useSWR from 'swr';
 import { 
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
-  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2 
+  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer // <-- Timer ikonu da eklendi
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
+import TimeoutTracker from './TimeoutTracker'; // <-- Yeni sayfamızı import ettik
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
@@ -33,90 +34,22 @@ const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig,
   );
 });
 
-// ZAMAN AŞIMI SAYACI EKLENMİŞ ROW BİLEŞENİ
-const MatchedRequestRow = React.memo(({ req, onDelete, timeoutLimitMins }) => {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isTimeout, setIsTimeout] = useState(req.status === 'TIMEOUT');
-
-  useEffect(() => {
-    // Eğer zaten zaman aşımına uğramışsa veya tamamlanmışsa sayacı çalıştırma
-    if (req.status === 'TIMEOUT' || req.status === 'TAMAMLANDI') {
-      setIsTimeout(req.status === 'TIMEOUT');
-      return;
-    }
-
-    // Başlangıç zamanını veritabanından alıyoruz, yoksa şimdiki zamanı baz alıyoruz
-    const startTime = req.created_at ? new Date(req.created_at).getTime() : Date.now();
-    const expireTimeMs = startTime + (timeoutLimitMins * 60 * 1000);
-
-    const calculateTime = () => {
-      const now = Date.now();
-      const diff = expireTimeMs - now;
-      if (diff <= 0) {
-        setTimeLeft(0);
-        setIsTimeout(true);
-        return false; // Sayacı durdur
-      } else {
-        setTimeLeft(diff);
-        return true; // Sayaca devam et
-      }
-    };
-
-    // İlk hesaplamayı yap, eğer süre dolmadıysa interval başlat
-    const shouldContinue = calculateTime();
-    if (!shouldContinue) return;
-
-    const timer = setInterval(() => {
-      const active = calculateTime();
-      if (!active) clearInterval(timer);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [req.created_at, req.status, timeoutLimitMins]);
-
-  // Kalan milisaniyeyi MM:SS formatına çeviren yardımcı
-  const formatTime = (ms) => {
-    if (ms <= 0) return "00:00";
-    const totalSeconds = Math.floor(ms / 1000);
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
-  // Eğer sayac sıfırlandıysa ekrandaki durumu görsel olarak TIMEOUT ile eziyoruz
-  const displayStatus = isTimeout ? 'TIMEOUT' : req.status;
-
-  return (
-    <tr className="hover:bg-neutral-50 transition">
-      <td className="px-4 py-3 font-mono text-neutral-900">
-        <span className="font-bold">#REQ-{req.id}</span>
-        {req.created_at && <div className="text-[10px] text-neutral-400 mt-0.5">{safeDateTime(req.created_at)}</div>}
-      </td>
-      <td className="px-4 py-3">
-        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${displayStatus === 'TIMEOUT' ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-800'}`}>
-          {displayStatus}
-        </span>
-      </td>
-      
-      {/* ZAMAN AŞIMI SAYACI SÜTUNU */}
-      <td className="px-4 py-3 font-mono text-[11px] font-bold">
-        {isTimeout ? (
-           <span className="text-rose-600">00:00</span>
-        ) : (
-           <span className="text-amber-600 animate-pulse">{formatTime(timeLeft)}</span>
-        )}
-      </td>
-      
-      <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
-      <td className="px-4 py-3 font-mono text-neutral-800">{cleanContact(req.contact_value)}</td>
-      <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
-      <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
-      <td className="px-4 py-3 text-right">
-        <button onClick={() => onDelete(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button>
-      </td>
-    </tr>
-  );
-});
+const MatchedRequestRow = React.memo(({ req, onDelete }) => (
+  <tr className="hover:bg-neutral-50 transition">
+    <td className="px-4 py-3 font-mono text-neutral-900">
+      <span className="font-bold">#REQ-{req.id}</span>
+      {req.created_at && <div className="text-[10px] text-neutral-400 mt-0.5">{safeDateTime(req.created_at)}</div>}
+    </td>
+    <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-neutral-200">{req.status}</span></td>
+    <td className="px-4 py-3 font-semibold text-neutral-900">"{req.raw_text}"</td>
+    <td className="px-4 py-3 font-mono text-neutral-800">{cleanContact(req.contact_value)}</td>
+    <td className="px-4 py-3">{req.provider_name ? <span className="font-bold text-neutral-900">{req.provider_name}</span> : <span className="text-neutral-400 italic text-[11px]">Atanmadı</span>}</td>
+    <td className="px-4 py-3 text-neutral-700">{extractAddress(req.location)}</td>
+    <td className="px-4 py-3 text-right">
+      <button onClick={() => onDelete(req.id)} className="p-1.5 text-neutral-400 hover:text-rose-600 rounded"><Trash2 size={14} /></button>
+    </td>
+  </tr>
+));
 
 const ProviderCard = React.memo(({ prov, onEdit, onDelete, onConnect }) => (
   <div className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
@@ -161,7 +94,7 @@ const SmsLogCard = React.memo(({ log }) => (
 
 export default function AdminDashboard() {
   const { API_BASE } = useAuth();
-  const [adminTab, setAdminTab] = useState('WOZ');
+  const [adminTab, setAdminTab] = useState('WOZ'); // TIMEOUT_TRACKER sekmesi de eklenecek
   
   const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
   const { data: rawProviders, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
@@ -379,6 +312,10 @@ export default function AdminDashboard() {
           <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>WoZ Havuzu ({pendingRequests.length})</button>
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
           <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Layers size={14} /><span>Tüm Eşleşmeler</span></button>
+          
+          {/* YENİ EKLENEN TIMEOUT SEKMESİ */}
+          <button onClick={() => setAdminTab('TIMEOUT_TRACKER')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TIMEOUT_TRACKER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Timer size={14} /><span>Timeout Takibi</span></button>
+          
           <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>İşlem Log ({filteredSmsLogs.length})</button>
           <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FileCheck2 size={14} /><span>Test Senaryolar ({tests.length})</span></button>
           <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Proje ({features.length})</span></button>
@@ -424,6 +361,11 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* YENİ EKLENEN TIMEOUT SEKMESİNİN ÇAĞRILMASI */}
+      {adminTab === 'TIMEOUT_TRACKER' && (
+        <TimeoutTracker />
+      )}
+
       {adminTab === 'PROVIDERS' && (
         <div className="space-y-3">
           <div className="bg-white rounded-xl border p-3 flex justify-between">
@@ -449,8 +391,6 @@ export default function AdminDashboard() {
                 <tr>
                   <SortableHeader label="ID / Tarih" sortKey="id" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Durum" sortKey="status" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                  {/* ZAMAN AŞIMI BAŞLIĞI */}
-                  <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-left">Zaman Aşımı</th>
                   <SortableHeader label="Talep Metni" sortKey="raw_text" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Müşteri" sortKey="contact_value" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Sağlayıcı" sortKey="provider_name" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
@@ -460,12 +400,7 @@ export default function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {sortedMatchedRequests.map((req) => (
-                  <MatchedRequestRow 
-                    key={req.id} 
-                    req={req} 
-                    onDelete={handleDeleteRequest} 
-                    timeoutLimitMins={15} /* 15 dakikalık süreyi parametre olarak geçtik */
-                  />
+                  <MatchedRequestRow key={req.id} req={req} onDelete={handleDeleteRequest} />
                 ))}
               </tbody>
             </table>
