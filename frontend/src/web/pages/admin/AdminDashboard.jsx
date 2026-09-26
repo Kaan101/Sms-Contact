@@ -1,4 +1,3 @@
-import TimeoutTracker from './TimeoutTracker';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -6,10 +5,11 @@ import useSWR from 'swr';
 import { 
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
-  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2 
+  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer // <-- Timer ikonu da eklendi
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
+import TimeoutTracker from './TimeoutTracker'; // <-- Yeni sayfamızı import ettik
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
@@ -94,7 +94,7 @@ const SmsLogCard = React.memo(({ log }) => (
 
 export default function AdminDashboard() {
   const { API_BASE } = useAuth();
-  const [adminTab, setAdminTab] = useState('WOZ');
+  const [adminTab, setAdminTab] = useState('WOZ'); // TIMEOUT_TRACKER sekmesi de eklenecek
   
   const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
   const { data: rawProviders, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
@@ -111,7 +111,6 @@ export default function AdminDashboard() {
   const features = safeArray(rawFeatures?.features);
   const tests = safeArray(rawTests?.tests);
   
-  // --- EKSİK OLAN YEREL AYARLAR (STATE) ---
   const [localSettings, setLocalSettings] = useState({
     pool_lifespan_hours: 72,
     customer_selection_timeout_mins: 60,
@@ -119,7 +118,6 @@ export default function AdminDashboard() {
     customer_approval_timeout_hours: 24
   });
 
-  // DB'den gelen ayarları local state ile senkronize et
   useEffect(() => {
     if (rawSettings?.settings) {
       setLocalSettings(prev => ({ ...prev, ...rawSettings.settings }));
@@ -314,6 +312,10 @@ export default function AdminDashboard() {
           <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>WoZ Havuzu ({pendingRequests.length})</button>
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
           <button onClick={() => setAdminTab('ALL_MATCHED')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1 transition ${adminTab === 'ALL_MATCHED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Layers size={14} /><span>Tüm Eşleşmeler</span></button>
+          
+          {/* YENİ EKLENEN TIMEOUT SEKMESİ */}
+          <button onClick={() => setAdminTab('TIMEOUT_TRACKER')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TIMEOUT_TRACKER' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Timer size={14} /><span>Timeout Takibi</span></button>
+          
           <button onClick={() => setAdminTab('SMS_LOGS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'SMS_LOGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>İşlem Log ({filteredSmsLogs.length})</button>
           <button onClick={() => setAdminTab('TESTS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FileCheck2 size={14} /><span>Test Senaryolar ({tests.length})</span></button>
           <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Proje ({features.length})</span></button>
@@ -357,6 +359,11 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+      )}
+
+      {/* YENİ EKLENEN TIMEOUT SEKMESİNİN ÇAĞRILMASI */}
+      {adminTab === 'TIMEOUT_TRACKER' && (
+        <TimeoutTracker />
       )}
 
       {adminTab === 'PROVIDERS' && (
