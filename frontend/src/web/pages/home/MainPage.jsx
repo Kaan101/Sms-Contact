@@ -13,11 +13,11 @@ export default function MainPage({ onGoToLogin }) {
   // WhatsApp senaryosu alt fazları
   const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); // CHATTING, SUCCESS_MARK
   const [chatStep, setChatStep] = useState(0); 
-  const [showSuccess, setShowSuccess] = useState(false); // Büyük yeşil onay işareti state'i
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Daktilo Efekti (Daha yumuşak bir başlama)
+  // 1. FAZ: Daktilo Efekti
   useEffect(() => {
     setTypedText('');
     setPhase('TYPING');
@@ -31,7 +31,6 @@ export default function MainPage({ onGoToLogin }) {
         currentIndex++;
       } else {
         clearInterval(typingInterval);
-        // Yazma bittikten sonra seçeneklerin gelmesini biraz daha geciktirdik
         setTimeout(() => setPhase('SHOW_OPTIONS'), 1500); 
       }
     }, 150);
@@ -44,20 +43,19 @@ export default function MainPage({ onGoToLogin }) {
     let t1, t2, t3, t4, t5;
 
     if (phase === 'SHOW_OPTIONS') {
-      t1 = setTimeout(() => setPhase('CLICK_OPTION'), 1800); // Yavaşlatıldı
+      t1 = setTimeout(() => setPhase('CLICK_OPTION'), 1800); 
     } else if (phase === 'CLICK_OPTION') {
-      t2 = setTimeout(() => setPhase('CLICK_SEND'), 1200); // Yavaşlatıldı
+      t2 = setTimeout(() => setPhase('CLICK_SEND'), 1200); 
     } else if (phase === 'CLICK_SEND') {
-      t3 = setTimeout(() => setPhase('MAP_SCANNING'), 1500); // Yavaşlatıldı
+      t3 = setTimeout(() => setPhase('MAP_SCANNING'), 1500); 
     } else if (phase === 'MAP_SCANNING') {
-      t4 = setTimeout(() => setPhase('FINAL_ACTION'), 4500); // Harita taraması uzatıldı
+      t4 = setTimeout(() => setPhase('FINAL_ACTION'), 4500); 
     } else if (phase === 'FINAL_ACTION') {
       // Senaryo 1 (Telefon) 7 saniye sürer.
-      // Senaryo 2 (WhatsApp) Chat (11sn) + Success Mark (4sn) = 15 saniye sürer.
+      // Senaryo 2 (WhatsApp) Chat + Success Mark toplam 16 saniye.
       const delay = scenario === 1 ? 7000 : 16000; 
       
       t5 = setTimeout(() => {
-        // Senaryo değişirken araya çok hafif bir yumuşaklık koymak için
         setPhase('TYPING'); 
         setScenario(prev => prev === 1 ? 2 : 1);
         setChatStep(0);
@@ -74,35 +72,34 @@ export default function MainPage({ onGoToLogin }) {
     };
   }, [phase, scenario]);
 
-  // 3. FAZ: WhatsApp Senaryosu (Chat ve Dev dev Yeşil Ok Geçişi)
+  // 3. FAZ: WhatsApp Chat Adımları ve Tekli Yeşil Ok Kurgusu
   useEffect(() => {
     let timers = [];
     if (phase === 'FINAL_ACTION' && scenario === 2) {
       setWhatsappPhase('CHATTING');
       setShowSuccess(false);
 
-      // Chat adımları
       const chatSteps = [
-        { step: 1, delay: 1000 },  // Bosch servis yazmaya başlar
-        { step: 2, delay: 3000 },  // Bosch servis ilk mesajı atar
-        { step: 3, delay: 4500 },  // Mehmet Bey yazmaya başlar
-        { step: 4, delay: 7000 },  // Mehmet Bey sorunu yazar
-        { step: 5, delay: 8500 },  // Bosch servis cevap yazmaya başlar
-        { step: 6, delay: 11000 }  // Bosch servis randevuyu onaylar
+        { step: 1, delay: 1000 },
+        { step: 2, delay: 3000 },
+        { step: 3, delay: 4500 },
+        { step: 4, delay: 7000 },
+        { step: 5, delay: 8500 },
+        { step: 6, delay: 11000 }
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
 
-      // Chat bittikten sonra ekran kararır ve BÜYÜK YEŞİL OK belirir
       timers.push(setTimeout(() => {
         setWhatsappPhase('SUCCESS_MARK');
-        // Yeşil okun yavaşça fade-in olması için
         setTimeout(() => setShowSuccess(true), 100);
-        // Yeşil okun kaybolup diğer senaryoya geçmesi için fade-out
         setTimeout(() => setShowSuccess(false), 3500); 
       }, 12500));
     }
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
+
+  // Şık bir SVG Sokak/Harita Deseni
+  const mapPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83 43.409-54.8 11.233L0 55.42l55.932-11.465L55.05 0h-.423zM25.32 0l-1.07 19.865-17.65-4.57 2.073-15.295h-.436l-2.074 15.295L0 13.68V14.1l6.096 1.579L4.022 30.985l-.426-.11 2.074-15.305 17.65 4.57 1.07-19.865h.423l-1.07 19.865 24.237 6.276L55.05 0h-.423L27.674 26.24 25.32 0z' fill='%2394a3b8' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E")`;
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans selection:bg-neutral-900 selection:text-white overflow-x-hidden">
@@ -190,14 +187,20 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
+              {/* İkili Ekranların Bulunduğu GRID */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch relative flex-1">
                 
+                {/* TEK VE DEV YEŞİL ONAY İŞARETİ - Tüm grid'in üzerini kaplar */}
+                <div className={`absolute inset-0 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out rounded-[2rem] ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 bg-white/70 backdrop-blur-sm scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
+                  <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center shadow-2xl">
+                    <CheckCircle2 size={72} className="text-emerald-500" />
+                  </div>
+                </div>
+
                 {/* SOL TARAF: MÜŞTERİ */}
                 {phase === 'FINAL_ACTION' && scenario === 2 ? (
                   <div className="flex flex-col h-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-md bg-white">
-                    
-                    {/* Chat Ekranı */}
-                    <div className={`flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000 ${whatsappPhase === 'CHATTING' ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000">
                       <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
                         <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">MU</div>
                         <div className="leading-tight flex-1">
@@ -235,13 +238,6 @@ export default function MainPage({ onGoToLogin }) {
                           <Send size={12} className="-ml-0.5" />
                         </div>
                       </div>
-                    </div>
-
-                    {/* Büyük Yeşil Ok - Müşteri Tarafı */}
-                    <div className={`absolute inset-0 bg-white/95 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
-                       <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse">
-                         <CheckCircle2 size={72} className="text-emerald-500" />
-                       </div>
                     </div>
                   </div>
                 ) : (
@@ -306,12 +302,10 @@ export default function MainPage({ onGoToLogin }) {
                   </div>
                 )}
 
-                {/* SAĞ TARAF: SAĞLAYICI */}
+                {/* SAĞ TARAF: SAĞLAYICI (Harita Deseni ve Arama Gizliliği) */}
                 {phase === 'FINAL_ACTION' && scenario === 2 ? (
                   <div className="flex flex-col h-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-md bg-white">
-                    
-                    {/* Chat Ekranı */}
-                    <div className={`flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000 delay-150 ${whatsappPhase === 'CHATTING' ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="flex flex-col h-[380px] bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] transition-opacity duration-1000">
                       <div className="bg-[#00A884] text-white px-4 py-3 flex items-center space-x-3 z-10 shadow-sm">
                         <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs shrink-0">M</div>
                         <div className="leading-tight flex-1">
@@ -350,31 +344,25 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                     </div>
-
-                    {/* Büyük Yeşil Ok - Sağlayıcı Tarafı */}
-                    <div className={`absolute inset-0 bg-white/95 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out delay-150 ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
-                       <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse">
-                         <CheckCircle2 size={72} className="text-emerald-500" />
-                       </div>
-                    </div>
-
                   </div>
                 ) : (
-                  <div className="bg-[#EAE6DF] border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full">
-                    <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]" />
-                    <div className="absolute inset-0 opacity-20 bg-gradient-to-r from-sky-100/50 via-transparent to-amber-100/40 pointer-events-none" />
+                  <div 
+                    className="bg-white border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full"
+                    style={{ backgroundImage: mapPattern, backgroundSize: '120px 120px' }}
+                  >
+                    <div className="absolute inset-0 bg-white/60 pointer-events-none" />
 
-                    <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3">
+                    <div className="relative z-10 flex items-center justify-between border-b border-neutral-300 pb-3 bg-white/90 p-2 rounded-xl shadow-xs">
                       <div className="flex items-center space-x-2.5">
                         <div className="w-7 h-7 rounded-full bg-neutral-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                          {scenario === 1 ? "A" : "M"}
+                          {phase === 'FINAL_ACTION' ? (scenario === 1 ? "A" : "M") : "?"}
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-neutral-900">
-                            {scenario === 1 ? "Ayşe Hanım" : "Murat Usta"}
+                            {phase === 'FINAL_ACTION' ? (scenario === 1 ? "Ayşe Hanım" : "Murat Usta") : "Sistem Taranıyor..."}
                           </h4>
                           <span className="text-[10px] text-neutral-600">
-                            {scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis"}
+                            {phase === 'FINAL_ACTION' ? (scenario === 1 ? "Tarabya Emlak Uzmanı" : "Bosch Yetkili Servis") : "Uygun uzman aranıyor"}
                           </span>
                         </div>
                       </div>
@@ -389,12 +377,12 @@ export default function MainPage({ onGoToLogin }) {
                     <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
                       {phase === 'MAP_SCANNING' || phase === 'FINAL_ACTION' ? (
                         <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
-                          <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/90 px-2.5 py-1 rounded-full border border-neutral-300 shadow-xs">
-                            <Compass size={13} className="animate-spin text-neutral-600" /> Bölgedeki Alternatifler Analiz Ediliyor
+                          <span className="text-[10px] font-mono text-neutral-800 font-bold uppercase tracking-wider flex items-center gap-1.5 bg-white/95 px-3 py-1.5 rounded-full border border-neutral-300 shadow-md">
+                            <Compass size={13} className="animate-spin text-neutral-600" /> En uygun uzman haritada işaretleniyor...
                           </span>
                         </div>
                       ) : (
-                        <div className="text-center text-neutral-600 text-xs font-mono bg-white/60 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-xs">
+                        <div className="text-center text-neutral-600 text-xs font-mono bg-white/90 px-3 py-1.5 rounded-lg border border-neutral-300 shadow-xs">
                           Talep gönderildiğinde harita taranacak...
                         </div>
                       )}
