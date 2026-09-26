@@ -9,8 +9,8 @@ export default function MainPage({ onGoToLogin }) {
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
-  // Fazlar: TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION
-  const [phase, setPhase] = useState('TYPING'); 
+  // Fazlar: MOBOOL_INTRO -> TYPING -> SHOW_OPTIONS -> CLICK_OPTION -> CLICK_SEND -> MAP_SCANNING -> MATCH_FOUND -> FINAL_ACTION -> MOBOOL_OUTRO
+  const [phase, setPhase] = useState('MOBOOL_INTRO'); 
   
   const [whatsappPhase, setWhatsappPhase] = useState('CHATTING'); 
   const [chatStep, setChatStep] = useState(0); 
@@ -18,53 +18,60 @@ export default function MainPage({ onGoToLogin }) {
 
   const fullText = scenario === 1 ? "Tarabya'da 3+1 kiralık" : "Bosch servis";
 
-  // 1. FAZ: Daktilo Efekti
+  // 1. FAZ: Daktilo Efekti ve MOBOOL İntro
   useEffect(() => {
     setTypedText('');
-    setPhase('TYPING');
+    setPhase('MOBOOL_INTRO');
     setWhatsappPhase('CHATTING');
     setShowSuccess(false);
-    let currentIndex = 0;
+    
+    // MOBOOL yazısı 2.5 saniye ekranda kalıp sonra typing fazına geçiyor
+    const introTimer = setTimeout(() => {
+      setPhase('TYPING');
+      let currentIndex = 0;
+      const typingInterval = setInterval(() => {
+        if (currentIndex <= fullText.length) {
+          setTypedText(fullText.slice(0, currentIndex));
+          currentIndex++;
+        } else {
+          clearInterval(typingInterval);
+          setTimeout(() => setPhase('SHOW_OPTIONS'), 1500); 
+        }
+      }, 150);
+      return () => clearInterval(typingInterval);
+    }, 2500);
 
-    const typingInterval = setInterval(() => {
-      if (currentIndex <= fullText.length) {
-        setTypedText(fullText.slice(0, currentIndex));
-        currentIndex++;
-      } else {
-        clearInterval(typingInterval);
-        setTimeout(() => setPhase('SHOW_OPTIONS'), 1500); 
-      }
-    }, 150);
-
-    return () => clearInterval(typingInterval);
+    return () => clearTimeout(introTimer);
   }, [scenario]);
 
-  // 2. FAZ: Kontrollü ve Yavaşlatılmış Akış
+  // 2. FAZ: Kontrollü ve Ekstra Yavaşlatılmış Akış
   useEffect(() => {
-    let t1, t2, t3, t4, t5, t6;
+    let t1, t2, t3, t4, t5, t6, t7;
 
     if (phase === 'SHOW_OPTIONS') {
-      t1 = setTimeout(() => setPhase('CLICK_OPTION'), 1800); 
+      t1 = setTimeout(() => setPhase('CLICK_OPTION'), 2000); 
     } else if (phase === 'CLICK_OPTION') {
-      t2 = setTimeout(() => setPhase('CLICK_SEND'), 1200); 
+      t2 = setTimeout(() => setPhase('CLICK_SEND'), 1500); 
     } else if (phase === 'CLICK_SEND') {
       t3 = setTimeout(() => setPhase('MAP_SCANNING'), 1500); 
     } else if (phase === 'MAP_SCANNING') {
-      // Harita taranıyor...
-      t4 = setTimeout(() => setPhase('MATCH_FOUND'), 4000); 
+      t4 = setTimeout(() => setPhase('MATCH_FOUND'), 4500); 
     } else if (phase === 'MATCH_FOUND') {
-      // Sadece SAĞ ekranda Bulundu! uyarısı (3.5 saniye)
       t5 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
     } else if (phase === 'FINAL_ACTION') {
-      // Senaryo 1 (Telefon) 7 saniye. 
-      // Senaryo 2 (WhatsApp) Tek ekran chat döngüsü yaklaşık 14 saniye sürecek.
-      const delay = scenario === 1 ? 7000 : 15000; 
+      // Senaryo 1: 7sn Telefon araması
+      // Senaryo 2: 12sn Chat + 2.5sn bekleme + 4sn Success Mark = 18.5sn
+      const delay = scenario === 1 ? 7000 : 18500; 
       
       t6 = setTimeout(() => {
-        setPhase('TYPING'); 
-        setScenario(prev => prev === 1 ? 2 : 1);
-        setChatStep(0);
-        setShowSuccess(false);
+        setPhase('MOBOOL_OUTRO');
+        
+        t7 = setTimeout(() => {
+           setScenario(prev => prev === 1 ? 2 : 1);
+           setChatStep(0);
+           setShowSuccess(false);
+        }, 3500); // Outro yazısı ekranda kalma süresi
+
       }, delay);
     }
 
@@ -75,10 +82,11 @@ export default function MainPage({ onGoToLogin }) {
       clearTimeout(t4);
       clearTimeout(t5);
       clearTimeout(t6);
+      clearTimeout(t7);
     };
   }, [phase, scenario]);
 
-  // 3. FAZ: WhatsApp Chat Adımları
+  // 3. FAZ: WhatsApp Chat Adımları (Chat bitince bekleme payı eklendi)
   useEffect(() => {
     let timers = [];
     if (phase === 'FINAL_ACTION' && scenario === 2) {
@@ -86,20 +94,21 @@ export default function MainPage({ onGoToLogin }) {
       setShowSuccess(false);
 
       const chatSteps = [
-        { step: 1, delay: 1000 },
-        { step: 2, delay: 3000 },
-        { step: 3, delay: 4500 },
-        { step: 4, delay: 7000 },
-        { step: 5, delay: 8500 },
-        { step: 6, delay: 11000 }
+        { step: 1, delay: 1500 },
+        { step: 2, delay: 3500 },
+        { step: 3, delay: 5000 },
+        { step: 4, delay: 7500 },
+        { step: 5, delay: 9000 },
+        { step: 6, delay: 12000 } // Chat burada biter.
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
 
+      // Chat bitimi (12sn) ile Onay (14.5sn) arasına 2.5 saniye okuma/nefes payı bırakıldı.
       timers.push(setTimeout(() => {
         setWhatsappPhase('SUCCESS_MARK');
         setTimeout(() => setShowSuccess(true), 100);
-        setTimeout(() => setShowSuccess(false), 3500); 
-      }, 12000));
+        setTimeout(() => setShowSuccess(false), 3800); 
+      }, 14500));
     }
     return () => timers.forEach(clearTimeout);
   }, [phase, scenario]);
@@ -176,9 +185,22 @@ export default function MainPage({ onGoToLogin }) {
           <div className="lg:col-span-7 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-neutral-100 to-white rounded-[2rem] transform rotate-1 scale-105 border border-neutral-200 shadow-xl" />
             
-            <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col space-y-6 min-h-[460px]">
+            <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col space-y-6 min-h-[460px] overflow-hidden">
               
-              <div className="flex items-center justify-between border-b pb-4">
+              {/* MOBOOL INTRO/OUTRO GEÇİŞ EKRANI (Tüm simülasyonun üzerine biner) */}
+              <div className={`absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-1000 ease-in-out ${
+                phase === 'MOBOOL_INTRO' || phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+              }`}>
+                <div className="w-16 h-16 bg-neutral-950 rounded-2xl flex items-center justify-center shadow-2xl mb-6">
+                  <Zap size={32} className="text-white" />
+                </div>
+                <h2 className="text-3xl font-extrabold text-neutral-950 mb-3 tracking-tight">MOBOOL</h2>
+                <p className="text-sm font-medium text-neutral-500 text-center px-8 leading-relaxed max-w-sm">
+                  {scenario === 1 ? 'Evinizin rahatlığında siz isteyin, en iyi uzmanlar anında size ulaşsın.' : 'Sorunlarınızı yazın, işin ehli ustalar kapınıza kadar gelsin.'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between border-b pb-4 relative z-40">
                 <div className="flex items-center space-x-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">Canlı Akış Simülasyonu</span>
@@ -192,15 +214,14 @@ export default function MainPage({ onGoToLogin }) {
                 </div>
               </div>
 
-              {/* GRID YAPISI: WhatsApp aşamasında tek ekran, diğerlerinde iki ekran */}
-              <div className={`grid items-stretch relative flex-1 ${
+              <div className={`grid items-stretch relative flex-1 transition-all duration-1000 ease-in-out ${
                   (phase === 'FINAL_ACTION' && scenario === 2) 
                     ? 'grid-cols-1 max-w-sm mx-auto w-full' 
                     : 'grid-cols-1 md:grid-cols-2 gap-6'
                 }`}>
                 
-                {/* TEK VE DEV YEŞİL ONAY İŞARETİ */}
-                <div className={`absolute inset-0 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out rounded-[2rem] ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 bg-white/70 backdrop-blur-sm scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
+                {/* TEK VE DEV YEŞİL ONAY İŞARETİ (WhatsApp Final Ekranında) */}
+                <div className={`absolute inset-0 z-50 flex items-center justify-center transition-all duration-1000 ease-in-out rounded-[2rem] ${showSuccess && whatsappPhase === 'SUCCESS_MARK' ? 'opacity-100 bg-white/80 backdrop-blur-md scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
                   <div className="w-32 h-32 rounded-full bg-emerald-100 flex items-center justify-center shadow-2xl">
                     <CheckCircle2 size={72} className="text-emerald-500" />
                   </div>
@@ -208,7 +229,7 @@ export default function MainPage({ onGoToLogin }) {
 
                 {/* SENARYO 2 FINAL: WHATSAPP TEK EKRAN */}
                 {(phase === 'FINAL_ACTION' && scenario === 2) ? (
-                  <div className="flex flex-col h-[400px] w-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-xl bg-white mx-auto">
+                  <div className="flex flex-col h-[400px] w-full relative overflow-hidden rounded-[2rem] border border-neutral-200 shadow-2xl bg-white mx-auto animate-in zoom-in duration-700">
                     <div className="flex flex-col h-full w-full bg-[#EFEAE2] border-[6px] border-neutral-900 rounded-[2rem] overflow-hidden transition-opacity duration-1000">
                       
                       <div className="bg-[#00A884] text-white px-4 py-3 flex items-center justify-between z-10 shadow-sm">
@@ -226,9 +247,7 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
                       </div>
                       
-                      {/* WhatsApp Mesajları (Küçültülmüş Fontlar ve Sıfır Taşma) */}
                       <div className="flex-1 p-2 space-y-2 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full">
-                        
                         <div className="text-center my-1"><span className="bg-[#E1F3FB] text-neutral-600 text-[8px] font-bold px-2 py-1 rounded-lg">SMS KONTAK Eşleşmesi Sağlandı</span></div>
 
                         {chatStep >= 2 && (
@@ -279,7 +298,7 @@ export default function MainPage({ onGoToLogin }) {
                 ) : (
                   <>
                     {/* NORMAL DURUM SOL TARAF (Müşteri) */}
-                    <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs h-full relative">
+                    <div className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xs h-full relative transition-all duration-1000">
                       
                       <div>
                         <div className="flex items-center space-x-2.5 mb-3">
@@ -324,9 +343,9 @@ export default function MainPage({ onGoToLogin }) {
                         </div>
 
                         {phase === 'FINAL_ACTION' && scenario === 1 && (
-                          <div className="animate-in fade-in zoom-in duration-1000">
+                          <div className="animate-in fade-in zoom-in duration-1000 h-[280px]">
                             {/* GERÇEKÇİ ARAMA EKRANI (Arkası Yeşil) */}
-                            <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-5 rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col justify-between h-[280px]">
+                            <div className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-5 rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col justify-between h-full">
                               
                               <div className="flex flex-col items-center pt-2">
                                 <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
@@ -365,7 +384,7 @@ export default function MainPage({ onGoToLogin }) {
 
                     {/* NORMAL DURUM SAĞ TARAF (Sağlayıcı ve Harita) */}
                     <div 
-                      className="bg-white border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full"
+                      className="bg-white border border-neutral-300 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden text-neutral-900 h-full transition-all duration-1000"
                       style={{ 
                         backgroundImage: mapBackgroundImage, 
                         backgroundSize: 'cover', 
@@ -422,14 +441,15 @@ export default function MainPage({ onGoToLogin }) {
 
                       <div className="relative z-10 flex-1 min-h-[140px] flex flex-col items-center justify-center py-2">
                         {phase === 'MAP_SCANNING' ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
-                            <div className="animate-bounce bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center space-y-2">
-                              <Compass size={24} className="animate-spin text-emerald-400" /> 
-                              <span className="text-xs font-bold text-center tracking-wide leading-relaxed">
+                          <div className="w-full h-full flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-700">
+                            {/* BEYAZ CAM EFEKTLİ ARAMA BALONCUĞU */}
+                            <div className="bg-white/95 backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl border border-neutral-200 flex flex-col items-center space-y-3 transform transition-transform hover:scale-105">
+                              <Compass size={28} className="animate-spin text-emerald-500" /> 
+                              <span className="text-xs font-extrabold text-center text-neutral-800 tracking-wide">
                                 {scenario === 1 ? (
-                                  <>En Uygun <span className="text-emerald-400">Emlakçı</span><br/>Aranıyor...</>
+                                  <>En Uygun <span className="text-emerald-600">Emlakçı</span> Aranıyor...</>
                                 ) : (
-                                  <>En Uygun <span className="text-emerald-400">Servis</span><br/>Aranıyor...</>
+                                  <>En Uygun <span className="text-emerald-600">Servis</span> Aranıyor...</>
                                 )}
                               </span>
                             </div>
