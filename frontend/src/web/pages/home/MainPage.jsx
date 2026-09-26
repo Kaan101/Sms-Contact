@@ -40,7 +40,6 @@ export default function MainPage({ onGoToLogin }) {
     let timeoutId;
     
     if (phase === 'SCENARIO_INTRO') {
-      // İntro ekranı bekleme süresi 1 saniye artırıldı (3000 -> 4000)
       timeoutId = setTimeout(() => setPhase('TYPING'), 4000);
     } else if (phase === 'TYPING') {
       setTypedText('');
@@ -53,7 +52,6 @@ export default function MainPage({ onGoToLogin }) {
           idx++;
         } else {
           clearInterval(t);
-          // Yazı bittikten sonraki boşluk 1 saniye azaltıldı (3200 -> 2200)
           timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 2200);
         }
       }, 70); 
@@ -120,8 +118,6 @@ export default function MainPage({ onGoToLogin }) {
         t1 = setTimeout(() => setPhase('FINAL_ACTION'), 3500); 
         break;
       case 'FINAL_ACTION': 
-        // 1. Senaryo (Telefon): 7 Saniye
-        // 2. Senaryo (WhatsApp): 12sn (Mesajlar) + 4sn (Okuma Süresi) = 16 Saniye (14'ten 16'ya uzatıldı)
         const delay = scenario === 1 ? 7000 : 16000;
         t1 = setTimeout(() => {
           if (scenario === 2) {
@@ -153,7 +149,7 @@ export default function MainPage({ onGoToLogin }) {
         { step: 3, delay: 5000 },
         { step: 4, delay: 7500 },
         { step: 5, delay: 9000 },
-        { step: 6, delay: 12000 } // Son mesaj 12. saniyede biter. Sonrasında phase geçişi 4 saniye daha bekletir.
+        { step: 6, delay: 12000 } 
       ];
       chatSteps.forEach(s => timers.push(setTimeout(() => setChatStep(s.step), s.delay)));
     }
@@ -220,7 +216,7 @@ export default function MainPage({ onGoToLogin }) {
             
             <div className="relative bg-white rounded-[2rem] border border-neutral-200 shadow-2xl p-6 lg:p-8 flex flex-col min-h-[480px] overflow-hidden">
               
-              {/* 1. SCENARIO_INTRO (Her ikisi de açık yeşil arka plan, özel bold metinler) */}
+              {/* 1. SCENARIO_INTRO */}
               <div className={`absolute inset-0 z-[70] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-emerald-50 ${
                 phase === 'SCENARIO_INTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
               }`}>
@@ -245,27 +241,27 @@ export default function MainPage({ onGoToLogin }) {
                 )}
               </div>
 
-              {/* 2. MOBOOL_OUTRO (Modern Grafik Zemin & Daktilo) */}
-              <div className={`absolute inset-0 z-[80] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-[#0A0F16] ${
+              {/* 2. MOBOOL_OUTRO (Açık, Ferah ve Modern Grafik Zemin) */}
+              <div className={`absolute inset-0 z-[80] flex flex-col items-center justify-center transition-all duration-1000 ease-in-out bg-neutral-50 ${
                 phase === 'MOBOOL_OUTRO' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
               }`}>
-                {/* Modern Network Arka Plan Efektleri */}
-                <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-                <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-emerald-500 opacity-20 blur-[100px]"></div>
-                <div className="absolute bottom-0 right-0 -z-10 h-[250px] w-[250px] rounded-full bg-blue-500 opacity-20 blur-[100px]"></div>
+                {/* Modern Network Arka Plan Efektleri (Açık Tema) */}
+                <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px]"></div>
+                <div className="absolute left-[-10%] top-[-10%] z-0 h-[400px] w-[400px] rounded-full bg-emerald-300 opacity-20 blur-[100px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] z-0 h-[300px] w-[300px] rounded-full bg-blue-300 opacity-20 blur-[100px]"></div>
                 
                 {/* İçerik */}
                 <div className="relative z-10 flex flex-col items-center">
-                  <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-3xl border border-white/10 flex items-center justify-center shadow-2xl mb-6">
-                    <Zap size={40} className="text-emerald-400" />
+                  <div className="w-20 h-20 bg-white backdrop-blur-md rounded-3xl border border-neutral-200 flex items-center justify-center shadow-xl mb-6">
+                    <Zap size={40} className="text-emerald-500" />
                   </div>
-                  <h2 className="text-4xl font-extrabold text-white mb-3 tracking-tight h-10">
+                  <h2 className="text-4xl font-extrabold text-neutral-900 mb-3 tracking-tight h-10">
                     {outroTitle}
-                    {outroTitle.length < fullOutroTitle.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse">|</span>}
+                    {outroTitle.length < fullOutroTitle.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse text-emerald-500">|</span>}
                   </h2>
-                  <p className="text-base font-medium text-neutral-400 text-center px-8 leading-relaxed max-w-sm h-12">
+                  <p className="text-base font-medium text-neutral-600 text-center px-8 leading-relaxed max-w-sm h-12">
                     {outroText}
-                    {outroTitle.length === fullOutroTitle.length && outroText.length < fullOutroText.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse">|</span>}
+                    {outroTitle.length === fullOutroTitle.length && outroText.length < fullOutroText.length && phase === 'MOBOOL_OUTRO' && <span className="animate-pulse text-emerald-500">|</span>}
                   </p>
                 </div>
               </div>
@@ -517,7 +513,6 @@ export default function MainPage({ onGoToLogin }) {
                           <Send size={14} className="-ml-0.5" />
                         </div>
                       </div>
-
                     </div>
                   )}
 
