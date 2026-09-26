@@ -55,7 +55,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. requests tablosu
+    // 2. requests tablosu (YENİ KOLON: request_type EKLENDİ)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -67,23 +67,36 @@ const initDatabase = async () => {
         is_urgent BOOLEAN DEFAULT FALSE,
         deadline_datetime TIMESTAMP WITH TIME ZONE,
         preferred_channel VARCHAR(50) NOT NULL DEFAULT 'PHONE',
-        status VARCHAR(50) NOT NULL DEFAULT 'POOL', -- PENDING yerine POOL yapısı eklendi
+        request_type VARCHAR(50) DEFAULT 'TALEP', -- YENİ: Kayıt Türü
+        status VARCHAR(50) NOT NULL DEFAULT 'POOL', 
         matched_provider_id INTEGER,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 🌟 3. YENİ: TALEP HAVUZU / KUYRUK TABLOSU (Marketplace Queue)
+    // 3. YENİ: TALEP HAVUZU / KUYRUK TABLOSU (Marketplace Queue)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS request_interests (
         id SERIAL PRIMARY KEY,
         request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
         provider_id INTEGER REFERENCES service_providers(id) ON DELETE CASCADE,
-        status VARCHAR(50) DEFAULT 'WAITING', -- WAITING, ACTIVE, SKIPPED
+        status VARCHAR(50) DEFAULT 'WAITING', 
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(request_id, provider_id)
       );
+    `);
+
+    // GÜNCELLEME GÜVENCESİ: Mevcut tabloda 'request_type' kolonu yoksa ekle (Hata almamak için PostgreSQL 'DO' bloğu kullanılır)
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+          BEGIN
+              ALTER TABLE requests ADD COLUMN request_type VARCHAR(50) DEFAULT 'TALEP';
+          EXCEPTION
+              WHEN duplicate_column THEN RAISE NOTICE 'column request_type already exists in requests.';
+          END;
+      END $$;
     `);
 
     // Güvenlik & Alterlar

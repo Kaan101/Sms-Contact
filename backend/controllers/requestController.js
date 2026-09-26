@@ -14,13 +14,33 @@ const logSms = async (requestId, type, phone, body) => {
 
 const createRequest = async (req, res) => {
   try {
-    const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime } = req.body;
+    // 1. requestType parametresi req.body'den alınıyor
+    const { 
+      rawText, 
+      disambiguationChoice, 
+      contactValue, 
+      preferredChannel, 
+      location, 
+      isUrgent, 
+      deadlineDatetime,
+      requestType // YENİ EKLENEN ALAN
+    } = req.body;
     
     const { rows: requestRows } = await pool.query(
-      `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'POOL') 
+      // 2. SQL Sorgusuna request_type kolonu ve $8 parametresi eklendi
+      `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, request_type, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'POOL') 
        RETURNING *;`,
-      [rawText, disambiguationChoice, contactValue, preferredChannel || 'PHONE', location, isUrgent || false, deadlineDatetime || null]
+      [
+        rawText, 
+        disambiguationChoice, 
+        contactValue, 
+        preferredChannel || 'PHONE', 
+        location, 
+        isUrgent || false, 
+        deadlineDatetime || null,
+        requestType || 'TALEP' // Varsayılan değer güvencesi eklendi
+      ]
     );
 
     const newRequest = requestRows[0];
@@ -28,6 +48,7 @@ const createRequest = async (req, res) => {
 
     res.status(201).json({ status: 'success', request: newRequest });
   } catch (error) {
+    console.error('Request Create Error:', error); // Hata ayıklamayı kolaylaştırmak için eklendi
     res.status(500).json({ status: 'error', message: 'Sunucu hatası' });
   }
 };
