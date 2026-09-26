@@ -532,7 +532,7 @@ export default function MainPage({ onGoToLogin }) {
                       
                       {chatStep >= 4 && (
                         <div className="self-end max-w-[85%] animate-in slide-in-from-right-2 fade-in duration-500">
-                          <span className="text-[10px] font-bold text-neutral-500/80 mb-1 mr-1 block text-right tracking-wider uppercase">Ayşen Hanım (Siz)</span>
+                          <span className="text-[10px] font-bold text-neutral-500/80 mb-1 mr-1 block text-right tracking-wider uppercase">Fatma Hanım (Siz)</span>
                           <div className="bg-[#D9FDD3] text-neutral-900 p-3 rounded-xl rounded-tr-none text-xs leading-relaxed shadow-sm relative flex flex-col">
                             <span className="break-words whitespace-normal">Kolay gelsin Murat Usta. Çamaşır makinesi su almıyor, ekranda E18 hatası var. Bugün bakma şansınız var mı?</span>
                             <div className="flex items-center justify-end mt-1 shrink-0">
