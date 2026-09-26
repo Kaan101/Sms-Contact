@@ -3,7 +3,7 @@ import axios from 'axios';
 import { MapContainer, TileLayer, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import useSWR from 'swr';
+import useSWR from 'swr'; 
 import { 
   Phone, MessageSquare, Mail, MessageCircle, MapPin, Clock, Shield, Tag, 
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
@@ -14,7 +14,7 @@ import { useAuth } from '../../../core/context/AuthContext';
 import { 
   safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, 
   extractCode, isCodeHiddenReq, cleanContact, extractPhoneForWa, safeDateTime, calculateRemainingTime 
-} from '../../../core/utils/helpers';
+} from '../../../core/utils/helpers'; 
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
@@ -269,19 +269,13 @@ export default function CustomerDashboard() {
       {/* YENİ TALEP FORMU */}
       {step === 'INPUT' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
-          <div className="text-center space-y-1 mb-2">
-            <h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Yeni Talep</h2>
-            <p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p>
-          </div>
-          
+          <div className="text-center space-y-1 mb-2"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
           <form onSubmit={handleCustomerCombinedSubmit} className="space-y-4">
             <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
-              
               <div className="flex gap-2">
                 <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleCustomerCombinedSubmit(e); }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" required />
-                {/* Eski yerindeki ok butonu kaldırıldı, aşağıya alındı. */}
+                <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit cursor-pointer"><ChevronDown size={16} /></button>
               </div>
-              
               <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                 <div className="flex flex-col leading-tight"><span className="flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span></span>{coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}</div>
                 <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
@@ -299,82 +293,63 @@ export default function CustomerDashboard() {
                 </div>
               </div>
               
-              {/* ALT KONTROLLER: Gönder Butonu ve Seçenekler Toggle */}
-              <div className="flex flex-col w-full pt-4 mt-2 border-t border-neutral-200/60">
-                <div className="flex justify-between items-start w-full px-1">
-                   {/* Sol Taraf: İsteğe bağlı bilgi metni */}
-                   <div className="text-[10px] text-neutral-400 font-mono mt-2 hidden sm:block">
-                      İhtiyaç duyarsanız seçenekleri genişletebilirsiniz.
-                   </div>
-                   
-                   {/* Sağ Taraf: Gönder ve Seçenekler Butonu Alt Alta */}
-                   <div className="flex flex-col items-end gap-1.5">
-                      <button type="submit" disabled={loading || !queryText.trim()} className="px-8 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-sm font-bold shadow-sm flex items-center space-x-2 cursor-pointer disabled:opacity-50 transition-all">
-                        {loading ? <><span>Gönderiliyor...</span><Loader2 size={16} className="animate-spin" /></> : <><span>Gönder</span><ArrowRight size={16} /></>}
-                      </button>
-                      
-                      {/* Seçenekler Butonu "Gönder"in Tam Altında */}
-                      <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 flex items-center gap-1 cursor-pointer transition-colors px-1 py-0.5 rounded hover:bg-neutral-100">
-                        <span>Seçenekler</span>
-                        {isDetailsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                      </button>
-                   </div>
-                </div>
-
-                {/* Seçenekler İçeriği (Butonu aşağı itmeden, kendi alanında aşağıya açılır) */}
-                {!isDetailsCollapsed && (
-                   <div className="mt-3 pt-5 border-t border-neutral-100 flex flex-col md:flex-row gap-6 animate-in slide-in-from-top-2 fade-in duration-200">
-                      <div className="w-full md:w-5/12 space-y-5">
-                         <div>
-                             <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>{deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase cursor-pointer">temizle</button>}</label>
-                             <div className="flex items-center gap-2"><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" /><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" /></div>
-                         </div>
-                         <div className="space-y-2">
-                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
-                           <div className="grid grid-cols-2 gap-2">
-                             <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Phone size={13} /><span>Telefon</span></button>
-                             <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageSquare size={13} /><span>SMS</span></button>
-                             <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span>E-posta</span></button>
-                             <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
-                           </div>
-                           {preferredChannels.includes('EMAIL') && (<div className="animate-in fade-in duration-150 pt-1"><input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" /></div>)}
-                         </div>
-                         <div className="grid grid-cols-2 gap-3 pt-2">
-                           <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}><input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" /><div className="flex items-center space-x-2"><Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} /><div className="flex flex-col"><span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span><span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span></div></div></label>
-                           <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}><input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" /><div className="flex items-center space-x-2 w-full justify-center"><Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} /><div className="flex flex-col text-center"><span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span><span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span></div></div></label>
-                         </div>
-                         <div className="pt-1">
-                            <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span>Grup / Kurum Kodu (Opsiyonel)</span><label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" /><span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span></label></label>
-                            <div className="relative"><Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" /></div>
-                         </div>
-                      </div>
-                      
-                      <div className="w-full md:w-7/12 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
-                         <div className="flex items-center justify-between mb-2"><span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span><button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition cursor-pointer"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button></div>
-                         
-                         <div className="relative w-full h-[350px] md:h-full md:min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
-                            <div className="absolute top-2 left-2 right-2 z-[1000]">
-                               <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input ref={mapSearchInputRef} type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" /></div>
-                               {mapSuggestions.length > 0 && (
-                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
-                                    {mapSuggestions.map((sug, idx) => (<div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); }}><MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>))}
-                                 </div>
-                               )}
-                            </div>
-                            
-                            <div className="absolute inset-0 z-0">
-                              <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-                                <ZoomControl position="bottomleft" />
-                                <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                <UniversalMapController center={mapPosition || [41.0082, 28.9784]} />
-                                <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
-                              </MapContainer>
-                            </div>
-                         </div>
-                      </div>
-                   </div>
-                )}
+              {/* Gönder butonu artık detayların üstünde. Menü açılınca aşağı kaymayacak! */}
+              <div className="flex items-center justify-end pt-1 pb-1 px-1">
+                <button type="submit" disabled={loading || !queryText.trim()} className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center space-x-1.5 cursor-pointer disabled:opacity-50">{loading ? <><span>Gönderiliyor...</span><Loader2 size={14} className="animate-spin" /></> : <><span>Talebi Gönder</span><ArrowRight size={14} /></>}</button>
               </div>
+
+              {!isDetailsCollapsed && (
+                 <div className="mt-3 pt-5 border-t border-neutral-200/70 flex flex-col md:flex-row gap-6">
+                    <div className="w-full md:w-5/12 space-y-5">
+                       <div>
+                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>{deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase cursor-pointer">temizle</button>}</label>
+                           <div className="flex items-center gap-2"><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" /><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" /></div>
+                       </div>
+                       <div className="space-y-2">
+                         <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
+                         <div className="grid grid-cols-2 gap-2">
+                           <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Phone size={13} /><span>Telefon</span></button>
+                           <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageSquare size={13} /><span>SMS</span></button>
+                           <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span>E-posta</span></button>
+                           <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
+                         </div>
+                         {preferredChannels.includes('EMAIL') && (<div className="animate-in fade-in duration-150 pt-1"><input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" /></div>)}
+                       </div>
+                       <div className="grid grid-cols-2 gap-3 pt-2">
+                         <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}><input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" /><div className="flex items-center space-x-2"><Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} /><div className="flex flex-col"><span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span><span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span></div></div></label>
+                         <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}><input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" /><div className="flex items-center space-x-2 w-full justify-center"><Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} /><div className="flex flex-col text-center"><span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span><span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span></div></div></label>
+                       </div>
+                       <div className="pt-1">
+                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span>Grup / Kurum Kodu (Opsiyonel)</span><label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" /><span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span></label></label>
+                          <div className="relative"><Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" /></div>
+                       </div>
+                    </div>
+                    
+                    <div className="w-full md:w-7/12 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
+                       <div className="flex items-center justify-between mb-2"><span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span><button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition cursor-pointer"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button></div>
+                       
+                       <div className="relative w-full h-[350px] md:h-full md:min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
+                          <div className="absolute top-2 left-2 right-2 z-[1000]">
+                             <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input ref={mapSearchInputRef} type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" /></div>
+                             {mapSuggestions.length > 0 && (
+                               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
+                                 {mapSuggestions.map((sug, idx) => (<div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); }}><MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>))}
+                               </div>
+                             )}
+                          </div>
+                          
+                          <div className="absolute inset-0 z-0">
+                            <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                              <ZoomControl position="bottomleft" />
+                              <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                              <UniversalMapController center={mapPosition || [41.0082, 28.9784]} />
+                              <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
+                            </MapContainer>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+              )}
             </div>
           </form>
         </div>
@@ -388,7 +363,7 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ (Kalan kısımlar aynı) */}
+      {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ */}
       {activeCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -403,6 +378,7 @@ export default function CustomerDashboard() {
                     const isHidden = isCodeHiddenReq(req.location);
                     const isActionLoading = actionLoadingId === req.id;
                     
+                    // --- SAYAÇ (TIMER) HESAPLAMALARI ---
                     let timerDisplay = null;
                     let isTimerCritical = false;
                     const refDate = req.updated_at || req.created_at || new Date().toISOString();
@@ -552,7 +528,7 @@ export default function CustomerDashboard() {
          </div>
       )}
 
-      {/* DEĞERLENDİRME BEKLEYENLER (Kalan kısımlar aynı) */}
+      {/* DEĞERLENDİRME BEKLEYENLER */}
       {pendingReviewCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -585,7 +561,7 @@ export default function CustomerDashboard() {
          </div>
       )}
 
-      {/* GEÇMİŞ TALEPLER (Kalan kısımlar aynı) */}
+      {/* GEÇMİŞ TALEPLER */}
       {pastCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none">
