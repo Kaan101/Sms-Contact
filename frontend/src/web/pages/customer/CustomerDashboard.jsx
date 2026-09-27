@@ -547,7 +547,7 @@ export default function CustomerDashboard() {
                                           <div className="flex justify-between items-center mb-1.5">
                                             <div className="flex items-center gap-1.5 text-amber-500">
                                               <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{parseFloat(rev.rating).toFixed(1)}</span>
-                                              {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {parseFloat(rev.score).toFixed(0)}</span>}
+                                     {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {Number(rev.score)}</span>}
                                             </div>
                                             <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
                                           </div>
