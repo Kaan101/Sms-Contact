@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, ArrowRight, LayoutDashboard } from 'lucide-react';
 import { useAuth } from './core/context/AuthContext';
 import MainPage from './web/pages/home/MainPage';
 
@@ -21,38 +21,45 @@ const FallbackLoader = () => (
 
 export default function App() {
   const { session, handleLogout } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
+  
+  // viewMode: 'MAIN' (Ana Tanıtım Sayfası) | 'LOGIN' (Giriş Formu) | 'DASHBOARD' (Aktif Panel)
+  const [viewMode, setViewMode] = useState(() => session ? 'DASHBOARD' : 'MAIN');
+
+  useEffect(() => {
+    if (session) {
+      setViewMode('DASHBOARD');
+    }
+  }, [session]);
 
   useEffect(() => {
     window.history.replaceState({ view: 'main' }, '', window.location.pathname);
 
-    const handlePopState = (event) => {
-      if (session) return; 
-
+    const handlePopState = () => {
       if (!window.location.hash.includes('#login')) {
-        setShowLogin(false);
+        if (!session) setViewMode('MAIN');
       } else {
-        setShowLogin(true);
+        if (!session) setViewMode('LOGIN');
       }
     };
 
     window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [session]);
 
-  // YENİ EKLENEN ROL PARAMETRESİ (Müşteri vs Sağlayıcı yönlendirmesi)
   const handleGoToLogin = (role = 'CUSTOMER') => {
-    // Rolü URL hash içerisine ekliyoruz (Örn: #login?role=PROVIDER)
+    if (session) {
+      // Zaten oturumu var; tekrar login ekranı yerine doğrudan paneline aktar
+      setViewMode('DASHBOARD');
+      return;
+    }
+
     const hash = `#login?role=${role}`;
     window.history.pushState({ view: 'login', role }, '', hash);
-    setShowLogin(true);
+    setViewMode('LOGIN');
   };
 
   const renderDashboard = () => {
-    switch (session.role) {
+    switch (session?.role) {
       case 'CUSTOMER': return <CustomerDashboard />;
       case 'PROVIDER': return <ProviderDashboard />;
       case 'TRACKER': return <TrackerDashboard />;
@@ -61,7 +68,9 @@ export default function App() {
     }
   };
 
-  if (!session && !showLogin) {
+  // 1. Durum: Oturum yoksa ve kullanıcı login formunu açmadıysa ana sayfayı göster
+  // 2. Durum: Kullanıcı giriş yapmış bile olsa logoya tıklayıp ana sayfaya geçmişse yine MainPage göster
+  if (viewMode === 'MAIN') {
     return <MainPage onGoToLogin={handleGoToLogin} />;
   }
 
@@ -70,19 +79,26 @@ export default function App() {
       
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-[500]">
         <div className={`${session?.role === 'ADMIN' || session?.role === 'TRACKER' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { 
-            if(session) handleLogout(); 
-            setShowLogin(false);
-            window.history.pushState({ view: 'main' }, '', window.location.pathname);
-          }}>
-            <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter">MB</div>
+          
+          {/* MOBOL LOGOSU: Tıklandığında oturumu silmez, ana sayfaya götürür */}
+          <div 
+            className="flex items-center space-x-3 cursor-pointer group" 
+            onClick={() => { 
+              setViewMode('MAIN'); 
+              window.history.pushState({ view: 'main' }, '', window.location.pathname);
+            }}
+            title="Ana Sayfaya Dön"
+          >
+            <div className="w-8 h-8 rounded-lg bg-neutral-950 flex items-center justify-center text-white shadow-sm font-mono text-sm font-semibold tracking-tighter group-hover:scale-105 transition-transform">
+              MB
+            </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-base tracking-tight text-neutral-950">Mobool</span>
               <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 font-medium hidden sm:inline">v19.0.0 (Modüler Çekirdek)</span>
             </div>
           </div>
 
-          {session && (
+          {session ? (
             <div className="flex items-center space-x-3">
               <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase border ${
                 session.role === 'CUSTOMER' ? 'bg-blue-50 text-blue-800 border-blue-200' :
@@ -93,13 +109,29 @@ export default function App() {
                 {session.role === 'CUSTOMER' ? '👤 Müşteri' : session.role === 'PROVIDER' ? '🛠️ Sağlayıcı' : session.role === 'TRACKER' ? '🗺️ Takip' : '⚙️ Admin'}
               </span>
               <span className="text-xs font-mono text-neutral-600 hidden sm:inline">{session.phone}</span>
-              <button onClick={() => { 
-                handleLogout(); 
-                setShowLogin(false);
-                window.history.pushState({ view: 'main' }, '', window.location.pathname); 
-              }} title="Çıkış Yap" className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-100 rounded-md transition"><LogOut size={16} /></button>
+              
+              {/* ÇIKIŞ BUTONU: Sadece buraya basıldığında oturumu kapatır */}
+              <button 
+                onClick={() => { 
+                  handleLogout(); 
+                  setViewMode('MAIN');
+                  window.history.pushState({ view: 'main' }, '', window.location.pathname); 
+                }} 
+                title="Güvenli Çıkış Yap" 
+                className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
+          ) : (
+            <button 
+              onClick={() => handleGoToLogin('LOGIN')} 
+              className="text-xs font-bold text-neutral-600 hover:text-neutral-950 cursor-pointer"
+            >
+              Giriş Yap
+            </button>
           )}
+
         </div>
       </header>
 

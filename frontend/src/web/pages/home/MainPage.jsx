@@ -4,8 +4,11 @@ import {
   MapPin, CheckCircle2, ArrowRight, Lock, 
   MessageCircle, Send, PhoneIncoming, Compass, CheckCheck, User, Wrench, Loader2
 } from 'lucide-react';
+import { useAuth } from '../../../core/context/AuthContext'; // YENİ: Auth Context Eklendi
 
 export default function MainPage({ onGoToLogin }) {
+  const { session } = useAuth(); // YENİ: Oturum Bilgisi Alınıyor
+
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
   
@@ -26,6 +29,23 @@ export default function MainPage({ onGoToLogin }) {
   const fullText = scenario === 1 
     ? "Tarabya sahile yakın, 3+1 kiralık daire." 
     : "Bosch çamaşır makinesi su almıyor, acil servis.";
+
+  // AKILLI YÖNLENDİRME FONKSİYONLARI (Giriş yapılmışsa doğrudan panele aktarır)
+  const handleCustomerAction = () => {
+    if (session && session.phone) {
+      onGoToLogin('CUSTOMER');
+    } else {
+      onGoToLogin('LOGIN');
+    }
+  };
+
+  const handleProviderAction = () => {
+    if (session && session.phone) {
+      onGoToLogin('PROVIDER');
+    } else {
+      onGoToLogin('LOGIN');
+    }
+  };
 
   // WhatsApp ekranında yeni mesaj gelince mesaj kutusunu alta kaydırır
   useEffect(() => {
@@ -52,7 +72,6 @@ export default function MainPage({ onGoToLogin }) {
           idx++;
         } else {
           clearInterval(t);
-          // Yazı bittikten sonraki boşluk KISALTILDI (1.2 saniyeden 0.8 saniyeye)
           timeoutId = setTimeout(() => setPhase('SHOW_OPTIONS'), 800);
         }
       }, 70); 
@@ -118,7 +137,6 @@ export default function MainPage({ onGoToLogin }) {
         t1 = setTimeout(() => setPhase('CLICK_SEND'), 1500); 
         break;
       case 'CLICK_SEND': 
-        // Gönderiliyor aşaması (2 Saniye)
         t1 = setTimeout(() => setPhase('MAP_SCANNING'), 2000); 
         break;
       case 'MAP_SCANNING': 
@@ -181,8 +199,11 @@ export default function MainPage({ onGoToLogin }) {
             <span>SMS KONTAK</span>
           </div>
           <div className="flex items-center space-x-3">
-            <button onClick={() => onGoToLogin('LOGIN')} className="px-6 py-2.5 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm cursor-pointer">
-              Giriş Yap
+            <button 
+              onClick={handleCustomerAction} 
+              className="px-6 py-2.5 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm cursor-pointer"
+            >
+              {session && session.phone ? 'Panele Git' : 'Giriş Yap'}
             </button>
           </div>
         </div>
@@ -211,10 +232,16 @@ export default function MainPage({ onGoToLogin }) {
               Numaranızı paylaşmak zorunda değilsiniz. Talebinizi oluşturun, çevrenizdeki en iyi uzmanlar anında görsün. Telefon arama mı, yoksa Whatsapp/Sms mi? Karar sizin.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <button onClick={() => onGoToLogin('CUSTOMER')} className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer">
+              <button 
+                onClick={handleCustomerAction} 
+                className="w-full sm:w-auto px-8 py-4 bg-neutral-950 hover:bg-neutral-800 text-white rounded-2xl font-bold text-sm transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
+              >
                 <span>Hemen Talep Oluştur</span><ArrowRight size={16} />
               </button>
-              <button onClick={() => onGoToLogin('PROVIDER')} className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-neutral-50 text-neutral-950 border border-neutral-200 rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer">
+              <button 
+                onClick={handleProviderAction} 
+                className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-neutral-50 text-neutral-950 border border-neutral-200 rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
+              >
                 <ShieldCheck size={16} className="text-neutral-500" /><span>Hizmet Veren Olun</span>
               </button>
             </div>
@@ -344,7 +371,7 @@ export default function MainPage({ onGoToLogin }) {
                       (phase === 'MAP_SCANNING' || phase === 'MATCH_FOUND' || phase === 'FINAL_ACTION') 
                         ? 'bg-emerald-50 border border-emerald-100 shadow-none scale-95 w-32 h-11 opacity-50' 
                         : phase === 'CLICK_SEND'
-                        ? 'bg-neutral-800 border border-transparent shadow-md w-36 h-11' // Gönderiliyor durumu
+                        ? 'bg-neutral-800 border border-transparent shadow-md w-36 h-11'
                         : 'bg-neutral-950 border border-transparent shadow-lg transform hover:scale-105 cursor-pointer w-28 h-11'
                     }`}>
                       
