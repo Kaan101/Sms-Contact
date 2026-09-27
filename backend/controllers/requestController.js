@@ -129,13 +129,13 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
- // 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek (Optimizeli + Teklif Detayları)
+// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek (Optimizeli + Teklif Detayları)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
 
-// 1. ADIM: Müşterinin tüm taleplerini TEK SORGULAR getir
+    // 1. ADIM: Müşterinin tüm taleplerini TEK SORGULAR getir
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
@@ -156,7 +156,7 @@ const getUserRequests = async (req, res) => {
     const activeRequestIds = requests.filter(r => r.status !== 'CANCELLED').map(r => r.id);
 
     if (activeRequestIds.length > 0) {
-// 2. ADIM: Bu taleplere ilgi gösteren TÜM sağlayıcıları TEK SORGULAR getir (Detaylarıyla Birlikte)
+      // 2. ADIM: Bu taleplere ilgi gösteren TÜM sağlayıcıları TEK SORGULAR getir (Detaylarıyla Birlikte)
       const { rows: allQueued } = await pool.query(
         `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status, ri.request_id,
           rpd.provider_budget, rpd.provider_currency, rpd.provider_target_date, rpd.provider_description,
@@ -247,7 +247,7 @@ const passToNextProvider = async (req, res) => {
 
 const selectCandidateProvider = async (req, res) => {
   try {
-    const { requestId } = req.params; // req.params olarak DÜZELTİLDİ
+    const { requestId } = req.params; 
     const { providerId } = req.body;
     
     await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
@@ -287,7 +287,6 @@ const getProviderAssignedRequests = async (req, res) => {
     const { providerId } = req.query;
     if (!providerId) return res.status(404).json({ message: 'Provider ID gerekli' });
 
-    // YENİ SORGUMUZ: Müşteri yorumlarını (provider_rating) ve Sağlayıcı Şartlarını (Bütçe & Tarih) birlikte çeker.
     const { rows } = await pool.query(
       `SELECT r.*, 
         (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'PROVIDER' LIMIT 1) as provider_rating,
@@ -300,26 +299,22 @@ const getProviderAssignedRequests = async (req, res) => {
       [providerId]
     );
 
-    res.status(200).json({ status: 'success', requests: rows });
-  } catch (error) {
-    console.error('getProviderAssignedRequests hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
-
     // GİZLİLİK KALKANI: Sağlayıcı henüz kabul etmediyse iletişim bilgisini maskele
     const secureRows = rows.map(r => {
       if (!['ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED'].includes(r.status)) {
         return {
           ...r,
-          contact_value: '*** ** ** (İşi Kabul Edince Görünür)' // Maskelenmiş değer
+          contact_value: '*** ** ** (İşi Kabul Edince Görünür)' 
         };
       }
       return r;
     });
 
     res.status(200).json({ status: 'success', requests: secureRows });
-  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
+  } catch (error) {
+    console.error('getProviderAssignedRequests hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 };
 
 const getMatchedRequests = async (req, res) => {
@@ -394,6 +389,7 @@ const upsertProviderRequestDetails = async (req, res) => {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
+
 module.exports = {
   createRequest,
   getOpenPoolRequests, 
