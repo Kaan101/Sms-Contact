@@ -7,7 +7,7 @@ import {
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
   ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer,
-  FileText, Bell // Rozet ikonları
+  FileText, Bell, Filter
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
@@ -95,7 +95,6 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   return (
     <tr className="hover:bg-neutral-50 transition">
       <td className="px-4 py-3 font-mono text-neutral-900">
-        {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
         <div className="flex items-center gap-1.5 mb-1">
           <span className="font-bold">#REQ-{req.id}</span>
           {req.request_type === 'BILDIRIM' ? (
@@ -153,14 +152,11 @@ const WozCard = React.memo(({ req, onAssign }) => (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-        
-        {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
         {req.request_type === 'BILDIRIM' ? (
           <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
         ) : (
           <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
         )}
-
         {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
         {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
       </div>
@@ -217,8 +213,15 @@ export default function AdminDashboard() {
   const [wozAssignModalReq, setWozAssignModalReq] = useState(null);
   const [wozProviderSearch, setWozProviderSearch] = useState('');
   const [searchProviderText, setSearchProviderText] = useState('');
+  
+  // ARAMA VE FİLTRE DURUMLARI (ALL_MATCHED TALEPLER İÇİN)
   const [searchMatchText, setSearchMatchText] = useState('');
   const [matchStatusFilter, setMatchStatusFilter] = useState('ALL');
+  
+  // YENİ: ARAMA VE FİLTRE DURUMLARI (PROJECT/ÖZELLİKLER İÇİN)
+  const [searchProjectText, setSearchProjectText] = useState('');
+  const [projectStatusFilter, setProjectStatusFilter] = useState('ALL');
+
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   const [expandedFeatureId, setExpandedFeatureId] = useState(null);
@@ -307,8 +310,26 @@ export default function AdminDashboard() {
   };
   
   const filteredProviders = useMemo(() => safeArray(providers).filter(p => { if(!p) return false; const q = safeLower(searchProviderText).trim(); if (!q) return true; return safeLower(p.name).includes(q) || safeLower(p.phone).includes(q) || safeArray(p.service_keywords).some(k => safeLower(k).includes(q)); }), [providers, searchProviderText]);
-  const filteredMatchedRequests = useMemo(() => safeArray(matchedRequests).filter(r => { if(!r) return false; const q = safeLower(searchMatchText).trim(); const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; if (!statusMatch) return false; if (!q) return true; return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); }), [matchedRequests, searchMatchText, matchStatusFilter]);
   
+  const filteredMatchedRequests = useMemo(() => safeArray(matchedRequests).filter(r => { 
+    if(!r) return false; 
+    const q = safeLower(searchMatchText).trim(); 
+    const statusMatch = matchStatusFilter === 'ALL' || r.status === matchStatusFilter; 
+    if (!statusMatch) return false; 
+    if (!q) return true; 
+    return safeLower(r.raw_text).includes(q) || safeLower(r.contact_value).includes(q) || safeLower(r.provider_name).includes(q) || safeLower(r.provider_phone).includes(q) || String(r.id).includes(q); 
+  }), [matchedRequests, searchMatchText, matchStatusFilter]);
+  
+  // YENİ: PROJE / ÖZELLİK FİLTRELEME MANTIĞI
+  const filteredFeatures = useMemo(() => safeArray(features).filter(feat => {
+    if (!feat) return false;
+    const q = safeLower(searchProjectText).trim();
+    const statusMatch = projectStatusFilter === 'ALL' || feat.status === projectStatusFilter;
+    if (!statusMatch) return false;
+    if (!q) return true;
+    return safeLower(feat.title).includes(q) || safeLower(feat.description).includes(q);
+  }), [features, searchProjectText, projectStatusFilter]);
+
   const sortedMatchedRequests = useMemo(() => { 
     let sortableItems = [...filteredMatchedRequests]; 
     if (sortConfig !== null) { 
@@ -471,16 +492,46 @@ export default function AdminDashboard() {
       )}
 
       {adminTab === 'ALL_MATCHED' && (
-        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm max-h-[650px] overflow-y-auto">
+        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm flex flex-col">
+          
+          {/* YENİ EKLENEN: Arama ve Filtre Çubuğu */}
+          <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-t-2xl">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input 
+                type="text" 
+                placeholder="Talep ID, İçerik, Sağlayıcı veya Konum ara..." 
+                value={searchMatchText}
+                onChange={(e) => setSearchMatchText(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-neutral-200 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 outline-none transition"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter size={16} className="text-neutral-500" />
+              <select 
+                value={matchStatusFilter}
+                onChange={(e) => setMatchStatusFilter(e.target.value)}
+                className="p-2 text-sm rounded-lg border border-neutral-200 bg-white focus:border-neutral-900 outline-none cursor-pointer font-medium text-neutral-700"
+              >
+                <option value="ALL">Tüm Durumlar</option>
+                <option value="POOL">Havuzda (POOL)</option>
+                <option value="MATCHED">Eşleşti (MATCHED)</option>
+                <option value="ACCEPTED">Kabul Edildi (ACCEPTED)</option>
+                <option value="PROVIDER_COMPLETED">Teslim Edildi (PROVIDER_COMPLETED)</option>
+                <option value="COMPLETED">Tamamlandı (COMPLETED)</option>
+                <option value="CANCELLED">İptal Edilenler (CANCELLED)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="max-h-[550px] overflow-y-auto">
             {!rawMatchedRequests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
-              <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm">
+              <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
                   <SortableHeader label="ID / Tarih" sortKey="id" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Durum" sortKey="status" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
-                  
                   <th className="px-4 py-3 font-semibold border-b border-neutral-200 text-left">Zaman Aşımı</th>
-                  
                   <SortableHeader label="Talep Metni" sortKey="raw_text" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Müşteri" sortKey="contact_value" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
                   <SortableHeader label="Sağlayıcı" sortKey="provider_name" sortConfig={sortConfig} handleRequestSort={handleRequestSort} />
@@ -499,6 +550,7 @@ export default function AdminDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
         </div>
       )}
 
@@ -546,36 +598,160 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* YENİ: TAMAMEN TABLO YAPISINA GEÇİRİLMİŞ PROJE (ÖZELLİK) EKRANI */}
       {adminTab === 'PROJECT' && (
         <div className="space-y-4">
+          
           <form onSubmit={handleCreateFeature} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
             <div className="flex items-center justify-between"><h3 className="text-xs font-mono uppercase font-bold text-neutral-700 flex items-center space-x-1.5"><Plus size={14} className="text-neutral-950" /><span>Yeni Özellik / Geliştirme Fikri Ekle</span></h3><span className="text-[11px] font-mono text-neutral-400">Default: Bekliyor / Orta</span></div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5"><div className="sm:col-span-5"><input type="text" required value={newFeature.title} onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })} placeholder="Özellik Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div><div className="sm:col-span-3"><input type="date" value={newFeature.targetDate} onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div><div className="sm:col-span-2"><select value={newFeature.priority} onChange={(e) => setNewFeature({ ...newFeature, priority: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none bg-neutral-50 font-medium"><option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option></select></div><div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"><Plus size={13} /><span>Ekle</span></button></div></div>
-            <div><textarea rows={4} value={newFeature.description} onChange={(e) => setNewFeature({ ...newFeature, description: e.target.value })} placeholder="Özelliğin detaylı açıklaması (opsiyonel)..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+              <div className="sm:col-span-5"><input type="text" required value={newFeature.title} onChange={(e) => setNewFeature({ ...newFeature, title: e.target.value })} placeholder="Özellik Başlığı..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950" /></div>
+              <div className="sm:col-span-3"><input type="date" value={newFeature.targetDate} onChange={(e) => setNewFeature({ ...newFeature, targetDate: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950" /></div>
+              <div className="sm:col-span-2">
+                <select value={newFeature.priority} onChange={(e) => setNewFeature({ ...newFeature, priority: e.target.value })} className="w-full p-2 text-xs rounded-lg border outline-none bg-neutral-50 font-medium">
+                  <option value="DÜŞÜK">Düşük</option>
+                  <option value="ORTA">Orta</option>
+                  <option value="YÜKSEK">Yüksek</option>
+                  <option value="KRİTİK">Kritik</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2"><button type="submit" className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1"><Plus size={13} /><span>Ekle</span></button></div>
+            </div>
           </form>
-          <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[500px] overflow-y-auto space-y-2.5 pr-1">
-            {!rawFeatures && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
-            {features.length === 0 && rawFeatures ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir proje özelliği veya fikir bulunmuyor.</div>) : (
-              features.map((feat) => {
-                const isExpanded = expandedFeatureId === feat.id;
-                return (
-                  <div key={feat.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200 overflow-hidden transition">
-                    <div onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-neutral-100/60 select-none text-xs"><div className="flex items-center space-x-3 flex-1 min-w-0 pr-2"><span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.priority === 'KRİTİK' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{feat.priority}</span><span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-700'}`}>{feat.status}</span><p className="font-semibold text-neutral-900 truncate">{feat.title}</p></div><div className="flex items-center space-x-3 text-neutral-400 shrink-0"><span className="font-mono text-[11px] flex items-center space-x-1 hidden sm:inline-flex"><Clock size={12} /><span>{safeDate(feat.target_date)}</span></span>{isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</div></div>
-                    {isExpanded && (
-                      <div className="p-4 pt-2 border-t border-neutral-200/80 bg-white space-y-3">
-                        <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Açıklama / Notlar</label><textarea rows={4} defaultValue={feat.description || ''} onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })} placeholder="Detaylı açıklama ekleyin..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                          <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Durum</label><select value={feat.status} onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"><option value="BEKLİYOR">Bekliyor</option><option value="DEVAM EDİYOR">Devam Ediyor</option><option value="TAMAMLANDI">Tamamlandı</option><option value="İPTAL">İptal</option></select></div>
-                          <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik</label><select value={feat.priority} onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-semibold text-xs"><option value="DÜŞÜK">Düşük</option><option value="ORTA">Orta</option><option value="YÜKSEK">Yüksek</option><option value="KRİTİK">Kritik</option></select></div>
-                          <div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Hedef Tarih</label><input type="date" defaultValue={(feat.target_date || '').split('T')[0] || ''} onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} className="w-full p-2 rounded-lg border outline-none bg-neutral-50 font-mono text-xs" /></div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-400"><span className="font-mono">Kayıt ID: #{feat.id}</span><button onClick={() => handleDeleteFeature(feat.id)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg flex items-center space-x-1 font-semibold transition"><Trash2 size={12} /><span>Özelliği Sil</span></button></div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+
+          <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm flex flex-col overflow-hidden">
+            
+            <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <input 
+                  type="text" 
+                  placeholder="Özellik / Proje ara..." 
+                  value={searchProjectText}
+                  onChange={(e) => setSearchProjectText(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-neutral-200 focus:border-neutral-900 outline-none transition"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter size={16} className="text-neutral-500" />
+                <select 
+                  value={projectStatusFilter}
+                  onChange={(e) => setProjectStatusFilter(e.target.value)}
+                  className="p-2 text-sm rounded-lg border border-neutral-200 bg-white focus:border-neutral-900 outline-none cursor-pointer font-medium text-neutral-700"
+                >
+                  <option value="ALL">Tüm Durumlar</option>
+                  <option value="BEKLİYOR">Bekleyenler</option>
+                  <option value="DEVAM EDİYOR">Devam Edenler</option>
+                  <option value="TAMAMLANDI">Tamamlananlar</option>
+                  <option value="İPTAL">İptal Edilenler</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="max-h-[500px] overflow-y-auto">
+              {!rawFeatures && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+              {filteredFeatures.length === 0 && rawFeatures ? (
+                <div className="p-8 text-center text-xs text-neutral-400">Aradığınız kriterde proje/özellik bulunamadı.</div>
+              ) : (
+                <table className="w-full text-left text-xs table-auto">
+                  <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">ID</th>
+                      <th className="px-4 py-3 font-semibold">Özellik Başlığı</th>
+                      <th className="px-4 py-3 font-semibold">Durum</th>
+                      <th className="px-4 py-3 font-semibold">Öncelik</th>
+                      <th className="px-4 py-3 font-semibold">Hedef Tarih</th>
+                      <th className="px-4 py-3 font-semibold text-right">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {filteredFeatures.map((feat) => {
+                      const isExpanded = expandedFeatureId === feat.id;
+                      return (
+                        <React.Fragment key={feat.id}>
+                          <tr className={`hover:bg-blue-50/20 transition group ${isExpanded ? 'bg-blue-50/20' : ''}`}>
+                            <td className="px-4 py-3 font-mono text-[10px] text-neutral-400 font-bold">#{feat.id}</td>
+                            <td className="px-4 py-3 font-semibold text-neutral-900 w-1/3">{feat.title}</td>
+                            
+                            <td className="px-4 py-3">
+                              <select 
+                                value={feat.status} 
+                                onChange={(e) => handleUpdateFeature(feat.id, { status: e.target.value })} 
+                                className={`px-2 py-1.5 rounded-md text-[10px] font-bold border outline-none cursor-pointer ${feat.status === 'TAMAMLANDI' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : feat.status === 'İPTAL' ? 'bg-neutral-100 text-neutral-500 border-neutral-200' : 'bg-white text-neutral-700 border-neutral-200 shadow-sm'}`}
+                              >
+                                <option value="BEKLİYOR">Bekliyor</option>
+                                <option value="DEVAM EDİYOR">Devam Ediyor</option>
+                                <option value="TAMAMLANDI">Tamamlandı</option>
+                                <option value="İPTAL">İptal</option>
+                              </select>
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <select 
+                                value={feat.priority} 
+                                onChange={(e) => handleUpdateFeature(feat.id, { priority: e.target.value })} 
+                                className={`px-2 py-1.5 rounded-md text-[10px] font-bold border outline-none cursor-pointer ${feat.priority === 'KRİTİK' ? 'bg-rose-50 text-rose-700 border-rose-200' : feat.priority === 'YÜKSEK' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white text-neutral-700 border-neutral-200 shadow-sm'}`}
+                              >
+                                <option value="DÜŞÜK">Düşük</option>
+                                <option value="ORTA">Orta</option>
+                                <option value="YÜKSEK">Yüksek</option>
+                                <option value="KRİTİK">Kritik</option>
+                              </select>
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <input 
+                                type="date" 
+                                defaultValue={(feat.target_date || '').split('T')[0]} 
+                                onChange={(e) => handleUpdateFeature(feat.id, { targetDate: e.target.value })} 
+                                className="px-2 py-1.5 bg-transparent border border-transparent hover:border-neutral-200 focus:border-neutral-900 rounded font-mono text-neutral-600 outline-none cursor-pointer transition" 
+                              />
+                            </td>
+
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button 
+                                  onClick={() => setExpandedFeatureId(isExpanded ? null : feat.id)} 
+                                  className={`p-1.5 rounded transition border shadow-xs ${isExpanded ? 'bg-neutral-100 border-neutral-300 text-neutral-900' : 'bg-white border-neutral-200 text-neutral-400 hover:text-neutral-900'}`}
+                                  title="Açıklamayı Düzenle"
+                                >
+                                  {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteFeature(feat.id)} 
+                                  className="p-1.5 bg-white border border-rose-100 text-rose-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 shadow-xs rounded transition"
+                                  title="Projeyi Sil"
+                                >
+                                  <Trash2 size={14}/>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Açıklama Satırı (Akordiyon gibi açılır) */}
+                          {isExpanded && (
+                            <tr className="bg-neutral-50/50">
+                              <td colSpan="6" className="px-4 py-3 border-t border-neutral-100">
+                                <div className="pl-6 border-l-2 border-blue-300">
+                                   <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-400 mb-1">Özellik Açıklaması (Terk Edildiğinde Otomatik Kaydedilir)</label>
+                                   <textarea 
+                                     rows={3} 
+                                     defaultValue={feat.description || ''} 
+                                     onBlur={(e) => handleUpdateFeature(feat.id, { description: e.target.value })} 
+                                     placeholder="Detaylı açıklama veya notlar ekleyin..." 
+                                     className="w-full p-2.5 text-xs rounded-lg border border-neutral-200 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 resize-none bg-white shadow-inner transition" 
+                                   />
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}
