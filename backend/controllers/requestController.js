@@ -129,19 +129,18 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
-// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek
+// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek (MÜKEMMEL PERFORMANS YAMASI)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
+    if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
 
-    if (!phone) {
-      return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
-    }
-
+    // 1. ADIM: Müşterinin tüm taleplerini TEK SORGULAR getir
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
-        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER' LIMIT 1) as customer_rating
+        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER' LIMIT 1) as customer_rating,
+        EXISTS(SELECT 1 FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER') as has_customer_review
        FROM requests r
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
        WHERE r.contact_value LIKE $1
@@ -149,36 +148,68 @@ const getUserRequests = async (req, res) => {
       [`%${phone}%`]
     );
 
-    for (let r of requests) {
-      if (r.status !== 'CANCELLED') {
-        // Sıraya giren sağlayıcıları ve ortalama puan/skorları çek
-        const { rows: queued } = await pool.query(
-          `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status,
-            (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating,
-            (SELECT AVG(rv.score) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_score,
-            (SELECT COUNT(rv.id) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as review_count
-           FROM request_interests ri
-           JOIN service_providers sp ON ri.provider_id = sp.id
-           WHERE ri.request_id = $1
-           ORDER BY ri.created_at ASC;`,
-          [r.id]
+    if (requests.length === 0) {
+      return res.status(200).json({ status: 'success', requests: [] });
+    }
+
+    // İptal edilmemiş taleplerin ID'lerini bir diziye topla (Örn: [12, 14, 15])
+    const activeRequestIds = requests.filter(r => r.status !== 'CANCELLED').map(r => r.id);
+
+    if (activeRequestIds.length > 0) {
+      // 2. ADIM: Bu taleplere ilgi gösteren TÜM sağlayıcıları TEK SORGULAR getir (= ANY($1) kullanımı)
+      const { rows: allQueued } = await pool.query(
+        `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status, ri.request_id,
+          (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating,
+          (SELECT AVG(rv.score) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_score,
+          (SELECT COUNT(rv.id) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as review_count
+         FROM request_interests ri
+         JOIN service_providers sp ON ri.provider_id = sp.id
+         WHERE ri.request_id = ANY($1::int[])
+         ORDER BY ri.created_at ASC;`,
+        [activeRequestIds]
+      );
+
+      // Sıraya giren benzersiz sağlayıcı ID'lerini topla
+      const providerIds = [...new Set(allQueued.map(q => q.id))];
+
+      let allReviews = [];
+      if (providerIds.length > 0) {
+        // 3. ADIM: Bu sağlayıcılara yapılmış TÜM müşteri yorumlarını TEK SORGULAR getir
+        const { rows } = await pool.query(
+          `SELECT rv.rating, rv.rating_knowledge, rv.rating_communication, rv.rating_timing, rv.rating_cost, rv.score, rv.comment, rv.rating_date, req.matched_provider_id as provider_id
+           FROM reviews rv
+           JOIN requests req ON rv.request_id = req.id
+           WHERE req.matched_provider_id = ANY($1::int[]) AND rv.reviewer_type = 'CUSTOMER'
+           ORDER BY rv.rating_date DESC;`,
+          [providerIds]
         );
-
-        // Her sağlayıcının detaylı geçmiş yorumlarını çek
-        for (let q of queued) {
-          const { rows: provReviews } = await pool.query(
-            `SELECT rv.rating, rv.rating_knowledge, rv.rating_communication, rv.rating_timing, rv.rating_cost, rv.score, rv.comment, rv.rating_date
-             FROM reviews rv
-             JOIN requests req ON rv.request_id = req.id
-             WHERE req.matched_provider_id = $1 AND rv.reviewer_type = 'CUSTOMER'
-             ORDER BY rv.rating_date DESC;`,
-            [q.id]
-          );
-          q.reviews = provReviews;
-        }
-
-        r.queuedProviders = queued;
+        allReviews = rows;
       }
+
+      // 4. ADIM: BELLEKTE EŞLEŞTİRME (Lightning Fast - Milisaniyeler sürer)
+      const reviewsByProvider = {};
+      allReviews.forEach(rev => {
+        if (!reviewsByProvider[rev.provider_id]) reviewsByProvider[rev.provider_id] = [];
+        reviewsByProvider[rev.provider_id].push(rev);
+      });
+
+      const queuedByRequest = {};
+      allQueued.forEach(q => {
+        q.reviews = reviewsByProvider[q.id] || [];
+        if (!queuedByRequest[q.request_id]) queuedByRequest[q.request_id] = [];
+        queuedByRequest[q.request_id].push(q);
+      });
+
+      // Verileri ana request nesnelerine tak
+      requests.forEach(r => {
+        if (r.status !== 'CANCELLED') {
+          r.queuedProviders = queuedByRequest[r.id] || [];
+        } else {
+          r.queuedProviders = [];
+        }
+      });
+    } else {
+      requests.forEach(r => r.queuedProviders = []);
     }
 
     res.status(200).json({ status: 'success', requests });
