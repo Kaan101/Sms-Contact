@@ -220,6 +220,21 @@ const initDatabase = async () => {
           BEGIN ALTER TABLE reviews ADD COLUMN score_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP; EXCEPTION WHEN duplicate_column THEN END;
       END $$;
     `);
+    // Yeni Tablo: Request - Provider Detayları (Teklif, Bütçe, Tarih)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS request_provider_details (
+        id SERIAL PRIMARY KEY,
+        request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+        provider_id INTEGER NOT NULL REFERENCES service_providers(id) ON DELETE CASCADE,
+        provider_budget NUMERIC(10,2),
+        provider_target_date TIMESTAMP WITH TIME ZONE,
+        provider_description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(request_id, provider_id)
+      );
+    `);
+    console.log("request_provider_details tablosu kontrol edildi/oluşturuldu.");
 
     console.log('✅ Veritabanı ve Marketplace/Havuz Mimarisi Hazır.');
   } catch (error) {

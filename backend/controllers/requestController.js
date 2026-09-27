@@ -129,7 +129,7 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
-// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek (MÜKEMMEL PERFORMANS YAMASI)
+ // 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek (Optimizeli + Teklif Detayları)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -152,29 +152,28 @@ const getUserRequests = async (req, res) => {
       return res.status(200).json({ status: 'success', requests: [] });
     }
 
-    // İptal edilmemiş taleplerin ID'lerini bir diziye topla (Örn: [12, 14, 15])
     const activeRequestIds = requests.filter(r => r.status !== 'CANCELLED').map(r => r.id);
 
     if (activeRequestIds.length > 0) {
-      // 2. ADIM: Bu taleplere ilgi gösteren TÜM sağlayıcıları TEK SORGULAR getir (= ANY($1) kullanımı)
+      // 2. ADIM: Sağlayıcıları ve rpd tablosundaki TEKLİF DETAYLARINI getir
       const { rows: allQueued } = await pool.query(
         `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status, ri.request_id,
+          rpd.provider_budget, rpd.provider_target_date, rpd.provider_description,
           (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating,
           (SELECT AVG(rv.score) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_score,
           (SELECT COUNT(rv.id) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as review_count
          FROM request_interests ri
          JOIN service_providers sp ON ri.provider_id = sp.id
+         LEFT JOIN request_provider_details rpd ON (rpd.request_id = ri.request_id AND rpd.provider_id = sp.id)
          WHERE ri.request_id = ANY($1::int[])
          ORDER BY ri.created_at ASC;`,
         [activeRequestIds]
       );
 
-      // Sıraya giren benzersiz sağlayıcı ID'lerini topla
       const providerIds = [...new Set(allQueued.map(q => q.id))];
 
       let allReviews = [];
       if (providerIds.length > 0) {
-        // 3. ADIM: Bu sağlayıcılara yapılmış TÜM müşteri yorumlarını TEK SORGULAR getir
         const { rows } = await pool.query(
           `SELECT rv.rating, rv.rating_knowledge, rv.rating_communication, rv.rating_timing, rv.rating_cost, rv.score, rv.comment, rv.rating_date, req.matched_provider_id as provider_id
            FROM reviews rv
@@ -186,7 +185,6 @@ const getUserRequests = async (req, res) => {
         allReviews = rows;
       }
 
-      // 4. ADIM: BELLEKTE EŞLEŞTİRME (Lightning Fast - Milisaniyeler sürer)
       const reviewsByProvider = {};
       allReviews.forEach(rev => {
         if (!reviewsByProvider[rev.provider_id]) reviewsByProvider[rev.provider_id] = [];
@@ -200,7 +198,6 @@ const getUserRequests = async (req, res) => {
         queuedByRequest[q.request_id].push(q);
       });
 
-      // Verileri ana request nesnelerine tak
       requests.forEach(r => {
         if (r.status !== 'CANCELLED') {
           r.queuedProviders = queuedByRequest[r.id] || [];
@@ -355,6 +352,34 @@ const deleteRequest = async (req, res) => {
     res.status(200).json({ status: 'success' });
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
+// Sağlayıcının bir talebe özel detaylarını (Teklif, Tarih, Açıklama) kaydet/güncelle
+const upsertProviderRequestDetails = async (req, res) => {
+  try {
+    const { requestId, providerId } = req.params;
+    const { providerBudget, providerTargetDate, providerDescription } = req.body;
+
+    const budget = providerBudget ? parseFloat(providerBudget) : null;
+    const targetDate = providerTargetDate ? new Date(providerTargetDate) : null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_target_date, provider_description) 
+       VALUES ($1, $2, $3, $4, $5) 
+       ON CONFLICT (request_id, provider_id) 
+       DO UPDATE SET 
+         provider_budget = EXCLUDED.provider_budget, 
+         provider_target_date = EXCLUDED.provider_target_date, 
+         provider_description = EXCLUDED.provider_description,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *;`,
+      [parseInt(requestId, 10), parseInt(providerId, 10), budget, targetDate, providerDescription]
+    );
+
+    res.status(200).json({ status: 'success', details: rows[0] });
+  } catch (error) {
+    console.error('upsertProviderRequestDetails hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
 
 module.exports = {
   createRequest,
@@ -369,5 +394,6 @@ module.exports = {
   getMatchedRequests,
   assignProviderManually,
   getOutboundNotifications,
-  deleteRequest
+  deleteRequest,
+  upsertProviderRequestDetails
 };

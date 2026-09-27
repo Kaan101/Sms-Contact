@@ -23,7 +23,8 @@ const {
   getMatchedRequests,
   assignProviderManually,
   getOutboundNotifications,
-  deleteRequest
+  deleteRequest,
+  upsertProviderRequestDetails
 } = require('../controllers/requestController');
 const {
   getFeatures,
@@ -73,6 +74,8 @@ router.post('/requests/:requestId/next-provider', passToNextProvider);
 router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
 router.post('/requests/:requestId/status', updateRequestStatus);
 router.delete('/requests/:requestId', deleteRequest);
+// Sağlayıcı teklif/şart ekleme rotası
+router.post('/requests/:requestId/providers/:providerId/details', upsertProviderRequestDetails);
 
 // 5. WoZ & Bildirimler
 router.get('/requests/pending', getPendingRequests);
