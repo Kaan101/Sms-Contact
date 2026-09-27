@@ -70,12 +70,29 @@ try {
       ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'MANUAL';
     `);
 
+    // service_providers tablosuna genişletilmiş profil kolonlarını güvenli şekilde ekle
+    await pool.query(`
+      ALTER TABLE service_providers 
+      ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'MANUAL',
+      ADD COLUMN IF NOT EXISTS address TEXT,
+      ADD COLUMN IF NOT EXISTS country VARCHAR(100) DEFAULT 'Türkiye',
+      ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS district VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS postal_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS provider_type VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS provider_subtype VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS description TEXT;
+    `);
+
     app.listen(PORT, () => {
       console.log(`🚀 Sunucu ${PORT} portunda aktif.`);
     });
   } catch (error) {
     console.error('Sunucu başlatma hatası:', error);
   }
+
+  
 };
 
 startServer();

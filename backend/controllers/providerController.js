@@ -7,11 +7,15 @@ const getNormalizedLast10 = (p) => {
   return digits.length >= 10 ? digits.slice(-10) : digits;
 };
 
-// 1. Yeni Servis Veren Ekleme
+ // 1. Yeni Servis Veren Ekleme (Tam Teşekküllü)
 const registerProvider = async (req, res) => {
   try {
-    // req.body'den 'source' değişkenini de alıyoruz
-    const { name, phone, email, serviceKeywords, communicationChannels, priorityScore, source } = req.body;
+    const { 
+      name, phone, email, serviceKeywords, communicationChannels, 
+      priorityScore, source,
+      address, country, city, district, neighborhood,
+      postalCode, providerType, providerSubtype, description
+    } = req.body;
 
     if (!name || !phone || !serviceKeywords || !communicationChannels) {
       return res.status(400).json({
@@ -28,14 +32,15 @@ const registerProvider = async (req, res) => {
       ? communicationChannels
       : ['PHONE'];
 
-    // Eğer kaynak (source) belirtilmemişse varsayılan olarak 'MANUAL' kabul et
     const providerSource = source ? source.toUpperCase().trim() : 'MANUAL';
+    const providerCountry = country ? country.trim() : 'Türkiye';
 
-    // SQL Sorgusuna source alanını ekliyoruz
     const insertQuery = `
       INSERT INTO service_providers 
-      (name, phone, email, service_keywords, communication_channels, priority_score, source)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (name, phone, email, service_keywords, communication_channels, priority_score, source, 
+       address, country, city, district, neighborhood,
+       postal_code, provider_type, provider_subtype, description)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *;
     `;
 
@@ -46,7 +51,16 @@ const registerProvider = async (req, res) => {
       keywordsArray,
       channelsArray,
       parseInt(priorityScore, 10) || 100,
-      providerSource // 7. parametre olarak eklendi
+      providerSource,
+      address && address.trim() !== '' ? address.trim() : null,
+      providerCountry,
+      city && city.trim() !== '' ? city.trim() : null,
+      district && district.trim() !== '' ? district.trim() : null,
+      neighborhood && neighborhood.trim() !== '' ? neighborhood.trim() : null,
+      postalCode && postalCode.trim() !== '' ? postalCode.trim() : null,
+      providerType && providerType.trim() !== '' ? providerType.trim() : null,
+      providerSubtype && providerSubtype.trim() !== '' ? providerSubtype.trim() : null,
+      description && description.trim() !== '' ? description.trim() : null
     ];
 
     const { rows } = await pool.query(insertQuery, values);
