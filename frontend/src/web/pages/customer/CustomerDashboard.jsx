@@ -68,7 +68,7 @@ export default function CustomerDashboard() {
   
   const [searchCustomerHistoryText, setSearchCustomerHistoryText] = useState(''); 
   const [expandedCustomerQueueReqId, setExpandedCustomerQueueReqId] = useState(null);
-  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null);
+  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null); 
 
   const [reviewRatingsMap, setReviewRatingsMap] = useState({});
   const [reviewCommentMap, setReviewCommentMap] = useState({});
@@ -122,7 +122,7 @@ export default function CustomerDashboard() {
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
         } catch { setLocationValue(`Haritadan İşaretlendi`); } finally { setIsLocating(false); }
       },
-      () => { applyFallbackLocation(myCustomerRequests); },
+      (err) => { applyFallbackLocation(myCustomerRequests); },
       { timeout: 6000 }
     );
   };
@@ -247,22 +247,16 @@ export default function CustomerDashboard() {
     }
   };
 
-  // DEĞERLENDİRME GÖNDERME (Optimistic Update ile ekrandan hemen kaldırılır)
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { 
     setActionLoadingId(requestId);
-    setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true }));
     try { 
       const currentRatings = isSkip ? null : (reviewRatingsMap[requestId] || { knowledge: 5, communication: 5, timing: 5, cost: 5 }); 
       const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); 
       await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, ratings: currentRatings, comment }); 
+      setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); 
       await mutateCustomerReqs(); 
     } catch (err) {
       alert('Değerlendirme gönderilemedi.');
-      setReviewedRequestsMap(prev => {
-        const copy = { ...prev };
-        delete copy[`${requestId}_${reviewerType}`];
-        return copy;
-      });
     } finally {
       setActionLoadingId(null);
     }
@@ -273,114 +267,43 @@ export default function CustomerDashboard() {
       setReviewRatingsMap(prev => ({ ...prev, [id]: { ...getRatingsForReq(id), [field]: value } }));
   };
 
-  // Aktif Görevler
-  const activeCustomerRequests = useMemo(() => 
-    safeArray(myCustomerRequests).filter(r => 
-      r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status))
-    ), 
-  [myCustomerRequests]);
-
-  // Değerlendirme Bekleyenler: DB'de kaydı (has_customer_review) veya yerel state'i olmayan tamamlanmış işler
-  const pendingReviewCustomerRequests = useMemo(() => 
-    safeArray(myCustomerRequests).filter(r => 
-      r && 
-      safeUpper(r.status) === 'COMPLETED' && 
-      !r.has_customer_review &&
-      r.customer_rating === null && 
-      !reviewedRequestsMap[`${r.id}_CUSTOMER`]
-    ), 
-  [myCustomerRequests, reviewedRequestsMap]);
-
-  // Geçmiş Talepler: İptal edilenler veya değerlendirmesi tamamlanmış işler
-  const pastCustomerRequests = useMemo(() => 
-    safeArray(myCustomerRequests).filter(r => 
-      r && (
-        safeUpper(r.status) === 'CANCELLED' || 
-        (safeUpper(r.status) === 'COMPLETED' && (
-          r.has_customer_review || 
-          r.customer_rating !== null || 
-          reviewedRequestsMap[`${r.id}_CUSTOMER`]
-        ))
-      )
-    ), 
-  [myCustomerRequests, reviewedRequestsMap]);
-
-  const filteredPastCustomerRequests = useMemo(() => 
-    safeArray(pastCustomerRequests).filter(req => { 
-      const q = safeLower(searchCustomerHistoryText).trim(); 
-      if (!q) return true; 
-      return safeLower(req.raw_text).includes(q) || safeLower(req.provider_name).includes(q) || safeLower(req.status).includes(q); 
-    }), 
-  [pastCustomerRequests, searchCustomerHistoryText]);
+  const activeCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status))), [myCustomerRequests]);
+  const pendingReviewCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && safeUpper(r.status) === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])), [myCustomerRequests, reviewedRequestsMap]);
+  const pastCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && (safeUpper(r.status) === 'CANCELLED' || (safeUpper(r.status) === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])))), [myCustomerRequests, reviewedRequestsMap]);
+  const filteredPastCustomerRequests = useMemo(() => safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req.raw_text).includes(q) || safeLower(req.provider_name).includes(q) || safeLower(req.status).includes(q); }), [pastCustomerRequests, searchCustomerHistoryText]);
 
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 px-6 py-8">
-      {errorMessage && (
-        <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8">
-          <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button>
-        </div>
-      )}
+      {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
 
       {/* YENİ TALEP FORMU */}
       {step === 'INPUT' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
-          <div className="text-center space-y-1 mb-2">
-            <h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2>
-            <p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p>
-          </div>
+          <div className="text-center space-y-1 mb-2"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
           <form onSubmit={handleCustomerCombinedSubmit} className="space-y-4">
             <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
               
               <div className="flex gap-2">
-                <textarea 
-                  rows={2} 
-                  value={queryText} 
-                  onChange={(e) => setQueryText(e.target.value)} 
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleCustomerCombinedSubmit(e); }} 
-                  placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." 
-                  className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" 
-                  required 
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} 
-                  className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit cursor-pointer"
-                >
-                  <ChevronDown size={16} />
-                </button>
+                <textarea rows={2} value={queryText} onChange={(e) => setQueryText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleCustomerCombinedSubmit(e); }} placeholder="Örn: Tarabya'da 2+1 kiralık daire arıyorum..." className="w-full p-2 text-lg font-bold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-none outline-none resize-none" required />
+                <button type="button" onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)} className="p-1.5 mt-1 text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg h-fit cursor-pointer"><ChevronDown size={16} /></button>
               </div>
               
               <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
-                <div className="flex flex-col leading-tight">
-                  <span className="flex items-center space-x-1">
-                    <MapPin size={12} className="text-neutral-700"/>
-                    <span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span>
-                  </span>
-                  {coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}
-                </div>
+                <div className="flex flex-col leading-tight"><span className="flex items-center space-x-1"><MapPin size={12} className="text-neutral-700"/><span className="truncate max-w-[250px] sm:max-w-[300px] font-semibold text-neutral-800">{locationValue || 'Konum Seçilmedi'}</span></span>{coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}</div>
                 <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
+                  
                   <span className="font-bold px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm text-neutral-800 border-neutral-200">
                     {requestType === 'TALEP' ? <FileText size={11} className="text-blue-600" /> : <Bell size={11} className="text-amber-500" />}
                     {requestType === 'TALEP' ? 'Talep' : 'Bildirim'}
                   </span>
+                  
                   {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
                   {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
-                  {companyCode && (
-                    <span className={`font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${isCodeHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
-                      {isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {companyCode} {isCodeHidden ? '(Gizli)' : ''}
-                    </span>
-                  )}
+                  {companyCode && (<span className={`font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${isCodeHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>{isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {companyCode} {isCodeHidden ? '(Gizli)' : ''}</span>)}
                   <div className="flex items-center space-x-2 border-l border-neutral-200 pl-2">
                     {preferredChannels.map((c, idx) => (
                       <React.Fragment key={c}>
-                        <span className="flex items-center space-x-1">
-                          {c === 'PHONE' && <Phone size={11} />}
-                          {c === 'SMS' && <MessageSquare size={11} />}
-                          {c === 'EMAIL' && <Mail size={11} />}
-                          {c === 'WHATSAPP' && <MessageCircle size={11} />}
-                          <span>{c === 'PHONE' ? 'Telefon' : c === 'SMS' ? 'SMS' : c === 'EMAIL' ? 'E-posta' : 'WhatsApp'}</span>
-                        </span>
+                        <span className="flex items-center space-x-1">{c === 'PHONE' && <Phone size={11} />}{c === 'SMS' && <MessageSquare size={11} />}{c === 'EMAIL' && <Mail size={11} />}{c === 'WHATSAPP' && <MessageCircle size={11} />}<span>{c === 'PHONE' ? 'Telefon' : c === 'SMS' ? 'SMS' : c === 'EMAIL' ? 'E-posta' : 'WhatsApp'}</span></span>
                         {idx < preferredChannels.length - 1 && <span className="text-neutral-300">•</span>}
                       </React.Fragment>
                     ))}
@@ -389,13 +312,7 @@ export default function CustomerDashboard() {
               </div>
               
               <div className="flex items-center justify-end pt-1 pb-1 px-1 relative z-10">
-                <button 
-                  type="submit" 
-                  disabled={loading || !queryText.trim()} 
-                  className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {loading ? <><span>Gönderiliyor...</span><Loader2 size={14} className="animate-spin" /></> : <><span>Talebi Gönder</span><ArrowRight size={14} /></>}
-                </button>
+                <button type="submit" disabled={loading || !queryText.trim()} className="px-6 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center space-x-1.5 cursor-pointer disabled:opacity-50">{loading ? <><span>Gönderiliyor...</span><Loader2 size={14} className="animate-spin" /></> : <><span>Talebi Gönder</span><ArrowRight size={14} /></>}</button>
               </div>
 
               {!isDetailsCollapsed && (
@@ -423,16 +340,9 @@ export default function CustomerDashboard() {
                        </div>
 
                        <div>
-                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
-                             <span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>
-                             {deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase cursor-pointer">temizle</button>}
-                           </label>
-                           <div className="flex items-center gap-2">
-                             <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" />
-                             <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" />
-                           </div>
+                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span className="flex items-center space-x-1"><Calendar size={12} className="text-neutral-700"/><span>Zamanlama</span></span>{deadlineDate && <button type="button" onClick={() => {setDeadlineDate(''); setDeadlineTime('23:59');}} className="text-[10px] text-rose-500 hover:underline lowercase cursor-pointer">temizle</button>}</label>
+                           <div className="flex items-center gap-2"><input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="flex-1 min-w-0 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 transition" /><input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} className="w-20 p-2 text-xs font-mono rounded-lg border outline-none focus:border-neutral-950 text-center shrink-0 transition" title="En Son Saat" /></div>
                        </div>
-                       
                        <div className="space-y-2">
                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
                          <div className="grid grid-cols-2 gap-2">
@@ -441,77 +351,27 @@ export default function CustomerDashboard() {
                            <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span>E-posta</span></button>
                            <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
                          </div>
-                         {preferredChannels.includes('EMAIL') && (
-                           <div className="animate-in fade-in duration-150 pt-1">
-                             <input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" />
-                           </div>
-                         )}
+                         {preferredChannels.includes('EMAIL') && (<div className="animate-in fade-in duration-150 pt-1"><input ref={emailInputRef} type="email" required value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} placeholder="E-posta Adresiniz..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" /></div>)}
                        </div>
-
                        <div className="grid grid-cols-2 gap-3 pt-2">
-                         <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
-                           <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
-                           <div className="flex items-center space-x-2">
-                             <Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
-                             <div className="flex flex-col">
-                               <span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span>
-                               <span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span>
-                             </div>
-                           </div>
-                         </label>
-                         <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                           <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                           <div className="flex items-center space-x-2 w-full justify-center">
-                             <Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} />
-                             <div className="flex flex-col text-center">
-                               <span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span>
-                               <span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span>
-                             </div>
-                           </div>
-                         </label>
+                         <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}><input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" /><div className="flex items-center space-x-2"><Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} /><div className="flex flex-col"><span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span><span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span></div></div></label>
+                         <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}><input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" /><div className="flex items-center space-x-2 w-full justify-center"><Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} /><div className="flex flex-col text-center"><span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span><span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span></div></div></label>
                        </div>
-
                        <div className="pt-1">
-                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
-                            <span>Grup / Kurum Kodu (Opsiyonel)</span>
-                            <label className="flex items-center space-x-1 cursor-pointer">
-                              <input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" />
-                              <span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span>
-                            </label>
-                          </label>
-                          <div className="relative">
-                            <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                            <input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" />
-                          </div>
+                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between"><span>Grup / Kurum Kodu (Opsiyonel)</span><label className="flex items-center space-x-1 cursor-pointer"><input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" /><span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span></label></label>
+                          <div className="relative"><Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} placeholder="Örn: MOB-2026" className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" /></div>
                        </div>
                     </div>
                     
                     <div className="w-full md:w-7/12 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
-                       <div className="flex items-center justify-between mb-2">
-                         <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                           <MapPin size={12} className="text-neutral-700" />
-                           <span>Haritadan Konum Seçin</span>
-                         </span>
-                         <button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition cursor-pointer">
-                           <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> 
-                           <span>Mevcut Konuma Git</span>
-                         </button>
-                       </div>
+                       <div className="flex items-center justify-between mb-2"><span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1"><MapPin size={12} className="text-neutral-700" /><span>Haritadan Konum Seçin</span></span><button type="button" onClick={fetchCurrentLocation} disabled={isLocating} className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition cursor-pointer"><Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> <span>Mevcut Konuma Git</span></button></div>
                        
                        <div className="relative w-full h-[350px] md:h-full md:min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                           <div className="absolute top-2 left-2 right-2 z-[1000]">
-                             <div className="relative">
-                               <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                               <input ref={mapSearchInputRef} type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" />
-                             </div>
+                             <div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input ref={mapSearchInputRef} type="text" value={mapSearchText} onChange={(e) => setMapSearchText(e.target.value)} onFocus={() => { if(mapSuggestions.length > 0) setIsSuggestionsVisible(true); }} onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} placeholder="Haritada mekan veya adres ara..." className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" /></div>
                              {mapSuggestions.length > 0 && (
                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
-                                  {mapSuggestions.map((sug, idx) => (
-                                    <div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); }}>
-                                      <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" />
-                                      <span>{sug.display_name}</span>
-                                    </div>
-                                  ))}
+                                  {mapSuggestions.map((sug, idx) => (<div key={idx} className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" onMouseDown={(e) => { e.preventDefault(); const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; setMapPosition(newPos); setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); setLocationValue(sug.display_name); setMapSearchText(''); }}><MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" /><span>{sug.display_name}</span></div>))}
                                </div>
                              )}
                           </div>
@@ -537,13 +397,7 @@ export default function CustomerDashboard() {
       {step === 'DISAMBIGUATE' && disambiguationData && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
           <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
-          <div className="space-y-2">
-            {safeArray(disambiguationData.options).map((option) => (
-              <button key={option.id} onClick={() => submitFinalRequest(option.text)} className="w-full text-left p-3.5 rounded-xl border hover:bg-neutral-50 text-xs font-semibold cursor-pointer">
-                {option.text}
-              </button>
-            ))}
-          </div>
+          <div className="space-y-2">{safeArray(disambiguationData.options).map((option) => (<button key={option.id} onClick={() => submitFinalRequest(option.text)} className="w-full text-left p-3.5 rounded-xl border hover:bg-neutral-50 text-xs font-semibold cursor-pointer">{option.text}</button>))}</div>
         </div>
       )}
 
@@ -551,10 +405,7 @@ export default function CustomerDashboard() {
       {activeCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
-                <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5">
-                  <Radio size={16} className="text-emerald-500 animate-pulse" />
-                  <span>Aktif Talepleriniz ({activeCustomerRequests.length})</span>
-                </h3>
+                <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5"><Radio size={16} className="text-emerald-500 animate-pulse" /><span>Aktif Talepleriniz ({activeCustomerRequests.length})</span></h3>
                 <div className="text-neutral-400">{isActiveCustomerRequestsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
              </div>
              {isActiveCustomerRequestsOpen && (
@@ -621,7 +472,7 @@ export default function CustomerDashboard() {
                           </div>
                         </div>
 
-                        {/* Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
+                        {/* YENİ: Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
                         {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             
@@ -640,7 +491,7 @@ export default function CustomerDashboard() {
                                 return (
                                   <div key={qProv.id} className={`border-b border-neutral-100 last:border-b-0 text-xs flex flex-col transition overflow-hidden shadow-sm ${isCurrent ? (isSkippedByThis ? 'bg-rose-50' : 'bg-emerald-50') : 'bg-white'}`}>
                                     
-                                    {/* Sağlayıcı Başlık Satırı */}
+                                    {/* Header Row (Tıklanabilir Alan) */}
                                     <div 
                                       onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
                                       className="p-3 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50"
@@ -683,7 +534,7 @@ export default function CustomerDashboard() {
                                       </div>
                                     </div>
 
-                                    {/* Akordiyon İçi: Tüm Değerlendirmeler */}
+                                    {/* Akordiyon İçi: Tüm Geçmiş Müşteri Yorumları */}
                                     {isProvExpanded && (
                                       <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
                                         {safeArray(qProv.reviews).length > 0 ? (
@@ -720,18 +571,9 @@ export default function CustomerDashboard() {
                             </div>
                           </div>
                         )}
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {extractAddress(req.location)}</span>
-                          {req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}
-                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2"><span>📍 {extractAddress(req.location)}</span>{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}</div>
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">
-                            {(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (
-                              <button disabled={isActionLoading} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50">
-                                <SkipForward size={11} /><span>Sıradakine Geç</span>
-                              </button>
-                            )}
-                          </div>
+                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (<button disabled={isActionLoading} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50"><SkipForward size={11} /><span>Sıradakine Geç</span></button>)}</div>
                           <div className="flex items-center space-x-1.5 ml-auto">
                             {(reqStatus === 'MATCHED' || reqStatus === 'PROVIDER_COMPLETED') && (
                               <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm cursor-pointer disabled:opacity-50">
@@ -739,9 +581,7 @@ export default function CustomerDashboard() {
                                 <span>{reqStatus === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span>
                               </button>
                             )}
-                            <button disabled={isActionLoading} onClick={() => handleDeleteRequest(req.id)} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px] cursor-pointer disabled:opacity-50" title="Talebi İptal Et">
-                              <Ban size={12} /> İptal
-                            </button>
+                            <button disabled={isActionLoading} onClick={() => handleDeleteRequest(req.id)} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px] cursor-pointer disabled:opacity-50" title="Talebi İptal Et"><Ban size={12} /> İptal</button>
                           </div>
                         </div>
                       </div>
@@ -756,10 +596,7 @@ export default function CustomerDashboard() {
       {pendingReviewCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
-                <h3 className="text-sm font-bold text-emerald-700 flex items-center space-x-1.5">
-                  <Sparkles size={16} className="text-amber-500" />
-                  <span>Değerlendirme Bekleyenler ({pendingReviewCustomerRequests.length})</span>
-                </h3>
+                <h3 className="text-sm font-bold text-emerald-700 flex items-center space-x-1.5"><Sparkles size={16} className="text-amber-500" /><span>Değerlendirme Bekleyenler ({pendingReviewCustomerRequests.length})</span></h3>
                 <div className="text-neutral-400">{isPendingReviewsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
              </div>
              {isPendingReviewsOpen && (
@@ -782,10 +619,7 @@ export default function CustomerDashboard() {
                           <div>
                             <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
                             <p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p>
-                            <p className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                              Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> 
-                              {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}
-                            </p>
+                            <p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p>
                           </div>
                           <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span>
                         </div>
@@ -824,19 +658,11 @@ export default function CustomerDashboard() {
                           </div>
 
                           <div className="pt-2">
-                             <input 
-                               type="text" 
-                               value={reviewCommentMap[req.id] || ''} 
-                               onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} 
-                               placeholder="Bu deneyiminizle ilgili eklemek istediğiniz yorumunuz (opsiyonel)..." 
-                               className="w-full p-3 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition" 
-                             />
+                             <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Bu deneyiminizle ilgili eklemek istediğiniz yorumunuz (opsiyonel)..." className="w-full p-3 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition" />
                           </div>
 
                           <div className="flex items-center justify-end space-x-3 pt-2">
-                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-2 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
-                              Yorum Yapmadan Geç
-                            </button>
+                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-2 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition">Yorum Yapmadan Geç</button>
                             <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
                               {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                               <span>Değerlendirmeyi Gönder</span>
@@ -856,28 +682,16 @@ export default function CustomerDashboard() {
       {pastCustomerRequests.length > 0 && (
          <div className="mt-8 space-y-3 transition-all duration-300">
              <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none">
-                <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5">
-                  <History size={16} className="text-neutral-500" />
-                  <span>Geçmiş Talepler ({pastCustomerRequests.length})</span>
-                </h3>
+                <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5"><History size={16} className="text-neutral-500" /><span>Geçmiş Talepler ({pastCustomerRequests.length})</span></h3>
                 <div className="text-neutral-400">{isCustomerHistoryOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
              </div>
              {isCustomerHistoryOpen && (
                <div className="space-y-3">
-                 <div className="relative mb-3">
-                   <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                   <input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium shadow-sm" />
-                 </div>
+                 <div className="relative mb-3"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium shadow-sm" /></div>
                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                    {filteredPastCustomerRequests.map((req) => (
                       <div key={req.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-semibold text-neutral-900">"{req.raw_text}"</p>
-                            <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p>
-                          </div>
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span>
-                        </div>
+                        <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
                       </div>
                    ))}
                  </div>
