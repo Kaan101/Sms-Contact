@@ -77,8 +77,8 @@ const createRequest = async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO requests 
-      (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, request_type, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'POOL')
+      (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, request_type, status, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'POOL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *;`,
       [
         rawText, 
