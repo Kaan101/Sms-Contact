@@ -42,6 +42,7 @@ try {
             provider_budget NUMERIC(10,2),
             provider_currency VARCHAR(10) DEFAULT 'TRY',
             provider_target_date TIMESTAMP WITH TIME ZONE,
+            provider_delivered_at TIMESTAMP WITH TIME ZONE, -- YENİ EKLENEN KOLON
             provider_description TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

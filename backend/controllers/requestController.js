@@ -260,11 +260,12 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
-const updateRequestStatus = async (req, res) => {
+ const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { newStatus } = req.body;
 
+    // 1. Önce ana talebin durumunu her halükarda güncelle
     const { rows } = await pool.query(
       `UPDATE requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *;`,
       [newStatus, requestId]
@@ -272,14 +273,31 @@ const updateRequestStatus = async (req, res) => {
 
     if (rows.length > 0) {
       const updatedReq = rows[0];
+
+      // 2. YENİ: Eğer Sağlayıcı "İşi Teslim Et" (PROVIDER_COMPLETED) tuşuna bastıysa
+      // Teslim zamanını yeni (request_provider_details) tablosuna yaz!
+      if (newStatus === 'PROVIDER_COMPLETED' && updatedReq.matched_provider_id) {
+        await pool.query(
+          `UPDATE request_provider_details 
+           SET provider_delivered_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+           WHERE request_id = $1 AND provider_id = $2`,
+          [requestId, updatedReq.matched_provider_id]
+        );
+      }
+
+      // 3. SMS Bildirimleri
       if (newStatus === 'ACCEPTED') {
         await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Talebiniz sağlayıcı tarafından kabul edildi. İletişime geçilecektir.`);
       } else if (newStatus === 'PROVIDER_COMPLETED') {
         await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Sağlayıcı işlemi tamamladığını bildirdi. Lütfen onaylayıp değerlendirin.`);
       }
     }
+    
     res.status(200).json({ status: 'success', request: rows[0] });
-  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
+  } catch (error) { 
+    console.error('updateRequestStatus hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message }); 
+  }
 };
 
 const getProviderAssignedRequests = async (req, res) => {
