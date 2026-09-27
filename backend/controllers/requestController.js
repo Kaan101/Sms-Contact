@@ -2,6 +2,7 @@ const { pool } = require('../config/db');
 const { safeArray, safeUpper } = require('../utils/helpers');
 
 // 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek
+// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -14,8 +15,8 @@ const getUserRequests = async (req, res) => {
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
-        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER' LIMIT 1) as customer_rating,
-        EXISTS(SELECT 1 FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER') as has_customer_review
+        (SELECT rating::float FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER' LIMIT 1) as customer_rating,
+        COALESCE(EXISTS(SELECT 1 FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER'), false) as has_customer_review
        FROM requests r
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
        WHERE r.contact_value LIKE $1
@@ -24,13 +25,16 @@ const getUserRequests = async (req, res) => {
     );
 
     for (let r of requests) {
+      // Eğer r.has_customer_review PostgreSQL'den object/string geliyorsa boolean'a çevir:
+      r.has_customer_review = Boolean(r.has_customer_review);
+      
       if (r.status !== 'CANCELLED') {
         // Sıraya giren sağlayıcılar ve ortalama puan/skorları
         const { rows: queued } = await pool.query(
           `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status,
-            (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating,
-            (SELECT AVG(rv.score) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_score,
-            (SELECT COUNT(rv.id) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as review_count
+            COALESCE((SELECT AVG(rv.rating)::float FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER'), 0) as avg_rating,
+            COALESCE((SELECT AVG(rv.score)::float FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER'), 0) as avg_score,
+            COALESCE((SELECT COUNT(rv.id)::int FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER'), 0) as review_count
            FROM request_interests ri
            JOIN service_providers sp ON ri.provider_id = sp.id
            WHERE ri.request_id = $1
@@ -63,6 +67,7 @@ const getUserRequests = async (req, res) => {
 };
 
 // 2. Yeni Talep Oluştur
+// 2. Yeni Talep Oluştur
 const createRequest = async (req, res) => {
   try {
     const { 
@@ -80,6 +85,9 @@ const createRequest = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Talep metni ve iletişim bilgisi zorunludur.' });
     }
 
+    // deadlineDatetime boş string ('') geliyorsa null'a çevirelim ki PostgreSQL Date parsing hatası (invalid input syntax for type timestamp) vermesin.
+    const safeDeadline = (deadlineDatetime && deadlineDatetime.trim() !== '') ? deadlineDatetime : null;
+
     const { rows } = await pool.query(
       `INSERT INTO requests 
       (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, request_type, status, created_at, updated_at)
@@ -92,7 +100,7 @@ const createRequest = async (req, res) => {
         preferredChannel || 'PHONE, SMS', 
         location || 'İstanbul, Türkiye', 
         Boolean(isUrgent), 
-        deadlineDatetime || null, 
+        safeDeadline, 
         requestType || 'TALEP'
       ]
     );
