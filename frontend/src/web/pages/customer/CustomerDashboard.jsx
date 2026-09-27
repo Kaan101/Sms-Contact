@@ -74,8 +74,7 @@ export default function CustomerDashboard() {
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
 
-  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null);
-
+ 
   const emailInputRef = useRef(null);
   const mapSearchInputRef = useRef(null);
 
