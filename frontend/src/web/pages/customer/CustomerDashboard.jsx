@@ -510,16 +510,16 @@ export default function CustomerDashboard() {
                                   <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
                                   
                                   {/* ÖZET: Sağlayıcı Ortalama Puanı ve Skoru */}
-                                  {qProv.avg_rating && (
-                                    <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                                      <Star size={8} fill="#f59e0b" /> {parseFloat(qProv.avg_rating).toFixed(1)} ({qProv.review_count} Yorum)
-                                    </span>
-                                  )}
-                                  {qProv.avg_score && (
-                                    <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
-                                      Sistem Skoru: {parseFloat(qProv.avg_score)}/100
-                                    </span>
-                                  )}
+{qProv.avg_rating && (
+  <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+    <Star size={8} fill="#f59e0b" /> {Number(parseFloat(qProv.avg_rating).toFixed(2))} ({qProv.review_count} Yorum)
+  </span>
+)}
+{qProv.avg_score && (
+  <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
+    Sistem Skoru: {Number(parseFloat(qProv.avg_score).toFixed(2))}/100
+  </span>
+)}
                                 </div>
                               </div>
                               
@@ -545,10 +545,10 @@ export default function CustomerDashboard() {
                                       {qProv.reviews.map((rev, revIdx) => (
                                         <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
                                           <div className="flex justify-between items-center mb-1.5">
-                                            <div className="flex items-center gap-1.5 text-amber-500">
-                                              <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{parseFloat(rev.rating).toFixed(1)}</span>
-{rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {parseFloat(rev.score)}</span>}
-                                            </div>
+                            <div className="flex items-center gap-1.5 text-amber-500">
+  <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{Number(parseFloat(rev.rating).toFixed(2))}</span>
+  {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {Number(parseFloat(rev.score).toFixed(2))}</span>}
+</div>
                                             <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
                                           </div>
                                           
