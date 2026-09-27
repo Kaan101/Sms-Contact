@@ -561,12 +561,12 @@ export default function CustomerDashboard() {
                                             </div>
                                           )}
                                           
-                                          <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
-                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{rev.rating_knowledge}/5</span></div>
-                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{rev.rating_communication}/5</span></div>
-                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{rev.rating_timing}/5</span></div>
-                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{rev.rating_cost}/5</span></div>
-                                          </div>
+<div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
+  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_knowledge)}/5</span></div>
+  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_communication)}/5</span></div>
+  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_timing)}/5</span></div>
+  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_cost)}/5</span></div>
+</div>
                                         </div>
                                       ))}
                                   </div>
