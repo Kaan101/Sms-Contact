@@ -144,9 +144,12 @@ export default function ProviderDashboard() {
       // 1. Bütçedeki formatlamaları (noktaları) temizle, saf rakam olarak gönder
       const cleanBudget = details.budget.replace(/\./g, '');
 
-      // 2. Tarih ve Saati birleştir (Veritabanına TIMESTAMP olarak gider)
-      const timePart = details.targetTime || '23:59';
-      const finalDateTime = `${details.targetDate}T${timePart}:00`;
+// 2. Tarih ve Saati birleştir (Zaman dilimi kaymasını önlemek için ISO'ya çevir)
+const timePart = details.targetTime || '23:59';
+// Tarayıcının yerel saatini baz alarak gerçek bir tarih objesi oluştur
+const localDateTime = new Date(`${details.targetDate}T${timePart}:00`);
+// Sunucunun ve veritabanının kayıpsız anlaması için evrensel formata (ISO) çevir
+const finalDateTime = localDateTime.toISOString();
 
       // 3. Döviz Kodu (Varsayılan TRY)
       const currencyCode = details.currency || 'TRY';
