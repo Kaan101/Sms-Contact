@@ -149,9 +149,9 @@ const initDatabase = async () => {
       );
     `);
 
-// 7. Değerlendirme & Yorum Tablosu (ONDALIKLI SAYI DESTEKLİ GÜNCEL HALİ)
+// 7. Değerlendirme & Yorum Tablosu (GÜNCELLENMİŞ - ONDALIKLI SAYI DESTEKLİ)
     await pool.query(`
-      DROP TABLE IF EXISTS reviews CASCADE; -- Eski hatalı tabloyu temizler
+      DROP TABLE IF EXISTS reviews CASCADE; -- Eski yapıyı temizler
       CREATE TABLE reviews (
         id SERIAL PRIMARY KEY,
         request_id INTEGER NOT NULL,
