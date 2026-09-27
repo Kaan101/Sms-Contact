@@ -132,7 +132,7 @@ export default function ProviderDashboard() {
     }
   }, [API_BASE, mutateProviderReqs, mutatePoolReq]);
 
-  // YENİ: Bütçe, Döviz, Tarih ve Saat detayları ile İşi Kabul Et
+ // YENİ: Bütçe, Döviz ve Hedef Tarih detayları ile İşi Kabul Et
   const handleAcceptWithDetails = useCallback(async (requestId) => {
     const details = proposalDetails[requestId];
     if (!details?.budget || !details?.targetDate) return;
@@ -144,19 +144,18 @@ export default function ProviderDashboard() {
       // 1. Bütçedeki formatlamaları (noktaları) temizle, saf rakam olarak gönder
       const cleanBudget = details.budget.replace(/\./g, '');
 
-      // 2. Tarih ve Saati birleştir (ISO formatına hazırla)
+      // 2. Tarih ve Saati birleştir (Veritabanına TIMESTAMP olarak gider)
       const timePart = details.targetTime || '23:59';
       const finalDateTime = `${details.targetDate}T${timePart}:00`;
 
-      // 3. Döviz Kodu (Veritabanına yük bindirmemek için açıklama içine gizliyoruz)
+      // 3. Döviz Kodu (Varsayılan TRY)
       const currencyCode = details.currency || 'TRY';
-      const autoDescription = `[DÖVİZ: ${currencyCode}]`;
 
-      // Şartları Kaydet
+      // Şartları doğrudan kendi yeni kolonlarına yazarak kaydet
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/providers/${Number(providerId)}/details`, {
         providerBudget: cleanBudget,
-        providerTargetDate: finalDateTime,
-        providerDescription: autoDescription
+        providerCurrency: currencyCode,
+        providerTargetDate: finalDateTime
       });
 
       // İşi "Kabul Edildi" Statüsüne Çek
@@ -170,7 +169,6 @@ export default function ProviderDashboard() {
       setActionLoadingId(null);
     }
   }, [API_BASE, providerProfile, proposalDetails, mutateProviderReqs, mutatePoolReq]);
-
   const handleJoinPool = useCallback(async (requestId) => {
     if (!providerProfile) return;
     setActionLoadingId(requestId);

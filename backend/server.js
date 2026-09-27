@@ -33,14 +33,14 @@ const startServer = async () => {
     
     // --- GÜVENLİ MIGRATION BAŞLANGICI ---
     // Production'da bile olsak, sadece "eksik olan" kritik tabloları 
-    // MEVCUT VERİLERİ SİLMEDEN oluşturur. (IF NOT EXISTS)
-    try {
+try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS request_provider_details (
             id SERIAL PRIMARY KEY,
             request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
             provider_id INTEGER NOT NULL REFERENCES service_providers(id) ON DELETE CASCADE,
             provider_budget NUMERIC(10,2),
+            provider_currency VARCHAR(10) DEFAULT 'TRY',
             provider_target_date TIMESTAMP WITH TIME ZONE,
             provider_description TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

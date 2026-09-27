@@ -155,10 +155,10 @@ const getUserRequests = async (req, res) => {
     const activeRequestIds = requests.filter(r => r.status !== 'CANCELLED').map(r => r.id);
 
     if (activeRequestIds.length > 0) {
-      // 2. ADIM: Sağlayıcıları ve rpd tablosundaki TEKLİF DETAYLARINI getir
+// 2. ADIM: Bu taleplere ilgi gösteren TÜM sağlayıcıları TEK SORGULAR getir (Detaylarıyla Birlikte)
       const { rows: allQueued } = await pool.query(
         `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status, ri.request_id,
-          rpd.provider_budget, rpd.provider_target_date, rpd.provider_description,
+          rpd.provider_budget, rpd.provider_currency, rpd.provider_target_date, rpd.provider_description,
           (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating,
           (SELECT AVG(rv.score) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_score,
           (SELECT COUNT(rv.id) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as review_count
@@ -352,26 +352,29 @@ const deleteRequest = async (req, res) => {
     res.status(200).json({ status: 'success' });
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
-// Sağlayıcının bir talebe özel detaylarını (Teklif, Tarih, Açıklama) kaydet/güncelle
+
+// Sağlayıcının bir talebe özel detaylarını (Teklif, Tarih, Açıklama, Döviz) kaydet/güncelle
 const upsertProviderRequestDetails = async (req, res) => {
   try {
     const { requestId, providerId } = req.params;
-    const { providerBudget, providerTargetDate, providerDescription } = req.body;
+    const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
 
     const budget = providerBudget ? parseFloat(providerBudget) : null;
     const targetDate = providerTargetDate ? new Date(providerTargetDate) : null;
+    const currency = providerCurrency || 'TRY';
 
     const { rows } = await pool.query(
-      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_target_date, provider_description) 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        ON CONFLICT (request_id, provider_id) 
        DO UPDATE SET 
          provider_budget = EXCLUDED.provider_budget, 
+         provider_currency = EXCLUDED.provider_currency,
          provider_target_date = EXCLUDED.provider_target_date, 
          provider_description = EXCLUDED.provider_description,
          updated_at = CURRENT_TIMESTAMP
        RETURNING *;`,
-      [parseInt(requestId, 10), parseInt(providerId, 10), budget, targetDate, providerDescription]
+      [parseInt(requestId, 10), parseInt(providerId, 10), budget, currency, targetDate, providerDescription]
     );
 
     res.status(200).json({ status: 'success', details: rows[0] });
@@ -380,7 +383,6 @@ const upsertProviderRequestDetails = async (req, res) => {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
-
 module.exports = {
   createRequest,
   getOpenPoolRequests, 
