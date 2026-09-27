@@ -5,7 +5,7 @@ import {
   Briefcase, Phone, Mail, Tag, Save, CheckCircle2, Clock, Trash2, X, 
   AlertTriangle, ShieldCheck, PhoneCall, Loader2, MessageCircle, 
   ChevronDown, ChevronUp, History, Timer, AlertCircle,
-  FileText, Bell // YENİ EKLENEN İKONLAR
+  FileText, Bell
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime, calculateRemainingTime } from '../../../core/utils/helpers';
@@ -30,6 +30,16 @@ export default function ProviderDashboard() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isPastTasksOpen, setIsPastTasksOpen] = useState(false);
   
+  // YENİ: Teklif detayları (Bütçe ve Hedef Tarih) state'i
+  const [proposalDetails, setProposalDetails] = useState({});
+
+  const updateProposalDetail = useCallback((reqId, field, value) => {
+    setProposalDetails(prev => ({
+      ...prev,
+      [reqId]: { ...prev[reqId], [field]: value }
+    }));
+  }, []);
+
   const [formData, setFormData] = useState({
     name: '',
     phone: session?.phone || '',
@@ -121,6 +131,33 @@ export default function ProviderDashboard() {
       setActionLoadingId(null);
     }
   }, [API_BASE, mutateProviderReqs, mutatePoolReq]);
+
+  // YENİ: Bütçe ve Tarih detayları ile İşi Kabul Et
+  const handleAcceptWithDetails = useCallback(async (requestId) => {
+    const details = proposalDetails[requestId];
+    if (!details?.budget || !details?.targetDate) return;
+
+    setActionLoadingId(requestId);
+    try {
+      const providerId = providerProfile?.id; // Sağlayıcı ID
+      
+      // 1. Önce Şartları (Fiyat ve Tarih) Kaydet
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/providers/${Number(providerId)}/details`, {
+        providerBudget: details.budget,
+        providerTargetDate: details.targetDate
+      });
+
+      // 2. Ardından İşi "Kabul Edildi" Statüsüne Çek
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'ACCEPTED' });
+      
+      await mutateProviderReqs(); 
+      await mutatePoolReq();
+    } catch (err) {
+      alert(`İşlem başarısız: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  }, [API_BASE, providerProfile, proposalDetails, mutateProviderReqs, mutatePoolReq]);
 
   const handleJoinPool = useCallback(async (requestId) => {
     if (!providerProfile) return;
@@ -279,7 +316,6 @@ export default function ProviderDashboard() {
                               <div className="flex items-center space-x-2 flex-wrap">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                                 
-                                {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
                                 {req.request_type === 'BILDIRIM' ? (
                                   <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
                                 ) : (
@@ -319,18 +355,6 @@ export default function ProviderDashboard() {
                             <span className="text-[10px] font-mono text-neutral-500">📍 {extractAddress(req.location)}</span>
                             
                             <div className="flex items-center space-x-2">
-                              {reqStatus === 'MATCHED' && (
-                                <>
-                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'ACCEPTED')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1 transition shadow-xs">
-                                    {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                                    <span>Kabul Et</span>
-                                  </button>
-                                  <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} className="px-3.5 py-2 border text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition">
-                                    Pas Geç
-                                  </button>
-                                </>
-                              )}
-                              
                               {reqStatus === 'ACCEPTED' && (
                                 <>
                                   <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'PROVIDER_COMPLETED')} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition shadow-sm">
@@ -345,6 +369,48 @@ export default function ProviderDashboard() {
                               )}
                             </div>
                           </div>
+
+                          {/* YENİ: Teklif Verme ve Şartlı Kabul Etme Alanı (Sadece MATCHED iken) */}
+                          {reqStatus === 'MATCHED' && (
+                            <div className="w-full mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2.5 shadow-sm">
+                              <label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide block">
+                                İşi Almak İçin Şartlarınızı Belirleyin:
+                              </label>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <input
+                                  type="number"
+                                  placeholder="Maliyet / Bütçe (₺)"
+                                  value={proposalDetails[req.id]?.budget || ''}
+                                  onChange={(e) => updateProposalDetail(req.id, 'budget', e.target.value)}
+                                  className="flex-1 p-2 text-xs font-bold rounded-lg border border-neutral-200 outline-none focus:border-emerald-500 shadow-sm bg-white"
+                                />
+                                <input
+                                  type="date"
+                                  value={proposalDetails[req.id]?.targetDate || ''}
+                                  onChange={(e) => updateProposalDetail(req.id, 'targetDate', e.target.value)}
+                                  className="flex-1 p-2 text-xs font-mono font-bold text-neutral-700 rounded-lg border border-neutral-200 outline-none focus:border-emerald-500 shadow-sm bg-white"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2 pt-1">
+                                <button 
+                                  onClick={() => handleAcceptWithDetails(req.id)} 
+                                  disabled={isActionLoading || !proposalDetails[req.id]?.budget || !proposalDetails[req.id]?.targetDate}
+                                  className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm flex items-center justify-center space-x-1.5"
+                                >
+                                  {isActionLoading && <Loader2 size={14} className="animate-spin" />}
+                                  <span>{(!proposalDetails[req.id]?.budget || !proposalDetails[req.id]?.targetDate) ? 'Tarih ve Bütçe Girin' : 'Şartlarla Kabul Et'}</span>
+                                </button>
+                                <button 
+                                  disabled={isActionLoading} 
+                                  onClick={() => handleStatusChange(req.id, 'PROVIDER_SKIPPED')} 
+                                  className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 bg-white rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition"
+                                >
+                                  Pas Geç
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                         </div>
                       );
                     })}
@@ -390,7 +456,6 @@ export default function ProviderDashboard() {
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                               
-                              {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
                               {req.request_type === 'BILDIRIM' ? (
                                 <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
                               ) : (
@@ -454,7 +519,6 @@ export default function ProviderDashboard() {
                               <div className="flex items-center space-x-2 flex-wrap">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                                 
-                                {/* YENİ: KAYIT TÜRÜ ROZETİ EKLENDİ */}
                                 {req.request_type === 'BILDIRIM' ? (
                                   <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
                                 ) : (
