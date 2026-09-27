@@ -64,6 +64,12 @@ try {
         console.log('Production ortamı: initDb (Tablo sıfırlama) atlandı.');
     }
 
+// service_providers tablosuna source (kaynak) kolonunu güvenli şekilde ekle
+    await pool.query(`
+      ALTER TABLE service_providers 
+      ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'MANUAL';
+    `);
+
     app.listen(PORT, () => {
       console.log(`🚀 Sunucu ${PORT} portunda aktif.`);
     });

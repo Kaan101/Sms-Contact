@@ -10,7 +10,8 @@ const getNormalizedLast10 = (p) => {
 // 1. Yeni Servis Veren Ekleme
 const registerProvider = async (req, res) => {
   try {
-    const { name, phone, email, serviceKeywords, communicationChannels, priorityScore } = req.body;
+    // req.body'den 'source' değişkenini de alıyoruz
+    const { name, phone, email, serviceKeywords, communicationChannels, priorityScore, source } = req.body;
 
     if (!name || !phone || !serviceKeywords || !communicationChannels) {
       return res.status(400).json({
@@ -27,10 +28,14 @@ const registerProvider = async (req, res) => {
       ? communicationChannels
       : ['PHONE'];
 
+    // Eğer kaynak (source) belirtilmemişse varsayılan olarak 'MANUAL' kabul et
+    const providerSource = source ? source.toUpperCase().trim() : 'MANUAL';
+
+    // SQL Sorgusuna source alanını ekliyoruz
     const insertQuery = `
       INSERT INTO service_providers 
-      (name, phone, email, service_keywords, communication_channels, priority_score)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      (name, phone, email, service_keywords, communication_channels, priority_score, source)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *;
     `;
 
@@ -40,7 +45,8 @@ const registerProvider = async (req, res) => {
       email && email.trim() !== '' ? email.trim() : null,
       keywordsArray,
       channelsArray,
-      parseInt(priorityScore, 10) || 100
+      parseInt(priorityScore, 10) || 100,
+      providerSource // 7. parametre olarak eklendi
     ];
 
     const { rows } = await pool.query(insertQuery, values);
