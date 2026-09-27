@@ -30,7 +30,7 @@ export default function ProviderDashboard() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isPastTasksOpen, setIsPastTasksOpen] = useState(false);
   
-  // YENİ: Teklif detayları (Bütçe ve Hedef Tarih) state'i
+  // Teklif detayları (Bütçe, Döviz, Tarih, Saat) state'i
   const [proposalDetails, setProposalDetails] = useState({});
 
   const updateProposalDetail = useCallback((reqId, field, value) => {
@@ -132,22 +132,34 @@ export default function ProviderDashboard() {
     }
   }, [API_BASE, mutateProviderReqs, mutatePoolReq]);
 
-  // YENİ: Bütçe ve Tarih detayları ile İşi Kabul Et
+  // YENİ: Bütçe, Döviz, Tarih ve Saat detayları ile İşi Kabul Et
   const handleAcceptWithDetails = useCallback(async (requestId) => {
     const details = proposalDetails[requestId];
     if (!details?.budget || !details?.targetDate) return;
 
     setActionLoadingId(requestId);
     try {
-      const providerId = providerProfile?.id; // Sağlayıcı ID
+      const providerId = providerProfile?.id;
       
-      // 1. Önce Şartları (Fiyat ve Tarih) Kaydet
+      // 1. Bütçedeki formatlamaları (noktaları) temizle, saf rakam olarak gönder
+      const cleanBudget = details.budget.replace(/\./g, '');
+
+      // 2. Tarih ve Saati birleştir (ISO formatına hazırla)
+      const timePart = details.targetTime || '23:59';
+      const finalDateTime = `${details.targetDate}T${timePart}:00`;
+
+      // 3. Döviz Kodu (Veritabanına yük bindirmemek için açıklama içine gizliyoruz)
+      const currencyCode = details.currency || 'TRY';
+      const autoDescription = `[DÖVİZ: ${currencyCode}]`;
+
+      // Şartları Kaydet
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/providers/${Number(providerId)}/details`, {
-        providerBudget: details.budget,
-        providerTargetDate: details.targetDate
+        providerBudget: cleanBudget,
+        providerTargetDate: finalDateTime,
+        providerDescription: autoDescription
       });
 
-      // 2. Ardından İşi "Kabul Edildi" Statüsüne Çek
+      // İşi "Kabul Edildi" Statüsüne Çek
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'ACCEPTED' });
       
       await mutateProviderReqs(); 
@@ -372,25 +384,53 @@ export default function ProviderDashboard() {
 
                           {/* YENİ: Teklif Verme ve Şartlı Kabul Etme Alanı (Sadece MATCHED iken) */}
                           {reqStatus === 'MATCHED' && (
-                            <div className="w-full mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2.5 shadow-sm">
+                            <div className="w-full mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3 shadow-sm">
                               <label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide block">
                                 İşi Almak İçin Şartlarınızı Belirleyin:
                               </label>
+                              
                               <div className="flex flex-col sm:flex-row gap-2">
-                                <input
-                                  type="number"
-                                  placeholder="Maliyet / Bütçe (₺)"
-                                  value={proposalDetails[req.id]?.budget || ''}
-                                  onChange={(e) => updateProposalDetail(req.id, 'budget', e.target.value)}
-                                  className="flex-1 p-2 text-xs font-bold rounded-lg border border-neutral-200 outline-none focus:border-emerald-500 shadow-sm bg-white"
-                                />
-                                <input
-                                  type="date"
-                                  value={proposalDetails[req.id]?.targetDate || ''}
-                                  onChange={(e) => updateProposalDetail(req.id, 'targetDate', e.target.value)}
-                                  className="flex-1 p-2 text-xs font-mono font-bold text-neutral-700 rounded-lg border border-neutral-200 outline-none focus:border-emerald-500 shadow-sm bg-white"
-                                />
+                                {/* Tutar ve Döviz Seçimi */}
+                                <div className="flex flex-1 items-center bg-white border border-neutral-200 rounded-lg overflow-hidden focus-within:border-emerald-500 shadow-sm transition">
+                                  <input
+                                    type="text"
+                                    placeholder="Tutar (Örn: 1.500)"
+                                    value={proposalDetails[req.id]?.budget || ''}
+                                    onChange={(e) => {
+                                      const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                      const formatted = numericValue ? new Intl.NumberFormat('tr-TR').format(numericValue) : '';
+                                      updateProposalDetail(req.id, 'budget', formatted);
+                                    }}
+                                    className="flex-1 p-2 text-xs font-bold text-neutral-900 outline-none w-full"
+                                  />
+                                  <select
+                                    value={proposalDetails[req.id]?.currency || 'TRY'}
+                                    onChange={(e) => updateProposalDetail(req.id, 'currency', e.target.value)}
+                                    className="bg-neutral-50 border-l border-neutral-200 p-2 text-[11px] font-bold text-neutral-700 outline-none cursor-pointer"
+                                  >
+                                    <option value="TRY">₺ TRY</option>
+                                    <option value="USD">$ USD</option>
+                                    <option value="EUR">€ EUR</option>
+                                  </select>
+                                </div>
+
+                                {/* Tarih ve Saat Seçimi */}
+                                <div className="flex flex-1 gap-2">
+                                  <input
+                                    type="date"
+                                    value={proposalDetails[req.id]?.targetDate || ''}
+                                    onChange={(e) => updateProposalDetail(req.id, 'targetDate', e.target.value)}
+                                    className="flex-1 p-2 text-xs font-mono font-bold text-neutral-700 rounded-lg border border-neutral-200 outline-none focus:border-emerald-500 shadow-sm bg-white"
+                                  />
+                                  <input
+                                    type="time"
+                                    value={proposalDetails[req.id]?.targetTime || ''}
+                                    onChange={(e) => updateProposalDetail(req.id, 'targetTime', e.target.value)}
+                                    className="w-24 p-2 text-xs font-mono font-bold text-neutral-700 rounded-lg border border-neutral-200 outline-none focus:border-emerald-500 shadow-sm bg-white"
+                                  />
+                                </div>
                               </div>
+
                               <div className="flex items-center space-x-2 pt-1">
                                 <button 
                                   onClick={() => handleAcceptWithDetails(req.id)} 
@@ -398,7 +438,7 @@ export default function ProviderDashboard() {
                                   className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm flex items-center justify-center space-x-1.5"
                                 >
                                   {isActionLoading && <Loader2 size={14} className="animate-spin" />}
-                                  <span>{(!proposalDetails[req.id]?.budget || !proposalDetails[req.id]?.targetDate) ? 'Tarih ve Bütçe Girin' : 'Şartlarla Kabul Et'}</span>
+                                  <span>{(!proposalDetails[req.id]?.budget || !proposalDetails[req.id]?.targetDate) ? 'Eksik Alanları Doldurun' : 'Şartlarla Kabul Et'}</span>
                                 </button>
                                 <button 
                                   disabled={isActionLoading} 
