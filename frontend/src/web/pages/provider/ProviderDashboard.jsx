@@ -30,7 +30,6 @@ export default function ProviderDashboard() {
   const [isPoolOpen, setIsPoolOpen] = useState(false);
   const [isPastTasksOpen, setIsPastTasksOpen] = useState(false);
   
-  // Teklif detayları (Bütçe, Döviz, Tarih, Saat) state'i
   const [proposalDetails, setProposalDetails] = useState({});
 
   const updateProposalDetail = useCallback((reqId, field, value) => {
@@ -132,7 +131,6 @@ export default function ProviderDashboard() {
     }
   }, [API_BASE, mutateProviderReqs, mutatePoolReq]);
 
- // YENİ: Bütçe, Döviz ve Hedef Tarih detayları ile İşi Kabul Et
   const handleAcceptWithDetails = useCallback(async (requestId) => {
     const details = proposalDetails[requestId];
     if (!details?.budget || !details?.targetDate) return;
@@ -140,28 +138,18 @@ export default function ProviderDashboard() {
     setActionLoadingId(requestId);
     try {
       const providerId = providerProfile?.id;
-      
-      // 1. Bütçedeki formatlamaları (noktaları) temizle, saf rakam olarak gönder
       const cleanBudget = details.budget.replace(/\./g, '');
-
-// 2. Tarih ve Saati birleştir (Zaman dilimi kaymasını önlemek için ISO'ya çevir)
-const timePart = details.targetTime || '23:59';
-// Tarayıcının yerel saatini baz alarak gerçek bir tarih objesi oluştur
-const localDateTime = new Date(`${details.targetDate}T${timePart}:00`);
-// Sunucunun ve veritabanının kayıpsız anlaması için evrensel formata (ISO) çevir
-const finalDateTime = localDateTime.toISOString();
-
-      // 3. Döviz Kodu (Varsayılan TRY)
+      const timePart = details.targetTime || '23:59';
+      const localDateTime = new Date(`${details.targetDate}T${timePart}:00`);
+      const finalDateTime = localDateTime.toISOString();
       const currencyCode = details.currency || 'TRY';
 
-      // Şartları doğrudan kendi yeni kolonlarına yazarak kaydet
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/providers/${Number(providerId)}/details`, {
         providerBudget: cleanBudget,
         providerCurrency: currencyCode,
         providerTargetDate: finalDateTime
       });
 
-      // İşi "Kabul Edildi" Statüsüne Çek
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'ACCEPTED' });
       
       await mutateProviderReqs(); 
@@ -172,6 +160,7 @@ const finalDateTime = localDateTime.toISOString();
       setActionLoadingId(null);
     }
   }, [API_BASE, providerProfile, proposalDetails, mutateProviderReqs, mutatePoolReq]);
+
   const handleJoinPool = useCallback(async (requestId) => {
     if (!providerProfile) return;
     setActionLoadingId(requestId);
@@ -218,7 +207,6 @@ const finalDateTime = localDateTime.toISOString();
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
         <div className="lg:col-span-5 bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
           <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
             <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -235,17 +223,14 @@ const finalDateTime = localDateTime.toISOString();
                   <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma / Sağlayıcı Adı *</label>
                   <input type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="Örn: Yıldız Tesisat" className="w-full p-3 text-xs rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 font-medium" />
                 </div>
-
                 <div>
                   <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">İletişim Telefonu *</label>
                   <input type="tel" required value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="0555..." className="w-full p-3 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 font-medium" />
                 </div>
-
                 <div>
                   <label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label>
                   <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="ornek@firma.com" className="w-full p-3 text-xs rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 font-medium" />
                 </div>
-
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler (Uzmanlıklar) *</label>
@@ -253,7 +238,6 @@ const finalDateTime = localDateTime.toISOString();
                   </div>
                   <textarea rows={4} maxLength={MAX_KEYWORD_CHARS} value={formData.serviceKeywords} onChange={(e) => setFormData({...formData, serviceKeywords: e.target.value})} placeholder="kombi, tamirat, nakliye, daire, tesisat..." className="w-full p-3 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 bg-neutral-50 resize-none font-medium leading-relaxed" />
                 </div>
-
                 <button type="submit" disabled={loading || metrics.wordCount > MAX_KEYWORD_COUNT} className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50 transition">
                   {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   <span>{providerProfile ? 'Profili Güncelle' : 'Profili Kaydet'}</span>
@@ -264,7 +248,6 @@ const finalDateTime = localDateTime.toISOString();
         </div>
 
         <div className="lg:col-span-7 space-y-6">
-          
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
             <div onClick={() => setIsActiveTasksOpen(!isActiveTasksOpen)} className="p-4 bg-neutral-50/70 border-b flex items-center justify-between cursor-pointer select-none hover:bg-neutral-100 transition">
               <h3 className="font-bold text-sm text-neutral-900 flex items-center space-x-2">
@@ -285,21 +268,17 @@ const finalDateTime = localDateTime.toISOString();
                     {activeRequests.map((req) => {
                       const reqStatus = safeUpper(req.status) || 'POOL';
                       const isActionLoading = actionLoadingId === req.id;
-                      
                       const forceRevealContact = ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
                       const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
                       const isHiddenPreference = safeString(req.contact_value).includes('HIDDEN');
-                      
-                      const displayContact = forceRevealContact 
-                      ? rawContact 
-                      : '*** ** ** (İşi Kabul Edince Açılacak)';
-                      
+                      const displayContact = forceRevealContact ? rawContact : '*** ** ** (İşi Kabul Edince Açılacak)';
                       const showWhatsApp = safeString(req.preferred_channel).includes('WHATSAPP') && (forceRevealContact || !isHiddenPreference);
 
                       let timerDisplay = null;
                       let isTimerCritical = false;
                       const refDate = req.updated_at || req.created_at || new Date().toISOString();
 
+                      // --- DİNAMİK SAYAÇ MANTIĞI (HEDEF TARİHE GÖRE) ---
                       if (reqStatus === 'MATCHED') {
                           const selectLimit = Number(systemSettings?.customer_selection_timeout_mins) || 60;
                           const remaining = calculateRemainingTime(refDate, selectLimit, 'mins');
@@ -308,18 +287,38 @@ const finalDateTime = localDateTime.toISOString();
                               isTimerCritical = remaining === "Süresi Doldu" || (parseInt(remaining) < 15 && remaining.includes("dk") && !remaining.includes("saat"));
                           }
                       } else if (reqStatus === 'ACCEPTED') {
-                          const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
-                          const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
-                          if (remaining) {
-                              timerDisplay = `Teslimat Kalan: ${remaining}`;
-                              isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                          // Eğer Hedef Tarih Verildiyse Sayaç O Tarihi Geri Sayar
+                          if (req.matched_target_date) {
+                              const targetMs = new Date(req.matched_target_date).getTime();
+                              const nowMs = new Date().getTime();
+                              const diffMs = targetMs - nowMs;
+                              
+                              if (diffMs <= 0) {
+                                  timerDisplay = "Süresi Doldu";
+                                  isTimerCritical = true;
+                              } else {
+                                  const totalMins = Math.floor(diffMs / 60000);
+                                  const h = Math.floor(totalMins / 60);
+                                  const m = totalMins % 60;
+                                  const d = Math.floor(h / 24);
+                                  
+                                  if (d > 0) timerDisplay = `Hedefe: ${d}g ${h%24}sa`;
+                                  else if (h > 0) timerDisplay = `Hedefe: ${h}sa ${m}dk`;
+                                  else { timerDisplay = `Hedefe: ${m}dk`; isTimerCritical = m < 15; }
+                              }
+                          } else {
+                              // Hedef tarih yoksa eski usül parametreyi kullan
+                              const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
+                              const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
+                              if (remaining) {
+                                  timerDisplay = `Teslimat: ${remaining}`;
+                                  isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                              }
                           }
                       } else if (reqStatus === 'PROVIDER_COMPLETED') {
                           const approvalLimit = Number(systemSettings?.customer_approval_timeout_hours) || 24;
                           const remaining = calculateRemainingTime(refDate, approvalLimit, 'hours');
-                          if (remaining) {
-                             timerDisplay = `Müşteri Onayı: ${remaining}`;
-                          }
+                          if (remaining) timerDisplay = `Müşteri Onayı: ${remaining}`;
                       }
 
                       return (
@@ -328,16 +327,27 @@ const finalDateTime = localDateTime.toISOString();
                             <div>
                               <div className="flex items-center space-x-2 flex-wrap">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                                
                                 {req.request_type === 'BILDIRIM' ? (
                                   <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
                                 ) : (
                                   <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
                                 )}
-
                                 {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
                               </div>
                               <h4 className="font-bold text-neutral-950 text-sm mt-1.5">"{req.raw_text}"</h4>
+                              
+                              {/* YENİ: KABUL EDİLEN BÜTÇE VE TARİH ETİKETLERİ */}
+                              {req.matched_budget && req.matched_target_date && reqStatus !== 'MATCHED' && (
+                                <div className="mt-2.5 flex flex-wrap gap-2">
+                                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
+                                     💰 Maliyet: {new Intl.NumberFormat('tr-TR').format(req.matched_budget)} {req.matched_currency || 'TRY'}
+                                  </span>
+                                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
+                                     🎯 Hedef: {safeDateTime(req.matched_target_date)}
+                                  </span>
+                                </div>
+                              )}
+                              
                             </div>
                             
                             <div className="flex flex-col items-end space-y-1.5 shrink-0 pl-2">
@@ -366,7 +376,6 @@ const finalDateTime = localDateTime.toISOString();
 
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
                             <span className="text-[10px] font-mono text-neutral-500">📍 {extractAddress(req.location)}</span>
-                            
                             <div className="flex items-center space-x-2">
                               {reqStatus === 'ACCEPTED' && (
                                 <>
@@ -383,15 +392,12 @@ const finalDateTime = localDateTime.toISOString();
                             </div>
                           </div>
 
-                          {/* YENİ: Teklif Verme ve Şartlı Kabul Etme Alanı (Sadece MATCHED iken) */}
                           {reqStatus === 'MATCHED' && (
                             <div className="w-full mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3 shadow-sm">
                               <label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide block">
                                 İşi Almak İçin Şartlarınızı Belirleyin:
                               </label>
-                              
                               <div className="flex flex-col sm:flex-row gap-2">
-                                {/* Tutar ve Döviz Seçimi */}
                                 <div className="flex flex-1 items-center bg-white border border-neutral-200 rounded-lg overflow-hidden focus-within:border-emerald-500 shadow-sm transition">
                                   <input
                                     type="text"
@@ -414,8 +420,6 @@ const finalDateTime = localDateTime.toISOString();
                                     <option value="EUR">€ EUR</option>
                                   </select>
                                 </div>
-
-                                {/* Tarih ve Saat Seçimi */}
                                 <div className="flex flex-1 gap-2">
                                   <input
                                     type="date"
@@ -431,7 +435,6 @@ const finalDateTime = localDateTime.toISOString();
                                   />
                                 </div>
                               </div>
-
                               <div className="flex items-center space-x-2 pt-1">
                                 <button 
                                   onClick={() => handleAcceptWithDetails(req.id)} 
@@ -451,7 +454,6 @@ const finalDateTime = localDateTime.toISOString();
                               </div>
                             </div>
                           )}
-
                         </div>
                       );
                     })}
@@ -480,7 +482,6 @@ const finalDateTime = localDateTime.toISOString();
                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                     {poolRequests.map((req) => {
                       const isActionLoading = actionLoadingId === req.id;
-                      
                       let timerDisplay = null;
                       let isTimerCritical = false;
                       const poolLimit = Number(systemSettings?.pool_lifespan_hours) || 72;
@@ -496,15 +497,12 @@ const finalDateTime = localDateTime.toISOString();
                           <div className="space-y-1.5 w-full sm:w-auto flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                              
                               {req.request_type === 'BILDIRIM' ? (
                                 <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
                               ) : (
                                 <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
                               )}
-
                               {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">⏰ {safeDateTime(req.created_at)}</span>}
-                              
                               {timerDisplay && (
                                  <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                                     {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
@@ -559,13 +557,11 @@ const finalDateTime = localDateTime.toISOString();
                             <div>
                               <div className="flex items-center space-x-2 flex-wrap">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-                                
                                 {req.request_type === 'BILDIRIM' ? (
                                   <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
                                 ) : (
                                   <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
                                 )}
-
                                 {req.created_at && <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-semibold">⏰ {safeDateTime(req.created_at)}</span>}
                               </div>
                               <h4 className="font-semibold text-neutral-900 text-sm mt-1.5">"{req.raw_text}"</h4>

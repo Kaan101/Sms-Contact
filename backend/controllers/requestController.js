@@ -135,19 +135,20 @@ const getUserRequests = async (req, res) => {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
 
-    // 1. ADIM: Müşterinin tüm taleplerini TEK SORGULAR getir
+// 1. ADIM: Müşterinin tüm taleplerini TEK SORGULAR getir
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
+        rpd.provider_budget as matched_budget, rpd.provider_currency as matched_currency, rpd.provider_target_date as matched_target_date,
         (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER' LIMIT 1) as customer_rating,
         EXISTS(SELECT 1 FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'CUSTOMER') as has_customer_review
        FROM requests r
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
+       LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = r.matched_provider_id)
        WHERE r.contact_value LIKE $1
        ORDER BY r.created_at DESC;`,
       [`%${phone}%`]
     );
-
     if (requests.length === 0) {
       return res.status(200).json({ status: 'success', requests: [] });
     }
@@ -286,15 +287,25 @@ const getProviderAssignedRequests = async (req, res) => {
     const { providerId } = req.query;
     if (!providerId) return res.status(404).json({ message: 'Provider ID gerekli' });
 
+    // YENİ SORGUMUZ: Müşteri yorumlarını (provider_rating) ve Sağlayıcı Şartlarını (Bütçe & Tarih) birlikte çeker.
     const { rows } = await pool.query(
       `SELECT r.*, 
-        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'PROVIDER' LIMIT 1) as provider_rating
+        (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'PROVIDER' LIMIT 1) as provider_rating,
+        rpd.provider_budget as matched_budget, rpd.provider_currency as matched_currency, rpd.provider_target_date as matched_target_date
        FROM requests r
+       LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = $1)
        WHERE r.matched_provider_id = $1 
        AND r.status IN ('MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED')
        ORDER BY r.updated_at DESC;`,
       [providerId]
     );
+
+    res.status(200).json({ status: 'success', requests: rows });
+  } catch (error) {
+    console.error('getProviderAssignedRequests hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
 
     // GİZLİLİK KALKANI: Sağlayıcı henüz kabul etmediyse iletişim bilgisini maskele
     const secureRows = rows.map(r => {

@@ -421,6 +421,7 @@ export default function CustomerDashboard() {
                     let isTimerCritical = false;
                     const refDate = req.updated_at || req.created_at || new Date().toISOString();
 
+                    // --- DİNAMİK SAYAÇ MANTIĞI ---
                     if (reqStatus === 'POOL' || reqStatus === 'PENDING') {
                        const poolLimit = Number(systemSettings?.pool_lifespan_hours) || 72;
                        const remaining = calculateRemainingTime(req.created_at, poolLimit, 'hours');
@@ -435,6 +436,34 @@ export default function CustomerDashboard() {
                          timerDisplay = `Onay Süreniz: ${remaining}`;
                          isTimerCritical = remaining === "Süresi Doldu" || (parseInt(remaining) < 15 && remaining.includes("dk") && !remaining.includes("saat"));
                        }
+                    } else if (reqStatus === 'ACCEPTED') {
+                        // Eğer Hedef Tarih Verildiyse Sayaç O Tarihi Geri Sayar
+                        if (req.matched_target_date) {
+                            const targetMs = new Date(req.matched_target_date).getTime();
+                            const nowMs = new Date().getTime();
+                            const diffMs = targetMs - nowMs;
+                            
+                            if (diffMs <= 0) {
+                                timerDisplay = "Süresi Doldu";
+                                isTimerCritical = true;
+                            } else {
+                                const totalMins = Math.floor(diffMs / 60000);
+                                const h = Math.floor(totalMins / 60);
+                                const m = totalMins % 60;
+                                const d = Math.floor(h / 24);
+                                
+                                if (d > 0) timerDisplay = `Teslimata: ${d}g ${h%24}sa`;
+                                else if (h > 0) timerDisplay = `Teslimata: ${h}sa ${m}dk`;
+                                else { timerDisplay = `Teslimata: ${m}dk`; isTimerCritical = m < 15; }
+                            }
+                        } else {
+                            const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
+                            const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
+                            if (remaining) {
+                                timerDisplay = `Teslimat: ${remaining}`;
+                                isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                            }
+                        }
                     } else if (reqStatus === 'PROVIDER_COMPLETED') {
                        const approvalLimit = Number(systemSettings?.customer_approval_timeout_hours) || 24;
                        const remaining = calculateRemainingTime(refDate, approvalLimit, 'hours');
@@ -455,6 +484,19 @@ export default function CustomerDashboard() {
                               {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
                             </div>
                             <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
+                            
+                            {/* YENİ: KABUL EDİLEN BÜTÇE VE TARİH ETİKETLERİ */}
+                            {req.matched_budget && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus) && (
+                              <div className="mt-2.5 flex flex-wrap gap-2">
+                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
+                                   💰 Maliyet: {new Intl.NumberFormat('tr-TR').format(Number(req.matched_budget))} {req.matched_currency || 'TRY'}
+                                </span>
+                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
+                                   🎯 Hedef: {safeDateTime(req.matched_target_date)}
+                                </span>
+                              </div>
+                            )}
+                            
                           </div>
                           
                           <div className="flex flex-col items-end gap-1.5">
@@ -473,7 +515,6 @@ export default function CustomerDashboard() {
                           </div>
                         </div>
 
-                        {/* YENİ: Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
                 {/* Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
                 {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
                   <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
@@ -488,13 +529,11 @@ export default function CustomerDashboard() {
                       {safeArray(req.queuedProviders).map((qProv, idx) => {
                         const isCurrent = String(req.matched_provider_id) === String(qProv.id);
                         const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
-                        // Hangi sağlayıcının akordiyonu açık?
                         const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
                         
                         return (
                           <div key={qProv.id} className={`border-b border-neutral-100 last:border-b-0 text-xs flex flex-col transition overflow-hidden shadow-sm ${isCurrent ? (isSkippedByThis ? 'bg-rose-50' : 'bg-emerald-50') : 'bg-white'}`}>
                             
-                            {/* Tıklanabilir Header Satırı */}
                             <div 
                               onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
                               className="p-3 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50"
@@ -506,24 +545,35 @@ export default function CustomerDashboard() {
                                   {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
                                   {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
                                 </p>
-                                <div className="flex items-center space-x-2 mt-1.5">
-                                  <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
+                                <div className="flex flex-col mt-1.5 space-y-1.5">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
+                                    {qProv.avg_rating && (
+                                      <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                        <Star size={8} fill="#f59e0b" /> {Number(parseFloat(qProv.avg_rating).toFixed(2))} ({qProv.review_count} Yorum)
+                                      </span>
+                                    )}
+                                    {qProv.avg_score && (
+                                      <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
+                                        Sistem Skoru: {Number(parseFloat(qProv.avg_score).toFixed(2))}/100
+                                      </span>
+                                    )}
+                                  </div>
                                   
-                                  {/* ÖZET: Sağlayıcı Ortalama Puanı ve Skoru */}
-{qProv.avg_rating && (
-  <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-    <Star size={8} fill="#f59e0b" /> {Number(parseFloat(qProv.avg_rating).toFixed(2))} ({qProv.review_count} Yorum)
-  </span>
-)}
-{qProv.avg_score && (
-  <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
-    Sistem Skoru: {Number(parseFloat(qProv.avg_score).toFixed(2))}/100
-  </span>
-)}
+                                  {/* YENİ: KUYRUKTAKİ SAĞLAYICININ TEKLİF DETAYI */}
+                                  {qProv.provider_budget && qProv.provider_target_date && (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="bg-emerald-50/70 border border-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                        💰 Bütçe: {new Intl.NumberFormat('tr-TR').format(Number(qProv.provider_budget))} {qProv.provider_currency || 'TRY'}
+                                      </span>
+                                      <span className="bg-indigo-50/70 border border-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                        🎯 Tarih: {safeDateTime(qProv.provider_target_date)}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               
-                              {/* Eylem Butonları */}
                               <div className="flex items-center space-x-2 shrink-0 ml-2">
                                   {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
                                       <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><ShieldCheck size={10} className="mr-1 inline-block"/>Onayla</button>
@@ -537,7 +587,6 @@ export default function CustomerDashboard() {
                               </div>
                             </div>
 
-                            {/* AKORDİYON İÇERİĞİ: Tüm Detaylı Yorumlar */}
                             {isProvExpanded && (
                               <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
                                 {safeArray(qProv.reviews).length > 0 ? (
@@ -552,7 +601,6 @@ export default function CustomerDashboard() {
                                             <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
                                           </div>
                                           
-                                          {/* AÇIKLAMA (COMMENT) ALANI: Sadece varsa ve boş değilse görünür */}
                                           {rev.comment && rev.comment.trim() !== '' && (
                                             <div className="mb-2.5 bg-neutral-50 p-2 rounded border border-neutral-100">
                                               <p className="text-[11px] text-neutral-700 italic leading-relaxed">
@@ -561,12 +609,12 @@ export default function CustomerDashboard() {
                                             </div>
                                           )}
                                           
-<div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
-  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_knowledge)}/5</span></div>
-  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_communication)}/5</span></div>
-  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_timing)}/5</span></div>
-  <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_cost)}/5</span></div>
-</div>
+                                          <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_knowledge)}/5</span></div>
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_communication)}/5</span></div>
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_timing)}/5</span></div>
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_cost)}/5</span></div>
+                                          </div>
                                         </div>
                                       ))}
                                   </div>
