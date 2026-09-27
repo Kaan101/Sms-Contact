@@ -29,7 +29,16 @@ app.get('/', (req, res) => {
 const startServer = async () => {
   try {
     await testDbConnection();
-    await initDatabase();
+    
+    // Geliştirme (development) ortamında veya manuel bir komut verildiğinde initDb çalışsın,
+    // Canlı (production/Railway) ortamında tabloları SIFIRLAMASIN!
+    if (process.env.NODE_ENV === 'development' || process.env.INIT_DB === 'true') {
+        console.log('Tablo oluşturma/güncelleme (initDb) başlatılıyor...');
+        await initDatabase();
+    } else {
+        console.log('Production ortamı: initDb atlandı.');
+    }
+
     app.listen(PORT, () => {
       console.log(`🚀 Sunucu ${PORT} portunda aktif.`);
     });
