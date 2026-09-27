@@ -542,7 +542,7 @@ export default function CustomerDashboard() {
                               <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
                                 {safeArray(qProv.reviews).length > 0 ? (
                                   <div className="space-y-2.5">
-                                    {qProv.reviews.map((rev, revIdx) => (
+                                      {qProv.reviews.map((rev, revIdx) => (
                                         <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
                                           <div className="flex justify-between items-center mb-1.5">
                                             <div className="flex items-center gap-1.5 text-amber-500">
@@ -551,7 +551,15 @@ export default function CustomerDashboard() {
                                             </div>
                                             <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
                                           </div>
-                                          {rev.comment && <p className="text-[11px] text-neutral-700 italic mb-2.5 leading-relaxed bg-neutral-50 p-2 rounded">"{rev.comment}"</p>}
+                                          
+                                          {/* AÇIKLAMA (COMMENT) ALANI: Sadece varsa ve boş değilse görünür */}
+                                          {rev.comment && rev.comment.trim() !== '' && (
+                                            <div className="mb-2.5 bg-neutral-50 p-2 rounded border border-neutral-100">
+                                              <p className="text-[11px] text-neutral-700 italic leading-relaxed">
+                                                "{rev.comment}"
+                                              </p>
+                                            </div>
+                                          )}
                                           
                                           <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
                                             <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{rev.rating_knowledge}/5</span></div>
@@ -560,7 +568,7 @@ export default function CustomerDashboard() {
                                             <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{rev.rating_cost}/5</span></div>
                                           </div>
                                         </div>
-                                    ))}
+                                      ))}
                                   </div>
                                 ) : (
                                   <div className="text-center text-[10px] text-neutral-400 py-3 italic bg-white border border-neutral-100 rounded-lg">Bu sağlayıcı için henüz geçmiş bir müşteri değerlendirmesi bulunmuyor.</div>
