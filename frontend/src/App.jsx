@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
-import { LogOut, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from './core/context/AuthContext';
 import MainPage from './web/pages/home/MainPage';
 
@@ -23,7 +23,7 @@ export default function App() {
   const { session, handleLogout } = useAuth();
   
   // viewMode: 'MAIN' (Ana Tanıtım Sayfası) | 'LOGIN' (Giriş Formu) | 'DASHBOARD' (Aktif Panel)
-  const [viewMode, setViewMode] = useState(() => session ? 'DASHBOARD' : 'MAIN');
+  const [viewMode, setViewMode] = useState(() => (session ? 'DASHBOARD' : 'MAIN'));
 
   useEffect(() => {
     if (session) {
@@ -46,16 +46,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [session]);
 
+  // ROL PARAMETRESİNİ KORUYARAK YÖNLENDİRME
   const handleGoToLogin = (role = 'CUSTOMER') => {
-    if (session) {
-      // Zaten oturumu var; tekrar login ekranı yerine doğrudan paneline aktar
-      setViewMode('DASHBOARD');
-      return;
-    }
-
     const hash = `#login?role=${role}`;
     window.history.pushState({ view: 'login', role }, '', hash);
-    setViewMode('LOGIN');
+
+    if (session) {
+      // Zaten oturum varsa doğrudan paneline aktar
+      setViewMode('DASHBOARD');
+    } else {
+      // Oturum yoksa, seçilen role (CUSTOMER -> Talep Oluştur, PROVIDER -> Hizmet Ver) göre Login moduna geç
+      setViewMode('LOGIN');
+    }
   };
 
   const renderDashboard = () => {
@@ -68,8 +70,6 @@ export default function App() {
     }
   };
 
-  // 1. Durum: Oturum yoksa ve kullanıcı login formunu açmadıysa ana sayfayı göster
-  // 2. Durum: Kullanıcı giriş yapmış bile olsa logoya tıklayıp ana sayfaya geçmişse yine MainPage göster
   if (viewMode === 'MAIN') {
     return <MainPage onGoToLogin={handleGoToLogin} />;
   }
@@ -80,7 +80,7 @@ export default function App() {
       <header className="border-b border-neutral-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-[500]">
         <div className={`${session?.role === 'ADMIN' || session?.role === 'TRACKER' ? 'w-full' : 'max-w-5xl'} mx-auto px-6 h-16 flex items-center justify-between transition-all duration-300`}>
           
-          {/* MOBOL LOGOSU: Tıklandığında oturumu silmez, ana sayfaya götürür */}
+          {/* MOBOOL LOGOSU: Oturumu silmeden ana tanıtım sayfasına geçirir */}
           <div 
             className="flex items-center space-x-3 cursor-pointer group" 
             onClick={() => { 

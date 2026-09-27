@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Phone, ShieldCheck, Zap, 
   MapPin, CheckCircle2, ArrowRight, Lock, 
-  MessageCircle, Send, PhoneIncoming, Compass, CheckCheck, User, Wrench, Loader2
+  MessageCircle, Send, Compass, CheckCheck, User, Wrench, Loader2
 } from 'lucide-react';
-import { useAuth } from '../../../core/context/AuthContext'; // YENİ: Auth Context Eklendi
+import { useAuth } from '../../../core/context/AuthContext';
 
 export default function MainPage({ onGoToLogin }) {
-  const { session } = useAuth(); // YENİ: Oturum Bilgisi Alınıyor
+  const { session } = useAuth();
 
   const [scenario, setScenario] = useState(1); // 1: Telefon, 2: Whatsapp/Sms
   const [typedText, setTypedText] = useState('');
@@ -25,26 +25,18 @@ export default function MainPage({ onGoToLogin }) {
 
   const chatContainerRef = useRef(null);
 
-  // Daha doğal ve canlı daktilo metinleri
+  // Doğal ve canlı daktilo metinleri
   const fullText = scenario === 1 
     ? "Tarabya sahile yakın, 3+1 kiralık daire." 
     : "Bosch çamaşır makinesi su almıyor, acil servis.";
 
-  // AKILLI YÖNLENDİRME FONKSİYONLARI (Giriş yapılmışsa doğrudan panele aktarır)
+  // ROLÜ KAYBETMEDEN AKTARAN BUTON İŞLEYİCİLERİ
   const handleCustomerAction = () => {
-    if (session && session.phone) {
-      onGoToLogin('CUSTOMER');
-    } else {
-      onGoToLogin('LOGIN');
-    }
+    onGoToLogin('CUSTOMER');
   };
 
   const handleProviderAction = () => {
-    if (session && session.phone) {
-      onGoToLogin('PROVIDER');
-    } else {
-      onGoToLogin('LOGIN');
-    }
+    onGoToLogin('PROVIDER');
   };
 
   // WhatsApp ekranında yeni mesaj gelince mesaj kutusunu alta kaydırır
@@ -200,7 +192,7 @@ export default function MainPage({ onGoToLogin }) {
           </div>
           <div className="flex items-center space-x-3">
             <button 
-              onClick={handleCustomerAction} 
+              onClick={() => onGoToLogin(session && session.phone ? session.role : 'LOGIN')} 
               className="px-6 py-2.5 text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition shadow-sm cursor-pointer"
             >
               {session && session.phone ? 'Panele Git' : 'Giriş Yap'}
@@ -544,7 +536,6 @@ export default function MainPage({ onGoToLogin }) {
                       </div>
                     </div>
                     
-                    {/* Büyütülmüş Fontlu Chat Alanı + AUTO SCROLL */}
                     <div ref={chatContainerRef} className="flex-1 p-3 space-y-3 relative z-0 flex flex-col overflow-y-auto overflow-x-hidden w-full scroll-smooth pb-4">
                       
                       {chatStep >= 2 && (
