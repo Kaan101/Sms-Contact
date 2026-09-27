@@ -74,6 +74,8 @@ export default function CustomerDashboard() {
   const [reviewCommentMap, setReviewCommentMap] = useState({});
   const [reviewedRequestsMap, setReviewedRequestsMap] = useState({});
 
+  const [expandedProviderReviewId, setExpandedProviderReviewId] = useState(null);
+
   const emailInputRef = useRef(null);
   const mapSearchInputRef = useRef(null);
 
@@ -473,104 +475,108 @@ export default function CustomerDashboard() {
                         </div>
 
                         {/* YENİ: Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
-                        {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
-                          <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
+                {/* Akordiyonlu Müşteri Eşleştirme Kuyruğu */}
+                {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
+                  <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
+                    
+                    <div className="p-3 flex items-center justify-between border-b border-emerald-100/50">
+                      <div className="text-[10px] font-mono font-bold text-emerald-700">
+                        {reqStatus === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'SİRAYA GİREN SAĞLAYICILAR')}
+                      </div>
+                    </div>
+
+                    <div className="bg-neutral-50/30">
+                      {safeArray(req.queuedProviders).map((qProv, idx) => {
+                        const isCurrent = String(req.matched_provider_id) === String(qProv.id);
+                        const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
+                        // Hangi sağlayıcının akordiyonu açık?
+                        const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
+                        
+                        return (
+                          <div key={qProv.id} className={`border-b border-neutral-100 last:border-b-0 text-xs flex flex-col transition overflow-hidden shadow-sm ${isCurrent ? (isSkippedByThis ? 'bg-rose-50' : 'bg-emerald-50') : 'bg-white'}`}>
                             
-                            <div className="p-3 flex items-center justify-between border-b border-emerald-100/50">
-                              <div className="text-[10px] font-mono font-bold text-emerald-700">
-                                 {reqStatus === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'SİRAYA GİREN SAĞLAYICILAR')}
+                            {/* Tıklanabilir Header Satırı */}
+                            <div 
+                              onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
+                              className="p-3 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50"
+                            >
+                              <div>
+                                <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
+                                  <span>#{idx + 1} {qProv.name}</span>
+                                  {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
+                                  {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
+                                  {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
+                                </p>
+                                <div className="flex items-center space-x-2 mt-1.5">
+                                  <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
+                                  
+                                  {/* ÖZET: Sağlayıcı Ortalama Puanı ve Skoru */}
+                                  {qProv.avg_rating && (
+                                    <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                      <Star size={8} fill="#f59e0b" /> {parseFloat(qProv.avg_rating).toFixed(1)} ({qProv.review_count} Yorum)
+                                    </span>
+                                  )}
+                                  {qProv.avg_score && (
+                                    <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
+                                      Sistem Skoru: {parseFloat(qProv.avg_score).toFixed(0)}/100
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Eylem Butonları */}
+                              <div className="flex items-center space-x-2 shrink-0 ml-2">
+                                  {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
+                                      <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><ShieldCheck size={10} className="mr-1 inline-block"/>Onayla</button>
+                                  )}
+                                  {!isCurrent && (
+                                      <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><Check size={10} className="mr-1 inline-block"/>Bunu Seç</button>
+                                  )}
+                                  <div className="text-neutral-400 p-1 bg-white border border-neutral-200 rounded ml-1 transition hover:bg-neutral-50 shadow-xs">
+                                      {isProvExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                                  </div>
                               </div>
                             </div>
 
-                            <div className="bg-neutral-50/30">
-                              {safeArray(req.queuedProviders).map((qProv, idx) => {
-                                const isCurrent = String(req.matched_provider_id) === String(qProv.id);
-                                const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
-                                const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
-                                
-                                return (
-                                  <div key={qProv.id} className={`border-b border-neutral-100 last:border-b-0 text-xs flex flex-col transition overflow-hidden shadow-sm ${isCurrent ? (isSkippedByThis ? 'bg-rose-50' : 'bg-emerald-50') : 'bg-white'}`}>
-                                    
-                                    {/* Header Row (Tıklanabilir Alan) */}
-                                    <div 
-                                      onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
-                                      className="p-3 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50"
-                                    >
-                                      <div>
-                                        <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
-                                          <span>#{idx + 1} {qProv.name}</span>
-                                          {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
-                                          {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
-                                          {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
-                                        </p>
-                                        <div className="flex items-center space-x-2 mt-1.5">
-                                          <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
-                                          
-                                          {/* Sağlayıcı Skoru & Puanı */}
-                                          {qProv.avg_rating && (
-                                            <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                                              <Star size={8} fill="#f59e0b" /> {parseFloat(qProv.avg_rating).toFixed(1)} ({qProv.review_count} Yorum)
-                                            </span>
-                                          )}
-                                          {qProv.avg_score && (
-                                            <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
-                                              Sistem Skoru: {parseFloat(qProv.avg_score).toFixed(0)}/100
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Eylem Butonları */}
-                                      <div className="flex items-center space-x-2 shrink-0 ml-2">
-                                          {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
-                                              <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><ShieldCheck size={10} className="mr-1 inline-block"/>Onayla</button>
-                                          )}
-                                          {!isCurrent && (
-                                              <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><Check size={10} className="mr-1 inline-block"/>Bunu Seç</button>
-                                          )}
-                                          <div className="text-neutral-400 p-1 bg-white border border-neutral-200 rounded ml-1 transition hover:bg-neutral-50 shadow-xs">
-                                              {isProvExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                            {/* AKORDİYON İÇERİĞİ: Tüm Detaylı Yorumlar */}
+                            {isProvExpanded && (
+                              <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
+                                {safeArray(qProv.reviews).length > 0 ? (
+                                  <div className="space-y-2.5">
+                                    {qProv.reviews.map((rev, revIdx) => (
+                                        <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
+                                          <div className="flex justify-between items-center mb-1.5">
+                                            <div className="flex items-center gap-1.5 text-amber-500">
+                                              <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{parseFloat(rev.rating).toFixed(1)}</span>
+                                              {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {parseFloat(rev.score).toFixed(0)}</span>}
+                                            </div>
+                                            <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
                                           </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Akordiyon İçi: Tüm Geçmiş Müşteri Yorumları */}
-                                    {isProvExpanded && (
-                                      <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
-                                        {safeArray(qProv.reviews).length > 0 ? (
-                                           <div className="space-y-2.5">
-                                             {qProv.reviews.map((rev, revIdx) => (
-                                                <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
-                                                  <div className="flex justify-between items-center mb-1.5">
-                                                     <div className="flex items-center gap-1.5 text-amber-500">
-                                                       <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{parseFloat(rev.rating).toFixed(1)}</span>
-                                                       {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {parseFloat(rev.score).toFixed(0)}</span>}
-                                                     </div>
-                                                     <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
-                                                  </div>
-                                                  {rev.comment && <p className="text-[11px] text-neutral-700 italic mb-2.5 leading-relaxed bg-neutral-50 p-2 rounded">"{rev.comment}"</p>}
-                                                  
-                                                  <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
-                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{rev.rating_knowledge}/5</span></div>
-                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{rev.rating_communication}/5</span></div>
-                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{rev.rating_timing}/5</span></div>
-                                                     <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{rev.rating_cost}/5</span></div>
-                                                  </div>
-                                                </div>
-                                             ))}
-                                           </div>
-                                        ) : (
-                                           <div className="text-center text-[10px] text-neutral-400 py-3 italic bg-white border border-neutral-100 rounded-lg">Bu sağlayıcı için henüz geçmiş bir müşteri değerlendirmesi bulunmuyor.</div>
-                                        )}
-                                      </div>
-                                    )}
-
+                                          {rev.comment && <p className="text-[11px] text-neutral-700 italic mb-2.5 leading-relaxed bg-neutral-50 p-2 rounded">"{rev.comment}"</p>}
+                                          
+                                          <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{rev.rating_knowledge}/5</span></div>
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{rev.rating_communication}/5</span></div>
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{rev.rating_timing}/5</span></div>
+                                            <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{rev.rating_cost}/5</span></div>
+                                          </div>
+                                        </div>
+                                    ))}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                ) : (
+                                  <div className="text-center text-[10px] text-neutral-400 py-3 italic bg-white border border-neutral-100 rounded-lg">Bu sağlayıcı için henüz geçmiş bir müşteri değerlendirmesi bulunmuyor.</div>
+                                )}
+                              </div>
+                            )}
+
                           </div>
-                        )}
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2"><span>📍 {extractAddress(req.location)}</span>{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}</div>
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (<button disabled={isActionLoading} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50"><SkipForward size={11} /><span>Sıradakine Geç</span></button>)}</div>

@@ -129,9 +129,15 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
+// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
+
+    if (!phone) {
+      return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
+    }
+
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
@@ -145,20 +151,39 @@ const getUserRequests = async (req, res) => {
 
     for (let r of requests) {
       if (r.status !== 'CANCELLED') {
+        // Sıraya giren sağlayıcıları ve ortalama puan/skorları çek
         const { rows: queued } = await pool.query(
-          `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status 
+          `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status,
+            (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating,
+            (SELECT AVG(rv.score) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_score,
+            (SELECT COUNT(rv.id) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as review_count
            FROM request_interests ri
            JOIN service_providers sp ON ri.provider_id = sp.id
            WHERE ri.request_id = $1
            ORDER BY ri.created_at ASC;`,
           [r.id]
         );
+
+        // Her sağlayıcının detaylı geçmiş yorumlarını çek
+        for (let q of queued) {
+          const { rows: provReviews } = await pool.query(
+            `SELECT rv.rating, rv.rating_knowledge, rv.rating_communication, rv.rating_timing, rv.rating_cost, rv.score, rv.comment, rv.rating_date
+             FROM reviews rv
+             JOIN requests req ON rv.request_id = req.id
+             WHERE req.matched_provider_id = $1 AND rv.reviewer_type = 'CUSTOMER'
+             ORDER BY rv.rating_date DESC;`,
+            [q.id]
+          );
+          q.reviews = provReviews;
+        }
+
         r.queuedProviders = queued;
       }
     }
 
     res.status(200).json({ status: 'success', requests });
   } catch (error) {
+    console.error('getUserRequests hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
