@@ -461,5 +461,6 @@ module.exports = {
   assignProviderManually,
   getOutboundNotifications,
   deleteRequest,
-  upsertProviderRequestDetails
+  upsertProviderRequestDetails,
+  createDirectReorder
 };

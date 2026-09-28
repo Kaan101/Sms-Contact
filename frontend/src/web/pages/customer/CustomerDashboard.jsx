@@ -290,33 +290,21 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.4.0-REORDER</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.4.1-SAFE-REORDER</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
-          <button 
-            onClick={() => setActiveTab('REQUESTS')} 
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
-          >
-            Taleplerim
-          </button>
-          <button 
-            onClick={() => setActiveTab('LISTS')} 
-            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
-          >
-            <Folder size={13} />
-            <span>Listelerim</span>
-          </button>
+          <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
+          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Folder size={13} /><span>Listelerim</span></button>
         </div>
       </div>
 
       {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
 
-{activeTab === 'LISTS' ? (
+      {activeTab === 'LISTS' ? (
         <CustomListsManager 
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
           
-          // 1. TALEP OLUŞTUR BUTONU (Eski bilgileri forma taşır, düzenleyip havuza atarsın)
           onReworkRequest={(origReq) => {
             setQueryText(origReq.raw_text || origReq.notes || '');
             if(origReq.location) {
@@ -338,25 +326,28 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // 2. TEKRARLA BUTONU (Havuza düşmeden, otomatik tarih hesaplayarak doğrudan eski sağlayıcıya atar)
+          // KORUMALI TEKRARLA BUTONU MANTIĞI
           onDirectReorder={async (origReq) => {
-            // Eğer geçmiş bir sağlayıcı yoksa uyar
-            const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
-            if (!origReq || !targetProviderId) {
-              alert('Bu talebin geçmişte çalıştığınız bir sağlayıcısı bulunamadığı için doğrudan tekrarlanamaz. Lütfen "Talep Oluştur" butonunu kullanın.');
+            if (!origReq) {
+              alert('Hata: Sunucuya bağlanılamadığı için bu talebin geçmiş verilerine ulaşılamıyor.');
               return;
             }
 
-            if (!window.confirm(`Bu siparişi "${origReq.provider_name || 'önceki sağlayıcıya'}" eski fiyat üzerinden doğrudan tekrar göndermek istediğinize emin misiniz?`)) return;
+            const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
+            if (!targetProviderId) {
+              alert('Bu siparişin geçmişte atanmış bir sağlayıcısı bulunamadı. Lütfen "Talep Oluştur" diyerek havuza gönderin.');
+              return;
+            }
+
+            if (!window.confirm(`Bu siparişi "${origReq.provider_name || 'önceki sağlayıcıya'}" doğrudan göndermek istediğinize emin misiniz?`)) return;
 
             setLoading(true);
             try {
-              // --- AKILLI TARİH HESAPLAMA (Eski teslimat süresini bulup şu anki zamana ekler) ---
               let suggestedTargetDate = null;
               if (origReq.matched_target_date && origReq.created_at) {
                 const oldCreated = new Date(origReq.created_at).getTime();
                 const oldTarget = new Date(origReq.matched_target_date).getTime();
-                const durationMs = oldTarget - oldCreated; // Aradan geçen süre (Milisaniye)
+                const durationMs = oldTarget - oldCreated; 
                 
                 if (durationMs > 0) {
                   const newTargetDate = new Date(Date.now() + durationMs);
@@ -372,19 +363,18 @@ export default function CustomerDashboard() {
                 isUrgent: origReq.is_urgent || false,
                 requestType: origReq.request_type || 'TALEP',
                 targetProviderId: targetProviderId,
-                suggestedBudget: origReq.matched_budget || origReq.provider_budget, // Eski Fiyat
-                suggestedTargetDate: suggestedTargetDate // Otomatik Hesaplanan Yeni Tarih
+                suggestedBudget: origReq.matched_budget || origReq.provider_budget,
+                suggestedTargetDate: suggestedTargetDate
               };
 
-              // Özel Direct-Reorder Endpoint'ine İstek Atıyoruz
               await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
               
-              alert('Sipariş başarıyla tekrarlandı! Havuza düşmeden doğrudan sağlayıcınızın onayına sunuldu.');
+              alert('Sipariş başarıyla tekrarlandı ve doğrudan sağlayıcınıza iletildi!');
               await mutateCustomerReqs();
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-              alert(err.response?.data?.message || 'Sipariş tekrarlanırken bir hata oluştu.');
+              alert(err.response?.data?.message || 'Sipariş tekrarlanırken bir hata oluştu. Lütfen Backend loglarınızı kontrol edin.');
             } finally {
               setLoading(false);
             }
