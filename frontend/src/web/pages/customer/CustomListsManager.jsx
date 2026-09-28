@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, RefreshCw, ExternalLink } from 'lucide-react';
+import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray } from '../../../core/utils/helpers';
 
@@ -129,7 +129,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
         <form onSubmit={handleCreateList} className="flex items-center gap-2">
           <input 
             type="text" 
-            placeholder="Yeni liste adı (Örn: Favori İşler)..." 
+            placeholder="Yeni liste adı..." 
             value={newListName}
             onChange={(e) => setNewListName(e.target.value)}
             className="px-3 py-2 text-xs rounded-xl border border-neutral-200 outline-none focus:border-neutral-900 bg-neutral-50 w-52"
@@ -247,7 +247,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER (Talep olanlarda Rework / Yeniden Ele Al Butonu) */}
+                {/* LİSTEDEKİ ÖĞELER (Her kartta Rework / İncele butonu aktif) */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
@@ -272,24 +272,20 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                           </div>
 
                           <div className="flex items-center justify-between pt-2 border-t border-neutral-100 mt-1">
-                            {item.request_id ? (
-                              <button 
-                                onClick={() => {
-                                  if (onSelectRequest) {
-                                    onSelectRequest(item.request_id);
-                                  } else {
-                                    alert(`Talep #${item.request_id} yeniden incelemeye alınıyor...`);
-                                  }
-                                }}
-                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
-                                title="Bu talebi yeniden ele al ve incele"
-                              >
-                                <RefreshCw size={11} className="animate-spin-hover" />
-                                <span>Rework / İncele</span>
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-neutral-400 italic">Manuel Kişi</span>
-                            )}
+                            <button 
+                              onClick={() => {
+                                if (item.request_id && onSelectRequest) {
+                                  onSelectRequest(item.request_id);
+                                } else {
+                                  alert(item.request_id ? `Talep #${item.request_id} inceleniyor...` : 'Bu öğe manuel eklenen bir kişidir.');
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                              title="Bu talebi yeniden ele al ve incele"
+                            >
+                              <RefreshCw size={11} />
+                              <span>Rework / İncele</span>
+                            </button>
 
                             <button 
                               onClick={() => handleDeleteItem(item.id)} 
