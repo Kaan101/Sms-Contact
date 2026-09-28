@@ -17,8 +17,7 @@ import {
   extractCode, isCodeHiddenReq, cleanContact, extractPhoneForWa, safeDateTime, calculateRemainingTime 
 } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
-import CustomListsManager from './CustomListsManager'; // Dosyayı kaydettiğin yola göre
-
+ 
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
 export default function CustomerDashboard() {
@@ -277,7 +276,7 @@ export default function CustomerDashboard() {
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 px-6 py-8">
       {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between mt-8"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
-    <CustomListsManager ownerType="CUSTOMER" ownerId={customerId} />
+    
 
       {/* YENİ TALEP FORMU */}
       {step === 'INPUT' && (
