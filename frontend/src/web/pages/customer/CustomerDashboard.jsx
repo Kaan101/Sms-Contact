@@ -287,8 +287,14 @@ export default function CustomerDashboard() {
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 px-6 py-8">
       
+      {/* BAŞLIK VE VERSİYON NUMARASI */}
       <div className="flex items-center justify-between border-b pb-4">
-        <h2 className="text-xl font-extrabold text-neutral-950">Müşteri Paneli</h2>
+        <div>
+          <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
+            <span>Müşteri Paneli</span>
+            <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.2.0-RELEASE</span>
+          </h2>
+        </div>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button 
             onClick={() => setActiveTab('REQUESTS')} 
@@ -313,18 +319,8 @@ export default function CustomerDashboard() {
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
           onSelectRequest={(reqId) => {
-            setActiveTab('REQUESTS'); // 1. Taleplerim sekmesine geç
-            setIsActiveCustomerRequestsOpen(true); // 2. Aktif talepler akordiyonunu aç
-            
-            // 3. İsteğe bağlı: İlgili talebi bulup kullanıcıya görsel bir odaklama sağlayalım
-            setTimeout(() => {
-              const reqElement = document.getElementById(`req-card-${reqId}`);
-              if (reqElement) {
-                reqElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                reqElement.classList.add('ring-2', 'ring-blue-500');
-                setTimeout(() => reqElement.classList.remove('ring-2', 'ring-blue-500'), 2000);
-              }
-            }, 100);
+            setActiveTab('REQUESTS'); 
+            setIsActiveCustomerRequestsOpen(true); 
           }} 
         />
       ) : (
