@@ -406,8 +406,9 @@ const upsertProviderRequestDetails = async (req, res) => {
     console.error('upsertProviderRequestDetails hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
+};
 
-  // Doğrudan Eski Sağlayıcıya Sipariş Geçme (Havuzu Bypass Eder)
+// Doğrudan Eski Sağlayıcıya Sipariş Geçme (Havuzu Bypass Eder)
 const createDirectReorder = async (req, res) => {
   try {
     const { 
@@ -415,7 +416,7 @@ const createDirectReorder = async (req, res) => {
       targetProviderId, suggestedBudget, suggestedTargetDate 
     } = req.body;
 
-    // 1. Talebi POOL yerine doğrudan MATCHED olarak oluştur ve eski fiyat/tarihi bas
+    // 1. Havuzu bypass ederek doğrudan MATCHED statüsünde siparişi oluştur
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, matched_budget, matched_target_date)
@@ -429,7 +430,7 @@ const createDirectReorder = async (req, res) => {
     
     const newReq = rows[0];
 
-    // 2. Sağlayıcının Ekranına Düşmesi İçin request_queue tablosuna INTERESTED (Teklif Verildi/Onay Bekliyor) olarak ekle
+    // 2. İlgili sağlayıcının paneline doğrudan INTERESTED (Kabul bekliyor) olarak düşür
     const queueQuery = `
       INSERT INTO request_queue (request_id, provider_id, interest_status, provider_budget, provider_target_date)
       VALUES ($1, $2, 'INTERESTED', $3, $4)
@@ -441,10 +442,6 @@ const createDirectReorder = async (req, res) => {
     console.error('Direct reorder hatası:', error);
     res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
   }
-};
-
-
-
 };
 
 module.exports = {
