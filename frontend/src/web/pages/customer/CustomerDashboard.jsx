@@ -52,7 +52,6 @@ export default function CustomerDashboard() {
   const [companyCode, setCompanyCode] = useState(() => { try { return localStorage.getItem('sc_company_code') || ''; } catch { return ''; }}); 
   const [isCodeHidden, setIsCodeHidden] = useState(() => { try { return localStorage.getItem('sc_is_code_hidden') === 'true'; } catch { return false; }}); 
 
-  // Kullanıcının listelerini kart içindeki "Listeye Ekle" özelliği için tutalım
   const [userLists, setUserLists] = useState([]);
   
   useEffect(() => {
@@ -302,7 +301,7 @@ export default function CustomerDashboard() {
             className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <Folder size={13} />
-            <span>Özel Listelerim</span>
+            <span>Listelerim</span>
           </button>
         </div>
       </div>
@@ -545,12 +544,11 @@ export default function CustomerDashboard() {
                             </div>
                           </div>
 
-                        {/* YENİ: KABUL EDİLDİĞİNDE LİSTEYE EKLEME ALANI */}
                         {reqStatus === 'ACCEPTED' && userLists.length > 0 && (
                           <div className="mt-2.5 p-3 bg-neutral-100 border border-neutral-200 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
                             <span className="text-[11px] font-bold text-neutral-700 flex items-center gap-1">
                               <Folder size={13} className="text-neutral-500" />
-                              <span>Bu işi özel listenize kaydedin:</span>
+                              <span>Bu işi listenize kaydedin:</span>
                             </span>
                             <div className="flex items-center gap-1.5">
                               <select 
