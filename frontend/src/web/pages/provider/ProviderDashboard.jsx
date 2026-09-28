@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime, calculateRemainingTime } from '../../../core/utils/helpers';
-import CustomListsManager from './CustomListsManager'; // YENİ: Özel Liste Yöneticisi Eklendi
+import CustomListsManager from '../../components/common/CustomListsManager';
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;

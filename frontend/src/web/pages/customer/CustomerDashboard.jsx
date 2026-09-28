@@ -17,7 +17,8 @@ import {
   extractCode, isCodeHiddenReq, cleanContact, extractPhoneForWa, safeDateTime, calculateRemainingTime 
 } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
-import CustomListsManager from './CustomListsManager'; // YENİ: Özel Liste Yöneticisi Eklendi
+
+import CustomListsManager from '../../components/common/CustomListsManager';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
