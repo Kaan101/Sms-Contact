@@ -247,7 +247,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER (Her kartta Rework / İncele butonu aktif) */}
+                {/* LİSTEDEKİ ÖĞELER (HER KARTTA REWORK / İNCELE BUTONU GARANTİLEDİ) */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
