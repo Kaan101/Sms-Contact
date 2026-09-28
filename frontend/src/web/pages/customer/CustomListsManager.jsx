@@ -4,7 +4,7 @@ import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, RefreshCw } from 
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray } from '../../../core/utils/helpers';
 
-export default function CustomListsManager({ ownerType, ownerId, onSelectRequest }) {
+export default function CustomListsManager({ ownerType, ownerId, onReworkRequest }) {
   const { API_BASE } = useAuth();
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +96,6 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
       setActiveListId(null);
       fetchLists();
     } catch (err) {
-      // ⭐ Backend'den gelen özel uyarı mesajını doğrudan kullanıcıya göster
       const errorMsg = err.response?.data?.message || 'Talep listeye eklenemedi.';
       alert(errorMsg);
     }
@@ -117,7 +116,6 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
     return phoneStr.split('|')[0].trim();
   };
 
-  // Karttaki notlardan veya request_id'den talep ID'sini akıllıca yakala
   const extractReqId = (item) => {
     if (item.request_id) return Number(item.request_id);
     if (item.notes) {
@@ -167,7 +165,6 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
           lists.map((list) => {
             const isAddingToThis = activeListId === list.id;
             
-            // ⭐ Listede zaten ekli olan request_id'leri filtreleyelim
             const existingRequestIdsInList = safeArray(list.items).map(i => extractReqId(i)).filter(Boolean);
             const filteredAvailableRequests = availableRequests.filter(req => !existingRequestIdsInList.includes(Number(req.id)));
 
@@ -273,7 +270,6 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER VE REWORK / İNCELE BUTONU */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
@@ -300,20 +296,26 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                             </div>
 
                             <div className="flex items-center justify-between pt-2 border-t border-neutral-100 mt-1">
-                              <button 
-                                onClick={() => {
-                                  if (targetReqId && onSelectRequest) {
-                                    onSelectRequest(targetReqId);
-                                  } else {
-                                    alert(targetReqId ? `Talep #${targetReqId} inceleniyor...` : 'Bu öğe manuel eklenen bir kişidir.');
-                                  }
-                                }}
-                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
-                                title="Bu talebi yeniden ele al ve incele"
-                              >
-                                <RefreshCw size={11} />
-                               <span>Rework / İncele</span>
-                              </button>
+                              
+                              {/* YENİDEN SÜRECE SOKMA BUTONU BURADA */}
+                              {targetReqId ? (
+                                <button 
+                                  onClick={() => {
+                                    // Talebin metnini nottan ayıkla (eğer varsa)
+                                    const extractedText = item.notes ? item.notes.replace(/\[Talep\s*#\d+\]\s*/i, '').trim() : '';
+                                    if (onReworkRequest) {
+                                      onReworkRequest(targetReqId, extractedText);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                                  title="Bu talebi yeniden oluşturarak açık havuza sok"
+                                >
+                                  <RefreshCw size={11} />
+                                  <span>Tekrar Talep Oluştur</span>
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-neutral-400 italic">Manuel Kişi</span>
+                              )}
 
                               <button 
                                 onClick={() => handleDeleteItem(item.id)} 
