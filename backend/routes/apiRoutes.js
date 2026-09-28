@@ -12,8 +12,8 @@ const {
 } = require('../controllers/providerController');
 const { 
   createRequest, 
-  getOpenPoolRequests,     // YENİ
-  joinRequestPool,         // YENİ
+  getOpenPoolRequests,        // YENİ
+  joinRequestPool,          // YENİ
   getUserRequests,
   getProviderAssignedRequests,
   passToNextProvider,
@@ -43,10 +43,12 @@ const {
   deleteTest
 } = require('../controllers/testController');
 
+// GÜNCELLENDİ: addRequestToList buraya eklendi
 const { 
   getListsByOwner, 
   createList, 
   addListItem, 
+  addRequestToList,
   removeListItem 
 } = require('../controllers/listController');
 
@@ -54,6 +56,7 @@ const {
 router.get('/lists/:ownerType/:ownerId', getListsByOwner);
 router.post('/lists', createList);
 router.post('/lists/:listId/items', addListItem);
+router.post('/lists/:listId/requests', addRequestToList); // 🌟 YENİ: Listeye Talep Ekleme Rotası
 router.delete('/lists/items/:itemId', removeListItem);
 
 // 1. Dosyanın en üstüne import edin
@@ -79,7 +82,7 @@ router.delete('/providers/:id', deleteProvider);
 
 // 4. Talepler ve Havuz (Marketplace Queue)
 router.post('/requests', createRequest);
-router.get('/requests/pool', getOpenPoolRequests);                   // 🌟 YENİ: Havuzdaki talepleri getir
+router.get('/requests/pool', getOpenPoolRequests);                                 // 🌟 YENİ: Havuzdaki talepleri getir
 router.post('/requests/:requestId/join-pool', joinRequestPool);      // 🌟 YENİ: Sağlayıcı havuza katılır
 router.get('/requests/my-requests', getUserRequests);
 router.get('/requests/provider-requests', getProviderAssignedRequests);
