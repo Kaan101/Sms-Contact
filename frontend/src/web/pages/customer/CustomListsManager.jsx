@@ -96,8 +96,7 @@ export default function CustomListsManager({ ownerType, ownerId, onReworkRequest
       setActiveListId(null);
       fetchLists();
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Talep listeye eklenemedi.';
-      alert(errorMsg);
+      alert(err.response?.data?.message || 'Talep listeye eklenemedi.');
     }
   };
 
@@ -131,7 +130,6 @@ export default function CustomListsManager({ ownerType, ownerId, onReworkRequest
 
   return (
     <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6 shadow-sm">
-      <h1 style={{color: 'red', fontSize: '30px'}}>BURASI GÜNCELLENDİ Mİ?</h1>
       
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div>
@@ -298,11 +296,9 @@ export default function CustomListsManager({ ownerType, ownerId, onReworkRequest
 
                             <div className="flex items-center justify-between pt-2 border-t border-neutral-100 mt-1">
                               
-                              {/* YENİDEN SÜRECE SOKMA BUTONU BURADA */}
                               {targetReqId ? (
                                 <button 
                                   onClick={() => {
-                                    // Talebin metnini nottan ayıkla (eğer varsa)
                                     const extractedText = item.notes ? item.notes.replace(/\[Talep\s*#\d+\]\s*/i, '').trim() : '';
                                     if (onReworkRequest) {
                                       onReworkRequest(targetReqId, extractedText);
