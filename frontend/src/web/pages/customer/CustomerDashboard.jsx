@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.4.1-SAFE-REORDER</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.4.2-ERROR-TRACKER</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -326,7 +326,7 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // KORUMALI TEKRARLA BUTONU MANTIĞI
+          // KORUMALI VE HATA MESAJINI AÇIKÇA GÖSTEREN TEKRARLA BUTONU
           onDirectReorder={async (origReq) => {
             if (!origReq) {
               alert('Hata: Sunucuya bağlanılamadığı için bu talebin geçmiş verilerine ulaşılamıyor.');
@@ -374,7 +374,9 @@ export default function CustomerDashboard() {
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-              alert(err.response?.data?.message || 'Sipariş tekrarlanırken bir hata oluştu. Lütfen Backend loglarınızı kontrol edin.');
+              // ⭐ İŞTE HAYAT KURTARACAK SATIR: Hata gizlenmez, ekrana basılır!
+              const hataDetayi = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+              alert(`Sipariş tekrarlanırken arka planda bir hata oluştu!\n\nDETAY: ${hataDetayi}`);
             } finally {
               setLoading(false);
             }
