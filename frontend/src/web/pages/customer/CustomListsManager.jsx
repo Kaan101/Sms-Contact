@@ -96,7 +96,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
       setActiveListId(null);
       fetchLists();
     } catch (err) {
-      alert('Talep listeye eklenemedi.');
+      alert(err.response?.data?.message || 'Talep listeye eklenemedi.');
     }
   };
 
@@ -154,6 +154,11 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
         ) : (
           lists.map((list) => {
             const isAddingToThis = activeListId === list.id;
+            
+            // ⭐ Bu listede zaten ekli olan request_id'leri filtreleyelim ki tekrar seçilemesin
+            const existingRequestIdsInList = safeArray(list.items).map(i => Number(i.request_id)).filter(Boolean);
+            const filteredAvailableRequests = availableRequests.filter(req => !existingRequestIdsInList.includes(Number(req.id)));
+
             return (
               <div key={list.id} className="bg-neutral-50/70 rounded-xl border border-neutral-200 overflow-hidden transition">
                 
@@ -201,11 +206,15 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                           className="flex-1 p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium"
                         >
                           <option value="">-- Listeye Eklemek İçin Bir Talep Seçin --</option>
-                          {availableRequests.map((req) => (
-                            <option key={req.id} value={req.id}>
-                              #REQ-{req.id} - "{req.raw_text}" ({req.status})
-                            </option>
-                          ))}
+                          {filteredAvailableRequests.length === 0 ? (
+                            <option disabled>Eklenebilecek başka talep kalmadı (Tümü ekli)</option>
+                          ) : (
+                            filteredAvailableRequests.map((req) => (
+                              <option key={req.id} value={req.id}>
+                                #REQ-{req.id} - "{req.raw_text}" ({req.status})
+                              </option>
+                            ))
+                          )}
                         </select>
                         <button type="submit" className="px-5 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition cursor-pointer shrink-0 shadow-sm">
                           Seçilen Talebi Ekle
@@ -252,7 +261,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER VE REWORK / İNCELE BUTONU */}
+                {/* LİSTEDEKİ ÖĞELER VE REWORK / İNCELE BUTONU (GARANTİLİ) */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>

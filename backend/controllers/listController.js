@@ -72,7 +72,7 @@ const addListItem = async (req, res) => {
   }
 };
 
-// 4. Listeye Sistemdeki Bir Talebi (Request) Ekle
+// 4. Listeye Sistemdeki Bir Talebi (Request) Ekle (Zaten ekliyse engelle!)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -80,6 +80,13 @@ const addRequestToList = async (req, res) => {
 
     if (!requestId) {
       return res.status(400).json({ status: 'error', message: 'Talep ID (requestId) zorunludur.' });
+    }
+
+    // ⭐ Aynı talep bu listede daha önce var mı kontrol et
+    const checkQuery = `SELECT id FROM list_items WHERE list_id = $1 AND request_id = $2;`;
+    const { rows: existingRows } = await pool.query(checkQuery, [listId, requestId]);
+    if (existingRows.length > 0) {
+      return res.status(400).json({ status: 'error', message: 'Bu talep zaten bu listede mevcut.' });
     }
 
     // Talebin bilgilerini çekelim
