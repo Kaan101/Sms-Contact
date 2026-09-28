@@ -4,7 +4,7 @@ import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, ExternalLink } fr
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray } from '../../../core/utils/helpers';
 
-export default function CustomListsManager({ ownerType, ownerId }) {
+export default function CustomListsManager({ ownerType, ownerId, onSelectRequest }) {
   const { API_BASE } = useAuth();
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +117,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
   return (
     <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6 shadow-sm">
       
-      {/* ÜST KISIM: "Özel" kelimesi kaldırıldı -> Listelerim */}
+      {/* ÜST KISIM: Başlık (Özel kelimesi kaldırılmış haliyle) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div>
           <h3 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
@@ -248,7 +248,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER (Telefonlar açık, talep olanlarda tıklayıp detay görüntüleme özelliği) */}
+                {/* LİSTEDEKİ ÖĞELER (Taleplere tıklayınca ilgili talep detayına/ekranına geçiş tetiklenir) */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
@@ -261,7 +261,6 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                               {item.request_id ? <FileText size={12} className="text-blue-600 shrink-0" /> : <User size={12} className="text-neutral-500 shrink-0" />}
                               <span>{item.contact_name}</span>
                             </h4>
-                            {/* Telefon artık gizlenmiyor (hidden yok, açıkça görünüyor) */}
                             <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">
                               <Phone size={11} className="text-blue-500 shrink-0" />
                               <span>{item.contact_phone}</span>
@@ -272,24 +271,28 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                               </p>
                             )}
 
-                            {/* Eğer bu öğe sisteme ait bir talepse, tıklayıp doğrudan o talebe gidebilme (talep oluşturma/detayına gitme aksiyonu) */}
+                            {/* Talep ID varsa tıklanabilir yönlendirme butonu */}
                             {item.request_id && (
                               <button 
                                 onClick={() => {
-                                  // Talep detayına veya ilgili sekmeye yönlendirme tetiklenebilir
-                                  alert(`Talep #${item.request_id} detayına yönlendiriliyor...`);
+                                  if (onSelectRequest) {
+                                    onSelectRequest(item.request_id);
+                                  } else {
+                                    // Eğer dashboard ana sayfaya dönmek isterse veya ilgili talebi öne çıkarmak isterse:
+                                    alert(`Talep #${item.request_id} seçildi.`);
+                                  }
                                 }}
-                                className="mt-1 text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                                className="mt-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-1 rounded w-fit transition"
                               >
-                                <span>Talebi İncele / İşlem Yap</span>
-                                <ExternalLink size={10} />
+                                <span>Talebi Aç / İncele</span>
+                                <ExternalLink size={11} />
                               </button>
                             )}
                           </div>
 
                           <button 
                             onClick={() => handleDeleteItem(item.id)} 
-                            className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer"
+                            className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer self-start"
                             title="Listeden Çıkar"
                           >
                             <Trash2 size={14} />
