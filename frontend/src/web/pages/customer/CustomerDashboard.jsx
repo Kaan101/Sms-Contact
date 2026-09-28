@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.7.0-BULLETPROOF</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.8.0-BULLETPROOF</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -326,31 +326,56 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // ⭐ KABA KUVVET (BRUTE FORCE) KOPYALAYICI 
+          // ⭐ KUSURSUZ (AKILLI + KULLANICI DESTEKLİ) TEKRARLA BUTONU
           onDirectReorder={async (origReq) => {
             if (!origReq) return alert('Bu talebin geçmiş verilerine ulaşılamıyor.');
 
             const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
             if (!targetProviderId) return alert('Bu siparişin geçmiş sağlayıcısı bulunamadı.');
 
-            if (!window.confirm(`Bu siparişi eski fiyat ve onay şartlarıyla "${origReq.provider_name || 'önceki sağlayıcısına'}" tekrar göndermek istediğinize emin misiniz?`)) return;
+            // 1. EĞER ESKİ FİYAT VERİTABANINDA YOKSA, KULLANICIYA MANUEL SORDUR!
+            let finalBudget = origReq.matched_budget || origReq.provider_budget;
+            if (!finalBudget) {
+               const userBudget = window.prompt('Geçmiş fiyat veritabanında bulunamadı. Lütfen tekrarlanacak fiyat teklifinizi TL olarak girin (Örn: 250):', '250');
+               if (!userBudget) return; // Kullanıcı iptale basarsa durdur
+               finalBudget = userBudget;
+            }
+
+            // 2. YENİ TESLİMAT TARİHİNİ HESAPLA (Yoksa düz 24 saat ekle)
+            let newTargetDate = null;
+            if (origReq.matched_target_date && origReq.created_at) {
+              const oldCreated = new Date(origReq.created_at).getTime();
+              const oldTarget = new Date(origReq.matched_target_date).getTime();
+              const diffMs = oldTarget - oldCreated; 
+              if (diffMs > 0 && !isNaN(diffMs)) {
+                newTargetDate = new Date(Date.now() + diffMs).toISOString();
+              }
+            }
+            if (!newTargetDate) {
+               newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+            }
+
+            if (!window.confirm(`Bu siparişi ${finalBudget} TL fiyat ve yeni hesaplanan tarihiyle "${origReq.provider_name || 'önceki sağlayıcıya'}" doğrudan göndermek istediğinize emin misiniz?`)) return;
 
             setLoading(true);
             try {
-              // SADECE ID VERİYORUZ. HESABI VEYA NULL RİSKİNİ BACKEND ÇÖZECEK.
+              // BÜTÜN VERİLERİ KESİN OLARAK GÖNDERİYORUZ
               const payload = {
                 rawText: origReq.raw_text,
                 contactValue: origReq.contact_value || session.phone,
                 preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
                 location: origReq.location || 'İstanbul, Türkiye',
                 isUrgent: origReq.is_urgent || false,
+                requestType: origReq.request_type || 'TALEP',
                 targetProviderId: targetProviderId,
-                oldRequestId: origReq.id 
+                suggestedBudget: finalBudget, // Kesinleşmiş Fiyat
+                suggestedTargetDate: newTargetDate, // Kesinleşmiş Tarih
+                suggestedDescription: origReq.provider_description || 'Tekrarlanan Sipariş'
               };
 
               await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
               
-              alert('Sipariş başarıyla tekrarlandı ve eski bütçeyle sağlayıcınıza iletildi!');
+              alert('Sipariş başarıyla tekrarlandı ve sağlayıcınıza iletildi!');
               await mutateCustomerReqs();
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -567,7 +592,8 @@ export default function CustomerDashboard() {
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
                               
-                              {req.matched_budget && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED', 'MATCHED'].includes(reqStatus) && (
+                              {/* YENİ: EĞER FİYAT GELDİYSE %100 GÖSTERECEK ŞEKİLDE DÜZELTİLDİ */}
+                              {req.matched_budget !== null && req.matched_budget !== undefined && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED', 'MATCHED'].includes(reqStatus) && (
                                 <div className="mt-2.5 flex flex-wrap gap-2">
                                   <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
                                       💰 Maliyet: {new Intl.NumberFormat('tr-TR').format(Number(req.matched_budget))} {req.matched_currency || 'TRY'}
@@ -676,7 +702,7 @@ export default function CustomerDashboard() {
                                             )}
                                           </div>
                                           
-                                          {qProv.provider_budget && qProv.provider_target_date && (
+                                          {qProv.provider_budget !== null && qProv.provider_budget !== undefined && qProv.provider_target_date && (
                                             <div className="flex flex-wrap items-center gap-2">
                                               <span className="bg-emerald-50/70 border border-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
                                                 💰 Bütçe: {new Intl.NumberFormat('tr-TR').format(Number(qProv.provider_budget))} {qProv.provider_currency || 'TRY'}

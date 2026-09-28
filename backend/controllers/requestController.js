@@ -392,78 +392,55 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// ⭐ KUSURSUZ AKILLI KOPYALAMA: Eski tüm bilgileri bulur, zamanı hesaplar ve KESİN yazar.
+// ⭐ KESİN VE GARANTİLİ KOPYALAMA: Verileri Frontend'den Zorunlu Olarak Alır
 const createDirectReorder = async (req, res) => {
   try {
-    const { rawText, contactValue, preferredChannel, location, isUrgent, targetProviderId, oldRequestId } = req.body;
+    const { 
+      rawText, contactValue, preferredChannel, location, isUrgent, requestType,
+      targetProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription
+    } = req.body;
 
-    if (!targetProviderId || !oldRequestId) {
-      return res.status(400).json({ status: 'error', message: 'Eksik parametre gönderildi.' });
-    }
-
-    // 1. ESKİ SİPARİŞİN HER ŞEYİNİ TEK BİR SORGUDAN ÇEKİYORUZ
-    const { rows: oldData } = await pool.query(`
-      SELECT r.created_at, 
-             rpd.provider_budget, 
-             rpd.provider_target_date, 
-             rpd.provider_description, 
-             rpd.provider_currency 
-      FROM requests r 
-      LEFT JOIN request_provider_details rpd ON rpd.request_id = r.id
-      WHERE r.id = $1 LIMIT 1
-    `, [oldRequestId]);
-
-    let newBudget = null;
-    let newCurrency = 'TRY';
-    let newDesc = 'Tekrarlanan Sipariş';
-    let newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // Hesap çökmesine karşı garanti (24 saat)
-
-    // Eski verileri yakala ve yeni tarihi (Aradaki farkı baz alarak) bul
-    if (oldData.length > 0) {
-      const old = oldData[0];
-      
-      if (old.provider_budget) newBudget = old.provider_budget;
-      if (old.provider_currency) newCurrency = old.provider_currency;
-      if (old.provider_description) newDesc = old.provider_description;
-
-      if (old.created_at && old.provider_target_date) {
-        const cTime = new Date(old.created_at).getTime();
-        const tTime = new Date(old.provider_target_date).getTime();
-        const diffMs = tTime - cTime;
-        
-        // Mantıksız bir tarih çıkmasın diye ufak bir güvenlik filtresi (0'dan büyükse ekle)
-        if (diffMs > 0 && !isNaN(diffMs)) {
-          newTargetDate = new Date(Date.now() + diffMs).toISOString(); 
-        }
-      }
-    }
-
-    // 2. YENİ TALEBİ MATCHED OLARAK OLUŞTUR (Havuza düşmeden doğrudan sağlayıcıya)
-    const { rows: newReqRows } = await pool.query(`
-      INSERT INTO requests (raw_text, contact_value, preferred_channel, location, is_urgent, status, matched_provider_id)
-      VALUES ($1, $2, $3, $4, $5, 'MATCHED', $6)
-      RETURNING *;
-    `, [rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent ? true : false, targetProviderId]);
+    const tProviderId = targetProviderId ? parseInt(targetProviderId, 10) : null;
     
-    const newReq = newReqRows[0];
+    // Frontend'den gelen fiyatı garanti altına alıyoruz (Boşsa 0)
+    const budget = suggestedBudget ? parseFloat(suggestedBudget) : 0;
+    
+    // Tarih gelmezse şu andan tam 24 saat sonrasını garanti atıyoruz
+    const targetDate = suggestedTargetDate ? new Date(suggestedTargetDate) : new Date(Date.now() + 86400000).toISOString();
 
-    // 3. SAĞLAYICIYI İLGİ LİSTESİNE (request_interests) ACTIVE OLARAK EKLE
+    if (!tProviderId) {
+      return res.status(400).json({ status: 'error', message: 'Sağlayıcı kimliği eksik.' });
+    }
+
+    // 1. TALEBİ MATCHED (Eşleşti) OLARAK OLUŞTUR
+    const insertReqQuery = `
+      INSERT INTO requests 
+      (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id)
+      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7)
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(insertReqQuery, [
+      rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent || false, requestType || 'TALEP', tProviderId
+    ]);
+    const newReq = rows[0];
+
+    // 2. SAĞLAYICIYI ACTIVE (Kabul Etti/Sırada) OLARAK EKLE
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
-      [newReq.id, targetProviderId]
+      [newReq.id, tProviderId]
     );
 
-    // 4. BULUNAN FİYATI VE HESAPLANAN TARİHİ DETAYLARA YAPIŞTIR
-    await pool.query(`
-      INSERT INTO request_provider_details 
-      (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [newReq.id, targetProviderId, newBudget, newCurrency, newTargetDate, newDesc]);
+    // 3. FİYAT VE TARİHİ DETAY TABLOSUNA KESİN YAZ
+    await pool.query(
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
+       VALUES ($1, $2, $3, 'TRY', $4, $5)`,
+      [newReq.id, tProviderId, budget, targetDate, suggestedDescription || 'Tekrarlanan Sipariş']
+    );
 
-    res.status(201).json({ status: 'success', request: newReq });
+    res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });
   } catch (error) {
     console.error('Direct reorder hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
+    res.status(500).json({ status: 'error', message: `Veritabanı Hatası: ${error.message}` });
   }
 };
 
