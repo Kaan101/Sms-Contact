@@ -409,6 +409,7 @@ const upsertProviderRequestDetails = async (req, res) => {
 };
 
 // Doğrudan Eski Sağlayıcıya Sipariş Geçme (Havuzu Bypass Eder)
+// 1. ÖNCE FONKSİYONU TANIMLIYORUZ
 const createDirectReorder = async (req, res) => {
   try {
     const { 
@@ -416,7 +417,6 @@ const createDirectReorder = async (req, res) => {
       targetProviderId, suggestedBudget, suggestedTargetDate 
     } = req.body;
 
-    // 1. Havuzu bypass ederek doğrudan MATCHED statüsünde siparişi oluştur
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, matched_budget, matched_target_date)
@@ -430,7 +430,6 @@ const createDirectReorder = async (req, res) => {
     
     const newReq = rows[0];
 
-    // 2. İlgili sağlayıcının paneline doğrudan INTERESTED (Kabul bekliyor) olarak düşür
     const queueQuery = `
       INSERT INTO request_queue (request_id, provider_id, interest_status, provider_budget, provider_target_date)
       VALUES ($1, $2, 'INTERESTED', $3, $4)
