@@ -26,7 +26,7 @@ export default function ProviderDashboard() {
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  const [activeTab, setActiveTab] = useState('TASKS'); // YENİ: Sekme Kontrolü ('TASKS' veya 'LISTS')
+  const [activeTab, setActiveTab] = useState('TASKS'); 
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isActiveTasksOpen, setIsActiveTasksOpen] = useState(false);
@@ -197,7 +197,6 @@ export default function ProviderDashboard() {
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6 px-6 py-8">
       
-      {/* YENİ: SAĞLAYICI PANELİ SEKME MENÜSÜ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
         <div>
           <h2 className="text-xl font-extrabold text-neutral-950">Sağlayıcı Paneli</h2>
@@ -230,7 +229,6 @@ export default function ProviderDashboard() {
         </div>
       </div>
 
-      {/* YENİ: SEKME KONTROLÜ İLE GÖSTERİM */}
       {activeTab === 'LISTS' ? (
         <CustomListsManager ownerType="PROVIDER" ownerId={session?.phone} />
       ) : (

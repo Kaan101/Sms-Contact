@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Folder, Plus, Trash2, Phone, User, Loader2 } from 'lucide-react';
+import { Folder, Plus, Trash2, Phone, User, Loader2, FileText } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
+import { safeArray } from '../../../core/utils/helpers';
 
 export default function CustomListsManager({ ownerType, ownerId }) {
   const { API_BASE } = useAuth();
@@ -10,7 +11,12 @@ export default function CustomListsManager({ ownerType, ownerId }) {
   
   const [newListName, setNewListName] = useState('');
   const [activeListId, setActiveListId] = useState(null);
+  
+  // Ekleme Modu: 'CONTACT' (Manuel Kişi) veya 'REQUEST' (Sistem Talebi)
+  const [addMode, setAddMode] = useState('REQUEST');
   const [newItem, setNewItem] = useState({ contactName: '', contactPhone: '', notes: '' });
+  const [selectedRequestId, setSelectedRequestId] = useState('');
+  const [availableRequests, setAvailableRequests] = useState([]);
 
   const fetchLists = async () => {
     if (!ownerType || !ownerId) return;
@@ -27,8 +33,25 @@ export default function CustomListsManager({ ownerType, ownerId }) {
     }
   };
 
+  // Kullanıcının veya sağlayıcının taleplerini çekelim ki listeye ekleyebilsin
+  const fetchAvailableRequests = async () => {
+    try {
+      const endpoint = ownerType === 'CUSTOMER' 
+        ? `${API_BASE}/requests/my-requests?phone=${encodeURIComponent(ownerId)}`
+        : `${API_BASE}/requests/provider-requests?providerPhone=${encodeURIComponent(ownerId)}`;
+      
+      const res = await axios.get(endpoint);
+      if (res.data && res.data.requests) {
+        setAvailableRequests(safeArray(res.data.requests));
+      }
+    } catch (err) {
+      console.error('Talepler yüklenemedi:', err);
+    }
+  };
+
   useEffect(() => {
     fetchLists();
+    fetchAvailableRequests();
   }, [ownerType, ownerId]);
 
   const handleCreateList = async (e) => {
@@ -47,10 +70,11 @@ export default function CustomListsManager({ ownerType, ownerId }) {
     }
   };
 
-  const handleAddItem = async (listId, e) => {
+  // Manuel Kişi Ekle
+  const handleAddContactItem = async (listId, e) => {
     e.preventDefault();
     if (!newItem.contactName.trim() || !newItem.contactPhone.trim()) {
-      alert('Kişi adı ve telefon numarası zorunludur.');
+      alert('İsim ve telefon zorunludur.');
       return;
     }
     try {
@@ -59,17 +83,34 @@ export default function CustomListsManager({ ownerType, ownerId }) {
       setActiveListId(null);
       fetchLists();
     } catch (err) {
-      alert('Kişi listeye eklenemedi.');
+      alert('Kişi eklenemedi.');
+    }
+  };
+
+  // Sistemden Talep Ekle
+  const handleAddRequestItem = async (listId, e) => {
+    e.preventDefault();
+    if (!selectedRequestId) {
+      alert('Lütfen bir talep seçin.');
+      return;
+    }
+    try {
+      await axios.post(`${API_BASE}/lists/${listId}/requests`, { requestId: selectedRequestId });
+      setSelectedRequestId('');
+      setActiveListId(null);
+      fetchLists();
+    } catch (err) {
+      alert('Talep listeye eklenemedi.');
     }
   };
 
   const handleDeleteItem = async (itemId) => {
-    if (!window.confirm('Bu kişiyi listeden çıkarmak istediğinize emin misiniz?')) return;
+    if (!window.confirm('Bu öğeyi listeden çıkarmak istediğinize emin misiniz?')) return;
     try {
       await axios.delete(`${API_BASE}/lists/items/${itemId}`);
       fetchLists();
     } catch (err) {
-      alert('Kişi silinemedi.');
+      alert('Öğe silinemedi.');
     }
   };
 
@@ -85,13 +126,13 @@ export default function CustomListsManager({ ownerType, ownerId }) {
             <Folder size={20} className="text-neutral-700" />
             <span>Özel Listelerim ({lists.length})</span>
           </h3>
-          <p className="text-xs text-neutral-500 mt-0.5">Favori sağlayıcılarınızı veya müşterilerinizi özel gruplar halinde organize edin.</p>
+          <p className="text-xs text-neutral-500 mt-0.5">Taleplerinizi veya iş ortaklarınızı özel listeler altında organize edin.</p>
         </div>
 
         <form onSubmit={handleCreateList} className="flex items-center gap-2">
           <input 
             type="text" 
-            placeholder="Yeni liste adı..." 
+            placeholder="Yeni liste adı (Örn: Favori İşler)..." 
             value={newListName}
             onChange={(e) => setNewListName(e.target.value)}
             className="px-3 py-2 text-xs rounded-xl border border-neutral-200 outline-none focus:border-neutral-900 bg-neutral-50 w-52"
@@ -117,7 +158,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-neutral-900">{list.list_name}</span>
                     <span className="text-[10px] font-mono bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-bold">
-                      {list.items ? list.items.length : 0} Kişi
+                      {list.items ? list.items.length : 0} Öğe
                     </span>
                   </div>
 
@@ -126,59 +167,86 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                     className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold transition flex items-center gap-1"
                   >
                     <Plus size={13} />
-                    <span>{isAddingToThis ? 'Kapat' : 'Kişi Ekle'}</span>
+                    <span>{isAddingToThis ? 'Kapat' : 'Öğe Ekle'}</span>
                   </button>
                 </div>
 
                 {isAddingToThis && (
-                  <form onSubmit={(e) => handleAddItem(list.id, e)} className="p-4 bg-blue-50/40 border-b border-blue-100 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                    <div className="sm:col-span-4">
-                      <input 
-                        type="text" 
-                        placeholder="İsim / Firma Adı *" 
-                        value={newItem.contactName}
-                        onChange={(e) => setNewItem({ ...newItem, contactName: e.target.value })}
-                        className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
-                        required
-                      />
+                  <div className="p-4 bg-blue-50/40 border-b border-blue-100 space-y-3">
+                    <div className="flex gap-2 text-xs">
+                      <button type="button" onClick={() => setAddMode('REQUEST')} className={`px-3 py-1.5 rounded-lg font-bold transition ${addMode === 'REQUEST' ? 'bg-neutral-950 text-white' : 'bg-white text-neutral-600 border'}`}>Sistemden Talep Ekle</button>
+                      <button type="button" onClick={() => setAddMode('CONTACT')} className={`px-3 py-1.5 rounded-lg font-bold transition ${addMode === 'CONTACT' ? 'bg-neutral-950 text-white' : 'bg-white text-neutral-600 border'}`}>Manuel Kişi / Firma Ekle</button>
                     </div>
-                    <div className="sm:col-span-4">
-                      <input 
-                        type="tel" 
-                        placeholder="Telefon Numarası *" 
-                        value={newItem.contactPhone}
-                        onChange={(e) => setNewItem({ ...newItem, contactPhone: e.target.value })}
-                        className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
-                        required
-                      />
-                    </div>
-                    <div className="sm:col-span-3">
-                      <input 
-                        type="text" 
-                        placeholder="Not (Opsiyonel)..." 
-                        value={newItem.notes}
-                        onChange={(e) => setNewItem({ ...newItem, notes: e.target.value })}
-                        className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
-                      />
-                    </div>
-                    <div className="sm:col-span-1">
-                      <button type="submit" className="w-full py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition">
-                        Ekle
-                      </button>
-                    </div>
-                  </form>
+
+                    {addMode === 'REQUEST' ? (
+                      <form onSubmit={(e) => handleAddRequestItem(list.id, e)} className="flex items-center gap-2">
+                        <select 
+                          value={selectedRequestId} 
+                          onChange={(e) => setSelectedRequestId(e.target.value)}
+                          className="flex-1 p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                        >
+                          <option value="">-- Bir Talep Seçin --</option>
+                          {availableRequests.map((req) => (
+                            <option key={req.id} value={req.id}>
+                              #REQ-{req.id} - "{req.raw_text}" ({req.status})
+                            </option>
+                          ))}
+                        </select>
+                        <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition">
+                          Ekle
+                        </button>
+                      </form>
+                    ) : (
+                      <form onSubmit={(e) => handleAddContactItem(list.id, e)} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div className="sm:col-span-4">
+                          <input 
+                            type="text" 
+                            placeholder="İsim / Firma Adı *" 
+                            value={newItem.contactName}
+                            onChange={(e) => setNewItem({ ...newItem, contactName: e.target.value })}
+                            className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                            required
+                          />
+                        </div>
+                        <div className="sm:col-span-4">
+                          <input 
+                            type="tel" 
+                            placeholder="Telefon Numarası *" 
+                            value={newItem.contactPhone}
+                            onChange={(e) => setNewItem({ ...newItem, contactPhone: e.target.value })}
+                            className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                            required
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <input 
+                            type="text" 
+                            placeholder="Not (Opsiyonel)..." 
+                            value={newItem.notes}
+                            onChange={(e) => setNewItem({ ...newItem, notes: e.target.value })}
+                            className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                          />
+                        </div>
+                        <div className="sm:col-span-1">
+                          <button type="submit" className="w-full py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition">
+                            Ekle
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 )}
 
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
-                    <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı kişi bulunmuyor.</div>
+                    <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {list.items.map((item) => (
                         <div key={item.id} className="p-3 bg-white rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
                           <div className="space-y-1 min-w-0 pr-2">
                             <h4 className="font-bold text-xs text-neutral-900 truncate flex items-center gap-1">
-                              <User size={12} className="text-neutral-400 shrink-0" />
+                              {item.request_id ? <FileText size={12} className="text-blue-500 shrink-0" /> : <User size={12} className="text-neutral-400 shrink-0" />}
                               <span>{item.contact_name}</span>
                             </h4>
                             <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">

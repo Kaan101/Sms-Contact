@@ -1,15 +1,13 @@
 const { pool } = require('../config/db');
 
-// 1. Kullanıcının/Sağlayıcının tüm listelerini ve içindeki kişileri getir
+// 1. Kullanıcının/Sağlayıcının tüm listelerini ve içindeki öğeleri getir
 const getListsByOwner = async (req, res) => {
   try {
     const { ownerType, ownerId } = req.params;
 
-    // Önce kullanıcının listelerini çek
     const listsQuery = `SELECT * FROM custom_lists WHERE owner_type = $1 AND owner_id = $2 ORDER BY created_at DESC;`;
     const { rows: lists } = await pool.query(listsQuery, [ownerType.toUpperCase(), ownerId]);
 
-    // Her listenin içindeki kişileri (items) de ekleyerek zenginleştirilmiş bir yapı oluşturalım
     const detailedLists = [];
     for (const list of lists) {
       const itemsQuery = `SELECT * FROM list_items WHERE list_id = $1 ORDER BY created_at DESC;`;
@@ -50,7 +48,7 @@ const createList = async (req, res) => {
   }
 };
 
-// 3. Mevcut Listeye Kişi Ekle
+// 3. Listeye Manuel Kişi / İletişim Ekle
 const addListItem = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -74,7 +72,44 @@ const addListItem = async (req, res) => {
   }
 };
 
-// 4. Listeden Kişi Sil
+// 4. Listeye Sistemdeki Bir Talebi (Request) Ekle
+const addRequestToList = async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const { requestId } = req.body;
+
+    if (!requestId) {
+      return res.status(400).json({ status: 'error', message: 'Talep ID (requestId) zorunludur.' });
+    }
+
+    // Talebin bilgilerini çekelim
+    const reqQuery = `SELECT * FROM requests WHERE id = $1;`;
+    const { rows: reqRows } = await pool.query(reqQuery, [requestId]);
+
+    if (reqRows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
+    }
+
+    const targetReq = reqRows[0];
+    const contactName = targetReq.provider_name || `Talep #${targetReq.id}`;
+    const contactPhone = targetReq.contact_value || 'Bilinmiyor';
+    const notes = `[Talep #${targetReq.id}] ${targetReq.raw_text}`;
+
+    const query = `
+      INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
+      VALUES ($1, $2, $3, $4, $5) 
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(query, [listId, requestId, contactName, contactPhone, notes]);
+
+    res.status(201).json({ status: 'success', message: 'Talep listeye eklendi.', item: rows[0] });
+  } catch (error) {
+    console.error('Listeye talep ekleme hatası:', error);
+    res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
+  }
+};
+
+// 5. Listeden Öğe Sil
 const removeListItem = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -83,12 +118,12 @@ const removeListItem = async (req, res) => {
     const { rows } = await pool.query(query, [itemId]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Kişi bulunamadı.' });
+      return res.status(404).json({ status: 'error', message: 'Öğe bulunamadı.' });
     }
 
-    res.status(200).json({ status: 'success', message: 'Kişi listeden çıkarıldı.' });
+    res.status(200).json({ status: 'success', message: 'Öğe listeden çıkarıldı.' });
   } catch (error) {
-    console.error('Listeden kişi silme hatası:', error);
+    console.error('Listeden öğe silme hatası:', error);
     res.status(500).json({ status: 'error', message: `Sunucu hatası: ${error.message}` });
   }
 };
@@ -97,5 +132,6 @@ module.exports = {
   getListsByOwner,
   createList,
   addListItem,
+  addRequestToList,
   removeListItem
 };

@@ -17,7 +17,6 @@ import {
   extractCode, isCodeHiddenReq, cleanContact, extractPhoneForWa, safeDateTime, calculateRemainingTime 
 } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
-
 import CustomListsManager from '../../components/common/CustomListsManager';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
@@ -37,7 +36,7 @@ export default function CustomerDashboard() {
   const [disambiguationData, setDisambiguationData] = useState(null);
   
   const [requestType, setRequestType] = useState('TALEP');
-  const [activeTab, setActiveTab] = useState('REQUESTS'); // YENİ: Sekme Kontrolü ('REQUESTS' veya 'LISTS')
+  const [activeTab, setActiveTab] = useState('REQUESTS'); 
   
   const [preferredChannels, setPreferredChannels] = useState(['PHONE', 'SMS', 'WHATSAPP']);
   const [contactEmail, setContactEmail] = useState('');
@@ -278,7 +277,6 @@ export default function CustomerDashboard() {
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 px-6 py-8">
       
-      {/* YENİ: MÜŞTERİ PANELİ SEKME MENÜSÜ (Talepler / Özel Listeler) */}
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950">Müşteri Paneli</h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
@@ -300,12 +298,10 @@ export default function CustomerDashboard() {
 
       {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
 
-      {/* YENİ: SEKME KONTROLÜ İLE GÖSTERİM */}
       {activeTab === 'LISTS' ? (
         <CustomListsManager ownerType="CUSTOMER" ownerId={session?.phone} />
       ) : (
         <>
-          {/* YENİ TALEP FORMU */}
           {step === 'INPUT' && (
             <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-3">
               <div className="text-center space-y-1 mb-2"><h2 className="text-xl font-extrabold tracking-tight text-neutral-950">Hangi Hizmete İhtiyacınız Var?</h2><p className="text-xs text-neutral-500">Doğal dil ile talebinizi yazın; açık havuzda en uygun sağlayıcılar sıraya girsin.</p></div>
@@ -422,7 +418,6 @@ export default function CustomerDashboard() {
             </div>
           )}
 
-          {/* DISAMBIGUATE EKRANI */}
           {step === 'DISAMBIGUATE' && disambiguationData && (
             <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
               <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
@@ -430,7 +425,6 @@ export default function CustomerDashboard() {
             </div>
           )}
 
-          {/* AKTİF TALEPLER VE KUYRUK YÖNETİMİ */}
           {activeCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -675,7 +669,6 @@ export default function CustomerDashboard() {
              </div>
           )}
 
-          {/* DETAYLI DEĞERLENDİRME EKRANI */}
           {pendingReviewCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -761,11 +754,10 @@ export default function CustomerDashboard() {
              </div>
           )}
 
-          {/* GEÇMİŞ TALEPLER */}
           {pastCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none">
-                   <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5"><History size={16} className="text-neutral-500" /><span>Geçmiş Talepler ({pastCustomerRequests.now || pastCustomerRequests.length})</span></h3>
+                   <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5"><History size={16} className="text-neutral-500" /><span>Geçmiş Talepler ({pastCustomerRequests.length})</span></h3>
                    <div className="text-neutral-400">{isCustomerHistoryOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
                 </div>
                 {isCustomerHistoryOpen && (
