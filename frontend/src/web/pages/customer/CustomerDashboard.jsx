@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.5.0-SMART-REORDER</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.5.1-PERFECT-REORDER</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -326,31 +326,42 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // KORUMALI VE AKILLI KOPYALAYAN TEKRARLA BUTONU
+          // ⭐ KUSURSUZ TEKRARLA ALGORİTMASI (Fiyatı Frontend'den Basıyoruz)
           onDirectReorder={async (origReq) => {
-            if (!origReq) {
-              alert('Hata: Sunucuya bağlanılamadığı için bu talebin geçmiş verilerine ulaşılamıyor.');
-              return;
-            }
+            if (!origReq) return alert('Bu talebin geçmiş verilerine ulaşılamıyor.');
 
             const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
-            if (!targetProviderId) {
-              alert('Bu siparişin geçmişte atanmış bir sağlayıcısı bulunamadı. Lütfen "Talep Oluştur" diyerek havuza gönderin.');
-              return;
-            }
+            if (!targetProviderId) return alert('Bu siparişin geçmiş sağlayıcısı bulunamadı. Lütfen "Talep Oluştur" diyerek havuza gönderin.');
 
             if (!window.confirm(`Bu siparişi "${origReq.provider_name || 'önceki sağlayıcısına'}" eski fiyat ve açıklamalarıyla tekrar göndermek istediğinize emin misiniz?`)) return;
 
             setLoading(true);
             try {
+              // 1. Yeni Tarih Hesaplama
+              let newTargetDate = null;
+              if (origReq.matched_target_date && origReq.created_at) {
+                const oldCreated = new Date(origReq.created_at).getTime();
+                const oldTarget = new Date(origReq.matched_target_date).getTime();
+                const diffMs = oldTarget - oldCreated; 
+                
+                if (diffMs > 0) {
+                  newTargetDate = new Date(Date.now() + diffMs).toISOString();
+                }
+              }
+
+              // 2. Fiyat ve Tarihi Frontend'den Zorunlu Olarak Gönder
               const payload = {
                 rawText: origReq.raw_text,
                 contactValue: origReq.contact_value || session.phone,
                 preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
                 location: origReq.location || 'İstanbul, Türkiye',
                 isUrgent: origReq.is_urgent || false,
+                requestType: origReq.request_type || 'TALEP',
                 targetProviderId: targetProviderId,
-                oldRequestId: origReq.id // Bütün sihri (tarih/fiyat bulmayı) Backend yapacak!
+                // Eski karttaki Bütçeyi ve Hesaplanan Tarihi Direkt Veriyoruz
+                suggestedBudget: origReq.matched_budget || null,
+                suggestedTargetDate: newTargetDate,
+                suggestedDescription: origReq.provider_description || 'Tekrarlanan Sipariş'
               };
 
               await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
@@ -361,7 +372,7 @@ export default function CustomerDashboard() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
               const hataDetayi = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-              alert(`Sipariş tekrarlanırken arka planda bir hata oluştu!\n\nDETAY: ${hataDetayi}`);
+              alert(`Sipariş tekrarlanırken hata oluştu!\n\nDETAY: ${hataDetayi}`);
             } finally {
               setLoading(false);
             }
@@ -572,7 +583,7 @@ export default function CustomerDashboard() {
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
                               
-                              {req.matched_budget && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus) && (
+                              {req.matched_budget && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED', 'MATCHED'].includes(reqStatus) && (
                                 <div className="mt-2.5 flex flex-wrap gap-2">
                                   <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
                                       💰 Maliyet: {new Intl.NumberFormat('tr-TR').format(Number(req.matched_budget))} {req.matched_currency || 'TRY'}
