@@ -43,6 +43,19 @@ const {
   deleteTest
 } = require('../controllers/testController');
 
+const { 
+  getListsByOwner, 
+  createList, 
+  addListItem, 
+  removeListItem 
+} = require('../controllers/listController');
+
+// Özel liste rotaları
+router.get('/lists/:ownerType/:ownerId', getListsByOwner);
+router.post('/lists', createList);
+router.post('/lists/:listId/items', addListItem);
+router.delete('/lists/items/:itemId', removeListItem);
+
 // 1. Dosyanın en üstüne import edin
 const { getSettings, updateSetting } = require('../controllers/settingsController');
 
