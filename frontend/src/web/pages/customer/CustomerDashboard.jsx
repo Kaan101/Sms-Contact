@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.2.1-RELEASE</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.3.0-REWORK</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button 
@@ -315,17 +315,13 @@ export default function CustomerDashboard() {
         <CustomListsManager 
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
-          onSelectRequest={(reqId) => {
+          // ⭐ BURASI: Rework tıklandığında eski metni al, Input ekranına dön ve doldur!
+          onReworkRequest={(reqId, rawText) => {
+            const origReq = myCustomerRequests.find(r => String(r.id) === String(reqId));
+            setQueryText(origReq ? origReq.raw_text : rawText);
             setActiveTab('REQUESTS'); 
-            setIsActiveCustomerRequestsOpen(true); 
-            setTimeout(() => {
-              const reqEl = document.getElementById(`req-card-${reqId}`);
-              if (reqEl) {
-                reqEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                reqEl.classList.add('ring-2', 'ring-blue-500');
-                setTimeout(() => reqEl.classList.remove('ring-2', 'ring-blue-500'), 2000);
-              }
-            }, 100);
+            setStep('INPUT'); 
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           }} 
         />
       ) : (
@@ -587,7 +583,7 @@ export default function CustomerDashboard() {
                                     await axios.post(`${API_BASE}/lists/${listId}/requests`, { requestId: req.id });
                                     alert('Talep listenize başarıyla eklendi!');
                                   } catch (err) {
-                                    alert('Eklenirken bir hata oluştu.');
+                                    alert(err.response?.data?.message || 'Eklenirken bir hata oluştu.');
                                   }
                                 }}
                                 className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-sm"
