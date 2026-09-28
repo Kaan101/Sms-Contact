@@ -32,7 +32,6 @@ const createRequest = async (req, res) => {
   }
 };
 
-// 🌟 SADELEŞTİRİLMİŞ, TERTEMİZ EŞLEŞTİRME MOTORU
 const normalizeTr = (str) => {
   return String(str || '')
     .replace(/İ/g, 'i').replace(/I/g, 'ı')
@@ -51,15 +50,10 @@ const isSmartMatch = (rawText, providerKeywords) => {
     ? providerKeywords 
     : String(providerKeywords).replace(/[{}"']/g, '').split(',');
 
-  // keywords dizisindeki (Örn: "ekmek", "su") kelimelerden HERHANGİ BİRİ (.some) eşleşirse TRUE döner
   return keywords.some(kw => {
     const cleanKw = normalizeTr(kw).trim();
     if (cleanKw.length < 2) return false;
-    
-    // Sağlayıcı kelimesinin ilk 4 harfini kök olarak al ("ekmek" -> "ekme", "su" -> "su")
     const root = cleanKw.slice(0, 4); 
-    
-    // Müşterinin yazdığı metin, bu kökü barındırıyorsa eşleşme başarılıdır
     return textNorm.includes(root);
   });
 };
@@ -89,7 +83,7 @@ const getOpenPoolRequests = async (req, res) => {
         return isSmartMatch(textToSearch, providerKeywords);
       }).map(req => ({
         ...req,
-        contact_value: '*** ** ** (Eşleşince Görünür)' // Havuzdaki herkes için maskele
+        contact_value: '*** ** ** (Eşleşince Görünür)' 
       }));
     }
 
@@ -104,13 +98,11 @@ const joinRequestPool = async (req, res) => {
     const { requestId } = req.params;
     const { providerId } = req.body;
 
-    // 1. Sağlayıcıyı sadece WAITING (Bekleyen) olarak listeye ekleriz, OTOMATİK EŞLEŞTİRME YAPMAYIZ.
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'WAITING') ON CONFLICT DO NOTHING`, 
       [requestId, providerId]
     );
 
-    // 2. Müşteriye "Sıraya biri girdi, girip seç" SMS'i atarız.
     const reqCheck = await pool.query(`SELECT contact_value FROM requests WHERE id = $1`, [requestId]);
     const provCheck = await pool.query(`SELECT name FROM service_providers WHERE id = $1`, [providerId]);
     
@@ -129,13 +121,11 @@ const joinRequestPool = async (req, res) => {
   }
 };
 
-// 1. Müşterinin Kendi Taleplerini ve Kuyruk Sağlayıcılarını Çek (Optimizeli + Teklif Detayları)
 const getUserRequests = async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
 
-    // 1. ADIM: Müşterinin tüm taleplerini TEK SORGULAR getir
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
@@ -149,6 +139,7 @@ const getUserRequests = async (req, res) => {
        ORDER BY r.created_at DESC;`,
       [`%${phone}%`]
     );
+    
     if (requests.length === 0) {
       return res.status(200).json({ status: 'success', requests: [] });
     }
@@ -156,7 +147,6 @@ const getUserRequests = async (req, res) => {
     const activeRequestIds = requests.filter(r => r.status !== 'CANCELLED').map(r => r.id);
 
     if (activeRequestIds.length > 0) {
-      // 2. ADIM: Bu taleplere ilgi gösteren TÜM sağlayıcıları TEK SORGULAR getir (Detaylarıyla Birlikte)
       const { rows: allQueued } = await pool.query(
         `SELECT sp.id, sp.name, sp.phone, sp.priority_score, ri.status as interest_status, ri.request_id,
           rpd.provider_budget, rpd.provider_currency, rpd.provider_target_date, rpd.provider_description,
@@ -260,12 +250,11 @@ const selectCandidateProvider = async (req, res) => {
   }
 };
 
- const updateRequestStatus = async (req, res) => {
+const updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { newStatus } = req.body;
 
-    // 1. Önce ana talebin durumunu her halükarda güncelle
     const { rows } = await pool.query(
       `UPDATE requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *;`,
       [newStatus, requestId]
@@ -274,8 +263,6 @@ const selectCandidateProvider = async (req, res) => {
     if (rows.length > 0) {
       const updatedReq = rows[0];
 
-      // 2. YENİ: Eğer Sağlayıcı "İşi Teslim Et" (PROVIDER_COMPLETED) tuşuna bastıysa
-      // Teslim zamanını yeni (request_provider_details) tablosuna yaz!
       if (newStatus === 'PROVIDER_COMPLETED' && updatedReq.matched_provider_id) {
         await pool.query(
           `UPDATE request_provider_details 
@@ -285,7 +272,6 @@ const selectCandidateProvider = async (req, res) => {
         );
       }
 
-      // 3. SMS Bildirimleri
       if (newStatus === 'ACCEPTED') {
         await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Talebiniz sağlayıcı tarafından kabul edildi. İletişime geçilecektir.`);
       } else if (newStatus === 'PROVIDER_COMPLETED') {
@@ -317,7 +303,6 @@ const getProviderAssignedRequests = async (req, res) => {
       [providerId]
     );
 
-    // GİZLİLİK KALKANI: Sağlayıcı henüz kabul etmediyse iletişim bilgisini maskele
     const secureRows = rows.map(r => {
       if (!['ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED'].includes(r.status)) {
         return {
@@ -377,7 +362,6 @@ const deleteRequest = async (req, res) => {
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
-// Sağlayıcının bir talebe özel detaylarını (Teklif, Tarih, Açıklama, Döviz) kaydet/güncelle
 const upsertProviderRequestDetails = async (req, res) => {
   try {
     const { requestId, providerId } = req.params;
@@ -408,8 +392,7 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// Doğrudan Eski Sağlayıcıya Sipariş Geçme (Havuzu Bypass Eder)
-// 1. ÖNCE FONKSİYONU TANIMLIYORUZ
+// YENİ: Doğrudan Eski Sağlayıcıya Sipariş Geçme (Havuzu Bypass Eder)
 const createDirectReorder = async (req, res) => {
   try {
     const { 
@@ -417,6 +400,7 @@ const createDirectReorder = async (req, res) => {
       targetProviderId, suggestedBudget, suggestedTargetDate 
     } = req.body;
 
+    // 1. Talebi doğrudan MATCHED olarak oluştur (Havuz atlanır)
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, matched_budget, matched_target_date)
@@ -430,11 +414,18 @@ const createDirectReorder = async (req, res) => {
     
     const newReq = rows[0];
 
-    const queueQuery = `
-      INSERT INTO request_queue (request_id, provider_id, interest_status, provider_budget, provider_target_date)
-      VALUES ($1, $2, 'INTERESTED', $3, $4)
-    `;
-    await pool.query(queueQuery, [newReq.id, targetProviderId, suggestedBudget, suggestedTargetDate]);
+    // 2. Doğru tabloya (request_interests) sağlayıcıyı ekle
+    await pool.query(
+      `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
+      [newReq.id, targetProviderId]
+    );
+
+    // 3. Fiyat ve Tarih detaylarını doğru tabloya (request_provider_details) yaz
+    await pool.query(
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date) 
+       VALUES ($1, $2, $3, 'TRY', $4)`,
+      [newReq.id, targetProviderId, suggestedBudget, suggestedTargetDate]
+    );
 
     res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });
   } catch (error) {
