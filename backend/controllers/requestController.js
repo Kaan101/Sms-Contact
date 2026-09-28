@@ -392,7 +392,7 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// ⭐ EN GARANTİLİ KOPYALAMA: Eski ID'yi Al, Fiyatı Al, Tarihe Dümdüz 24 Saat Ekle
+// ⭐ KUSURSUZ AKILLI KOPYALAMA: Eski tüm bilgileri bulur, zamanı hesaplar ve KESİN yazar.
 const createDirectReorder = async (req, res) => {
   try {
     const { rawText, contactValue, preferredChannel, location, isUrgent, targetProviderId, oldRequestId } = req.body;
@@ -401,7 +401,44 @@ const createDirectReorder = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Eksik parametre gönderildi.' });
     }
 
-    // 1. Yeni Talebi MATCHED olarak güvenli şekilde oluştur (Zorunlu olmayan her şey default alır)
+    // 1. ESKİ SİPARİŞİN HER ŞEYİNİ TEK BİR SORGUDAN ÇEKİYORUZ
+    const { rows: oldData } = await pool.query(`
+      SELECT r.created_at, 
+             rpd.provider_budget, 
+             rpd.provider_target_date, 
+             rpd.provider_description, 
+             rpd.provider_currency 
+      FROM requests r 
+      LEFT JOIN request_provider_details rpd ON rpd.request_id = r.id
+      WHERE r.id = $1 LIMIT 1
+    `, [oldRequestId]);
+
+    let newBudget = null;
+    let newCurrency = 'TRY';
+    let newDesc = 'Tekrarlanan Sipariş';
+    let newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // Hesap çökmesine karşı garanti (24 saat)
+
+    // Eski verileri yakala ve yeni tarihi (Aradaki farkı baz alarak) bul
+    if (oldData.length > 0) {
+      const old = oldData[0];
+      
+      if (old.provider_budget) newBudget = old.provider_budget;
+      if (old.provider_currency) newCurrency = old.provider_currency;
+      if (old.provider_description) newDesc = old.provider_description;
+
+      if (old.created_at && old.provider_target_date) {
+        const cTime = new Date(old.created_at).getTime();
+        const tTime = new Date(old.provider_target_date).getTime();
+        const diffMs = tTime - cTime;
+        
+        // Mantıksız bir tarih çıkmasın diye ufak bir güvenlik filtresi (0'dan büyükse ekle)
+        if (diffMs > 0 && !isNaN(diffMs)) {
+          newTargetDate = new Date(Date.now() + diffMs).toISOString(); 
+        }
+      }
+    }
+
+    // 2. YENİ TALEBİ MATCHED OLARAK OLUŞTUR (Havuza düşmeden doğrudan sağlayıcıya)
     const { rows: newReqRows } = await pool.query(`
       INSERT INTO requests (raw_text, contact_value, preferred_channel, location, is_urgent, status, matched_provider_id)
       VALUES ($1, $2, $3, $4, $5, 'MATCHED', $6)
@@ -410,28 +447,18 @@ const createDirectReorder = async (req, res) => {
     
     const newReq = newReqRows[0];
 
-    // 2. Sağlayıcıyı eşleşme (interest) tablosuna ACTIVE (İşi almış) olarak ekle
+    // 3. SAĞLAYICIYI İLGİ LİSTESİNE (request_interests) ACTIVE OLARAK EKLE
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, targetProviderId]
     );
 
-    // 3. Eski siparişin detaylarını (SADECE BÜTÇEYİ) zorla çek.
-    const { rows: oldDetails } = await pool.query(
-      `SELECT provider_budget FROM request_provider_details WHERE request_id = $1 LIMIT 1`,
-      [oldRequestId]
-    );
-
-    // Bütçeyi bulamazsa 0 yazar ki SQL patlamasın. Hedef tarih ise DÜMDÜZ 24 SAAT SONRASIDIR (hesaplama hatası riski = %0).
-    const safeBudget = oldDetails.length > 0 && oldDetails[0].provider_budget ? parseFloat(oldDetails[0].provider_budget) : 0;
-    const safeTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    // 4. Detayları yeni ID ile hatasız bir şekilde kendi tablosuna yapıştır.
-    await pool.query(
-      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description)
-       VALUES ($1, $2, $3, 'TRY', $4, 'Tekrarlanan Sipariş')`,
-      [newReq.id, targetProviderId, safeBudget, safeTargetDate]
-    );
+    // 4. BULUNAN FİYATI VE HESAPLANAN TARİHİ DETAYLARA YAPIŞTIR
+    await pool.query(`
+      INSERT INTO request_provider_details 
+      (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [newReq.id, targetProviderId, newBudget, newCurrency, newTargetDate, newDesc]);
 
     res.status(201).json({ status: 'success', request: newReq });
   } catch (error) {
