@@ -313,8 +313,18 @@ export default function CustomerDashboard() {
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
           onSelectRequest={(reqId) => {
-            setActiveTab('REQUESTS'); // Taleplerim sekmesine dön
-            setIsActiveCustomerRequestsOpen(true); // Aktif talepler akordiyonunu aç
+            setActiveTab('REQUESTS'); // 1. Taleplerim sekmesine geç
+            setIsActiveCustomerRequestsOpen(true); // 2. Aktif talepler akordiyonunu aç
+            
+            // 3. İsteğe bağlı: İlgili talebi bulup kullanıcıya görsel bir odaklama sağlayalım
+            setTimeout(() => {
+              const reqElement = document.getElementById(`req-card-${reqId}`);
+              if (reqElement) {
+                reqElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                reqElement.classList.add('ring-2', 'ring-blue-500');
+                setTimeout(() => reqElement.classList.remove('ring-2', 'ring-blue-500'), 2000);
+              }
+            }, 100);
           }} 
         />
       ) : (
@@ -511,7 +521,7 @@ export default function CustomerDashboard() {
                       }
 
                       return (
-                        <div key={req.id} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 shadow-sm space-y-3">
+                        <div key={req.id} id={`req-card-${req.id}`} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 shadow-sm space-y-3">
                           <div className="flex items-start justify-between gap-2 flex-wrap">
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
