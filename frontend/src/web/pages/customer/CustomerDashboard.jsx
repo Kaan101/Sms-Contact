@@ -309,7 +309,14 @@ export default function CustomerDashboard() {
       {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
 
       {activeTab === 'LISTS' ? (
-        <CustomListsManager ownerType="CUSTOMER" ownerId={session?.phone} />
+        <CustomListsManager 
+          ownerType="CUSTOMER" 
+          ownerId={session?.phone} 
+          onSelectRequest={(reqId) => {
+            setActiveTab('REQUESTS'); // Taleplerim sekmesine dön
+            setIsActiveCustomerRequestsOpen(true); // Aktif talepler akordiyonunu aç
+          }} 
+        />
       ) : (
         <>
           {step === 'INPUT' && (
