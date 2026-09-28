@@ -392,67 +392,45 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// ⭐ YENİ: GARANTİLİ KOPYALAMA MOTORU (Fiyatı ve Tarihi Veritabanından Kendi Çeker)
+// ⭐ EN GARANTİLİ KOPYALAMA: Eski ID'yi Al, Fiyatı Al, Tarihe Dümdüz 24 Saat Ekle
 const createDirectReorder = async (req, res) => {
   try {
-    const { 
-      rawText, contactValue, preferredChannel, location, isUrgent, requestType, 
-      targetProviderId, oldRequestId 
-    } = req.body;
+    const { rawText, contactValue, preferredChannel, location, isUrgent, targetProviderId, oldRequestId } = req.body;
 
     if (!targetProviderId || !oldRequestId) {
       return res.status(400).json({ status: 'error', message: 'Eksik parametre gönderildi.' });
     }
 
-    // 1. ESKİ SİPARİŞİN FİYAT VE TARİHİNİ KESİN SORGULA
-    const { rows: oldDetails } = await pool.query(
-      `SELECT provider_budget, provider_target_date FROM request_provider_details WHERE request_id = $1 LIMIT 1`,
-      [oldRequestId]
-    );
-
-    const { rows: oldReqs } = await pool.query(
-      `SELECT created_at FROM requests WHERE id = $1 LIMIT 1`,
-      [oldRequestId]
-    );
-
-    let copyBudget = null;
-    let copyTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // Hesaplama çökse bile 24 saat varsayılan
-
-    // Eski değerleri yakala ve hesapla
-    if (oldDetails.length > 0) {
-      copyBudget = oldDetails[0].provider_budget; // Bütçeyi birebir al
-      
-      // Tarihleri hesapla
-      if (oldReqs.length > 0 && oldDetails[0].provider_target_date) {
-        const cTime = new Date(oldReqs[0].created_at).getTime();
-        const tTime = new Date(oldDetails[0].provider_target_date).getTime();
-        const diff = tTime - cTime;
-        if (diff > 0) {
-          copyTargetDate = new Date(Date.now() + diff);
-        }
-      }
-    }
-
-    // 2. YENİ TALEBİ MATCHED OLARAK OLUŞTUR
+    // 1. Yeni Talebi MATCHED olarak güvenli şekilde oluştur (Zorunlu olmayan her şey default alır)
     const { rows: newReqRows } = await pool.query(`
-      INSERT INTO requests (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id)
-      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7)
+      INSERT INTO requests (raw_text, contact_value, preferred_channel, location, is_urgent, status, matched_provider_id)
+      VALUES ($1, $2, $3, $4, $5, 'MATCHED', $6)
       RETURNING *;
-    `, [rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent || false, requestType || 'TALEP', targetProviderId]);
+    `, [rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent ? true : false, targetProviderId]);
     
     const newReq = newReqRows[0];
 
-    // 3. SAĞLAYICIYI ACTIVE OLARAK İLGİ TABLOSUNA EKLE
+    // 2. Sağlayıcıyı eşleşme (interest) tablosuna ACTIVE (İşi almış) olarak ekle
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, targetProviderId]
     );
 
-    // 4. BULUNAN ESKİ FİYAT VE HESAPLANAN TARİHİ DETAYLARA KESİN OLARAK YAZ
+    // 3. Eski siparişin detaylarını (SADECE BÜTÇEYİ) zorla çek.
+    const { rows: oldDetails } = await pool.query(
+      `SELECT provider_budget FROM request_provider_details WHERE request_id = $1 LIMIT 1`,
+      [oldRequestId]
+    );
+
+    // Bütçeyi bulamazsa 0 yazar ki SQL patlamasın. Hedef tarih ise DÜMDÜZ 24 SAAT SONRASIDIR (hesaplama hatası riski = %0).
+    const safeBudget = oldDetails.length > 0 && oldDetails[0].provider_budget ? parseFloat(oldDetails[0].provider_budget) : 0;
+    const safeTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    // 4. Detayları yeni ID ile hatasız bir şekilde kendi tablosuna yapıştır.
     await pool.query(
       `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description)
        VALUES ($1, $2, $3, 'TRY', $4, 'Tekrarlanan Sipariş')`,
-      [newReq.id, targetProviderId, copyBudget, copyTargetDate]
+      [newReq.id, targetProviderId, safeBudget, safeTargetDate]
     );
 
     res.status(201).json({ status: 'success', request: newReq });
