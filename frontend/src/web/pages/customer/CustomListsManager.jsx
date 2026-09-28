@@ -136,6 +136,8 @@ export default function CustomListsManager({ ownerType, ownerId, onReworkRequest
           <h3 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
             <Folder size={20} className="text-neutral-700" />
             <span>Listelerim ({lists.length})</span>
+            {/* HATA AYIKLAMA ETİKETİ */}
+            <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold ml-2">v1.3.1-LIST-FIX</span>
           </h3>
           <p className="text-xs text-neutral-500 mt-0.5">Taleplerinizi veya iş ortaklarınızı listeler altında organize edin.</p>
         </div>
