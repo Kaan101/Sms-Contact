@@ -392,23 +392,53 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// ⭐ YENİ: GARANTİLİ KOPYALAMA (DOĞRUDAN FRONTEND VERİLERİYLE)
+// ⭐ KUSURSUZ AKILLI KOPYALAMA (BACKEND TARAFINDAN YÖNETİLİR)
 const createDirectReorder = async (req, res) => {
   try {
     const { 
-      rawText, contactValue, preferredChannel, location, isUrgent, requestType,
-      targetProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription
+      rawText, contactValue, preferredChannel, location, isUrgent, requestType, 
+      targetProviderId, oldRequestId 
     } = req.body;
 
     const tProviderId = targetProviderId ? parseInt(targetProviderId, 10) : null;
-    const budget = suggestedBudget ? parseFloat(suggestedBudget) : null;
-    const targetDate = suggestedTargetDate ? new Date(suggestedTargetDate) : null;
+    const oReqId = oldRequestId ? parseInt(oldRequestId, 10) : null;
 
-    if (!tProviderId) {
-      return res.status(400).json({ status: 'error', message: 'Sağlayıcı kimliği eksik.' });
+    if (!tProviderId || !oReqId) {
+      return res.status(400).json({ status: 'error', message: 'Eksik parametre: targetProviderId veya oldRequestId bulunamadı.' });
     }
 
-    // 1. Yeni Talebi doğrudan MATCHED olarak oluştur (Havuz atlanır)
+    // 1. ESKİ SİPARİŞ VERİLERİNİ ÇEK VE HESAPLA
+    const oldQuery = await pool.query(
+      `SELECT r.created_at as req_created_at, rpd.provider_budget, rpd.provider_currency, rpd.provider_target_date, rpd.provider_description
+       FROM requests r
+       LEFT JOIN request_provider_details rpd ON rpd.request_id = r.id AND rpd.provider_id = $1
+       WHERE r.id = $2`,
+      [tProviderId, oReqId]
+    );
+
+    let budget = null;
+    let currency = 'TRY';
+    let description = 'Tekrarlanan Sipariş';
+    let targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // Hesaplama çökse bile varsayılan 24 saat ekler
+
+    if (oldQuery.rows.length > 0) {
+      const old = oldQuery.rows[0];
+      budget = old.provider_budget || null;
+      currency = old.provider_currency || 'TRY';
+      description = old.provider_description || 'Tekrarlanan Sipariş';
+
+      // Eski tarih farkını (hedef - sipariş saati) hesapla ve şu anki zamana ekle
+      if (old.req_created_at && old.provider_target_date) {
+        const created = new Date(old.req_created_at).getTime();
+        const target = new Date(old.provider_target_date).getTime();
+        const diffMs = target - created;
+        if (diffMs > 0 && !isNaN(diffMs)) {
+          targetDate = new Date(Date.now() + diffMs);
+        }
+      }
+    }
+
+    // 2. YENİ TALEBİ "MATCHED" OLARAK OLUŞTUR
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id)
@@ -418,20 +448,19 @@ const createDirectReorder = async (req, res) => {
     const { rows } = await pool.query(insertReqQuery, [
       rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent || false, requestType || 'TALEP', tProviderId
     ]);
-    
     const newReq = rows[0];
 
-    // 2. Sağlayıcıyı eşleşme tablosuna ekle
+    // 3. SAĞLAYICIYI ACTIVE OLARAK İLGİ TABLOSUNA EKLE
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, tProviderId]
     );
 
-    // 3. Fiyat ve Tarih verilerini (Frontend'den gelen kesin verilerle) detaylar tablosuna KESİNLİKLE yaz!
+    // 4. DETAYLARI (Fiyat ve Yeni Tarih) İLGİLİ TABLOYA YAZ
     await pool.query(
       `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
-       VALUES ($1, $2, $3, 'TRY', $4, $5)`,
-      [newReq.id, tProviderId, budget, targetDate, suggestedDescription || 'Tekrarlanan Sipariş']
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newReq.id, tProviderId, budget, currency, targetDate, description]
     );
 
     res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });

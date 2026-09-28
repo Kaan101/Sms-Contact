@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.5.1-PERFECT-REORDER</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.6.0-SMART-DB-REORDER</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -326,9 +326,9 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // ⭐ KUSURSUZ TEKRARLA ALGORİTMASI (Fiyatı Frontend'den Basıyoruz)
+          // KORUMALI VE SADELEŞTİRİLMİŞ YENİ TEKRARLA BUTONU
           onDirectReorder={async (origReq) => {
-            if (!origReq) return alert('Bu talebin geçmiş verilerine ulaşılamıyor.');
+            if (!origReq) return alert('Hata: Sunucuya bağlanılamadığı için bu talebin geçmiş verilerine ulaşılamıyor.');
 
             const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
             if (!targetProviderId) return alert('Bu siparişin geçmiş sağlayıcısı bulunamadı. Lütfen "Talep Oluştur" diyerek havuza gönderin.');
@@ -337,19 +337,7 @@ export default function CustomerDashboard() {
 
             setLoading(true);
             try {
-              // 1. Yeni Tarih Hesaplama
-              let newTargetDate = null;
-              if (origReq.matched_target_date && origReq.created_at) {
-                const oldCreated = new Date(origReq.created_at).getTime();
-                const oldTarget = new Date(origReq.matched_target_date).getTime();
-                const diffMs = oldTarget - oldCreated; 
-                
-                if (diffMs > 0) {
-                  newTargetDate = new Date(Date.now() + diffMs).toISOString();
-                }
-              }
-
-              // 2. Fiyat ve Tarihi Frontend'den Zorunlu Olarak Gönder
+              // Bütün hesaplama işini Backend'e gönderiyoruz, Frontend sadece işin ID'sini söylüyor
               const payload = {
                 rawText: origReq.raw_text,
                 contactValue: origReq.contact_value || session.phone,
@@ -358,15 +346,12 @@ export default function CustomerDashboard() {
                 isUrgent: origReq.is_urgent || false,
                 requestType: origReq.request_type || 'TALEP',
                 targetProviderId: targetProviderId,
-                // Eski karttaki Bütçeyi ve Hesaplanan Tarihi Direkt Veriyoruz
-                suggestedBudget: origReq.matched_budget || null,
-                suggestedTargetDate: newTargetDate,
-                suggestedDescription: origReq.provider_description || 'Tekrarlanan Sipariş'
+                oldRequestId: origReq.id // SİHİR BURADA: Backend bu ID ile eski fiyat ve tarihi kendi bulacak!
               };
 
               await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
               
-              alert('Sipariş başarıyla tekrarlandı ve doğrudan sağlayıcınıza iletildi!');
+              alert('Sipariş başarıyla tekrarlandı ve fiyat/tarih kopyalanarak sağlayıcınıza iletildi!');
               await mutateCustomerReqs();
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
