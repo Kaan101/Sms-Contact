@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, getProviderContactDisplay, extractPhoneForWa, safeDateTime, calculateRemainingTime } from '../../../core/utils/helpers';
+import CustomListsManager from './CustomListsManager'; // Dosyayı kaydettiğin yola göre
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
@@ -193,6 +194,7 @@ export default function ProviderDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6 px-6 py-8">
+     
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
         <div>
           <h2 className="text-xl font-extrabold text-neutral-950">Sağlayıcı Paneli</h2>
@@ -205,6 +207,8 @@ export default function ProviderDashboard() {
           </div>
         )}
       </div>
+
+<CustomListsManager ownerType="PROVIDER" ownerId={providerId} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-5 bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300">
