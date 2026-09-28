@@ -396,31 +396,30 @@ const upsertProviderRequestDetails = async (req, res) => {
 const createDirectReorder = async (req, res) => {
   try {
     const { 
-      rawText, contactValue, preferredChannel, location, isUrgent, requestType, 
+      rawText, contactValue, preferredChannel, location, isUrgent,
       targetProviderId, suggestedBudget, suggestedTargetDate 
     } = req.body;
 
-    // 1. Talebi doğrudan MATCHED olarak oluştur (Havuz atlanır)
+    // 1. Talebi MATCHED olarak oluştur (Olmayan sütunları buradan çıkardık, sadece ana veriler)
     const insertReqQuery = `
       INSERT INTO requests 
-      (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, matched_budget, matched_target_date)
-      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7, $8, $9)
+      (raw_text, contact_value, preferred_channel, location, is_urgent, status, matched_provider_id)
+      VALUES ($1, $2, $3, $4, $5, 'MATCHED', $6)
       RETURNING *;
     `;
     const { rows } = await pool.query(insertReqQuery, [
-      rawText, contactValue, preferredChannel, location, isUrgent, requestType, 
-      targetProviderId, suggestedBudget, suggestedTargetDate
+      rawText, contactValue, preferredChannel, location, isUrgent, targetProviderId
     ]);
     
     const newReq = rows[0];
 
-    // 2. Doğru tabloya (request_interests) sağlayıcıyı ekle
+    // 2. Sağlayıcıyı eşleştirme tablosuna (request_interests) ACTIVE olarak ekle
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, targetProviderId]
     );
 
-    // 3. Fiyat ve Tarih detaylarını doğru tabloya (request_provider_details) yaz
+    // 3. İŞTE DOĞRU YER: Fiyat ve Tarih detaylarını kendi tablosuna (request_provider_details) yaz
     await pool.query(
       `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date) 
        VALUES ($1, $2, $3, 'TRY', $4)`,
@@ -430,7 +429,8 @@ const createDirectReorder = async (req, res) => {
     res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });
   } catch (error) {
     console.error('Direct reorder hatası:', error);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası.' });
+    // Hatayı detaylı görmek için error.message eklendi
+    res.status(500).json({ status: 'error', message: error.message || 'Sunucu hatası.' });
   }
 };
 
