@@ -392,27 +392,53 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// YENİ: Doğrudan Eski Sağlayıcıya Sipariş Geçme (Havuzu Bypass Eder)
+// ⭐ YENİ: AKILLI TEKRARLAMA (SMART CLONE) MOTORU
 const createDirectReorder = async (req, res) => {
   try {
-    // 1. Frontend'den gelen her veriyi KESİNLİKLE null kontrolünden (sanitize) geçiriyoruz.
-    // PostgreSQL 'undefined' verisinden nefret eder ve çöker.
-    const rawText = req.body.rawText || '';
-    const contactValue = req.body.contactValue || '';
-    const preferredChannel = req.body.preferredChannel || 'PHONE';
-    const location = req.body.location || '';
-    const isUrgent = req.body.isUrgent === true;
-    
-    // Sayısal değerleri güvenli parse et
-    const targetProviderId = req.body.targetProviderId ? parseInt(req.body.targetProviderId, 10) : null;
-    const suggestedBudget = req.body.suggestedBudget ? parseFloat(req.body.suggestedBudget) : null;
-    const suggestedTargetDate = req.body.suggestedTargetDate || null;
+    const { 
+      rawText, contactValue, preferredChannel, location, isUrgent,
+      targetProviderId, oldRequestId 
+    } = req.body;
 
-    if (!targetProviderId) {
+    const tProviderId = targetProviderId ? parseInt(targetProviderId, 10) : null;
+    const oReqId = oldRequestId ? parseInt(oldRequestId, 10) : null;
+
+    if (!tProviderId) {
       return res.status(400).json({ status: 'error', message: 'Sağlayıcı kimliği eksik.' });
     }
 
-    // 2. Talebi MATCHED olarak oluştur
+    let suggestedBudget = null;
+    let suggestedTargetDate = null;
+    let suggestedDescription = null;
+
+    // ESKİ TALEBİ BUL VE FİYAT/AÇIKLAMA/TARİH HESABINI BACKEND'DE YAP
+    if (oReqId) {
+      const oldReqQuery = await pool.query(
+        `SELECT r.created_at, rpd.provider_budget, rpd.provider_target_date, rpd.provider_description
+         FROM requests r
+         LEFT JOIN request_provider_details rpd ON rpd.request_id = r.id AND rpd.provider_id = $1
+         WHERE r.id = $2`,
+         [tProviderId, oReqId]
+      );
+      
+      if (oldReqQuery.rows.length > 0) {
+         const oldData = oldReqQuery.rows[0];
+         suggestedBudget = oldData.provider_budget;
+         suggestedDescription = oldData.provider_description;
+         
+         // Eski talep verilme saati ile hedeflenen saat arasındaki farkı (milisaniye) bulup şu ana ekle
+         if (oldData.created_at && oldData.provider_target_date) {
+            const oldCreated = new Date(oldData.created_at).getTime();
+            const oldTarget = new Date(oldData.provider_target_date).getTime();
+            const diff = oldTarget - oldCreated;
+            if (diff > 0) {
+               suggestedTargetDate = new Date(Date.now() + diff).toISOString();
+            }
+         }
+      }
+    }
+
+    // 1. Yeni Talebi MATCHED olarak oluştur (Havuz atlanır)
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, status, matched_provider_id)
@@ -420,28 +446,27 @@ const createDirectReorder = async (req, res) => {
       RETURNING *;
     `;
     const { rows } = await pool.query(insertReqQuery, [
-      rawText, contactValue, preferredChannel, location, isUrgent, targetProviderId
+      rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent || false, tProviderId
     ]);
     
     const newReq = rows[0];
 
-    // 3. Sağlayıcıyı eşleştirme tablosuna (request_interests) ACTIVE olarak ekle
+    // 2. Doğru tabloya (request_interests) sağlayıcıyı ekle
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
-      [newReq.id, targetProviderId]
+      [newReq.id, tProviderId]
     );
 
-    // 4. Fiyat ve Tarih detaylarını kendi tablosuna (request_provider_details) yaz
+    // 3. Bulunan Eski Fiyat, Tarih ve Açıklamayı detaylar tablosuna yaz
     await pool.query(
-      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date) 
-       VALUES ($1, $2, $3, 'TRY', $4)`,
-      [newReq.id, targetProviderId, suggestedBudget, suggestedTargetDate]
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
+       VALUES ($1, $2, $3, 'TRY', $4, $5)`,
+      [newReq.id, tProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription]
     );
 
     res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });
   } catch (error) {
     console.error('Direct reorder hatası:', error);
-    // Hatanın tam olarak ne olduğunu görebilmek için error.message fırlatıyoruz
     res.status(500).json({ status: 'error', message: `Veritabanı Hatası: ${error.message}` });
   }
 };

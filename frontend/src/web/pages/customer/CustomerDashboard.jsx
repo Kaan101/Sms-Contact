@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.4.2-ERROR-TRACKER</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.5.0-SMART-REORDER</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -326,7 +326,7 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // KORUMALI VE HATA MESAJINI AÇIKÇA GÖSTEREN TEKRARLA BUTONU
+          // KORUMALI VE AKILLI KOPYALAYAN TEKRARLA BUTONU
           onDirectReorder={async (origReq) => {
             if (!origReq) {
               alert('Hata: Sunucuya bağlanılamadığı için bu talebin geçmiş verilerine ulaşılamıyor.');
@@ -339,32 +339,18 @@ export default function CustomerDashboard() {
               return;
             }
 
-            if (!window.confirm(`Bu siparişi "${origReq.provider_name || 'önceki sağlayıcıya'}" doğrudan göndermek istediğinize emin misiniz?`)) return;
+            if (!window.confirm(`Bu siparişi "${origReq.provider_name || 'önceki sağlayıcısına'}" eski fiyat ve açıklamalarıyla tekrar göndermek istediğinize emin misiniz?`)) return;
 
             setLoading(true);
             try {
-              let suggestedTargetDate = null;
-              if (origReq.matched_target_date && origReq.created_at) {
-                const oldCreated = new Date(origReq.created_at).getTime();
-                const oldTarget = new Date(origReq.matched_target_date).getTime();
-                const durationMs = oldTarget - oldCreated; 
-                
-                if (durationMs > 0) {
-                  const newTargetDate = new Date(Date.now() + durationMs);
-                  suggestedTargetDate = newTargetDate.toISOString();
-                }
-              }
-
               const payload = {
                 rawText: origReq.raw_text,
                 contactValue: origReq.contact_value || session.phone,
                 preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
                 location: origReq.location || 'İstanbul, Türkiye',
                 isUrgent: origReq.is_urgent || false,
-                requestType: origReq.request_type || 'TALEP',
                 targetProviderId: targetProviderId,
-                suggestedBudget: origReq.matched_budget || origReq.provider_budget,
-                suggestedTargetDate: suggestedTargetDate
+                oldRequestId: origReq.id // Bütün sihri (tarih/fiyat bulmayı) Backend yapacak!
               };
 
               await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
@@ -374,7 +360,6 @@ export default function CustomerDashboard() {
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-              // ⭐ İŞTE HAYAT KURTARACAK SATIR: Hata gizlenmez, ekrana basılır!
               const hataDetayi = err.response?.data ? JSON.stringify(err.response.data) : err.message;
               alert(`Sipariş tekrarlanırken arka planda bir hata oluştu!\n\nDETAY: ${hataDetayi}`);
             } finally {
