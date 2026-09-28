@@ -290,7 +290,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.3.0-REWORK</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.4.0-REORDER</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button 
@@ -315,14 +315,66 @@ export default function CustomerDashboard() {
         <CustomListsManager 
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
-          // ⭐ BURASI: Rework tıklandığında eski metni al, Input ekranına dön ve doldur!
-          onReworkRequest={(reqId, rawText) => {
-            const origReq = myCustomerRequests.find(r => String(r.id) === String(reqId));
-            setQueryText(origReq ? origReq.raw_text : rawText);
+          
+          // 1. TALEP OLUŞTUR (FORM DOLDURMA - HAVUZA ATMAK İÇİN)
+          onReworkRequest={(origReq) => {
+            setQueryText(origReq.raw_text || origReq.notes || '');
+            if(origReq.location) {
+               setLocationValue(extractAddress(origReq.location));
+               const coords = extractGPS(origReq.location);
+               if(coords) {
+                 setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
+                 setMapPosition({lat: coords[0], lng: coords[1]});
+               }
+               setCompanyCode(extractCode(origReq.location) || '');
+               setIsCodeHidden(isCodeHiddenReq(origReq.location));
+            }
+            if(origReq.is_urgent) setIsUrgent(true);
+            if(origReq.request_type) setRequestType(origReq.request_type);
+
             setActiveTab('REQUESTS'); 
             setStep('INPUT'); 
+            setIsDetailsCollapsed(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-          }} 
+          }}
+
+          // 2. TEKRARLA (DOĞRUDAN ESKİ SAĞLAYICIYA PASLAMA)
+          onDirectReorder={async (origReq) => {
+            if (!origReq || (!origReq.matched_provider_id && !origReq.provider_id)) {
+              alert('Bu talebin geçmişte onaylanmış bir sağlayıcısı bulunamadığı için doğrudan tekrarlanamaz. Lütfen "Talep Oluştur" butonunu kullanın.');
+              return;
+            }
+
+            if (!window.confirm(`Bu siparişi ${origReq.provider_name || 'aynı sağlayıcıya'} tekrar göndermek istediğinize emin misiniz?`)) return;
+
+            setLoading(true);
+            try {
+              // Havuza düşmeden hedeflenmiş sipariş
+              const payload = {
+                rawText: origReq.raw_text,
+                disambiguationChoice: null,
+                contactValue: origReq.contact_value || session.phone,
+                preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
+                location: origReq.location || 'İstanbul, Türkiye',
+                isUrgent: origReq.is_urgent || false,
+                deadlineDatetime: null,
+                requestType: origReq.request_type || 'TALEP',
+                // Backend requestController içindeki createRequest metodunun bu parametreyi alıp 
+                // status = 'MATCHED' ve matched_provider_id = targetProviderId olarak yazması gerekir.
+                targetProviderId: origReq.matched_provider_id || origReq.provider_id 
+              };
+
+              await axios.post(`${API_BASE}/requests`, payload);
+              alert('Siparişiniz başarıyla tekrarlandı ve doğrudan sağlayıcıya iletildi!');
+              await mutateCustomerReqs();
+              setActiveTab('REQUESTS');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) {
+              alert('Sipariş tekrarlanırken bir hata oluştu.');
+            } finally {
+              setLoading(false);
+            }
+          }}
         />
       ) : (
         <>
