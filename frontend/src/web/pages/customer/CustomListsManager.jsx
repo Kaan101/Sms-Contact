@@ -110,6 +110,11 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
     }
   };
 
+  const cleanPhoneNumber = (phoneStr) => {
+    if (!phoneStr) return '';
+    return phoneStr.split('|')[0].trim();
+  };
+
   if (loading) {
     return <div className="flex justify-center p-6"><Loader2 className="animate-spin text-neutral-400" size={24} /></div>;
   }
@@ -165,7 +170,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${isAddingToThis ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-neutral-950 text-white hover:bg-neutral-800'}`}
                   >
                     <Plus size={14} className={isAddingToThis ? 'rotate-45 transition-transform' : 'transition-transform'} />
-                    <span>{isAddingToThis ? 'İptal Et' : 'Listeye Ekle'}</span>
+                    <span>{isAddingToThis ? 'İptal Et' : '+ Öğe Ekle'}</span>
                   </button>
                 </div>
 
@@ -247,7 +252,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER (HER KARTTA REWORK / İNCELE BUTONU GARANTİLEDİ) */}
+                {/* LİSTEDEKİ ÖĞELER VE REWORK / İNCELE BUTONU */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
@@ -262,7 +267,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                             </h4>
                             <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">
                               <Phone size={11} className="text-blue-500 shrink-0" />
-                              <span>{item.contact_phone}</span>
+                              <span>{cleanPhoneNumber(item.contact_phone)}</span>
                             </p>
                             {item.notes && (
                               <p className="text-[10px] text-neutral-600 bg-neutral-50 p-1.5 rounded border border-neutral-100 line-clamp-2">
