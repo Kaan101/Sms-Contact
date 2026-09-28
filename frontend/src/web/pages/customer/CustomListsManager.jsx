@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray } from '../../../core/utils/helpers';
 
@@ -117,14 +117,14 @@ export default function CustomListsManager({ ownerType, ownerId }) {
   return (
     <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6 shadow-sm">
       
-      {/* ÜST KISIM: BAŞLIK VE YENİ LİSTE OLUŞTURMA */}
+      {/* ÜST KISIM: "Özel" kelimesi kaldırıldı -> Listelerim */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div>
           <h3 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
             <Folder size={20} className="text-neutral-700" />
-            <span>Özel Listelerim ({lists.length})</span>
+            <span>Listelerim ({lists.length})</span>
           </h3>
-          <p className="text-xs text-neutral-500 mt-0.5">Taleplerinizi veya iş ortaklarınızı özel listeler altında organize edin.</p>
+          <p className="text-xs text-neutral-500 mt-0.5">Taleplerinizi veya iş ortaklarınızı listeler altında organize edin.</p>
         </div>
 
         <form onSubmit={handleCreateList} className="flex items-center gap-2">
@@ -142,11 +142,10 @@ export default function CustomListsManager({ ownerType, ownerId }) {
         </form>
       </div>
 
-      {/* LİSTELERİN GÖSTERİM ALANI */}
       <div className="space-y-4">
         {lists.length === 0 ? (
           <div className="text-center py-10 text-neutral-400 text-xs bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
-            Henüz hiç özel liste oluşturmadınız. Yukarıdan yeni bir liste ekleyerek başlayın.
+            Henüz hiç liste oluşturmadınız. Yukarıdan yeni bir liste ekleyerek başlayın.
           </div>
         ) : (
           lists.map((list) => {
@@ -154,7 +153,6 @@ export default function CustomListsManager({ ownerType, ownerId }) {
             return (
               <div key={list.id} className="bg-neutral-50/70 rounded-xl border border-neutral-200 overflow-hidden transition">
                 
-                {/* LİSTE BAŞLIĞI VE ÖĞE EKLE BUTONU */}
                 <div className="p-4 flex items-center justify-between bg-white border-b border-neutral-100">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-neutral-900">{list.list_name}</span>
@@ -172,7 +170,6 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                   </button>
                 </div>
 
-                {/* AÇILIR EKLEME PANELİ */}
                 {isAddingToThis && (
                   <div className="p-4 bg-blue-50/40 border-b border-blue-100 space-y-3 animate-in fade-in duration-200">
                     <div className="flex gap-2 text-xs">
@@ -251,7 +248,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELERİN KARTLARI */}
+                {/* LİSTEDEKİ ÖĞELER (Telefonlar açık, talep olanlarda tıklayıp detay görüntüleme özelliği) */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
@@ -264,6 +261,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                               {item.request_id ? <FileText size={12} className="text-blue-600 shrink-0" /> : <User size={12} className="text-neutral-500 shrink-0" />}
                               <span>{item.contact_name}</span>
                             </h4>
+                            {/* Telefon artık gizlenmiyor (hidden yok, açıkça görünüyor) */}
                             <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">
                               <Phone size={11} className="text-blue-500 shrink-0" />
                               <span>{item.contact_phone}</span>
@@ -273,7 +271,22 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                                 📝 {item.notes}
                               </p>
                             )}
+
+                            {/* Eğer bu öğe sisteme ait bir talepse, tıklayıp doğrudan o talebe gidebilme (talep oluşturma/detayına gitme aksiyonu) */}
+                            {item.request_id && (
+                              <button 
+                                onClick={() => {
+                                  // Talep detayına veya ilgili sekmeye yönlendirme tetiklenebilir
+                                  alert(`Talep #${item.request_id} detayına yönlendiriliyor...`);
+                                }}
+                                className="mt-1 text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <span>Talebi İncele / İşlem Yap</span>
+                                <ExternalLink size={10} />
+                              </button>
+                            )}
                           </div>
+
                           <button 
                             onClick={() => handleDeleteItem(item.id)} 
                             className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer"
