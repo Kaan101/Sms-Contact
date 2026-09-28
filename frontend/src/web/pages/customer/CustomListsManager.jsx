@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Folder, Plus, Trash2, Phone, User, Loader2, FileText } from 'lucide-react';
+import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray } from '../../../core/utils/helpers';
 
@@ -12,8 +12,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
   const [newListName, setNewListName] = useState('');
   const [activeListId, setActiveListId] = useState(null);
   
-  // Ekleme Modu: 'CONTACT' (Manuel Kişi) veya 'REQUEST' (Sistem Talebi)
-  const [addMode, setAddMode] = useState('REQUEST');
+  const [addMode, setAddMode] = useState('REQUEST'); // 'REQUEST' veya 'CONTACT'
   const [newItem, setNewItem] = useState({ contactName: '', contactPhone: '', notes: '' });
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [availableRequests, setAvailableRequests] = useState([]);
@@ -33,7 +32,6 @@ export default function CustomListsManager({ ownerType, ownerId }) {
     }
   };
 
-  // Kullanıcının veya sağlayıcının taleplerini çekelim ki listeye ekleyebilsin
   const fetchAvailableRequests = async () => {
     try {
       const endpoint = ownerType === 'CUSTOMER' 
@@ -70,7 +68,6 @@ export default function CustomListsManager({ ownerType, ownerId }) {
     }
   };
 
-  // Manuel Kişi Ekle
   const handleAddContactItem = async (listId, e) => {
     e.preventDefault();
     if (!newItem.contactName.trim() || !newItem.contactPhone.trim()) {
@@ -87,7 +84,6 @@ export default function CustomListsManager({ ownerType, ownerId }) {
     }
   };
 
-  // Sistemden Talep Ekle
   const handleAddRequestItem = async (listId, e) => {
     e.preventDefault();
     if (!selectedRequestId) {
@@ -120,6 +116,8 @@ export default function CustomListsManager({ ownerType, ownerId }) {
 
   return (
     <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6 shadow-sm">
+      
+      {/* ÜST KISIM: BAŞLIK VE YENİ LİSTE OLUŞTURMA */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div>
           <h3 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
@@ -137,13 +135,14 @@ export default function CustomListsManager({ ownerType, ownerId }) {
             onChange={(e) => setNewListName(e.target.value)}
             className="px-3 py-2 text-xs rounded-xl border border-neutral-200 outline-none focus:border-neutral-900 bg-neutral-50 w-52"
           />
-          <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition flex items-center gap-1 shrink-0">
+          <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition flex items-center gap-1 shrink-0 cursor-pointer">
             <Plus size={14} />
-            <span>Oluştur</span>
+            <span>Liste Oluştur</span>
           </button>
         </form>
       </div>
 
+      {/* LİSTELERİN GÖSTERİM ALANI */}
       <div className="space-y-4">
         {lists.length === 0 ? (
           <div className="text-center py-10 text-neutral-400 text-xs bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
@@ -154,6 +153,8 @@ export default function CustomListsManager({ ownerType, ownerId }) {
             const isAddingToThis = activeListId === list.id;
             return (
               <div key={list.id} className="bg-neutral-50/70 rounded-xl border border-neutral-200 overflow-hidden transition">
+                
+                {/* LİSTE BAŞLIĞI VE ÖĞE EKLE BUTONU */}
                 <div className="p-4 flex items-center justify-between bg-white border-b border-neutral-100">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-neutral-900">{list.list_name}</span>
@@ -164,18 +165,31 @@ export default function CustomListsManager({ ownerType, ownerId }) {
 
                   <button 
                     onClick={() => setActiveListId(isAddingToThis ? null : list.id)} 
-                    className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${isAddingToThis ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-neutral-950 text-white hover:bg-neutral-800'}`}
                   >
-                    <Plus size={13} />
-                    <span>{isAddingToThis ? 'Kapat' : 'Öğe Ekle'}</span>
+                    <Plus size={14} className={isAddingToThis ? 'rotate-45 transition-transform' : 'transition-transform'} />
+                    <span>{isAddingToThis ? 'İptal Et' : 'Listeye Ekle'}</span>
                   </button>
                 </div>
 
+                {/* AÇILIR EKLEME PANELİ */}
                 {isAddingToThis && (
-                  <div className="p-4 bg-blue-50/40 border-b border-blue-100 space-y-3">
+                  <div className="p-4 bg-blue-50/40 border-b border-blue-100 space-y-3 animate-in fade-in duration-200">
                     <div className="flex gap-2 text-xs">
-                      <button type="button" onClick={() => setAddMode('REQUEST')} className={`px-3 py-1.5 rounded-lg font-bold transition ${addMode === 'REQUEST' ? 'bg-neutral-950 text-white' : 'bg-white text-neutral-600 border'}`}>Sistemden Talep Ekle</button>
-                      <button type="button" onClick={() => setAddMode('CONTACT')} className={`px-3 py-1.5 rounded-lg font-bold transition ${addMode === 'CONTACT' ? 'bg-neutral-950 text-white' : 'bg-white text-neutral-600 border'}`}>Manuel Kişi / Firma Ekle</button>
+                      <button 
+                        type="button" 
+                        onClick={() => setAddMode('REQUEST')} 
+                        className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${addMode === 'REQUEST' ? 'bg-neutral-950 text-white shadow-sm' : 'bg-white text-neutral-600 border border-neutral-200'}`}
+                      >
+                        Sistemden Talep Ekle
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setAddMode('CONTACT')} 
+                        className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${addMode === 'CONTACT' ? 'bg-neutral-950 text-white shadow-sm' : 'bg-white text-neutral-600 border border-neutral-200'}`}
+                      >
+                        Manuel Kişi / Firma Ekle
+                      </button>
                     </div>
 
                     {addMode === 'REQUEST' ? (
@@ -183,17 +197,17 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                         <select 
                           value={selectedRequestId} 
                           onChange={(e) => setSelectedRequestId(e.target.value)}
-                          className="flex-1 p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                          className="flex-1 p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium"
                         >
-                          <option value="">-- Bir Talep Seçin --</option>
+                          <option value="">-- Listeye Eklemek İçin Bir Talep Seçin --</option>
                           {availableRequests.map((req) => (
                             <option key={req.id} value={req.id}>
                               #REQ-{req.id} - "{req.raw_text}" ({req.status})
                             </option>
                           ))}
                         </select>
-                        <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition">
-                          Ekle
+                        <button type="submit" className="px-5 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition cursor-pointer shrink-0 shadow-sm">
+                          Seçilen Talebi Ekle
                         </button>
                       </form>
                     ) : (
@@ -228,7 +242,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                           />
                         </div>
                         <div className="sm:col-span-1">
-                          <button type="submit" className="w-full py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition">
+                          <button type="submit" className="w-full py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition cursor-pointer shadow-sm">
                             Ekle
                           </button>
                         </div>
@@ -237,6 +251,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                   </div>
                 )}
 
+                {/* LİSTEDEKİ ÖĞELERİN KARTLARI */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
@@ -246,7 +261,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                         <div key={item.id} className="p-3 bg-white rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
                           <div className="space-y-1 min-w-0 pr-2">
                             <h4 className="font-bold text-xs text-neutral-900 truncate flex items-center gap-1">
-                              {item.request_id ? <FileText size={12} className="text-blue-500 shrink-0" /> : <User size={12} className="text-neutral-400 shrink-0" />}
+                              {item.request_id ? <FileText size={12} className="text-blue-600 shrink-0" /> : <User size={12} className="text-neutral-500 shrink-0" />}
                               <span>{item.contact_name}</span>
                             </h4>
                             <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">
@@ -261,7 +276,7 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                           </div>
                           <button 
                             onClick={() => handleDeleteItem(item.id)} 
-                            className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0"
+                            className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer"
                             title="Listeden Çıkar"
                           >
                             <Trash2 size={14} />
@@ -271,11 +286,13 @@ export default function CustomListsManager({ ownerType, ownerId }) {
                     </div>
                   )}
                 </div>
+
               </div>
             );
           })
         )}
       </div>
+
     </div>
   );
 }

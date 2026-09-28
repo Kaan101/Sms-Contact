@@ -35,6 +35,17 @@ export default function ProviderDashboard() {
   
   const [proposalDetails, setProposalDetails] = useState({});
 
+  // Sağlayıcının listelerini kart içindeki "Listeye Ekle" özelliği için tutalım
+  const [providerLists, setProviderLists] = useState([]);
+
+  useEffect(() => {
+    if (session?.phone) {
+      axios.get(`${API_BASE}/lists/PROVIDER/${session.phone}`)
+        .then(res => { if(res.data?.lists) setProviderLists(res.data.lists); })
+        .catch(() => {});
+    }
+  }, [API_BASE, session?.phone]);
+
   const updateProposalDetail = useCallback((reqId, field, value) => {
     setProposalDetails(prev => ({
       ...prev,
@@ -382,6 +393,43 @@ export default function ProviderDashboard() {
                                   )}
                               </div>
                             </div>
+
+                            {/* YENİ: KABUL EDİLDİĞİNDE LİSTEYE EKLEME ALANI */}
+                            {reqStatus === 'ACCEPTED' && providerLists.length > 0 && (
+                              <div className="mt-2.5 p-3 bg-neutral-100 border border-neutral-200 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                                <span className="text-[11px] font-bold text-neutral-700 flex items-center gap-1">
+                                  <Folder size={13} className="text-neutral-500" />
+                                  <span>Bu işi özel listenize kaydedin:</span>
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <select 
+                                    id={`prov-list-select-${req.id}`}
+                                    className="p-1.5 text-xs rounded-lg border border-neutral-200 bg-white outline-none font-medium text-neutral-800"
+                                  >
+                                    <option value="">Liste Seçin...</option>
+                                    {providerLists.map(lst => (
+                                      <option key={lst.id} value={lst.id}>{lst.list_name}</option>
+                                    ))}
+                                  </select>
+                                  <button 
+                                    onClick={async () => {
+                                      const selectEl = document.getElementById(`prov-list-select-${req.id}`);
+                                      const listId = selectEl.value;
+                                      if (!listId) { alert('Lütfen bir liste seçin.'); return; }
+                                      try {
+                                        await axios.post(`${API_BASE}/lists/${listId}/requests`, { requestId: req.id });
+                                        alert('Talep listenize başarıyla eklendi!');
+                                      } catch (err) {
+                                        alert('Eklenirken bir hata oluştu.');
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-sm"
+                                  >
+                                    Ekle
+                                  </button>
+                                </div>
+                              </div>
+                            )}
 
                             <div className="bg-white border p-3 rounded-xl flex items-center justify-between shadow-xs">
                               <div className="flex flex-col">
