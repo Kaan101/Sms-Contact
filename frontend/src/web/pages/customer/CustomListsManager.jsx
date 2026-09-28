@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, ExternalLink } from 'lucide-react';
+import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, RefreshCw, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray } from '../../../core/utils/helpers';
 
@@ -12,7 +12,7 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
   const [newListName, setNewListName] = useState('');
   const [activeListId, setActiveListId] = useState(null);
   
-  const [addMode, setAddMode] = useState('REQUEST'); // 'REQUEST' veya 'CONTACT'
+  const [addMode, setAddMode] = useState('REQUEST');
   const [newItem, setNewItem] = useState({ contactName: '', contactPhone: '', notes: '' });
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [availableRequests, setAvailableRequests] = useState([]);
@@ -117,7 +117,6 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
   return (
     <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6 shadow-sm">
       
-      {/* ÜST KISIM: Başlık (Özel kelimesi kaldırılmış haliyle) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div>
           <h3 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
@@ -248,17 +247,17 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                   </div>
                 )}
 
-                {/* LİSTEDEKİ ÖĞELER (Taleplere tıklayınca ilgili talep detayına/ekranına geçiş tetiklenir) */}
+                {/* LİSTEDEKİ ÖĞELER (Talep olanlarda Rework / Yeniden Ele Al Butonu) */}
                 <div className="p-4">
                   {!list.items || list.items.length === 0 ? (
                     <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {list.items.map((item) => (
-                        <div key={item.id} className="p-3 bg-white rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
-                          <div className="space-y-1 min-w-0 pr-2">
-                            <h4 className="font-bold text-xs text-neutral-900 truncate flex items-center gap-1">
-                              {item.request_id ? <FileText size={12} className="text-blue-600 shrink-0" /> : <User size={12} className="text-neutral-500 shrink-0" />}
+                        <div key={item.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-xs flex flex-col justify-between space-y-2">
+                          <div className="space-y-1 min-w-0">
+                            <h4 className="font-bold text-xs text-neutral-950 truncate flex items-center gap-1.5">
+                              {item.request_id ? <FileText size={13} className="text-blue-600 shrink-0" /> : <User size={13} className="text-neutral-500 shrink-0" />}
                               <span>{item.contact_name}</span>
                             </h4>
                             <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">
@@ -266,37 +265,40 @@ export default function CustomListsManager({ ownerType, ownerId, onSelectRequest
                               <span>{item.contact_phone}</span>
                             </p>
                             {item.notes && (
-                              <p className="text-[10px] text-neutral-500 bg-neutral-50 p-1 rounded truncate">
+                              <p className="text-[10px] text-neutral-600 bg-neutral-50 p-1.5 rounded border border-neutral-100 line-clamp-2">
                                 📝 {item.notes}
                               </p>
                             )}
+                          </div>
 
-                            {/* Talep ID varsa tıklanabilir yönlendirme butonu */}
-                            {item.request_id && (
+                          <div className="flex items-center justify-between pt-2 border-t border-neutral-100 mt-1">
+                            {item.request_id ? (
                               <button 
                                 onClick={() => {
                                   if (onSelectRequest) {
                                     onSelectRequest(item.request_id);
                                   } else {
-                                    // Eğer dashboard ana sayfaya dönmek isterse veya ilgili talebi öne çıkarmak isterse:
-                                    alert(`Talep #${item.request_id} seçildi.`);
+                                    alert(`Talep #${item.request_id} yeniden incelemeye alınıyor...`);
                                   }
                                 }}
-                                className="mt-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-1 rounded w-fit transition"
+                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                                title="Bu talebi yeniden ele al ve incele"
                               >
-                                <span>Talebi Aç / İncele</span>
-                                <ExternalLink size={11} />
+                                <RefreshCw size={11} className="animate-spin-hover" />
+                                <span>Rework / İncele</span>
                               </button>
+                            ) : (
+                              <span className="text-[10px] text-neutral-400 italic">Manuel Kişi</span>
                             )}
-                          </div>
 
-                          <button 
-                            onClick={() => handleDeleteItem(item.id)} 
-                            className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer self-start"
-                            title="Listeden Çıkar"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                            <button 
+                              onClick={() => handleDeleteItem(item.id)} 
+                              className="p-1.5 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer"
+                              title="Listeden Çıkar"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
