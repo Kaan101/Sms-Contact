@@ -52,6 +52,9 @@ const {
   removeListItem 
 } = require('../controllers/listController');
 
+const { createDirectReorder } = require('../controllers/requestController');
+router.post('/direct-reorder', createDirectReorder);
+
 // Özel liste rotaları
 router.get('/lists/:ownerType/:ownerId', getListsByOwner);
 router.post('/lists', createList);

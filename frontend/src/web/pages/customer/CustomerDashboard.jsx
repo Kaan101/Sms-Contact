@@ -311,12 +311,12 @@ export default function CustomerDashboard() {
 
       {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
 
-      {activeTab === 'LISTS' ? (
+{activeTab === 'LISTS' ? (
         <CustomListsManager 
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
           
-          // 1. TALEP OLUŞTUR (FORM DOLDURMA - HAVUZA ATMAK İÇİN)
+          // 1. TALEP OLUŞTUR BUTONU (Eski bilgileri forma taşır, düzenleyip havuza atarsın)
           onReworkRequest={(origReq) => {
             setQueryText(origReq.raw_text || origReq.notes || '');
             if(origReq.location) {
@@ -338,39 +338,53 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // 2. TEKRARLA (DOĞRUDAN ESKİ SAĞLAYICIYA PASLAMA)
+          // 2. TEKRARLA BUTONU (Havuza düşmeden, otomatik tarih hesaplayarak doğrudan eski sağlayıcıya atar)
           onDirectReorder={async (origReq) => {
-            if (!origReq || (!origReq.matched_provider_id && !origReq.provider_id)) {
-              alert('Bu talebin geçmişte onaylanmış bir sağlayıcısı bulunamadığı için doğrudan tekrarlanamaz. Lütfen "Talep Oluştur" butonunu kullanın.');
+            // Eğer geçmiş bir sağlayıcı yoksa uyar
+            const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
+            if (!origReq || !targetProviderId) {
+              alert('Bu talebin geçmişte çalıştığınız bir sağlayıcısı bulunamadığı için doğrudan tekrarlanamaz. Lütfen "Talep Oluştur" butonunu kullanın.');
               return;
             }
 
-            if (!window.confirm(`Bu siparişi ${origReq.provider_name || 'aynı sağlayıcıya'} tekrar göndermek istediğinize emin misiniz?`)) return;
+            if (!window.confirm(`Bu siparişi "${origReq.provider_name || 'önceki sağlayıcıya'}" eski fiyat üzerinden doğrudan tekrar göndermek istediğinize emin misiniz?`)) return;
 
             setLoading(true);
             try {
-              // Havuza düşmeden hedeflenmiş sipariş
+              // --- AKILLI TARİH HESAPLAMA (Eski teslimat süresini bulup şu anki zamana ekler) ---
+              let suggestedTargetDate = null;
+              if (origReq.matched_target_date && origReq.created_at) {
+                const oldCreated = new Date(origReq.created_at).getTime();
+                const oldTarget = new Date(origReq.matched_target_date).getTime();
+                const durationMs = oldTarget - oldCreated; // Aradan geçen süre (Milisaniye)
+                
+                if (durationMs > 0) {
+                  const newTargetDate = new Date(Date.now() + durationMs);
+                  suggestedTargetDate = newTargetDate.toISOString();
+                }
+              }
+
               const payload = {
                 rawText: origReq.raw_text,
-                disambiguationChoice: null,
                 contactValue: origReq.contact_value || session.phone,
                 preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
                 location: origReq.location || 'İstanbul, Türkiye',
                 isUrgent: origReq.is_urgent || false,
-                deadlineDatetime: null,
                 requestType: origReq.request_type || 'TALEP',
-                // Backend requestController içindeki createRequest metodunun bu parametreyi alıp 
-                // status = 'MATCHED' ve matched_provider_id = targetProviderId olarak yazması gerekir.
-                targetProviderId: origReq.matched_provider_id || origReq.provider_id 
+                targetProviderId: targetProviderId,
+                suggestedBudget: origReq.matched_budget || origReq.provider_budget, // Eski Fiyat
+                suggestedTargetDate: suggestedTargetDate // Otomatik Hesaplanan Yeni Tarih
               };
 
-              await axios.post(`${API_BASE}/requests`, payload);
-              alert('Siparişiniz başarıyla tekrarlandı ve doğrudan sağlayıcıya iletildi!');
+              // Özel Direct-Reorder Endpoint'ine İstek Atıyoruz
+              await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
+              
+              alert('Sipariş başarıyla tekrarlandı! Havuza düşmeden doğrudan sağlayıcınızın onayına sunuldu.');
               await mutateCustomerReqs();
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-              alert('Sipariş tekrarlanırken bir hata oluştu.');
+              alert(err.response?.data?.message || 'Sipariş tekrarlanırken bir hata oluştu.');
             } finally {
               setLoading(false);
             }
