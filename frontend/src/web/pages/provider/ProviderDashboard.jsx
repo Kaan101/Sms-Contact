@@ -5,7 +5,7 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ThumbsUp, ArrowRight
+  User, Award, ShieldCheck, Tag, ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -27,7 +27,6 @@ function ProviderRequestCard({
 }) {
   const reqStatus = safeUpper(req.status) || 'MATCHED';
   
-  // Tekrarlanan sipariş mi kontrolü
   const isReorder = Boolean(
     (req.provider_description && req.provider_description.includes('Tekrar')) ||
     (req.matched_budget && req.matched_target_date)
@@ -48,8 +47,16 @@ function ProviderRequestCard({
   const [budget, setBudget] = useState(initialBudget);
   const [targetDate, setTargetDate] = useState(initialDate);
   const [description, setDescription] = useState(req.provider_description || '');
-  const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Buton ve Inline Bildirim Durumları
+  const [btnLoading, setBtnLoading] = useState(false);
+  const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', text: '' }
+
+  const showFeedback = (type, text) => {
+    setFeedback({ type, text });
+    setTimeout(() => setFeedback(null), 3500);
+  };
 
   useEffect(() => {
     setBudget(req.provider_budget || req.matched_budget || '');
@@ -74,43 +81,64 @@ function ProviderRequestCard({
   };
 
   const handleAccept = async () => {
-    setLoading(true);
+    setBtnLoading(true);
+    setFeedback(null);
     try {
       await saveDetails();
       await axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' });
-      alert(isReorder ? 'Sipariş devam ettirildi.' : 'Sipariş başarıyla kabul edildi.');
+      showFeedback('success', isReorder ? 'Sipariş devam ettirildi' : 'Kabul edildi');
       onRefresh();
     } catch (err) {
-      alert(err.response?.data?.message || 'İşlem sırasında hata oluştu.');
+      showFeedback('error', err.response?.data?.message || 'İşlem başarısız');
     } finally {
-      setLoading(false);
+      setBtnLoading(false);
     }
   };
 
   const handleComplete = async () => {
-    if (!window.confirm('Bu hizmeti tamamladığınızı bildirmek istiyor musunuz?')) return;
-    setLoading(true);
+    setBtnLoading(true);
+    setFeedback(null);
     try {
       await axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'PROVIDER_COMPLETED' });
-      alert('Hizmet tamamlandı olarak işaretlendi. Müşteri onayı bekleniyor.');
+      showFeedback('success', 'Teslimat bildirildi');
       onRefresh();
     } catch (err) {
-      alert('Hata oluştu.');
+      showFeedback('error', 'Tamamlama başarısız');
     } finally {
-      setLoading(false);
+      setBtnLoading(false);
     }
   };
 
   const handleSkip = async () => {
-    if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Sıradaki sağlayıcıya iletilecektir.')) return;
-    setLoading(true);
+    setBtnLoading(true);
+    setFeedback(null);
     try {
       await axios.post(`${API_BASE}/requests/${req.id}/next-provider`);
+      showFeedback('success', 'Pas geçildi');
       onRefresh();
     } catch (err) {
-      alert('Pas geçme işlemi başarısız.');
+      showFeedback('error', 'Hata oluştu');
     } finally {
-      setLoading(false);
+      setBtnLoading(false);
+    }
+  };
+
+  // Liste Ekleme Inline Bildirimi
+  const [listFeedback, setListFeedback] = useState(null);
+  const handleAddToList = async () => {
+    const selectEl = document.getElementById(`prov-list-${req.id}`);
+    if (!selectEl?.value) {
+      setListFeedback({ type: 'error', text: 'Liste seçin' });
+      setTimeout(() => setListFeedback(null), 2500);
+      return;
+    }
+    try {
+      await axios.post(`${API_BASE}/lists/${selectEl.value}/requests`, { requestId: req.id });
+      setListFeedback({ type: 'success', text: 'Kaydedildi' });
+    } catch (e) {
+      setListFeedback({ type: 'error', text: 'Eklenemedi' });
+    } finally {
+      setTimeout(() => setListFeedback(null), 2500);
     }
   };
 
@@ -158,8 +186,6 @@ function ProviderRequestCard({
             <MapPin size={12} className="text-neutral-400 shrink-0" />
             <span>{extractAddress(req.location)}</span>
           </p>
-          
-          {/* İletişim Bilgisi (Tekrarlanan işlerde doğrudan açık görünür) */}
           <p className="text-xs font-mono text-blue-700 font-semibold mt-1 flex items-center gap-1">
             <Phone size={12} className="text-blue-500 shrink-0" />
             <span>{req.contact_value}</span>
@@ -201,7 +227,7 @@ function ProviderRequestCard({
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
             <DollarSign size={14} className="text-emerald-600" />
-            <span>Sipariş Şartları (Fiyat & Teslimat Tarihi)</span>
+            <span>Sipariş Şartları</span>
           </span>
           {reqStatus === 'MATCHED' && (
             <button
@@ -209,7 +235,7 @@ function ProviderRequestCard({
               onClick={() => setIsEditing(!isEditing)}
               className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
             >
-              {isEditing ? 'Düzenlemeyi Kapat' : 'Şartları Düzenle'}
+              {isEditing ? 'Kapat' : 'Şartları Düzenle'}
             </button>
           )}
         </div>
@@ -259,11 +285,11 @@ function ProviderRequestCard({
         )}
       </div>
 
-      {/* Aksiyon Butonları */}
+      {/* Aksiyon Butonları & Düğmenin Solundaki Geri Bildirimler */}
       <div className="flex items-center justify-between pt-1 border-t border-neutral-100 flex-wrap gap-2">
         <div className="flex items-center gap-1.5">
           {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <select
                 id={`prov-list-${req.id}`}
                 className="p-1.5 text-xs rounded-lg border border-neutral-200 bg-white outline-none text-neutral-800"
@@ -273,18 +299,20 @@ function ProviderRequestCard({
                   <option key={l.id} value={l.id}>{l.list_name}</option>
                 ))}
               </select>
+              
+              {listFeedback && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
+                  listFeedback.type === 'success' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                }`}>
+                  {listFeedback.text}
+                </span>
+              )}
+
               <button
                 type="button"
-                onClick={async () => {
-                  const selectEl = document.getElementById(`prov-list-${req.id}`);
-                  if (!selectEl?.value) return alert('Lütfen bir liste seçin.');
-                  try {
-                    await axios.post(`${API_BASE}/lists/${selectEl.value}/requests`, { requestId: req.id });
-                    alert('Listeye kaydedildi.');
-                  } catch (e) {
-                    alert('Hata oluştu.');
-                  }
-                }}
+                onClick={handleAddToList}
                 className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-bold transition cursor-pointer"
               >
                 Ekle
@@ -293,35 +321,56 @@ function ProviderRequestCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
+        {/* SAĞ TARAF: BİLDİRİM VE İŞLEM DÜĞMESİ */}
+        <div className="flex items-center gap-2.5 ml-auto">
+          {/* DÜĞMENİN SOLUNDA ÇIKAN SADE GERİ BİLDİRİM ETİKETİ */}
+          {feedback && (
+            <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in slide-in-from-right-1 duration-200 flex items-center gap-1 ${
+              feedback.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}>
+              {feedback.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
+              <span>{feedback.text}</span>
+            </div>
+          )}
+
           {reqStatus === 'MATCHED' && (
             <>
               {!isReorder && (
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={btnLoading}
                   onClick={handleSkip}
-                  className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
+                  className="px-3 py-2 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
                 >
                   Pas Geç
                 </button>
               )}
               <button
                 type="button"
-                disabled={loading}
+                disabled={btnLoading}
                 onClick={handleAccept}
-                className={`px-5 py-2 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition ${
+                className={`px-5 py-2 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition ${
                   isReorder ? 'bg-neutral-950 hover:bg-neutral-800' : 'bg-emerald-600 hover:bg-emerald-700'
                 }`}
               >
-                {loading ? (
-                  <Loader2 size={13} className="animate-spin" />
+                {btnLoading ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>İşleniyor...</span>
+                  </>
                 ) : isReorder ? (
-                  <ArrowRight size={14} />
+                  <>
+                    <span>Devam</span>
+                    <ArrowRight size={14} />
+                  </>
                 ) : (
-                  <Check size={14} />
+                  <>
+                    <Check size={14} />
+                    <span>Şartları Onayla & İşi Kabul Et</span>
+                  </>
                 )}
-                <span>{isReorder ? 'Devam' : 'Şartları Onayla & İşi Kabul Et'}</span>
               </button>
             </>
           )}
@@ -329,12 +378,21 @@ function ProviderRequestCard({
           {reqStatus === 'ACCEPTED' && (
             <button
               type="button"
-              disabled={loading}
+              disabled={btnLoading}
               onClick={handleComplete}
-              className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition"
+              className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition"
             >
-              {loading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={14} />}
-              <span>İşi Teslim Et</span>
+              {btnLoading ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Tamamlanıyor...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={14} />
+                  <span>İşi Teslim Et</span>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -404,15 +462,29 @@ export default function ProviderDashboard() {
     return assignedRequests.filter(r => safeUpper(r.status) === 'ACCEPTED').length;
   }, [assignedRequests]);
 
+  // Havuz Talep Olma Durumu ve Sol Bildirim
+  const [poolActionId, setPoolActionId] = useState(null);
+  const [poolFeedbackMap, setPoolFeedbackMap] = useState({}); // { [reqId]: { type, text } }
+
   const handleJoinPool = async (requestId) => {
-    if (!providerId) return alert('Sağlayıcı kimliği doğrulanamadı.');
+    if (!providerId) {
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
+      setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3000);
+      return;
+    }
+
+    setPoolActionId(requestId);
+    setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null }));
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId });
-      alert('Talebe talip oldunuz. Müşteri sizi seçtiğinde bildirim alacaksınız.');
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Sıraya girildi' } }));
       mutatePool();
       mutateAssigned();
     } catch (err) {
-      alert(err.response?.data?.message || 'Havuz işleminde hata oluştu.');
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: err.response?.data?.message || 'Hata oluştu' } }));
+    } finally {
+      setPoolActionId(null);
+      setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3500);
     }
   };
 
@@ -570,37 +642,66 @@ export default function ProviderDashboard() {
             </div>
           ) : (
             <div className="space-y-3">
-              {poolRequests.map(req => (
-                <div key={req.id} className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
-                      <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
-                        {safeDateTime(req.created_at)}
-                      </span>
-                      {req.is_urgent && (
-                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                          ACİL
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
-                    <p className="text-xs text-neutral-500 flex items-center gap-1">
-                      <MapPin size={12} className="text-neutral-400 shrink-0" />
-                      <span>{extractAddress(req.location)}</span>
-                    </p>
-                  </div>
+              {poolRequests.map(req => {
+                const isJoining = poolActionId === req.id;
+                const poolFb = poolFeedbackMap[req.id];
 
-                  <button
-                    type="button"
-                    onClick={() => handleJoinPool(req.id)}
-                    className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                  >
-                    <Send size={13} />
-                    <span>Talebe Talip Ol</span>
-                  </button>
-                </div>
-              ))}
+                return (
+                  <div key={req.id} className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
+                        <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
+                          {safeDateTime(req.created_at)}
+                        </span>
+                        {req.is_urgent && (
+                          <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                            ACİL
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
+                      <p className="text-xs text-neutral-500 flex items-center gap-1">
+                        <MapPin size={12} className="text-neutral-400 shrink-0" />
+                        <span>{extractAddress(req.location)}</span>
+                      </p>
+                    </div>
+
+                    {/* HAVUZ BUTONU VE SOLUNDAKİ BİLDİRİM */}
+                    <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                      {poolFb && (
+                        <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in duration-200 flex items-center gap-1 ${
+                          poolFb.type === 'success'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-rose-50 text-rose-800 border-rose-200'
+                        }`}>
+                          {poolFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
+                          <span>{poolFb.text}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={isJoining}
+                        onClick={() => handleJoinPool(req.id)}
+                        className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+                      >
+                        {isJoining ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            <span>İletiliyor...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send size={13} />
+                            <span>Talebe Talip Ol</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -611,12 +712,8 @@ export default function ProviderDashboard() {
         <CustomListsManager
           ownerType="PROVIDER"
           ownerId={session?.phone}
-          onReworkRequest={(origReq) => {
-            alert(`Bu talep (#REQ-${origReq.id}) üzerinden müşteriye doğrudan ulaşıp yeni sipariş oluşturabilirsiniz.`);
-          }}
-          onDirectReorder={(origReq) => {
-            alert(`Talep (#REQ-${origReq.id}) için müşteriye sipariş hatırlatması gönderildi.`);
-          }}
+          onReworkRequest={() => {}}
+          onDirectReorder={() => {}}
         />
       )}
     </div>
