@@ -286,6 +286,7 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
+// Sağlayıcının üzerine düşen işleri getiren fonksiyon
 const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
@@ -294,12 +295,18 @@ const getProviderAssignedRequests = async (req, res) => {
     const { rows } = await pool.query(
       `SELECT r.*, 
         (SELECT rating FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_type = 'PROVIDER' LIMIT 1) as provider_rating,
-        rpd.provider_budget as matched_budget, rpd.provider_currency as matched_currency, rpd.provider_target_date as matched_target_date
+        rpd.provider_budget,
+        rpd.provider_currency,
+        rpd.provider_target_date,
+        rpd.provider_description,
+        rpd.provider_budget as matched_budget, 
+        rpd.provider_currency as matched_currency, 
+        rpd.provider_target_date as matched_target_date
        FROM requests r
        LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = $1)
        WHERE r.matched_provider_id = $1 
        AND r.status IN ('MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED')
-       ORDER BY r.updated_at DESC;`,
+       ORDER BY r.updated_at DESC, r.created_at DESC;`,
       [providerId]
     );
 
@@ -320,6 +327,38 @@ const getProviderAssignedRequests = async (req, res) => {
   }
 };
 
+// Sağlayıcının teklif/tutar/tarih güncelleme fonksiyonu
+const upsertProviderRequestDetails = async (req, res) => {
+  try {
+    const { requestId, providerId } = req.params;
+    const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
+
+    const budget = providerBudget !== undefined && providerBudget !== null && providerBudget !== '' 
+      ? parseFloat(providerBudget) 
+      : null;
+    const targetDate = providerTargetDate ? new Date(providerTargetDate) : null;
+    const currency = providerCurrency || 'TRY';
+
+    const { rows } = await pool.query(
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       ON CONFLICT (request_id, provider_id) 
+       DO UPDATE SET 
+         provider_budget = EXCLUDED.provider_budget, 
+         provider_currency = EXCLUDED.provider_currency,
+         provider_target_date = EXCLUDED.provider_target_date, 
+         provider_description = COALESCE(EXCLUDED.provider_description, request_provider_details.provider_description),
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *;`,
+      [parseInt(requestId, 10), parseInt(providerId, 10), budget, currency, targetDate, providerDescription || '']
+    );
+
+    res.status(200).json({ status: 'success', details: rows[0] });
+  } catch (error) {
+    console.error('upsertProviderRequestDetails hatası:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
 const getMatchedRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT r.*, sp.name as provider_name, sp.phone as provider_phone FROM requests r LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id ORDER BY r.created_at DESC;`);
