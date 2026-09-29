@@ -286,7 +286,6 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// Sağlayıcının üzerine düşen işleri getiren fonksiyon
 const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
@@ -327,38 +326,6 @@ const getProviderAssignedRequests = async (req, res) => {
   }
 };
 
-// Sağlayıcının teklif/tutar/tarih güncelleme fonksiyonu
-const upsertProviderRequestDetails = async (req, res) => {
-  try {
-    const { requestId, providerId } = req.params;
-    const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
-
-    const budget = providerBudget !== undefined && providerBudget !== null && providerBudget !== '' 
-      ? parseFloat(providerBudget) 
-      : null;
-    const targetDate = providerTargetDate ? new Date(providerTargetDate) : null;
-    const currency = providerCurrency || 'TRY';
-
-    const { rows } = await pool.query(
-      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       ON CONFLICT (request_id, provider_id) 
-       DO UPDATE SET 
-         provider_budget = EXCLUDED.provider_budget, 
-         provider_currency = EXCLUDED.provider_currency,
-         provider_target_date = EXCLUDED.provider_target_date, 
-         provider_description = COALESCE(EXCLUDED.provider_description, request_provider_details.provider_description),
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING *;`,
-      [parseInt(requestId, 10), parseInt(providerId, 10), budget, currency, targetDate, providerDescription || '']
-    );
-
-    res.status(200).json({ status: 'success', details: rows[0] });
-  } catch (error) {
-    console.error('upsertProviderRequestDetails hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-};
 const getMatchedRequests = async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT r.*, sp.name as provider_name, sp.phone as provider_phone FROM requests r LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id ORDER BY r.created_at DESC;`);
@@ -401,12 +368,15 @@ const deleteRequest = async (req, res) => {
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
+// TEK TANIM: Sağlayıcı detaylarını (tutar, para birimi, tarih, açıklama) güncelleme/ekleme
 const upsertProviderRequestDetails = async (req, res) => {
   try {
     const { requestId, providerId } = req.params;
     const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
 
-    const budget = providerBudget ? parseFloat(providerBudget) : null;
+    const budget = providerBudget !== undefined && providerBudget !== null && providerBudget !== '' 
+      ? parseFloat(providerBudget) 
+      : null;
     const targetDate = providerTargetDate ? new Date(providerTargetDate) : null;
     const currency = providerCurrency || 'TRY';
 
@@ -418,10 +388,10 @@ const upsertProviderRequestDetails = async (req, res) => {
          provider_budget = EXCLUDED.provider_budget, 
          provider_currency = EXCLUDED.provider_currency,
          provider_target_date = EXCLUDED.provider_target_date, 
-         provider_description = EXCLUDED.provider_description,
+         provider_description = COALESCE(EXCLUDED.provider_description, request_provider_details.provider_description),
          updated_at = CURRENT_TIMESTAMP
        RETURNING *;`,
-      [parseInt(requestId, 10), parseInt(providerId, 10), budget, currency, targetDate, providerDescription]
+      [parseInt(requestId, 10), parseInt(providerId, 10), budget, currency, targetDate, providerDescription || '']
     );
 
     res.status(200).json({ status: 'success', details: rows[0] });
@@ -431,49 +401,76 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// ⭐ KESİN VE GARANTİLİ KOPYALAMA: Verileri Frontend'den Zorunlu Olarak Alır
+// Tekrarlanan siparişi oluşturma ve geçmiş detayları yeni kayda kopyalama
 const createDirectReorder = async (req, res) => {
   try {
     const { 
       rawText, contactValue, preferredChannel, location, isUrgent, requestType,
-      targetProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription
+      targetProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription, oldRequestId
     } = req.body;
 
     const tProviderId = targetProviderId ? parseInt(targetProviderId, 10) : null;
-    
-    // Frontend'den gelen fiyatı garanti altına alıyoruz (Boşsa 0)
-    const budget = suggestedBudget ? parseFloat(suggestedBudget) : 0;
-    
-    // Tarih gelmezse şu andan tam 24 saat sonrasını garanti atıyoruz
-    const targetDate = suggestedTargetDate ? new Date(suggestedTargetDate) : new Date(Date.now() + 86400000).toISOString();
-
     if (!tProviderId) {
       return res.status(400).json({ status: 'error', message: 'Sağlayıcı kimliği eksik.' });
     }
 
-    // 1. TALEBİ MATCHED (Eşleşti) OLARAK OLUŞTUR
+    let budget = suggestedBudget ? parseFloat(suggestedBudget) : null;
+    let targetDate = suggestedTargetDate ? new Date(suggestedTargetDate) : null;
+    let description = suggestedDescription || 'Tekrarlanan Sipariş';
+
+    // Eğer frontend'den değerler eksik geldiyse eski sipariş detaylarından tamamla
+    if ((budget === null || targetDate === null) && oldRequestId) {
+      const { rows: oldDetails } = await pool.query(
+        `SELECT rpd.provider_budget, rpd.provider_target_date, rpd.provider_description, r.created_at as req_created
+         FROM requests r
+         LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = $1)
+         WHERE r.id = $2 LIMIT 1`,
+        [tProviderId, parseInt(oldRequestId, 10)]
+      );
+
+      if (oldDetails.length > 0) {
+        if (budget === null && oldDetails[0].provider_budget) {
+          budget = parseFloat(oldDetails[0].provider_budget);
+        }
+        if (targetDate === null && oldDetails[0].provider_target_date && oldDetails[0].req_created) {
+          const diffMs = new Date(oldDetails[0].provider_target_date).getTime() - new Date(oldDetails[0].req_created).getTime();
+          if (diffMs > 0) {
+            targetDate = new Date(Date.now() + diffMs);
+          }
+        }
+        if (!description && oldDetails[0].provider_description) {
+          description = oldDetails[0].provider_description;
+        }
+      }
+    }
+
+    if (!targetDate) {
+      targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
+
+    // 1. Talebi MATCHED durumunda oluştur
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id)
       VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7)
       RETURNING *;
     `;
-    const { rows } = await pool.query(insertReqQuery, [
+    const { rows: newReqRows } = await pool.query(insertReqQuery, [
       rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent || false, requestType || 'TALEP', tProviderId
     ]);
-    const newReq = rows[0];
+    const newReq = newReqRows[0];
 
-    // 2. SAĞLAYICIYI ACTIVE (Kabul Etti/Sırada) OLARAK EKLE
+    // 2. Sağlayıcıyı eşleşme tablosuna ACTIVE olarak ekle
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, tProviderId]
     );
 
-    // 3. FİYAT VE TARİHİ DETAY TABLOSUNA KESİN YAZ
+    // 3. Fiyat ve teslimat tarihini detay tablosuna ekle
     await pool.query(
       `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
        VALUES ($1, $2, $3, 'TRY', $4, $5)`,
-      [newReq.id, tProviderId, budget, targetDate, suggestedDescription || 'Tekrarlanan Sipariş']
+      [newReq.id, tProviderId, budget, targetDate, description]
     );
 
     res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });
