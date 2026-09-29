@@ -9,7 +9,7 @@ import {
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
   ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
-  FileText, Bell, Folder
+  FileText, Bell, Folder, CheckCircle2 // ⭐ EKLENDİ: CheckCircle2 import edildi
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -106,7 +106,7 @@ function CustomerDashboardContent() {
   useEffect(() => { localStorage.setItem('sc_company_code', companyCode); }, [companyCode]);
   useEffect(() => { localStorage.setItem('sc_is_code_hidden', isCodeHidden); }, [isCodeHidden]);
 
-  // ⭐ Harita için varsayılan güvenli koordinat (Null asla kalmaz)
+  // Varsayılan koordinat
   const defaultPosition = useMemo(() => ({ lat: 41.0082, lng: 28.9784 }), []);
   const [mapPosition, setMapPosition] = useState(defaultPosition);
   const [mapSearchText, setMapSearchText] = useState('');
@@ -372,7 +372,7 @@ function CustomerDashboardContent() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.2.0-CRASH-PROOF</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.3.0-FIXED</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -653,7 +653,7 @@ function CustomerDashboardContent() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                                 {req.created_at && (<span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>)}
-                                {reqCode && (<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>{isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {reqCode} {isHidden ? '(Gizli)' : ''}</span>)}
+                                {reqCode && (<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}><Tag size={10}/> KOD: {reqCode} {isHidden ? '(Gizli)' : ''}</span>)}
                                 {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
