@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Component } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
@@ -19,9 +19,45 @@ import {
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
 import CustomListsManager from '../../components/common/CustomListsManager';
 
+// ⭐ Beyaz Ekranı Engelleyen Koruyucu (Error Boundary)
+class SafeDashboardBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('CustomerDashboard Render Hatası:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 max-w-xl mx-auto my-12 bg-rose-50 border border-rose-200 rounded-2xl text-rose-900 space-y-3 shadow-sm">
+          <div className="flex items-center gap-2 font-bold text-base text-rose-800">
+            <AlertTriangle size={20} />
+            <span>Arayüz Yüklenirken Bir Hata Oluştu</span>
+          </div>
+          <p className="text-xs font-mono bg-white p-3 rounded-lg border border-rose-100 overflow-x-auto text-rose-700">
+            {String(this.state.error?.message || this.state.error)}
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-rose-900 text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-rose-950 transition"
+          >
+            Sayfayı Yenile
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
-export default function CustomerDashboard() {
+function CustomerDashboardContent() {
   const { session, API_BASE } = useAuth();
   
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
@@ -70,7 +106,9 @@ export default function CustomerDashboard() {
   useEffect(() => { localStorage.setItem('sc_company_code', companyCode); }, [companyCode]);
   useEffect(() => { localStorage.setItem('sc_is_code_hidden', isCodeHidden); }, [isCodeHidden]);
 
-  const [mapPosition, setMapPosition] = useState(null);
+  // ⭐ Harita için varsayılan güvenli koordinat (Null asla kalmaz)
+  const defaultPosition = useMemo(() => ({ lat: 41.0082, lng: 28.9784 }), []);
+  const [mapPosition, setMapPosition] = useState(defaultPosition);
   const [mapSearchText, setMapSearchText] = useState('');
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
@@ -82,9 +120,9 @@ export default function CustomerDashboard() {
   const [actionFeedbackMap, setActionFeedbackMap] = useState({});
 
   const showActionFeedback = (key, type, text) => {
-    setActionFeedbackMap(prev => ({ ...prev, [key]: { type, text } }));
+    setActionFeedbackMap(prev => ({ ...(prev || {}), [key]: { type, text } }));
     setTimeout(() => {
-      setActionFeedbackMap(prev => ({ ...prev, [key]: null }));
+      setActionFeedbackMap(prev => ({ ...(prev || {}), [key]: null }));
     }, 3500);
   };
   
@@ -117,16 +155,16 @@ export default function CustomerDashboard() {
     if (validReq) {
       setLocationValue(extractAddress(validReq.location) || 'İstanbul, Türkiye');
       const coords = extractGPS(validReq.location);
-      if (coords) {
+      if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
         setMapPosition({ lat: coords[0], lng: coords[1] });
         setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
       } else {
-        setMapPosition({ lat: 41.0082, lng: 28.9784 });
+        setMapPosition(defaultPosition);
         setCoordinates('41.008200, 28.978400');
       }
     } else {
       setLocationValue('İstanbul, Türkiye');
-      setMapPosition({ lat: 41.0082, lng: 28.9784 });
+      setMapPosition(defaultPosition);
       setCoordinates('41.008200, 28.978400');
     }
     setIsLocating(false);
@@ -139,13 +177,15 @@ export default function CustomerDashboard() {
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
-          setMapPosition({ lat: latitude, lng: longitude });
-          setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-          const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
-          const addr = geoRes?.data?.address || {};
-          const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
-          const city = addr.city || addr.province || '';
-          setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
+          if (!isNaN(latitude) && !isNaN(longitude)) {
+            setMapPosition({ lat: latitude, lng: longitude });
+            setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
+            const addr = geoRes?.data?.address || {};
+            const district = addr.suburb || addr.district || addr.town || addr.city_district || '';
+            const city = addr.city || addr.province || '';
+            setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
+          }
         } catch { setLocationValue(`Haritadan İşaretlendi`); } finally { setIsLocating(false); }
       },
       () => { applyFallbackLocation(myCustomerRequests); },
@@ -154,7 +194,7 @@ export default function CustomerDashboard() {
   };
 
   useEffect(() => {
-    if (step === 'INPUT' && !mapPosition && !isLocating) fetchCurrentLocation();
+    if (step === 'INPUT' && !isLocating) fetchCurrentLocation();
   }, [step]);
 
   useEffect(() => {
@@ -183,7 +223,7 @@ export default function CustomerDashboard() {
   const submitFinalRequest = async (disambiguationChoice) => {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
-    const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session?.phone})` : (session?.phone || '');
+    const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session?.phone || ''})` : (session?.phone || '');
     const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
     const channelString = preferredChannels.join(', ');
 
@@ -207,7 +247,7 @@ export default function CustomerDashboard() {
     try {
       await axios.post(`${API_BASE}/requests`, { rawText: queryText, disambiguationChoice, contactValue: flaggedContactValue, preferredChannel: channelString, location: backendLocation, isUrgent, deadlineDatetime: deadlineDatetimeISO, requestType });
       
-      setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
+      setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(defaultPosition); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
       await mutateCustomerReqs();
     } catch (err) { setErrorMessage(err?.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
@@ -287,7 +327,7 @@ export default function CustomerDashboard() {
       const currentRatings = isSkip ? null : (reviewRatingsMap[requestId] || { knowledge: 5, communication: 5, timing: 5, cost: 5 }); 
       const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); 
       await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, ratings: currentRatings, comment }); 
-      setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); 
+      setReviewedRequestsMap(prev => ({ ...(prev || {}), [`${requestId}_${reviewerType}`]: true })); 
       showActionFeedback(actionKey, 'success', isSkip ? 'Atlandı' : 'Değerlendirme iletildi');
       await mutateCustomerReqs(); 
     } catch (err) {
@@ -318,7 +358,7 @@ export default function CustomerDashboard() {
 
   const getRatingsForReq = (id) => reviewRatingsMap[id] || { knowledge: 5, communication: 5, timing: 5, cost: 5 };
   const updateSpecificRating = (id, field, value) => {
-      setReviewRatingsMap(prev => ({ ...prev, [id]: { ...getRatingsForReq(id), [field]: value } }));
+      setReviewRatingsMap(prev => ({ ...(prev || {}), [id]: { ...getRatingsForReq(id), [field]: value } }));
   };
 
   const activeCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r?.status))), [myCustomerRequests]);
@@ -332,7 +372,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.1.0-STABLE</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.2.0-CRASH-PROOF</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -352,7 +392,7 @@ export default function CustomerDashboard() {
             if(origReq?.location) {
                setLocationValue(extractAddress(origReq.location));
                const coords = extractGPS(origReq.location);
-               if(coords) {
+               if(coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
                  setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
                  setMapPosition({lat: coords[0], lng: coords[1]});
                }
@@ -516,10 +556,10 @@ export default function CustomerDashboard() {
                             </div>
                             
                             <div className="absolute inset-0 z-0">
-                              <MapContainer center={mapPosition || [41.0082, 28.9784]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                              <MapContainer center={[mapPosition.lat, mapPosition.lng]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                 <ZoomControl position="bottomleft" />
                                 <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                                <UniversalMapController center={mapPosition || [41.0082, 28.9784]} />
+                                <UniversalMapController center={[mapPosition.lat, mapPosition.lng]} />
                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                               </MapContainer>
                             </div>
@@ -993,5 +1033,14 @@ export default function CustomerDashboard() {
         </>
       )}
     </div>
+  );
+}
+
+// Güvenlik Kalkanı Sarmalıyla Dışa Aktar
+export default function CustomerDashboard() {
+  return (
+    <SafeDashboardBoundary>
+      <CustomerDashboardContent />
+    </SafeDashboardBoundary>
   );
 }
