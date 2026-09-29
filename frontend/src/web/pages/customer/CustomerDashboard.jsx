@@ -28,7 +28,12 @@ export default function CustomerDashboard() {
   const systemSettings = rawSettings?.settings || { pool_lifespan_hours: 72, customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48, customer_approval_timeout_hours: 24 };
 
   const mapIcons = useMemo(() => ({
-    custom: new L.DivIcon({ html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));"><svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg></div>`, className: '', iconSize: [0, 0], iconAnchor: [0, 0] })
+    custom: new L.DivIcon({ 
+      html: `<div style="margin-top: -32px; margin-left: -16px; filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.3));"><svg width="32" height="32" viewBox="0 0 24 24" fill="#171717" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg></div>`, 
+      className: '', 
+      iconSize: [0, 0], 
+      iconAnchor: [0, 0] 
+    })
   }), []);
 
   const [step, setStep] = useState('INPUT');
@@ -57,7 +62,7 @@ export default function CustomerDashboard() {
   useEffect(() => {
     if (session?.phone) {
       axios.get(`${API_BASE}/lists/CUSTOMER/${session.phone}`)
-        .then(res => { if(res.data?.lists) setUserLists(res.data.lists); })
+        .then(res => { if(res?.data?.lists) setUserLists(res.data.lists); })
         .catch(() => {});
     }
   }, [API_BASE, session?.phone]);
@@ -70,11 +75,11 @@ export default function CustomerDashboard() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // Aksiyon ve Geri Bildirim State'leri (Popup yerine buton yanı rozetler)
+  // Aksiyon ve Geri Bildirim State'leri
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
-  const [actionFeedbackMap, setActionFeedbackMap] = useState({}); // { [key]: { type: 'success' | 'error', text: '' } }
+  const [actionFeedbackMap, setActionFeedbackMap] = useState({});
 
   const showActionFeedback = (key, type, text) => {
     setActionFeedbackMap(prev => ({ ...prev, [key]: { type, text } }));
@@ -108,7 +113,7 @@ export default function CustomerDashboard() {
   const myCustomerRequests = useMemo(() => safeArray(customerRequestsRes?.requests), [customerRequestsRes]);
 
   const applyFallbackLocation = (pastRequests) => {
-    const validReq = safeArray(pastRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
+    const validReq = safeArray(pastRequests).find(r => r?.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
     if (validReq) {
       setLocationValue(extractAddress(validReq.location) || 'İstanbul, Türkiye');
       const coords = extractGPS(validReq.location);
@@ -143,7 +148,7 @@ export default function CustomerDashboard() {
           setLocationValue(`${district}, ${city}`.replace(/^,\s*/, ''));
         } catch { setLocationValue(`Haritadan İşaretlendi`); } finally { setIsLocating(false); }
       },
-      (err) => { applyFallbackLocation(myCustomerRequests); },
+      () => { applyFallbackLocation(myCustomerRequests); },
       { timeout: 6000 }
     );
   };
@@ -178,7 +183,7 @@ export default function CustomerDashboard() {
   const submitFinalRequest = async (disambiguationChoice) => {
     setLoading(true);
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
-    const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session.phone})` : session.phone;
+    const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session?.phone})` : (session?.phone || '');
     const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
     const channelString = preferredChannels.join(', ');
 
@@ -186,7 +191,7 @@ export default function CustomerDashboard() {
     let fallbackCoords = '41.008200, 28.978400';
     
     if (!locationValue) {
-       const lastReq = safeArray(myCustomerRequests).find(r => r.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
+       const lastReq = safeArray(myCustomerRequests).find(r => r?.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
        if (lastReq) {
          fallbackLoc = extractAddress(lastReq.location) || fallbackLoc;
          const coords = extractGPS(lastReq.location);
@@ -204,7 +209,7 @@ export default function CustomerDashboard() {
       
       setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(null); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
       await mutateCustomerReqs();
-    } catch (err) { setErrorMessage(err.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
+    } catch (err) { setErrorMessage(err?.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
 
   const handleCustomerCombinedSubmit = async (e) => {
@@ -316,10 +321,10 @@ export default function CustomerDashboard() {
       setReviewRatingsMap(prev => ({ ...prev, [id]: { ...getRatingsForReq(id), [field]: value } }));
   };
 
-  const activeCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r.status))), [myCustomerRequests]);
-  const pendingReviewCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && safeUpper(r.status) === 'COMPLETED' && !(r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])), [myCustomerRequests, reviewedRequestsMap]);
-  const pastCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && (safeUpper(r.status) === 'CANCELLED' || (safeUpper(r.status) === 'COMPLETED' && (r.customer_rating !== null || reviewedRequestsMap[`${r.id}_CUSTOMER`])))), [myCustomerRequests, reviewedRequestsMap]);
-  const filteredPastCustomerRequests = useMemo(() => safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req.raw_text).includes(q) || safeLower(req.provider_name).includes(q) || safeLower(req.status).includes(q); }), [pastCustomerRequests, searchCustomerHistoryText]);
+  const activeCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && ['POOL', 'MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED', 'MANUAL_INTERVENTION', 'PENDING', 'PROVIDER_SKIPPED'].includes(safeUpper(r?.status))), [myCustomerRequests]);
+  const pendingReviewCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && safeUpper(r?.status) === 'COMPLETED' && !(r?.customer_rating !== null || reviewedRequestsMap[`${r?.id}_CUSTOMER`])), [myCustomerRequests, reviewedRequestsMap]);
+  const pastCustomerRequests = useMemo(() => safeArray(myCustomerRequests).filter(r => r && (safeUpper(r?.status) === 'CANCELLED' || (safeUpper(r?.status) === 'COMPLETED' && (r?.customer_rating !== null || reviewedRequestsMap[`${r?.id}_CUSTOMER`])))), [myCustomerRequests, reviewedRequestsMap]);
+  const filteredPastCustomerRequests = useMemo(() => safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req?.raw_text).includes(q) || safeLower(req?.provider_name).includes(q) || safeLower(req?.status).includes(q); }), [pastCustomerRequests, searchCustomerHistoryText]);
 
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 px-6 py-8">
@@ -327,7 +332,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.0.0-NO-POPUPS</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.1.0-STABLE</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -343,8 +348,8 @@ export default function CustomerDashboard() {
           ownerId={session?.phone} 
           
           onReworkRequest={(origReq) => {
-            setQueryText(origReq.raw_text || origReq.notes || '');
-            if(origReq.location) {
+            setQueryText(origReq?.raw_text || origReq?.notes || '');
+            if(origReq?.location) {
                setLocationValue(extractAddress(origReq.location));
                const coords = extractGPS(origReq.location);
                if(coords) {
@@ -354,8 +359,8 @@ export default function CustomerDashboard() {
                setCompanyCode(extractCode(origReq.location) || '');
                setIsCodeHidden(isCodeHiddenReq(origReq.location));
             }
-            if(origReq.is_urgent) setIsUrgent(true);
-            if(origReq.request_type) setRequestType(origReq.request_type);
+            if(origReq?.is_urgent) setIsUrgent(true);
+            if(origReq?.request_type) setRequestType(origReq.request_type);
 
             setActiveTab('REQUESTS'); 
             setStep('INPUT'); 
@@ -363,7 +368,6 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // KESİNTİSİZ VE POPUP-SIZ TEKRARLA İŞLEMİ
           onDirectReorder={async (origReq) => {
             if (!origReq) return;
             const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
@@ -387,7 +391,7 @@ export default function CustomerDashboard() {
 
               const payload = {
                 rawText: origReq.raw_text,
-                contactValue: origReq.contact_value || session.phone,
+                contactValue: origReq.contact_value || session?.phone,
                 preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
                 location: origReq.location || 'İstanbul, Türkiye',
                 isUrgent: origReq.is_urgent || false,
@@ -530,7 +534,7 @@ export default function CustomerDashboard() {
           {step === 'DISAMBIGUATE' && disambiguationData && (
             <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 space-y-4">
               <div className="text-center"><h3 className="font-extrabold text-lg text-neutral-950">Hizmet Amacını Netleştirelim</h3></div>
-              <div className="space-y-2">{safeArray(disambiguationData.options).map((option) => (<button key={option.id} onClick={() => submitFinalRequest(option.text)} className="w-full text-left p-3.5 rounded-xl border hover:bg-neutral-50 text-xs font-semibold cursor-pointer">{option.text}</button>))}</div>
+              <div className="space-y-2">{safeArray(disambiguationData?.options).map((option) => (<button key={option?.id} onClick={() => submitFinalRequest(option?.text)} className="w-full text-left p-3.5 rounded-xl border hover:bg-neutral-50 text-xs font-semibold cursor-pointer">{option?.text}</button>))}</div>
             </div>
           )}
 
@@ -543,6 +547,7 @@ export default function CustomerDashboard() {
                 {isActiveCustomerRequestsOpen && (
                  <div className="space-y-3">
                    {activeCustomerRequests.map((req) => {
+                      if (!req) return null;
                       const reqStatus = safeUpper(req.status) || 'POOL';
                       const reqCode = extractCode(req.location);
                       const isHidden = isCodeHiddenReq(req.location);
@@ -655,12 +660,11 @@ export default function CustomerDashboard() {
                               >
                                 <option value="">Liste Seçin...</option>
                                 {userLists.map(lst => (
-                                  <option key={lst.id} value={lst.id}>{lst.list_name}</option>
+                                  <option key={lst?.id} value={lst?.id}>{lst?.list_name}</option>
                                 ))}
                               </select>
 
-                              {/* LİSTEYE EKLEME GERİ BİLDİRİMİ */}
-                              {actionFeedbackMap[`list_add_${req.id}`] && (
+                              {actionFeedbackMap?.[`list_add_${req.id}`] && (
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
                                   actionFeedbackMap[`list_add_${req.id}`].type === 'success' 
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
@@ -693,6 +697,7 @@ export default function CustomerDashboard() {
 
                             <div className="bg-neutral-50/30">
                               {safeArray(req.queuedProviders).map((qProv, idx) => {
+                                if (!qProv) return null;
                                 const isCurrent = String(req.matched_provider_id) === String(qProv.id);
                                 const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
                                 const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
@@ -742,8 +747,7 @@ export default function CustomerDashboard() {
                                       </div>
                                       
                                       <div className="flex items-center space-x-2 shrink-0 ml-2">
-                                          {/* SEÇ/ONAYLA GERİ BİLDİRİMİ */}
-                                          {actionFeedbackMap[isCurrent ? acceptKey : selectKey] && (
+                                          {actionFeedbackMap?.[isCurrent ? acceptKey : selectKey] && (
                                             <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
                                               actionFeedbackMap[isCurrent ? acceptKey : selectKey].type === 'success'
                                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -779,14 +783,14 @@ export default function CustomerDashboard() {
                                               {qProv.reviews.map((rev, revIdx) => (
                                                 <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200 shadow-xs hover:border-blue-200 transition">
                                                   <div className="flex justify-between items-center mb-1.5">
-                                    <div className="flex items-center gap-1.5 text-amber-500">
-                                      <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{Number(parseFloat(rev.rating).toFixed(2))}</span>
-                                      {rev.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {Number(parseFloat(rev.score).toFixed(2))}</span>}
-                                    </div>
-                                                  <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev.rating_date)}</span>
+                                                    <div className="flex items-center gap-1.5 text-amber-500">
+                                                      <Star size={11} fill="#f59e0b" /> <span className="font-bold text-[11px]">{Number(parseFloat(rev?.rating || 0).toFixed(2))}</span>
+                                                      {rev?.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {Number(parseFloat(rev.score).toFixed(2))}</span>}
+                                                    </div>
+                                                    <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev?.rating_date)}</span>
                                                   </div>
                                                   
-                                                  {rev.comment && rev.comment.trim() !== '' && (
+                                                  {rev?.comment && rev.comment.trim() !== '' && (
                                                     <div className="mb-2.5 bg-neutral-50 p-2 rounded border border-neutral-100">
                                                       <p className="text-[11px] text-neutral-700 italic leading-relaxed">
                                                         "{rev.comment}"
@@ -795,10 +799,10 @@ export default function CustomerDashboard() {
                                                   )}
                                                   
                                                   <div className="grid grid-cols-4 gap-1 text-[8px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-2">
-                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_knowledge)}/5</span></div>
-                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_communication)}/5</span></div>
-                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_timing)}/5</span></div>
-                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev.rating_cost)}/5</span></div>
+                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Uzmanlık</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev?.rating_knowledge || 0)}/5</span></div>
+                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">İletişim</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev?.rating_communication || 0)}/5</span></div>
+                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Hız</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev?.rating_timing || 0)}/5</span></div>
+                                                    <div className="flex flex-col gap-0.5"><span className="text-neutral-400">Fiyat</span><span className="text-neutral-800 text-[10px]">{parseFloat(rev?.rating_cost || 0)}/5</span></div>
                                                   </div>
                                                 </div>
                                               ))}
@@ -818,12 +822,11 @@ export default function CustomerDashboard() {
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2"><span>📍 {extractAddress(req.location)}</span>{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}</div>
                         
-                        {/* ALT AKSİYON BUTONLARI VE GERİ BİLDİRİMLERİ */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
                           <div className="flex items-center space-x-1.5">
                             {(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (
                               <div className="flex items-center gap-1.5">
-                                {actionFeedbackMap[`skip_${req.id}`] && (
+                                {actionFeedbackMap?.[`skip_${req.id}`] && (
                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${actionFeedbackMap[`skip_${req.id}`].type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
                                     {actionFeedbackMap[`skip_${req.id}`].text}
                                   </span>
@@ -837,15 +840,14 @@ export default function CustomerDashboard() {
                           </div>
                           
                           <div className="flex items-center space-x-2 ml-auto">
-                            {/* DÜĞMENİN SOLUNDAKİ ORTAK BİLDİRİM (Tamamlama veya İptal için) */}
-                            {(actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]) && (
+                            {(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`]) && (
                               <div className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
-                                (actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]).type === 'success'
+                                (actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.type === 'success'
                                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                   : 'bg-rose-50 text-rose-800 border-rose-200'
                               }`}>
-                                {(actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]).type === 'success' ? <Check size={11} /> : <AlertCircle size={11} />}
-                                <span>{(actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]).text}</span>
+                                {(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.type === 'success' ? <Check size={11} /> : <AlertCircle size={11} />}
+                                <span>{(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.text}</span>
                               </div>
                             )}
 
@@ -879,8 +881,9 @@ export default function CustomerDashboard() {
                 {isPendingReviewsOpen && (
                  <div className="space-y-4">
                    {pendingReviewCustomerRequests.map((req) => {
+                     if (!req) return null;
                      const isActionLoading = actionLoadingKey === `review_${req.id}`;
-                     const reviewFb = actionFeedbackMap[`review_${req.id}`];
+                     const reviewFb = actionFeedbackMap?.[`review_${req.id}`];
                      const ratings = getRatingsForReq(req.id);
                      const avg = ((ratings.knowledge + ratings.communication + ratings.timing + ratings.cost) / 4).toFixed(1);
                      
@@ -940,7 +943,6 @@ export default function CustomerDashboard() {
                           </div>
 
                           <div className="flex items-center justify-end space-x-3 pt-2">
-                            {/* DÜĞMENİN SOLUNDAKİ GERİ BİLDİRİM ETİKETİ */}
                             {reviewFb && (
                               <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
                                 reviewFb.type === 'success'
@@ -979,8 +981,8 @@ export default function CustomerDashboard() {
                    <div className="relative mb-3"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium shadow-sm" /></div>
                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                      {filteredPastCustomerRequests.map((req) => (
-                        <div key={req.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
-                          <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req.status}</span></div>
+                        <div key={req?.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
+                          <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req?.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req?.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req?.status}</span></div>
                         </div>
                      ))}
                    </div>
