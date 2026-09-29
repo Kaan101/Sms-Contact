@@ -1,229 +1,444 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Folder, Plus, Trash2, Phone, User, Loader2, FileText, RefreshCw, Send } from 'lucide-react';
+import { 
+  Folder, Plus, Trash2, Edit2, ChevronRight, ChevronDown, 
+  RefreshCw, Copy, Send, Check, X, AlertCircle, Loader2,
+  Calendar, MapPin, Tag, Phone, ArrowRight, FileText, Bell
+} from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
-import { safeArray } from '../../../core/utils/helpers';
+import { 
+  safeArray, safeDateTime, extractAddress, extractCode, isCodeHiddenReq 
+} from '../../../core/utils/helpers';
 
-export default function CustomListsManager({ ownerType, ownerId, onReworkRequest, onDirectReorder }) {
+export default function CustomListsManager({ 
+  ownerType = 'CUSTOMER', // 'CUSTOMER' | 'PROVIDER'
+  ownerId, 
+  onReworkRequest, 
+  onDirectReorder 
+}) {
   const { API_BASE } = useAuth();
-  const [lists, setLists] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [newListName, setNewListName] = useState('');
-  const [activeListId, setActiveListId] = useState(null);
-  
-  const [addMode, setAddMode] = useState('REQUEST');
-  const [newItem, setNewItem] = useState({ contactName: '', contactPhone: '', notes: '' });
-  const [selectedRequestId, setSelectedRequestId] = useState('');
-  const [availableRequests, setAvailableRequests] = useState([]);
 
+  const [lists, setLists] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedListId, setSelectedListId] = useState(null);
+  const [listItems, setListItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+
+  // Yeni Liste Oluşturma State'i
+  const [newListName, setNewListName] = useState('');
+  const [isCreatingList, setIsCreatingList] = useState(false);
+
+  // Düğme Aksiyon ve Geri Bildirim State'leri
+  const [actionLoadingKey, setActionLoadingKey] = useState(null);
+  const [actionFeedbackMap, setActionFeedbackMap] = useState({});
+
+  const showActionFeedback = (key, type, text) => {
+    setActionFeedbackMap(prev => ({ ...(prev || {}), [key]: { type, text } }));
+    setTimeout(() => {
+      setActionFeedbackMap(prev => ({ ...(prev || {}), [key]: null }));
+    }, 3500);
+  };
+
+  // 1. Listeleri Getir
   const fetchLists = async () => {
-    if (!ownerType || !ownerId) return;
+    if (!ownerId) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await axios.get(`${API_BASE}/lists/${ownerType}/${ownerId}`);
-      if (res.data?.status === 'success') setLists(res.data.lists);
+      const res = await axios.get(`${API_BASE}/lists/${ownerType}/${encodeURIComponent(ownerId)}`);
+      const fetchedLists = safeArray(res?.data?.lists);
+      setLists(fetchedLists);
+      if (fetchedLists.length > 0 && !selectedListId) {
+        setSelectedListId(fetchedLists[0].id);
+      }
     } catch (err) {
-      console.error('Listeler yüklenemedi:', err);
+      console.error('Listeler alınamadı:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchAvailableRequests = async () => {
+  useEffect(() => {
+    fetchLists();
+  }, [ownerId, ownerType]);
+
+  // 2. Seçili Listenin İçindeki Talepleri Getir
+  const fetchListItems = async (listId) => {
+    if (!listId) return;
+    setItemsLoading(true);
     try {
-      const endpoint = ownerType === 'CUSTOMER' 
-        ? `${API_BASE}/requests/my-requests?phone=${encodeURIComponent(ownerId)}`
-        : `${API_BASE}/requests/provider-requests?providerPhone=${encodeURIComponent(ownerId)}`;
-      
-      const res = await axios.get(endpoint);
-      if (res.data?.requests) setAvailableRequests(safeArray(res.data.requests));
+      const res = await axios.get(`${API_BASE}/lists/${listId}/requests`);
+      setListItems(safeArray(res?.data?.requests));
     } catch (err) {
-      console.error('Talepler yüklenemedi:', err);
+      console.error('Liste öğeleri alınamadı:', err);
+    } finally {
+      setItemsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLists();
-    fetchAvailableRequests();
-  }, [ownerType, ownerId]);
+    if (selectedListId) {
+      fetchListItems(selectedListId);
+    } else {
+      setListItems([]);
+    }
+  }, [selectedListId]);
 
+  // Yeni Liste Oluştur
   const handleCreateList = async (e) => {
     e.preventDefault();
     if (!newListName.trim()) return;
+
+    const actionKey = 'create_list';
+    setActionLoadingKey(actionKey);
     try {
-      await axios.post(`${API_BASE}/lists`, { ownerType, ownerId, listName: newListName.trim() });
+      const res = await axios.post(`${API_BASE}/lists`, {
+        ownerType,
+        ownerId,
+        listName: newListName.trim()
+      });
+      showActionFeedback(actionKey, 'success', 'Liste oluşturuldu');
       setNewListName('');
-      fetchLists();
-    } catch (err) { alert('Liste oluşturulamadı.'); }
+      setIsCreatingList(false);
+      await fetchLists();
+      if (res?.data?.list?.id) {
+        setSelectedListId(res.data.list.id);
+      }
+    } catch (err) {
+      showActionFeedback(actionKey, 'error', 'Oluşturulamadı');
+    } finally {
+      setActionLoadingKey(null);
+    }
   };
 
-  const handleAddContactItem = async (listId, e) => {
-    e.preventDefault();
-    if (!newItem.contactName.trim() || !newItem.contactPhone.trim()) return alert('İsim ve telefon zorunludur.');
+  // Liste Sil
+  const handleDeleteList = async (listId) => {
+    const actionKey = `delete_list_${listId}`;
+    setActionLoadingKey(actionKey);
     try {
-      await axios.post(`${API_BASE}/lists/${listId}/items`, newItem);
-      setNewItem({ contactName: '', contactPhone: '', notes: '' });
-      setActiveListId(null);
-      fetchLists();
-    } catch (err) { alert('Kişi eklenemedi.'); }
+      await axios.delete(`${API_BASE}/lists/${listId}`);
+      showActionFeedback(actionKey, 'success', 'Liste silindi');
+      if (selectedListId === listId) {
+        setSelectedListId(null);
+      }
+      await fetchLists();
+    } catch (err) {
+      showActionFeedback(actionKey, 'error', 'Silinemedi');
+    } finally {
+      setActionLoadingKey(null);
+    }
   };
 
-  const handleAddRequestItem = async (listId, e) => {
-    e.preventDefault();
-    if (!selectedRequestId) return alert('Lütfen bir talep seçin.');
+  // Listeden Öğe Çıkar
+  const handleRemoveItem = async (requestId) => {
+    if (!selectedListId) return;
+    const actionKey = `remove_item_${requestId}`;
+    setActionLoadingKey(actionKey);
     try {
-      await axios.post(`${API_BASE}/lists/${listId}/requests`, { requestId: selectedRequestId });
-      setSelectedRequestId('');
-      setActiveListId(null);
-      fetchLists();
-    } catch (err) { alert(err.response?.data?.message || 'Talep listeye eklenemedi.'); }
+      await axios.delete(`${API_BASE}/lists/${selectedListId}/requests/${requestId}`);
+      showActionFeedback(actionKey, 'success', 'Listeden çıkarıldı');
+      await fetchListItems(selectedListId);
+    } catch (err) {
+      showActionFeedback(actionKey, 'error', 'Çıkarılamadı');
+    } finally {
+      setActionLoadingKey(null);
+    }
   };
 
-  const handleDeleteItem = async (itemId) => {
-    if (!window.confirm('Bu öğeyi listeden çıkarmak istediğinize emin misiniz?')) return;
+  // Doğrudan Yeniden Sipariş Et Butonu
+  const handleReorderClick = async (req) => {
+    const actionKey = `reorder_${req.id}`;
+    setActionLoadingKey(actionKey);
     try {
-      await axios.delete(`${API_BASE}/lists/items/${itemId}`);
-      fetchLists();
-    } catch (err) { alert('Öğe silinemedi.'); }
+      if (onDirectReorder) {
+        await onDirectReorder(req);
+        showActionFeedback(actionKey, 'success', 'Sipariş iletildi');
+      }
+    } catch (err) {
+      showActionFeedback(actionKey, 'error', 'Sipariş verilemedi');
+    } finally {
+      setActionLoadingKey(null);
+    }
   };
 
-  const cleanPhoneNumber = (phoneStr) => phoneStr ? phoneStr.split('|')[0].trim() : '';
-  const extractReqId = (item) => item.request_id ? Number(item.request_id) : (item.notes?.match(/\[Talep\s*#(\d+)\]/i)?.[1] ? Number(item.notes.match(/\[Talep\s*#(\d+)\]/i)[1]) : null);
+  // Forma Aktar Butonu
+  const handleReworkClick = (req) => {
+    const actionKey = `rework_${req.id}`;
+    if (onReworkRequest) {
+      onReworkRequest(req);
+      showActionFeedback(actionKey, 'success', 'Forma aktarıldı');
+    }
+  };
 
-  if (loading) return <div className="flex justify-center p-6"><Loader2 className="animate-spin text-neutral-400" size={24} /></div>;
+  const selectedList = lists.find(l => l.id === selectedListId);
 
   return (
-    <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6 shadow-sm">
+    <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-xs p-5 space-y-6">
       
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+      {/* BAŞLIK & YENİ LİSTE EKLEME BUTONU */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-4">
         <div>
-          <h3 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
-            <Folder size={20} className="text-neutral-700" />
-            <span>Listelerim ({lists.length})</span>
+          <h3 className="font-extrabold text-neutral-900 text-base flex items-center gap-2">
+            <Folder size={18} className="text-neutral-700" />
+            <span>Kişisel Listelerim</span>
           </h3>
-          <p className="text-xs text-neutral-500 mt-0.5">Taleplerinizi veya iş ortaklarınızı listeler altında organize edin.</p>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Sık kullandığınız işleri listelere kaydedip tek tıkla tekrarlayabilir veya forma aktarabilirsiniz.
+          </p>
         </div>
 
-        <form onSubmit={handleCreateList} className="flex items-center gap-2">
-          <input type="text" placeholder="Yeni liste adı..." value={newListName} onChange={(e) => setNewListName(e.target.value)} className="px-3 py-2 text-xs rounded-xl border border-neutral-200 outline-none focus:border-neutral-900 bg-neutral-50 w-52" />
-          <button type="submit" className="px-4 py-2 bg-neutral-950 text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition flex items-center gap-1 shrink-0 cursor-pointer"><Plus size={14} /><span>Liste Oluştur</span></button>
-        </form>
+        <div className="flex items-center gap-2">
+          {actionFeedbackMap?.create_list && (
+            <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
+              actionFeedbackMap.create_list.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}>
+              {actionFeedbackMap.create_list.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
+              <span>{actionFeedbackMap.create_list.text}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsCreatingList(!isCreatingList)}
+            className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Plus size={14} />
+            <span>Yeni Liste</span>
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-4">
+      {/* YENİ LİSTE OLUŞTURMA FORMU */}
+      {isCreatingList && (
+        <form onSubmit={handleCreateList} className="bg-neutral-50 border border-neutral-200 rounded-xl p-3.5 flex items-center gap-2 animate-in fade-in duration-150">
+          <input
+            type="text"
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            placeholder="Liste adı girin (Örn: Düzenli Ofis Temizliği)..."
+            className="flex-1 bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-neutral-900 font-medium"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => { setIsCreatingList(false); setNewListName(''); }}
+            className="p-2 text-neutral-500 hover:text-neutral-700 bg-white border border-neutral-200 rounded-lg cursor-pointer transition"
+          >
+            <X size={14} />
+          </button>
+          <button
+            type="submit"
+            disabled={actionLoadingKey === 'create_list' || !newListName.trim()}
+            className="px-4 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 transition flex items-center gap-1"
+          >
+            {actionLoadingKey === 'create_list' && <Loader2 size={12} className="animate-spin" />}
+            <span>Oluştur</span>
+          </button>
+        </form>
+      )}
+
+      {/* LİSTELER YATAY SEKMELERİ */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
         {lists.length === 0 ? (
-          <div className="text-center py-10 text-neutral-400 text-xs bg-neutral-50 rounded-xl border border-dashed border-neutral-200">Henüz hiç liste oluşturmadınız. Yukarıdan yeni bir liste ekleyerek başlayın.</div>
+          <span className="text-neutral-400 text-xs italic py-1">Henüz oluşturulmuş bir liste yok.</span>
         ) : (
-          lists.map((list) => {
-            const isAddingToThis = activeListId === list.id;
-            const existingIds = safeArray(list.items).map(extractReqId).filter(Boolean);
-            const filteredRequests = availableRequests.filter(req => !existingIds.includes(Number(req.id)));
+          lists.map(lst => {
+            const isSelected = selectedListId === lst.id;
+            const deleteKey = `delete_list_${lst.id}`;
+            const isDeleting = actionLoadingKey === deleteKey;
 
             return (
-              <div key={list.id} className="bg-neutral-50/70 rounded-xl border border-neutral-200 overflow-hidden transition">
+              <div 
+                key={lst.id}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                  isSelected 
+                    ? 'bg-neutral-950 text-white border-neutral-950 shadow-xs' 
+                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                }`}
+                onClick={() => setSelectedListId(lst.id)}
+              >
+                <Folder size={13} className={isSelected ? 'text-white' : 'text-neutral-500'} />
+                <span className="font-bold">{lst.list_name}</span>
                 
-                <div className="p-4 flex items-center justify-between bg-white border-b border-neutral-100">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-neutral-900">{list.list_name}</span>
-                    <span className="text-[10px] font-mono bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-bold">{list.items?.length || 0} Öğe</span>
-                  </div>
-                  <button onClick={() => setActiveListId(isAddingToThis ? null : list.id)} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${isAddingToThis ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-neutral-950 text-white hover:bg-neutral-800'}`}>
-                    <Plus size={14} className={isAddingToThis ? 'rotate-45 transition-transform' : 'transition-transform'} />
-                    <span>{isAddingToThis ? 'İptal Et' : '+ Öğe Ekle'}</span>
-                  </button>
-                </div>
-
-                {isAddingToThis && (
-                  <div className="p-4 bg-blue-50/40 border-b border-blue-100 space-y-3 animate-in fade-in duration-200">
-                    <div className="flex gap-2 text-xs">
-                      <button type="button" onClick={() => setAddMode('REQUEST')} className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${addMode === 'REQUEST' ? 'bg-neutral-950 text-white shadow-sm' : 'bg-white text-neutral-600 border border-neutral-200'}`}>Sistemden Talep Ekle</button>
-                      <button type="button" onClick={() => setAddMode('CONTACT')} className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${addMode === 'CONTACT' ? 'bg-neutral-950 text-white shadow-sm' : 'bg-white text-neutral-600 border border-neutral-200'}`}>Manuel Kişi / Firma Ekle</button>
-                    </div>
-
-                    {addMode === 'REQUEST' ? (
-                      <form onSubmit={(e) => handleAddRequestItem(list.id, e)} className="flex items-center gap-2">
-                        <select value={selectedRequestId} onChange={(e) => setSelectedRequestId(e.target.value)} className="flex-1 p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium">
-                          <option value="">-- Listeye Eklemek İçin Bir Talep Seçin --</option>
-                          {filteredRequests.length === 0 ? <option disabled>Eklenebilecek başka talep kalmadı</option> : filteredRequests.map((req) => (<option key={req.id} value={req.id}>#REQ-{req.id} - "{req.raw_text}" ({req.status})</option>))}
-                        </select>
-                        <button type="submit" className="px-5 py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition cursor-pointer shrink-0 shadow-sm">Seçilen Talebi Ekle</button>
-                      </form>
-                    ) : (
-                      <form onSubmit={(e) => handleAddContactItem(list.id, e)} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                        <div className="sm:col-span-4"><input type="text" placeholder="İsim / Firma Adı *" value={newItem.contactName} onChange={(e) => setNewItem({ ...newItem, contactName: e.target.value })} className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" required /></div>
-                        <div className="sm:col-span-4"><input type="tel" placeholder="Telefon Numarası *" value={newItem.contactPhone} onChange={(e) => setNewItem({ ...newItem, contactPhone: e.target.value })} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" required /></div>
-                        <div className="sm:col-span-3"><input type="text" placeholder="Not (Opsiyonel)..." value={newItem.notes} onChange={(e) => setNewItem({ ...newItem, notes: e.target.value })} className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" /></div>
-                        <div className="sm:col-span-1"><button type="submit" className="w-full py-2 bg-neutral-950 text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition cursor-pointer shadow-sm">Ekle</button></div>
-                      </form>
-                    )}
-                  </div>
-                )}
-
-                <div className="p-4">
-                  {!list.items || list.items.length === 0 ? (
-                    <div className="text-xs text-neutral-400 italic py-2">Bu listede henüz kayıtlı öğe bulunmuyor.</div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-3">
-                      {list.items.map((item) => {
-                        const targetReqId = extractReqId(item);
-                        const origReq = availableRequests.find(r => String(r.id) === String(targetReqId));
-
-                        return (
-                          <div key={item.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1 min-w-0">
-                              <h4 className="font-bold text-xs text-neutral-950 truncate flex items-center gap-1.5">
-                                {targetReqId ? <FileText size={13} className="text-blue-600 shrink-0" /> : <User size={13} className="text-neutral-500 shrink-0" />}
-                                <span>{item.contact_name}</span>
-                              </h4>
-                              <p className="text-[11px] font-mono text-blue-700 flex items-center gap-1">
-                                <Phone size={11} className="text-blue-500 shrink-0" />
-                                <span>{cleanPhoneNumber(item.contact_phone)}</span>
-                              </p>
-                              {item.notes && <p className="text-[10px] text-neutral-600 bg-neutral-50 p-1.5 rounded border border-neutral-100 line-clamp-2">📝 {item.notes}</p>}
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 border-neutral-100 pt-2 sm:pt-0 mt-2 sm:mt-0">
-                              {targetReqId ? (
-                                <div className="flex items-center gap-1.5">
-                                  {/* 1. TALEP OLUŞTUR (Düzenleyerek yeniden aç) */}
-                                  <button 
-                                    onClick={() => onReworkRequest && onReworkRequest(origReq || { id: targetReqId, raw_text: item.notes })}
-                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs border border-blue-200"
-                                    title="Talebi düzenleyerek forma aktar"
-                                  >
-                                    <FileText size={12} />
-                                    <span>Talep Oluştur</span>
-                                  </button>
-                                  
-                                  {/* 2. TEKRARLA (Doğrudan eski sağlayıcıya sipariş geç) */}
-                                  <button 
-                                    onClick={() => onDirectReorder && onDirectReorder(origReq)}
-                                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs border border-emerald-200"
-                                    title="Aynı siparişi doğrudan sağlayıcıya ilet"
-                                  >
-                                    <Send size={12} />
-                                    <span>Tekrarla</span>
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-neutral-400 italic">Manuel Kişi</span>
-                              )}
-
-                              <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 ml-2 text-neutral-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer" title="Listeden Çıkar"><Trash2 size={14} /></button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
+                {/* Liste Sil Butonu */}
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteList(lst.id);
+                  }}
+                  className={`ml-1 p-0.5 rounded transition cursor-pointer ${
+                    isSelected ? 'hover:bg-neutral-800 text-neutral-400 hover:text-rose-300' : 'hover:bg-neutral-100 text-neutral-400 hover:text-rose-600'
+                  }`}
+                  title="Listeyi Sil"
+                >
+                  {isDeleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                </button>
               </div>
             );
           })
         )}
       </div>
+
+      {/* SEÇİLİ LİSTENİN İÇERİĞİ */}
+      {selectedList && (
+        <div className="space-y-3 pt-2 border-t border-neutral-100">
+          <div className="flex items-center justify-between text-xs text-neutral-500 font-mono">
+            <span>
+              <strong>{selectedList.list_name}</strong> ({listItems.length} Kayıtlı Talep)
+            </span>
+            <button
+              type="button"
+              onClick={() => fetchListItems(selectedList.id)}
+              className="hover:text-neutral-900 transition flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw size={11} className={itemsLoading ? 'animate-spin' : ''} />
+              <span>Yenile</span>
+            </button>
+          </div>
+
+          {itemsLoading ? (
+            <div className="py-8 flex items-center justify-center text-xs text-neutral-400 gap-2">
+              <Loader2 size={16} className="animate-spin" />
+              <span>Kayıtlar yükleniyor...</span>
+            </div>
+          ) : listItems.length === 0 ? (
+            <div className="py-8 text-center text-xs text-neutral-400 border border-dashed rounded-xl">
+              Bu listede henüz kayıtlı bir iş bulunmuyor. Taleplerim sekmesindeki işlerin altındaki "Bu işi listenize kaydedin" alanından ekleyebilirsiniz.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {listItems.map(req => {
+                const reworkKey = `rework_${req.id}`;
+                const reorderKey = `reorder_${req.id}`;
+                const removeKey = `remove_item_${req.id}`;
+
+                const isReordering = actionLoadingKey === reorderKey;
+                const isRemoving = actionLoadingKey === removeKey;
+
+                const reorderFb = actionFeedbackMap?.[reorderKey];
+                const reworkFb = actionFeedbackMap?.[reworkKey];
+                const removeFb = actionFeedbackMap?.[removeKey];
+
+                const reqCode = extractCode(req.location);
+                const isHidden = isCodeHiddenReq(req.location);
+
+                return (
+                  <div 
+                    key={req.id}
+                    className="p-3.5 bg-neutral-50/70 border border-neutral-200/90 rounded-xl space-y-2.5 shadow-2xs hover:bg-neutral-50 transition"
+                  >
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="space-y-1 flex-1 min-w-[220px]">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
+                          <span className="font-bold px-1.5 py-0.2 rounded border text-[9px] flex items-center gap-1 bg-white text-neutral-800 border-neutral-200">
+                            {req.request_type === 'BILDIRIM' ? <Bell size={10} className="text-amber-500" /> : <FileText size={10} className="text-blue-600" />}
+                            {req.request_type === 'BILDIRIM' ? 'Bildirim' : 'Talep'}
+                          </span>
+                          {req.is_urgent && (
+                            <span className="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
+                              ACİL
+                            </span>
+                          )}
+                          {reqCode && (
+                            <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold border flex items-center gap-1 ${
+                              isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                              <Tag size={9}/> KOD: {reqCode}
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-xs font-bold text-neutral-900 leading-snug pt-0.5">"{req.raw_text}"</h4>
+
+                        <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-500 font-mono pt-0.5">
+                          <span className="flex items-center gap-1">
+                            <MapPin size={11} className="text-neutral-400" />
+                            <span>{extractAddress(req.location)}</span>
+                          </span>
+                          {req.provider_name && (
+                            <span>
+                              Sağlayıcı: <strong className="text-neutral-800">{req.provider_name}</strong>
+                            </span>
+                          )}
+                          {req.matched_budget && (
+                            <span className="text-emerald-700 font-bold">
+                              💰 {new Intl.NumberFormat('tr-TR').format(Number(req.matched_budget))} TRY
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* AKSİYON BUTONLARI VE SOL TARAFTAKİ GERİ BİLDİRİMLER */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center ml-auto">
+                        {/* Ortak Rozet Bildirimi */}
+                        {(reorderFb || reworkFb || removeFb) && (
+                          <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
+                            (reorderFb || reworkFb || removeFb)?.type === 'success'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-rose-50 text-rose-800 border-rose-200'
+                          }`}>
+                            {(reorderFb || reworkFb || removeFb)?.type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
+                            <span>{(reorderFb || reworkFb || removeFb)?.text}</span>
+                          </div>
+                        )}
+
+                        {/* Listeden Çıkar Butonu */}
+                        <button
+                          type="button"
+                          disabled={isRemoving}
+                          onClick={() => handleRemoveItem(req.id)}
+                          className="p-1.5 text-neutral-400 hover:text-rose-600 border border-neutral-200 bg-white rounded-lg transition cursor-pointer"
+                          title="Listeden Çıkar"
+                        >
+                          {isRemoving ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        </button>
+
+                        {/* Forma Aktar Butonu */}
+                        <button
+                          type="button"
+                          onClick={() => handleReworkClick(req)}
+                          className="px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-700 border border-neutral-300 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Bilgileri talep formuna kopyala"
+                        >
+                          <Copy size={11} />
+                          <span>Forma Aktar</span>
+                        </button>
+
+                        {/* Doğrudan Tekrarla Butonu */}
+                        {ownerType === 'CUSTOMER' && (
+                          <button
+                            type="button"
+                            disabled={isReordering}
+                            onClick={() => handleReorderClick(req)}
+                            className="px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+                            title="Aynı şartlarla sağlayıcıya doğrudan ilet"
+                          >
+                            {isReordering ? (
+                              <>
+                                <Loader2 size={11} className="animate-spin" />
+                                <span>İletiliyor...</span>
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw size={11} />
+                                <span>Tekrarla</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

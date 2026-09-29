@@ -149,53 +149,84 @@ function CustomerDashboardContent() {
   
   const myCustomerRequests = useMemo(() => safeArray(customerRequestsRes?.requests), [customerRequestsRes]);
 
-  const populateFormWithPastRequest = (pastReq) => {
-    if (!pastReq) return;
-    const actionKey = `copy_${pastReq.id}`;
-    setActionLoadingKey(actionKey);
+  // ⭐ GEÇMİŞ TALEBİN BİLGİLERİNİ TALEP FORMUNA DOLDURMA
+const populateFormWithPastRequest = (pastReq) => {
+  if (!pastReq) return;
+  const actionKey = `copy_${pastReq.id}`;
+  setActionLoadingKey(actionKey);
 
-    setQueryText(pastReq.raw_text || '');
+  setQueryText(pastReq.raw_text || '');
 
-    if (pastReq.location) {
-      const extractedAddr = extractAddress(pastReq.location);
-      if (extractedAddr) setLocationValue(extractedAddr);
+  // 1. Kayıt Türünü Aynen Koru (BILDIRIM ise BILDIRIM kalır)
+  if (pastReq.request_type) {
+    setRequestType(pastReq.request_type);
+  }
 
-      const coords = extractGPS(pastReq.location);
-      if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-        setMapPosition({ lat: coords[0], lng: coords[1] });
-        setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
+  // 2. Hedef Tarih / Zamanlama Farkını Hesapla (Varsa)
+  if (pastReq.deadline_datetime && pastReq.created_at) {
+    try {
+      const oldCreated = new Date(pastReq.created_at).getTime();
+      const oldDeadline = new Date(pastReq.deadline_datetime).getTime();
+      const diffMs = oldDeadline - oldCreated;
+
+      if (diffMs > 0 && !isNaN(diffMs)) {
+        const newTargetDateObj = new Date(Date.now() + diffMs);
+        const yyyy = newTargetDateObj.getFullYear();
+        const mm = String(newTargetDateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(newTargetDateObj.getDate()).padStart(2, '0');
+        const hours = String(newTargetDateObj.getHours()).padStart(2, '0');
+        const mins = String(newTargetDateObj.getMinutes()).padStart(2, '0');
+
+        setDeadlineDate(`${yyyy}-${mm}-${dd}`);
+        setDeadlineTime(`${hours}:${mins}`);
       }
+    } catch (e) {
+      setDeadlineDate('');
+      setDeadlineTime('23:59');
+    }
+  } else {
+    setDeadlineDate('');
+    setDeadlineTime('23:59');
+  }
 
-      const code = extractCode(pastReq.location);
-      if (code) {
-        setCompanyCode(code);
-        setIsCodeHidden(isCodeHiddenReq(pastReq.location));
-      }
+  // 3. Konum ve Kod Bilgileri
+  if (pastReq.location) {
+    const extractedAddr = extractAddress(pastReq.location);
+    if (extractedAddr) setLocationValue(extractedAddr);
+
+    const coords = extractGPS(pastReq.location);
+    if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+      setMapPosition({ lat: coords[0], lng: coords[1] });
+      setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
     }
 
-    setIsUrgent(Boolean(pastReq.is_urgent));
-    if (pastReq.request_type) {
-      setRequestType(pastReq.request_type);
+    const code = extractCode(pastReq.location);
+    if (code) {
+      setCompanyCode(code);
+      setIsCodeHidden(isCodeHiddenReq(pastReq.location));
     }
+  }
 
-    if (pastReq.preferred_channel) {
-      const channels = pastReq.preferred_channel
-        .split(',')
-        .map(c => c.trim().toUpperCase())
-        .filter(c => ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'].includes(c));
-      if (channels.length > 0) {
-        setPreferredChannels(channels);
-      }
+  setIsUrgent(Boolean(pastReq.is_urgent));
+
+  if (pastReq.preferred_channel) {
+    const channels = pastReq.preferred_channel
+      .split(',')
+      .map(c => c.trim().toUpperCase())
+      .filter(c => ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'].includes(c));
+    if (channels.length > 0) {
+      setPreferredChannels(channels);
     }
+  }
 
-    setActiveTab('REQUESTS');
-    setStep('INPUT');
-    setIsDetailsCollapsed(false);
-    showActionFeedback(actionKey, 'success', 'Aktarıldı');
-    setActionLoadingKey(null);
+  setActiveTab('REQUESTS');
+  setStep('INPUT');
+  setIsDetailsCollapsed(false);
+  showActionFeedback(actionKey, 'success', 'Forma Aktarıldı');
+  setActionLoadingKey(null);
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r?.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));

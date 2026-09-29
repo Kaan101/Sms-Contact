@@ -406,12 +406,13 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
-// Tekrarlanan siparişi oluşturma ve geçmiş detayları yeni kayda kopyalama
+ 
+// ⭐ AKILLI ZAMAN FARKI VE TÜR KORUMALI REORDER
 const createDirectReorder = async (req, res) => {
   try {
     const { 
       rawText, contactValue, preferredChannel, location, isUrgent, requestType,
-      targetProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription, oldRequestId
+      targetProviderId, suggestedBudget, suggestedTargetDate, suggestedDescription, oldRequestId 
     } = req.body;
 
     const tProviderId = targetProviderId ? parseInt(targetProviderId, 10) : null;
@@ -419,32 +420,59 @@ const createDirectReorder = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Sağlayıcı kimliği eksik.' });
     }
 
-    let budget = suggestedBudget ? parseFloat(suggestedBudget) : null;
+    // 1. ESKİ TALEP BİLGİLERİNİ ÇEK
+    let finalRequestType = requestType || 'TALEP';
+    let newDeadlineDatetime = null;
+    let budget = suggestedBudget !== undefined && suggestedBudget !== null && suggestedBudget !== '' 
+      ? parseFloat(suggestedBudget) 
+      : null;
     let targetDate = suggestedTargetDate ? new Date(suggestedTargetDate) : null;
     let description = suggestedDescription || 'Tekrarlanan Sipariş';
 
-    // Eğer frontend'den değerler eksik geldiyse eski sipariş detaylarından tamamla
-    if ((budget === null || targetDate === null) && oldRequestId) {
-      const { rows: oldDetails } = await pool.query(
-        `SELECT rpd.provider_budget, rpd.provider_target_date, rpd.provider_description, r.created_at as req_created
+    if (oldRequestId) {
+      const { rows: oldRows } = await pool.query(
+        `SELECT r.request_type, r.created_at, r.deadline_datetime,
+                rpd.provider_budget, rpd.provider_target_date, rpd.provider_description
          FROM requests r
          LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = $1)
          WHERE r.id = $2 LIMIT 1`,
         [tProviderId, parseInt(oldRequestId, 10)]
       );
 
-      if (oldDetails.length > 0) {
-        if (budget === null && oldDetails[0].provider_budget) {
-          budget = parseFloat(oldDetails[0].provider_budget);
+      if (oldRows.length > 0) {
+        const old = oldRows[0];
+
+        // Kayıt türünü koru (BILDIRIM ise kesinlikle BILDIRIM kalır)
+        if (old.request_type) {
+          finalRequestType = old.request_type;
         }
-        if (targetDate === null && oldDetails[0].provider_target_date && oldDetails[0].req_created) {
-          const diffMs = new Date(oldDetails[0].provider_target_date).getTime() - new Date(oldDetails[0].req_created).getTime();
-          if (diffMs > 0) {
-            targetDate = new Date(Date.now() + diffMs);
+
+        const oldCreatedMs = old.created_at ? new Date(old.created_at).getTime() : null;
+
+        // Kullanıcının belirlediği hedef tarih (deadline_datetime) farkını koru
+        if (oldCreatedMs && old.deadline_datetime) {
+          const oldDeadlineMs = new Date(old.deadline_datetime).getTime();
+          const diffDeadline = oldDeadlineMs - oldCreatedMs;
+          if (diffDeadline > 0 && !isNaN(diffDeadline)) {
+            newDeadlineDatetime = new Date(Date.now() + diffDeadline);
           }
         }
-        if (!description && oldDetails[0].provider_description) {
-          description = oldDetails[0].provider_description;
+
+        // Sağlayıcı termin tarihi farkını koru (suggestedTargetDate önceden hesaplanmadıysa)
+        if (!targetDate && oldCreatedMs && old.provider_target_date) {
+          const oldTargetMs = new Date(old.provider_target_date).getTime();
+          const diffTarget = oldTargetMs - oldCreatedMs;
+          if (diffTarget > 0 && !isNaN(diffTarget)) {
+            targetDate = new Date(Date.now() + diffTarget);
+          }
+        }
+
+        if (budget === null && old.provider_budget) {
+          budget = parseFloat(old.provider_budget);
+        }
+
+        if (!description && old.provider_description) {
+          description = old.provider_description;
         }
       }
     }
@@ -453,25 +481,32 @@ const createDirectReorder = async (req, res) => {
       targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
     }
 
-    // 1. Talebi MATCHED durumunda oluştur
+    // 2. TALEBİ OLUŞTUR (request_type ve yeni deadline ile)
     const insertReqQuery = `
       INSERT INTO requests 
-      (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id)
-      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7)
+      (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, deadline_datetime)
+      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7, $8)
       RETURNING *;
     `;
     const { rows: newReqRows } = await pool.query(insertReqQuery, [
-      rawText || '', contactValue || '', preferredChannel || 'PHONE', location || '', isUrgent || false, requestType || 'TALEP', tProviderId
+      rawText || '', 
+      contactValue || '', 
+      preferredChannel || 'PHONE', 
+      location || '', 
+      isUrgent || false, 
+      finalRequestType, 
+      tProviderId,
+      newDeadlineDatetime
     ]);
     const newReq = newReqRows[0];
 
-    // 2. Sağlayıcıyı eşleşme tablosuna ACTIVE olarak ekle
+    // 3. SAĞLAYICIYI ACTIVE OLARAK EKLE
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, tProviderId]
     );
 
-    // 3. Fiyat ve teslimat tarihini detay tablosuna ekle
+    // 4. DETAYLARI AKTAR
     await pool.query(
       `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
        VALUES ($1, $2, $3, 'TRY', $4, $5)`,
