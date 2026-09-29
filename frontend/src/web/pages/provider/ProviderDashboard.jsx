@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import useSWR from 'swr';
 import { 
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
-  Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2
+  Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
+  User, Award, ShieldCheck, Tag, ThumbsUp
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -15,7 +16,7 @@ import CustomListsManager from '../../components/common/CustomListsManager';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
-// Tekil Talep Kartı (Form durumlarını bağımsız yönetmek için alt bileşen)
+// Tekil Talep Kartı (Form durumlarını bağımsız yöneten alt bileşen)
 function ProviderRequestCard({ 
   req, 
   providerId, 
@@ -26,7 +27,6 @@ function ProviderRequestCard({
 }) {
   const reqStatus = safeUpper(req.status) || 'MATCHED';
   
-  // Tutar ve Tarih State'leri (Gelen verilerle varsayılan olarak dolar)
   const initialBudget = req.provider_budget || req.matched_budget || '';
   const initialDate = useMemo(() => {
     const rawDate = req.provider_target_date || req.matched_target_date;
@@ -45,7 +45,6 @@ function ProviderRequestCard({
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Talep güncellendiğinde formu senkronize et
   useEffect(() => {
     setBudget(req.provider_budget || req.matched_budget || '');
     if (req.provider_target_date || req.matched_target_date) {
@@ -59,7 +58,6 @@ function ProviderRequestCard({
     }
   }, [req]);
 
-  // Sağlayıcı Detaylarını Kaydet (Tutar / Tarih / Açıklama)
   const saveDetails = async () => {
     await axios.post(`${API_BASE}/requests/${req.id}/providers/${providerId}/details`, {
       providerBudget: budget ? parseFloat(budget) : null,
@@ -69,15 +67,12 @@ function ProviderRequestCard({
     });
   };
 
-  // İşi Kabul Et
   const handleAccept = async () => {
     setLoading(true);
     try {
-      // 1. Önce güncel tutar ve tarihi veri tabanına yaz
       await saveDetails();
-      // 2. Statüyü ACCEPTED yap
       await axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' });
-      alert('Sipariş kabul edildi ve detaylar müşteriye iletildi.');
+      alert('Sipariş başarıyla kabul edildi.');
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.message || 'İşlem sırasında hata oluştu.');
@@ -86,7 +81,6 @@ function ProviderRequestCard({
     }
   };
 
-  // İşi Tamamla / Teslim Et
   const handleComplete = async () => {
     if (!window.confirm('Bu hizmeti tamamladığınızı bildirmek istiyor musunuz?')) return;
     setLoading(true);
@@ -101,7 +95,6 @@ function ProviderRequestCard({
     }
   };
 
-  // Pas Geç (Sıradakine Devret)
   const handleSkip = async () => {
     if (!window.confirm('Bu talebi pas geçmek istediğinize emin misiniz? Sıradaki sağlayıcıya iletilecektir.')) return;
     setLoading(true);
@@ -115,7 +108,6 @@ function ProviderRequestCard({
     }
   };
 
-  // Zamanlayıcı hesabı
   let timerDisplay = null;
   const refDate = req.updated_at || req.created_at || new Date().toISOString();
   if (reqStatus === 'MATCHED') {
@@ -191,7 +183,7 @@ function ProviderRequestCard({
         </div>
       </div>
 
-      {/* TUTAR VE TARİH FORMU / BİLGİ ALANI */}
+      {/* Şartlar / Teklif Paneli */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
@@ -254,7 +246,7 @@ function ProviderRequestCard({
         )}
       </div>
 
-      {/* KART BUTONLARI */}
+      {/* Aksiyon Butonları */}
       <div className="flex items-center justify-between pt-1 border-t border-neutral-100 flex-wrap gap-2">
         <div className="flex items-center gap-1.5">
           {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
@@ -330,16 +322,27 @@ function ProviderRequestCard({
 
 export default function ProviderDashboard() {
   const { session, API_BASE } = useAuth();
-  const providerId = session?.id;
 
-  const [activeTab, setActiveTab] = useState('ASSIGNED'); // 'ASSIGNED' | 'POOL' | 'LISTS'
+  // Sağlayıcı Bilgilerini Çekme (Hem session ID hem de Phone fallback)
+  const { data: providerInfoData, mutate: mutateProviderInfo } = useSWR(
+    session?.phone ? `${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}` : null,
+    fetcher
+  );
+
+  const provider = useMemo(() => {
+    return providerInfoData?.provider || session || {};
+  }, [providerInfoData, session]);
+
+  const providerId = provider?.id || session?.id;
+
+  const [activeTab, setActiveTab] = useState('ASSIGNED'); 
   const [filterStatus, setFilterStatus] = useState('ALL');
 
   // Sistem Ayarları
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
-  // Sağlayıcıya Atanan İşler (MATCHED, ACCEPTED, vb.)
+  // Sağlayıcıya Atanan İşler (providerId güvenli çağrı)
   const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(
     providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}` : null,
     fetcher,
@@ -370,7 +373,6 @@ export default function ProviderDashboard() {
   const assignedRequests = useMemo(() => safeArray(assignedData?.requests), [assignedData]);
   const poolRequests = useMemo(() => safeArray(poolData?.poolRequests), [poolData]);
 
-  // Filtrelenmiş İşler
   const filteredAssigned = useMemo(() => {
     if (filterStatus === 'ALL') return assignedRequests;
     return assignedRequests.filter(r => safeUpper(r.status) === filterStatus);
@@ -384,8 +386,8 @@ export default function ProviderDashboard() {
     return assignedRequests.filter(r => safeUpper(r.status) === 'ACCEPTED').length;
   }, [assignedRequests]);
 
-  // Havuzdaki Talebe Talip Ol (Sıraya Gir)
   const handleJoinPool = async (requestId) => {
+    if (!providerId) return alert('Sağlayıcı kimliği doğrulanamadı.');
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId });
       alert('Talebe talip oldunuz. Müşteri sizi seçtiğinde bildirim alacaksınız.');
@@ -398,20 +400,48 @@ export default function ProviderDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6 px-4 py-8">
-      {/* ÜST BAŞLIK & SEKMELER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
-            <span>Sağlayıcı Paneli</span>
-            <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
-              v1.9.0-SYNC
-            </span>
-          </h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            {session?.name || 'Hizmet Sağlayıcı'} • {session?.phone}
-          </p>
+      
+      {/* 🌟 1. PROFİL KARTI (GERİ GETİRİLDİ) */}
+      <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-neutral-950 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+            {provider?.name ? provider.name.charAt(0).toUpperCase() : <User size={22} />}
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-extrabold text-neutral-900 text-base">{provider?.name || 'Hizmet Sağlayıcı'}</h3>
+              <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <ShieldCheck size={11} /> Onaylı Profil
+              </span>
+            </div>
+            <p className="text-xs text-neutral-500 font-mono mt-0.5">{provider?.phone || session?.phone}</p>
+          </div>
         </div>
 
+        {/* Skor & İstatistik Rozetleri */}
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0">
+          <div className="flex flex-col items-center bg-amber-50/70 border border-amber-200/80 px-3.5 py-1.5 rounded-xl">
+            <span className="text-[9px] font-mono text-amber-700 uppercase font-bold flex items-center gap-1">
+              <Star size={10} fill="#f59e0b" className="text-amber-500" /> Müşteri Puanı
+            </span>
+            <span className="text-sm font-extrabold text-amber-900 mt-0.5">
+              {provider?.avg_rating ? Number(parseFloat(provider.avg_rating).toFixed(1)) : '5.0'} / 5.0
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center bg-blue-50/70 border border-blue-200/80 px-3.5 py-1.5 rounded-xl">
+            <span className="text-[9px] font-mono text-blue-700 uppercase font-bold flex items-center gap-1">
+              <Award size={10} className="text-blue-500" /> Sistem Skoru
+            </span>
+            <span className="text-sm font-extrabold text-blue-900 mt-0.5">
+              {provider?.priority_score || '100'} Puan
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. SEKMELER */}
+      <div className="flex items-center justify-between border-b pb-3">
         <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button
             type="button"
@@ -451,43 +481,40 @@ export default function ProviderDashboard() {
             <span>Listelerim</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => { mutateAssigned(); mutateProviderInfo(); }}
+          className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs"
+          title="Yenile"
+        >
+          <RefreshCw size={14} className={isValidatingAssigned ? 'animate-spin' : ''} />
+        </button>
       </div>
 
-      {/* GÖREVLERİM SEKMESİ */}
+      {/* 3. GÖREVLERİM */}
       {activeTab === 'ASSIGNED' && (
         <div className="space-y-4">
-          {/* FİLTRE BUTONLARI */}
-          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-xs">
-            <div className="flex items-center gap-1.5">
-              {[
-                { id: 'ALL', label: `Tümü (${assignedRequests.length})` },
-                { id: 'MATCHED', label: `Onay Bekleyen (${pendingCount})` },
-                { id: 'ACCEPTED', label: `İşlemde (${activeCount})` },
-                { id: 'COMPLETED', label: 'Tamamlananlar' }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setFilterStatus(f.id)}
-                  className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                    filterStatus === f.id
-                      ? 'bg-neutral-950 text-white shadow-xs'
-                      : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => mutateAssigned()}
-              className="p-1.5 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-lg transition shrink-0 cursor-pointer shadow-xs"
-              title="Listeyi Yenile"
-            >
-              <RefreshCw size={14} className={isValidatingAssigned ? 'animate-spin' : ''} />
-            </button>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {[
+              { id: 'ALL', label: `Tümü (${assignedRequests.length})` },
+              { id: 'MATCHED', label: `Onay Bekleyen (${pendingCount})` },
+              { id: 'ACCEPTED', label: `İşlemde (${activeCount})` },
+              { id: 'COMPLETED', label: 'Tamamlananlar' }
+            ].map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilterStatus(f.id)}
+                className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                  filterStatus === f.id
+                    ? 'bg-neutral-950 text-white shadow-xs'
+                    : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
 
           {filteredAssigned.length === 0 ? (
@@ -512,12 +539,12 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* AÇIK HAVUZ SEKMESİ */}
+      {/* 4. AÇIK HAVUZ */}
       {activeTab === 'POOL' && (
         <div className="space-y-4">
           <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900">
-            Aşağıdaki talepler hizmet anahtar kelimelerinizle eşleşen açık havuz talepleridir. 
-            <strong> "Talip Ol"</strong> butonuna basarak sıraya girebilirsiniz. Müşteri sizi seçtiğinde görevlerinize düşecektir.
+            Aşağıdaki talepler uzmanlık alanlarınızla eşleşen açık havuz talepleridir. 
+            <strong> "Talip Ol"</strong> diyerek sıraya girebilirsiniz. Müşteri sizi seçtiğinde iş görevlerinize düşecektir.
           </div>
 
           {poolRequests.length === 0 ? (
@@ -562,7 +589,7 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* LİSTELERİM SEKMESİ */}
+      {/* 5. LİSTELERİM */}
       {activeTab === 'LISTS' && (
         <CustomListsManager
           ownerType="PROVIDER"
