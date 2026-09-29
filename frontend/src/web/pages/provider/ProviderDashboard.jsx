@@ -5,7 +5,7 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ArrowRight
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -51,7 +51,7 @@ function ProviderRequestCard({
 
   // Buton ve Inline Bildirim Durumları
   const [btnLoading, setBtnLoading] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', text: '' }
+  const [feedback, setFeedback] = useState(null);
 
   const showFeedback = (type, text) => {
     setFeedback({ type, text });
@@ -221,12 +221,12 @@ function ProviderRequestCard({
         </div>
       </div>
 
-      {/* Şartlar / Teklif Paneli */}
+      {/* Şartlar / Teklif Paneli (Tutar + Tarih + Açıklama) */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
             <DollarSign size={14} className="text-emerald-600" />
-            <span>Sipariş Şartları</span>
+            <span>Sipariş Şartları (Fiyat, Tarih & Açıklama)</span>
           </span>
           {reqStatus === 'MATCHED' && (
             <button
@@ -240,46 +240,72 @@ function ProviderRequestCard({
         </div>
 
         {reqStatus === 'MATCHED' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
-                Tutar (TRY) *
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                placeholder="Örn: 250"
-                className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
-              />
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
+                  Tutar (TRY) *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  placeholder="Örn: 250"
+                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
+                  Hedef Teslimat Tarihi / Saati *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                />
+              </div>
             </div>
+
+            {/* ⭐ Açıklama Alanı */}
             <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
-                Hedef Teslimat Tarihi / Saati *
+              <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
+                <AlignLeft size={11} className="text-neutral-500" />
+                <span>Teklif Notu / Açıklama (Opsiyonel)</span>
               </label>
-              <input
-                type="datetime-local"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Örn: Malzeme dahil fiyat teklifidir, parçalar temin edildikten sonra montaj yapılacaktır..."
+                className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800 placeholder:text-neutral-400"
               />
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-4 text-xs font-mono">
-            <div>
-              <span className="text-neutral-500">Maliyet / Tutar: </span>
-              <strong className="text-emerald-700 font-bold">
-                {budget ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
-              </strong>
+          <div className="space-y-2 text-xs font-mono">
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <span className="text-neutral-500">Maliyet / Tutar: </span>
+                <strong className="text-emerald-700 font-bold">
+                  {budget ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
+                </strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Hedef Teslimat: </span>
+                <strong className="text-neutral-900 font-bold">
+                  {targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}
+                </strong>
+              </div>
             </div>
-            <div>
-              <span className="text-neutral-500">Hedef Teslimat: </span>
-              <strong className="text-neutral-900 font-bold">
-                {targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}
-              </strong>
-            </div>
+
+            {description && (
+              <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60">
+                <span className="font-bold text-neutral-500 block text-[10px] uppercase font-mono mb-0.5">Sağlayıcı Notu:</span>
+                <p className="italic text-neutral-800 leading-relaxed">"{description}"</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -459,7 +485,6 @@ export default function ProviderDashboard() {
     return assignedRequests.filter(r => safeUpper(r.status) === 'ACCEPTED').length;
   }, [assignedRequests]);
 
-  // Havuz Talep Olma Durumu ve Sol Bildirim
   const [poolActionId, setPoolActionId] = useState(null);
   const [poolFeedbackMap, setPoolFeedbackMap] = useState({});
 
@@ -664,7 +689,6 @@ export default function ProviderDashboard() {
                       </p>
                     </div>
 
-                    {/* HAVUZ BUTONU VE SOLUNDAKİ BİLDİRİM */}
                     <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
                       {poolFb && (
                         <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in duration-200 flex items-center gap-1 ${
@@ -677,7 +701,6 @@ export default function ProviderDashboard() {
                         </div>
                       )}
 
-                      {/* ⭐ GÜNCELLENDİ: Arka plan renksiz/şeffaf, metin sade 'Talip Ol' */}
                       <button
                         type="button"
                         disabled={isJoining}
