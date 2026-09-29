@@ -70,9 +70,18 @@ export default function CustomerDashboard() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
+  // Aksiyon ve Geri Bildirim State'leri (Popup yerine buton yanı rozetler)
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [actionLoadingKey, setActionLoadingKey] = useState(null);
+  const [actionFeedbackMap, setActionFeedbackMap] = useState({}); // { [key]: { type: 'success' | 'error', text: '' } }
+
+  const showActionFeedback = (key, type, text) => {
+    setActionFeedbackMap(prev => ({ ...prev, [key]: { type, text } }));
+    setTimeout(() => {
+      setActionFeedbackMap(prev => ({ ...prev, [key]: null }));
+    }, 3500);
+  };
   
   const [isActiveCustomerRequestsOpen, setIsActiveCustomerRequestsOpen] = useState(true);
   const [isPendingReviewsOpen, setIsPendingReviewsOpen] = useState(true);
@@ -209,68 +218,96 @@ export default function CustomerDashboard() {
     } catch { await submitFinalRequest(null); }
   };
 
-  const handleStatusChange = async (requestId, newStatus) => { 
-    setActionLoadingId(requestId);
+  const handleStatusChange = async (requestId, newStatus, key) => { 
+    const actionKey = key || `status_${requestId}_${newStatus}`;
+    setActionLoadingKey(actionKey);
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
+      showActionFeedback(actionKey, 'success', newStatus === 'ACCEPTED' ? 'Onaylandı' : 'Tamamlandı');
       await mutateCustomerReqs(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
+      showActionFeedback(actionKey, 'error', 'İşlem yapılamadı');
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
     }
   };
 
   const handleCustomerNextProvider = async (requestId) => { 
-    setActionLoadingId(requestId);
+    const actionKey = `skip_${requestId}`;
+    setActionLoadingKey(actionKey);
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); 
+      showActionFeedback(actionKey, 'success', 'Sıradakine geçildi');
       await mutateCustomerReqs(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
+      showActionFeedback(actionKey, 'error', 'Hata oluştu');
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
     }
   };
 
   const handleCustomerSelectCandidate = async (requestId, providerId) => { 
-    setActionLoadingId(requestId);
+    const actionKey = `select_${requestId}_${providerId}`;
+    setActionLoadingKey(actionKey);
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); 
       setExpandedCustomerQueueReqId(null); 
+      showActionFeedback(actionKey, 'success', 'Sağlayıcı seçildi');
       await mutateCustomerReqs(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
+      showActionFeedback(actionKey, 'error', 'Seçim yapılamadı');
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
     }
   };
 
   const handleDeleteRequest = async (requestId) => { 
-    if (!window.confirm('Bu talebi iptal etmek istediğinize emin misiniz?')) return;
-    setActionLoadingId(requestId);
+    const actionKey = `cancel_${requestId}`;
+    setActionLoadingKey(actionKey);
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'CANCELLED' }); 
+      showActionFeedback(actionKey, 'success', 'Talep iptal edildi');
       await mutateCustomerReqs(); 
     } catch (err) {
-      alert('İşlem gerçekleştirilemedi.');
+      showActionFeedback(actionKey, 'error', 'İptal edilemedi');
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
     }
   };
 
   const handleSendReview = async (requestId, reviewerType, isSkip = false) => { 
-    setActionLoadingId(requestId);
+    const actionKey = `review_${requestId}`;
+    setActionLoadingKey(actionKey);
     try { 
       const currentRatings = isSkip ? null : (reviewRatingsMap[requestId] || { knowledge: 5, communication: 5, timing: 5, cost: 5 }); 
       const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); 
       await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, ratings: currentRatings, comment }); 
       setReviewedRequestsMap(prev => ({ ...prev, [`${requestId}_${reviewerType}`]: true })); 
+      showActionFeedback(actionKey, 'success', isSkip ? 'Atlandı' : 'Değerlendirme iletildi');
       await mutateCustomerReqs(); 
     } catch (err) {
-      alert('Değerlendirme gönderilemedi.');
+      showActionFeedback(actionKey, 'error', 'Gönderilemedi');
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
+    }
+  };
+
+  const handleAddRequestToList = async (requestId) => {
+    const selectEl = document.getElementById(`cust-list-select-${requestId}`);
+    const listId = selectEl?.value;
+    const actionKey = `list_add_${requestId}`;
+    if (!listId) {
+      showActionFeedback(actionKey, 'error', 'Liste seçin');
+      return;
+    }
+    setActionLoadingKey(actionKey);
+    try {
+      await axios.post(`${API_BASE}/lists/${listId}/requests`, { requestId });
+      showActionFeedback(actionKey, 'success', 'Listeye eklendi');
+    } catch (err) {
+      showActionFeedback(actionKey, 'error', 'Eklenemedi');
+    } finally {
+      setActionLoadingKey(null);
     }
   };
 
@@ -290,7 +327,7 @@ export default function CustomerDashboard() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v1.8.0-BULLETPROOF</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.0.0-NO-POPUPS</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -326,40 +363,28 @@ export default function CustomerDashboard() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
 
-          // ⭐ KUSURSUZ (AKILLI + KULLANICI DESTEKLİ) TEKRARLA BUTONU
+          // KESİNTİSİZ VE POPUP-SIZ TEKRARLA İŞLEMİ
           onDirectReorder={async (origReq) => {
-            if (!origReq) return alert('Bu talebin geçmiş verilerine ulaşılamıyor.');
-
+            if (!origReq) return;
             const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
-            if (!targetProviderId) return alert('Bu siparişin geçmiş sağlayıcısı bulunamadı.');
-
-            // 1. EĞER ESKİ FİYAT VERİTABANINDA YOKSA, KULLANICIYA MANUEL SORDUR!
-            let finalBudget = origReq.matched_budget || origReq.provider_budget;
-            if (!finalBudget) {
-               const userBudget = window.prompt('Geçmiş fiyat veritabanında bulunamadı. Lütfen tekrarlanacak fiyat teklifinizi TL olarak girin (Örn: 250):', '250');
-               if (!userBudget) return; // Kullanıcı iptale basarsa durdur
-               finalBudget = userBudget;
-            }
-
-            // 2. YENİ TESLİMAT TARİHİNİ HESAPLA (Yoksa düz 24 saat ekle)
-            let newTargetDate = null;
-            if (origReq.matched_target_date && origReq.created_at) {
-              const oldCreated = new Date(origReq.created_at).getTime();
-              const oldTarget = new Date(origReq.matched_target_date).getTime();
-              const diffMs = oldTarget - oldCreated; 
-              if (diffMs > 0 && !isNaN(diffMs)) {
-                newTargetDate = new Date(Date.now() + diffMs).toISOString();
-              }
-            }
-            if (!newTargetDate) {
-               newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-            }
-
-            if (!window.confirm(`Bu siparişi ${finalBudget} TL fiyat ve yeni hesaplanan tarihiyle "${origReq.provider_name || 'önceki sağlayıcıya'}" doğrudan göndermek istediğinize emin misiniz?`)) return;
+            if (!targetProviderId) return;
 
             setLoading(true);
             try {
-              // BÜTÜN VERİLERİ KESİN OLARAK GÖNDERİYORUZ
+              let finalBudget = origReq.matched_budget || origReq.provider_budget || 0;
+              let newTargetDate = null;
+              if (origReq.matched_target_date && origReq.created_at) {
+                const oldCreated = new Date(origReq.created_at).getTime();
+                const oldTarget = new Date(origReq.matched_target_date).getTime();
+                const diffMs = oldTarget - oldCreated; 
+                if (diffMs > 0 && !isNaN(diffMs)) {
+                  newTargetDate = new Date(Date.now() + diffMs).toISOString();
+                }
+              }
+              if (!newTargetDate) {
+                 newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+              }
+
               const payload = {
                 rawText: origReq.raw_text,
                 contactValue: origReq.contact_value || session.phone,
@@ -368,20 +393,17 @@ export default function CustomerDashboard() {
                 isUrgent: origReq.is_urgent || false,
                 requestType: origReq.request_type || 'TALEP',
                 targetProviderId: targetProviderId,
-                suggestedBudget: finalBudget, // Kesinleşmiş Fiyat
-                suggestedTargetDate: newTargetDate, // Kesinleşmiş Tarih
-                suggestedDescription: origReq.provider_description || 'Tekrarlanan Sipariş'
+                suggestedBudget: finalBudget,
+                suggestedTargetDate: newTargetDate,
+                suggestedDescription: 'Tekrarlanan Sipariş'
               };
 
               await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
-              
-              alert('Sipariş başarıyla tekrarlandı ve sağlayıcınıza iletildi!');
               await mutateCustomerReqs();
               setActiveTab('REQUESTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
-              const hataDetayi = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-              alert(`Siparişte bir hata oluştu!\n\nDETAY: ${hataDetayi}`);
+              setErrorMessage('Sipariş tekrarlanırken bir sorun oluştu.');
             } finally {
               setLoading(false);
             }
@@ -524,7 +546,6 @@ export default function CustomerDashboard() {
                       const reqStatus = safeUpper(req.status) || 'POOL';
                       const reqCode = extractCode(req.location);
                       const isHidden = isCodeHiddenReq(req.location);
-                      const isActionLoading = actionLoadingId === req.id;
                       
                       let timerDisplay = null;
                       let isTimerCritical = false;
@@ -587,12 +608,11 @@ export default function CustomerDashboard() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                                 {req.created_at && (<span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>)}
-                                {reqCode && (<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}><Tag size={10}/> KOD: {reqCode} {isHidden ? '(Gizli)' : ''}</span>)}
+                                {reqCode && (<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>{isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {reqCode} {isHidden ? '(Gizli)' : ''}</span>)}
                                 {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
                               
-                              {/* YENİ: EĞER FİYAT GELDİYSE %100 GÖSTERECEK ŞEKİLDE DÜZELTİLDİ */}
                               {req.matched_budget !== null && req.matched_budget !== undefined && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED', 'MATCHED'].includes(reqStatus) && (
                                 <div className="mt-2.5 flex flex-wrap gap-2">
                                   <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
@@ -638,21 +658,25 @@ export default function CustomerDashboard() {
                                   <option key={lst.id} value={lst.id}>{lst.list_name}</option>
                                 ))}
                               </select>
+
+                              {/* LİSTEYE EKLEME GERİ BİLDİRİMİ */}
+                              {actionFeedbackMap[`list_add_${req.id}`] && (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
+                                  actionFeedbackMap[`list_add_${req.id}`].type === 'success' 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                                }`}>
+                                  {actionFeedbackMap[`list_add_${req.id}`].text}
+                                </span>
+                              )}
+
                               <button 
-                                onClick={async () => {
-                                  const selectEl = document.getElementById(`cust-list-select-${req.id}`);
-                                  const listId = selectEl.value;
-                                  if (!listId) { alert('Lütfen bir liste seçin.'); return; }
-                                  try {
-                                    await axios.post(`${API_BASE}/lists/${listId}/requests`, { requestId: req.id });
-                                    alert('Talep listenize başarıyla eklendi!');
-                                  } catch (err) {
-                                    alert(err.response?.data?.message || 'Eklenirken bir hata oluştu.');
-                                  }
-                                }}
-                                className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-sm"
+                                disabled={actionLoadingKey === `list_add_${req.id}`}
+                                onClick={() => handleAddRequestToList(req.id)}
+                                className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-sm disabled:opacity-60 flex items-center gap-1"
                               >
-                                Ekle
+                                {actionLoadingKey === `list_add_${req.id}` && <Loader2 size={11} className="animate-spin" />}
+                                <span>Ekle</span>
                               </button>
                             </div>
                           </div>
@@ -672,6 +696,8 @@ export default function CustomerDashboard() {
                                 const isCurrent = String(req.matched_provider_id) === String(qProv.id);
                                 const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
                                 const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
+                                const selectKey = `select_${req.id}_${qProv.id}`;
+                                const acceptKey = `status_${req.id}_ACCEPTED`;
                                 
                                 return (
                                   <div key={qProv.id} className={`border-b border-neutral-100 last:border-b-0 text-xs flex flex-col transition overflow-hidden shadow-sm ${isCurrent ? (isSkippedByThis ? 'bg-rose-50' : 'bg-emerald-50') : 'bg-white'}`}>
@@ -716,11 +742,29 @@ export default function CustomerDashboard() {
                                       </div>
                                       
                                       <div className="flex items-center space-x-2 shrink-0 ml-2">
+                                          {/* SEÇ/ONAYLA GERİ BİLDİRİMİ */}
+                                          {actionFeedbackMap[isCurrent ? acceptKey : selectKey] && (
+                                            <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
+                                              actionFeedbackMap[isCurrent ? acceptKey : selectKey].type === 'success'
+                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                : 'bg-rose-50 text-rose-800 border-rose-200'
+                                            }`}>
+                                              {actionFeedbackMap[isCurrent ? acceptKey : selectKey].type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
+                                              <span>{actionFeedbackMap[isCurrent ? acceptKey : selectKey].text}</span>
+                                            </div>
+                                          )}
+
                                           {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
-                                              <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED'); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><ShieldCheck size={10} className="mr-1 inline-block"/>Onayla</button>
+                                              <button disabled={actionLoadingKey === acceptKey} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED', acceptKey); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
+                                                {actionLoadingKey === acceptKey ? <Loader2 size={10} className="animate-spin mr-1" /> : <ShieldCheck size={10} className="mr-1"/>}
+                                                <span>Onayla</span>
+                                              </button>
                                           )}
                                           {!isCurrent && (
-                                              <button disabled={isActionLoading} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 transition shadow-sm"><Check size={10} className="mr-1 inline-block"/>Bunu Seç</button>
+                                              <button disabled={actionLoadingKey === selectKey} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
+                                                {actionLoadingKey === selectKey ? <Loader2 size={10} className="animate-spin mr-1" /> : <Check size={10} className="mr-1"/>}
+                                                <span>Bunu Seç</span>
+                                              </button>
                                           )}
                                           <div className="text-neutral-400 p-1 bg-white border border-neutral-200 rounded ml-1 transition hover:bg-neutral-50 shadow-xs">
                                               {isProvExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
@@ -773,16 +817,49 @@ export default function CustomerDashboard() {
                         )}
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2"><span>📍 {extractAddress(req.location)}</span>{req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}</div>
+                        
+                        {/* ALT AKSİYON BUTONLARI VE GERİ BİLDİRİMLERİ */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">{(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (<button disabled={isActionLoading} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50"><SkipForward size={11} /><span>Sıradakine Geç</span></button>)}</div>
-                          <div className="flex items-center space-x-1.5 ml-auto">
+                          <div className="flex items-center space-x-1.5">
+                            {(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (
+                              <div className="flex items-center gap-1.5">
+                                {actionFeedbackMap[`skip_${req.id}`] && (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${actionFeedbackMap[`skip_${req.id}`].type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                                    {actionFeedbackMap[`skip_${req.id}`].text}
+                                  </span>
+                                )}
+                                <button disabled={actionLoadingKey === `skip_${req.id}`} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50">
+                                  {actionLoadingKey === `skip_${req.id}` ? <Loader2 size={11} className="animate-spin" /> : <SkipForward size={11} />}
+                                  <span>Sıradakine Geç</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 ml-auto">
+                            {/* DÜĞMENİN SOLUNDAKİ ORTAK BİLDİRİM (Tamamlama veya İptal için) */}
+                            {(actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]) && (
+                              <div className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
+                                (actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]).type === 'success'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : 'bg-rose-50 text-rose-800 border-rose-200'
+                              }`}>
+                                {(actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]).type === 'success' ? <Check size={11} /> : <AlertCircle size={11} />}
+                                <span>{(actionFeedbackMap[`status_${req.id}_COMPLETED`] || actionFeedbackMap[`cancel_${req.id}`]).text}</span>
+                              </div>
+                            )}
+
                             {(reqStatus === 'MATCHED' || reqStatus === 'PROVIDER_COMPLETED') && (
-                              <button disabled={isActionLoading} onClick={() => handleStatusChange(req.id, 'COMPLETED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm cursor-pointer disabled:opacity-50">
-                                {isActionLoading && <Loader2 size={11} className="animate-spin" />}
+                              <button disabled={actionLoadingKey === `status_${req.id}_COMPLETED`} onClick={() => handleStatusChange(req.id, 'COMPLETED', `status_${req.id}_COMPLETED`)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm cursor-pointer disabled:opacity-60">
+                                {actionLoadingKey === `status_${req.id}_COMPLETED` ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={12} />}
                                 <span>{reqStatus === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span>
                               </button>
                             )}
-                            <button disabled={isActionLoading} onClick={() => handleDeleteRequest(req.id)} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px] cursor-pointer disabled:opacity-50" title="Talebi İptal Et"><Ban size={12} /> İptal</button>
+
+                            <button disabled={actionLoadingKey === `cancel_${req.id}`} onClick={() => handleDeleteRequest(req.id)} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1" title="Talebi İptal Et">
+                              {actionLoadingKey === `cancel_${req.id}` ? <Loader2 size={11} className="animate-spin" /> : <Ban size={12} />}
+                              <span>İptal</span>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -802,7 +879,8 @@ export default function CustomerDashboard() {
                 {isPendingReviewsOpen && (
                  <div className="space-y-4">
                    {pendingReviewCustomerRequests.map((req) => {
-                     const isActionLoading = actionLoadingId === req.id;
+                     const isActionLoading = actionLoadingKey === `review_${req.id}`;
+                     const reviewFb = actionFeedbackMap[`review_${req.id}`];
                      const ratings = getRatingsForReq(req.id);
                      const avg = ((ratings.knowledge + ratings.communication + ratings.timing + ratings.cost) / 4).toFixed(1);
                      
@@ -862,8 +940,20 @@ export default function CustomerDashboard() {
                           </div>
 
                           <div className="flex items-center justify-end space-x-3 pt-2">
+                            {/* DÜĞMENİN SOLUNDAKİ GERİ BİLDİRİM ETİKETİ */}
+                            {reviewFb && (
+                              <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
+                                reviewFb.type === 'success'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : 'bg-rose-50 text-rose-800 border-rose-200'
+                              }`}>
+                                {reviewFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
+                                <span>{reviewFb.text}</span>
+                              </div>
+                            )}
+
                             <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-2 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition">Yorum Yapmadan Geç</button>
-                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 transition">
+                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-60 flex items-center space-x-1.5 transition">
                               {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                               <span>Değerlendirmeyi Gönder</span>
                             </button>
