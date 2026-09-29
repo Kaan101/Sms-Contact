@@ -9,7 +9,7 @@ import {
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
   ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
-  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus, Copy
+  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus, Copy, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -149,84 +149,130 @@ function CustomerDashboardContent() {
   
   const myCustomerRequests = useMemo(() => safeArray(customerRequestsRes?.requests), [customerRequestsRes]);
 
-  // ⭐ GEÇMİŞ TALEBİN BİLGİLERİNİ TALEP FORMUNA DOLDURMA
-const populateFormWithPastRequest = (pastReq) => {
-  if (!pastReq) return;
-  const actionKey = `copy_${pastReq.id}`;
-  setActionLoadingKey(actionKey);
+  // ⭐ FORMA AKTARMA FONKSİYONU
+  const populateFormWithPastRequest = (pastReq) => {
+    if (!pastReq) return;
+    const actionKey = `copy_${pastReq.id}`;
+    setActionLoadingKey(actionKey);
 
-  setQueryText(pastReq.raw_text || '');
+    setQueryText(pastReq.raw_text || '');
 
-  // 1. Kayıt Türünü Aynen Koru (BILDIRIM ise BILDIRIM kalır)
-  if (pastReq.request_type) {
-    setRequestType(pastReq.request_type);
-  }
+    if (pastReq.request_type) {
+      setRequestType(pastReq.request_type);
+    }
 
-  // 2. Hedef Tarih / Zamanlama Farkını Hesapla (Varsa)
-  if (pastReq.deadline_datetime && pastReq.created_at) {
-    try {
-      const oldCreated = new Date(pastReq.created_at).getTime();
-      const oldDeadline = new Date(pastReq.deadline_datetime).getTime();
-      const diffMs = oldDeadline - oldCreated;
+    if (pastReq.deadline_datetime && pastReq.created_at) {
+      try {
+        const oldCreated = new Date(pastReq.created_at).getTime();
+        const oldDeadline = new Date(pastReq.deadline_datetime).getTime();
+        const diffMs = oldDeadline - oldCreated;
 
-      if (diffMs > 0 && !isNaN(diffMs)) {
-        const newTargetDateObj = new Date(Date.now() + diffMs);
-        const yyyy = newTargetDateObj.getFullYear();
-        const mm = String(newTargetDateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(newTargetDateObj.getDate()).padStart(2, '0');
-        const hours = String(newTargetDateObj.getHours()).padStart(2, '0');
-        const mins = String(newTargetDateObj.getMinutes()).padStart(2, '0');
+        if (diffMs > 0 && !isNaN(diffMs)) {
+          const newTargetDateObj = new Date(Date.now() + diffMs);
+          const yyyy = newTargetDateObj.getFullYear();
+          const mm = String(newTargetDateObj.getMonth() + 1).padStart(2, '0');
+          const dd = String(newTargetDateObj.getDate()).padStart(2, '0');
+          const hours = String(newTargetDateObj.getHours()).padStart(2, '0');
+          const mins = String(newTargetDateObj.getMinutes()).padStart(2, '0');
 
-        setDeadlineDate(`${yyyy}-${mm}-${dd}`);
-        setDeadlineTime(`${hours}:${mins}`);
+          setDeadlineDate(`${yyyy}-${mm}-${dd}`);
+          setDeadlineTime(`${hours}:${mins}`);
+        }
+      } catch (e) {
+        setDeadlineDate('');
+        setDeadlineTime('23:59');
       }
-    } catch (e) {
+    } else {
       setDeadlineDate('');
       setDeadlineTime('23:59');
     }
-  } else {
-    setDeadlineDate('');
-    setDeadlineTime('23:59');
-  }
 
-  // 3. Konum ve Kod Bilgileri
-  if (pastReq.location) {
-    const extractedAddr = extractAddress(pastReq.location);
-    if (extractedAddr) setLocationValue(extractedAddr);
+    if (pastReq.location) {
+      const extractedAddr = extractAddress(pastReq.location);
+      if (extractedAddr) setLocationValue(extractedAddr);
 
-    const coords = extractGPS(pastReq.location);
-    if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-      setMapPosition({ lat: coords[0], lng: coords[1] });
-      setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
+      const coords = extractGPS(pastReq.location);
+      if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+        setMapPosition({ lat: coords[0], lng: coords[1] });
+        setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
+      }
+
+      const code = extractCode(pastReq.location);
+      if (code) {
+        setCompanyCode(code);
+        setIsCodeHidden(isCodeHiddenReq(pastReq.location));
+      }
     }
 
-    const code = extractCode(pastReq.location);
-    if (code) {
-      setCompanyCode(code);
-      setIsCodeHidden(isCodeHiddenReq(pastReq.location));
+    setIsUrgent(Boolean(pastReq.is_urgent));
+
+    if (pastReq.preferred_channel) {
+      const channels = pastReq.preferred_channel
+        .split(',')
+        .map(c => c.trim().toUpperCase())
+        .filter(c => ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'].includes(c));
+      if (channels.length > 0) {
+        setPreferredChannels(channels);
+      }
     }
-  }
 
-  setIsUrgent(Boolean(pastReq.is_urgent));
+    setActiveTab('REQUESTS');
+    setStep('INPUT');
+    setIsDetailsCollapsed(false);
+    showActionFeedback(actionKey, 'success', 'Aktarıldı');
+    setActionLoadingKey(null);
 
-  if (pastReq.preferred_channel) {
-    const channels = pastReq.preferred_channel
-      .split(',')
-      .map(c => c.trim().toUpperCase())
-      .filter(c => ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'].includes(c));
-    if (channels.length > 0) {
-      setPreferredChannels(channels);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // ⭐ DOĞRUDAN REORDER (TEKRARLA) FONKSİYONU
+  const handleDirectReorderAction = async (origReq) => {
+    if (!origReq) return;
+    const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
+    if (!targetProviderId) return;
+
+    const actionKey = `reorder_${origReq.id}`;
+    setActionLoadingKey(actionKey);
+
+    try {
+      let finalBudget = origReq.matched_budget || origReq.provider_budget || 0;
+      let newTargetDate = null;
+
+      if (origReq.matched_target_date && origReq.created_at) {
+        const oldCreated = new Date(origReq.created_at).getTime();
+        const oldTarget = new Date(origReq.matched_target_date).getTime();
+        const diffMs = oldTarget - oldCreated; 
+        if (diffMs > 0 && !isNaN(diffMs)) {
+          newTargetDate = new Date(Date.now() + diffMs).toISOString();
+        }
+      }
+      if (!newTargetDate) {
+        newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      const payload = {
+        rawText: origReq.raw_text,
+        contactValue: origReq.contact_value || session?.phone,
+        preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
+        location: origReq.location || 'İstanbul, Türkiye',
+        isUrgent: origReq.is_urgent || false,
+        requestType: origReq.request_type || 'TALEP',
+        targetProviderId: targetProviderId,
+        suggestedBudget: finalBudget,
+        suggestedTargetDate: newTargetDate,
+        suggestedDescription: 'Tekrarlanan Sipariş',
+        oldRequestId: origReq.id
+      };
+
+      await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
+      await mutateCustomerReqs();
+      showActionFeedback(actionKey, 'success', 'Tekrarlandı');
+    } catch (err) {
+      showActionFeedback(actionKey, 'error', 'Hata oluştu');
+    } finally {
+      setActionLoadingKey(null);
     }
-  }
-
-  setActiveTab('REQUESTS');
-  setStep('INPUT');
-  setIsDetailsCollapsed(false);
-  showActionFeedback(actionKey, 'success', 'Forma Aktarıldı');
-  setActionLoadingKey(null);
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
+  };
 
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r?.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
@@ -455,7 +501,7 @@ const populateFormWithPastRequest = (pastReq) => {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.6.0-OPTIONAL-REFILL</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.7.0-ICON-ACTIONS</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -469,55 +515,8 @@ const populateFormWithPastRequest = (pastReq) => {
         <CustomListsManager 
           ownerType="CUSTOMER" 
           ownerId={session?.phone} 
-          
-          onReworkRequest={(origReq) => {
-            populateFormWithPastRequest(origReq);
-          }}
-
-          onDirectReorder={async (origReq) => {
-            if (!origReq) return;
-            const targetProviderId = origReq.matched_provider_id || origReq.provider_id;
-            if (!targetProviderId) return;
-
-            setLoading(true);
-            try {
-              let finalBudget = origReq.matched_budget || origReq.provider_budget || 0;
-              let newTargetDate = null;
-              if (origReq.matched_target_date && origReq.created_at) {
-                const oldCreated = new Date(origReq.created_at).getTime();
-                const oldTarget = new Date(origReq.matched_target_date).getTime();
-                const diffMs = oldTarget - oldCreated; 
-                if (diffMs > 0 && !isNaN(diffMs)) {
-                  newTargetDate = new Date(Date.now() + diffMs).toISOString();
-                }
-              }
-              if (!newTargetDate) {
-                 newTargetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-              }
-
-              const payload = {
-                rawText: origReq.raw_text,
-                contactValue: origReq.contact_value || session?.phone,
-                preferredChannel: origReq.preferred_channel || 'PHONE, SMS, WHATSAPP',
-                location: origReq.location || 'İstanbul, Türkiye',
-                isUrgent: origReq.is_urgent || false,
-                requestType: origReq.request_type || 'TALEP',
-                targetProviderId: targetProviderId,
-                suggestedBudget: finalBudget,
-                suggestedTargetDate: newTargetDate,
-                suggestedDescription: 'Tekrarlanan Sipariş'
-              };
-
-              await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
-              await mutateCustomerReqs();
-              setActiveTab('REQUESTS');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch (err) {
-              setErrorMessage('Sipariş tekrarlanırken bir sorun oluştu.');
-            } finally {
-              setLoading(false);
-            }
-          }}
+          onReworkRequest={(origReq) => populateFormWithPastRequest(origReq)}
+          onDirectReorder={(origReq) => handleDirectReorderAction(origReq)}
         />
       ) : (
         <>
@@ -1133,7 +1132,7 @@ const populateFormWithPastRequest = (pastReq) => {
              </div>
           )}
 
-          {/* GEÇMİŞ TALEPLER - İSTEĞE BAĞLI FORMA AKTAR BUTONU */}
+          {/* ⭐ GEÇMİŞ TALEPLER - SADECE İKON AKSİYONLARI */}
           {pastCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -1146,13 +1145,18 @@ const populateFormWithPastRequest = (pastReq) => {
                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                      {filteredPastCustomerRequests.map((req) => {
                         const copyKey = `copy_${req?.id}`;
+                        const reorderKey = `reorder_${req?.id}`;
+
                         const isCopying = actionLoadingKey === copyKey;
+                        const isReordering = actionLoadingKey === reorderKey;
+
                         const copyFb = actionFeedbackMap?.[copyKey];
+                        const reorderFb = actionFeedbackMap?.[reorderKey];
 
                         return (
                           <div 
                             key={req?.id} 
-                            className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-xs space-y-2 text-xs transition-all duration-200"
+                            className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-2 text-xs hover:border-neutral-300 transition-all duration-200"
                           >
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                               <div className="space-y-1 flex-1 min-w-[200px]">
@@ -1170,35 +1174,37 @@ const populateFormWithPastRequest = (pastReq) => {
                                 </div>
                               </div>
                               
-                              {/* İSTEĞE BAĞLI FORMA AKTAR ALANI (BİLDİRİM VE DÜĞME) */}
-                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center ml-auto">
-                                {copyFb && (
+                              {/* ⭐ SADECE İKON AKSİYONLARI VE SOL BİLDİRİMİ */}
+                              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center ml-auto">
+                                {(copyFb || reorderFb) && (
                                   <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
-                                    copyFb.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                                    (copyFb || reorderFb)?.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
                                   }`}>
-                                    {copyFb.type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
-                                    <span>{copyFb.text}</span>
+                                    {(copyFb || reorderFb)?.type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
+                                    <span>{(copyFb || reorderFb)?.text}</span>
                                   </div>
                                 )}
 
+                                {/* 1. Forma Aktar İkonu (Copy) */}
                                 <button
                                   type="button"
                                   disabled={isCopying}
                                   onClick={() => populateFormWithPastRequest(req)}
-                                  className="px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-                                  title="Bu talebin bilgilerini yukarıdaki forma doldurur"
+                                  className="p-2 text-neutral-600 hover:text-neutral-950 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50"
+                                  title="Bilgileri Talep Formuna Aktar"
                                 >
-                                  {isCopying ? (
-                                    <>
-                                      <Loader2 size={11} className="animate-spin text-neutral-600" />
-                                      <span>Aktarılıyor...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy size={11} className="text-neutral-600" />
-                                      <span>Forma Aktar</span>
-                                    </>
-                                  )}
+                                  {isCopying ? <Loader2 size={13} className="animate-spin text-neutral-700" /> : <Copy size={13} />}
+                                </button>
+
+                                {/* 2. Doğrudan Tekrarla İkonu (RefreshCw) */}
+                                <button
+                                  type="button"
+                                  disabled={isReordering}
+                                  onClick={() => handleDirectReorderAction(req)}
+                                  className="p-2 text-neutral-700 hover:text-white bg-white hover:bg-neutral-950 border border-neutral-200 hover:border-neutral-950 rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50"
+                                  title="Aynı Şartlarla Doğrudan Tekrarla"
+                                >
+                                  {isReordering ? <Loader2 size={13} className="animate-spin text-neutral-700" /> : <RefreshCw size={13} />}
                                 </button>
                               </div>
                             </div>
