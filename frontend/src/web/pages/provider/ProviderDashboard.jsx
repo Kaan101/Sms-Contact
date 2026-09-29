@@ -123,7 +123,6 @@ function ProviderRequestCard({
     }
   };
 
-  // Liste Ekleme Inline Bildirimi
   const [listFeedback, setListFeedback] = useState(null);
   const handleAddToList = async () => {
     const selectEl = document.getElementById(`prov-list-${req.id}`);
@@ -321,9 +320,7 @@ function ProviderRequestCard({
           )}
         </div>
 
-        {/* SAĞ TARAF: BİLDİRİM VE İŞLEM DÜĞMESİ */}
         <div className="flex items-center gap-2.5 ml-auto">
-          {/* DÜĞMENİN SOLUNDA ÇIKAN SADE GERİ BİLDİRİM ETİKETİ */}
           {feedback && (
             <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in slide-in-from-right-1 duration-200 flex items-center gap-1 ${
               feedback.type === 'success'
@@ -464,7 +461,7 @@ export default function ProviderDashboard() {
 
   // Havuz Talep Olma Durumu ve Sol Bildirim
   const [poolActionId, setPoolActionId] = useState(null);
-  const [poolFeedbackMap, setPoolFeedbackMap] = useState({}); // { [reqId]: { type, text } }
+  const [poolFeedbackMap, setPoolFeedbackMap] = useState({});
 
   const handleJoinPool = async (requestId) => {
     if (!providerId) {
@@ -680,21 +677,22 @@ export default function ProviderDashboard() {
                         </div>
                       )}
 
+                      {/* ⭐ GÜNCELLENDİ: Arka plan renksiz/şeffaf, metin sade 'Talip Ol' */}
                       <button
                         type="button"
                         disabled={isJoining}
                         onClick={() => handleJoinPool(req.id)}
-                        className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+                        className="px-4 py-2 bg-transparent hover:bg-neutral-100 text-neutral-800 border border-neutral-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                       >
                         {isJoining ? (
                           <>
-                            <Loader2 size={13} className="animate-spin" />
+                            <Loader2 size={13} className="animate-spin text-neutral-600" />
                             <span>İletiliyor...</span>
                           </>
                         ) : (
                           <>
-                            <Send size={13} />
-                            <span>Talebe Talip Ol</span>
+                            <Send size={13} className="text-neutral-600" />
+                            <span>Talip Ol</span>
                           </>
                         )}
                       </button>
