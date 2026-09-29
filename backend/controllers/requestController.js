@@ -309,8 +309,13 @@ const getProviderAssignedRequests = async (req, res) => {
       [providerId]
     );
 
+    // GİZLİLİK KALKANI KONTROLÜ:
+    // Eğer iş zaten kabul edildiyse VEYA tekrarlanan bir siparişse (Reorder) telefon doğrudan görünür!
     const secureRows = rows.map(r => {
-      if (!['ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED'].includes(r.status)) {
+      const isReorder = r.provider_description && r.provider_description.includes('Tekrar');
+      const isAcceptedOrDone = ['ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED'].includes(r.status);
+
+      if (!isAcceptedOrDone && !isReorder) {
         return {
           ...r,
           contact_value: '*** ** ** (İşi Kabul Edince Görünür)' 

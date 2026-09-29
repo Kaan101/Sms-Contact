@@ -5,7 +5,7 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ThumbsUp
+  User, Award, ShieldCheck, Tag, ThumbsUp, ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -16,7 +16,7 @@ import CustomListsManager from '../../components/common/CustomListsManager';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
-// Tekil Talep Kartı (Form durumlarını bağımsız yöneten alt bileşen)
+// Tekil Talep Kartı
 function ProviderRequestCard({ 
   req, 
   providerId, 
@@ -27,6 +27,12 @@ function ProviderRequestCard({
 }) {
   const reqStatus = safeUpper(req.status) || 'MATCHED';
   
+  // Tekrarlanan sipariş mi kontrolü
+  const isReorder = Boolean(
+    (req.provider_description && req.provider_description.includes('Tekrar')) ||
+    (req.matched_budget && req.matched_target_date)
+  );
+
   const initialBudget = req.provider_budget || req.matched_budget || '';
   const initialDate = useMemo(() => {
     const rawDate = req.provider_target_date || req.matched_target_date;
@@ -63,7 +69,7 @@ function ProviderRequestCard({
       providerBudget: budget ? parseFloat(budget) : null,
       providerCurrency: 'TRY',
       providerTargetDate: targetDate ? new Date(targetDate).toISOString() : null,
-      providerDescription: description || 'Tekrarlanan Sipariş Onayı'
+      providerDescription: description || (isReorder ? 'Tekrarlanan Sipariş Onayı' : '')
     });
   };
 
@@ -72,7 +78,7 @@ function ProviderRequestCard({
     try {
       await saveDetails();
       await axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' });
-      alert('Sipariş başarıyla kabul edildi.');
+      alert(isReorder ? 'Sipariş devam ettirildi.' : 'Sipariş başarıyla kabul edildi.');
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.message || 'İşlem sırasında hata oluştu.');
@@ -136,6 +142,11 @@ function ProviderRequestCard({
             <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
               {safeDateTime(req.created_at)}
             </span>
+            {isReorder && (
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                Tekrarlanan Sipariş
+              </span>
+            )}
             {req.is_urgent && (
               <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
                 ACİL
@@ -147,7 +158,9 @@ function ProviderRequestCard({
             <MapPin size={12} className="text-neutral-400 shrink-0" />
             <span>{extractAddress(req.location)}</span>
           </p>
-          <p className="text-xs font-mono text-blue-700 mt-1 flex items-center gap-1">
+          
+          {/* İletişim Bilgisi (Tekrarlanan işlerde doğrudan açık görünür) */}
+          <p className="text-xs font-mono text-blue-700 font-semibold mt-1 flex items-center gap-1">
             <Phone size={12} className="text-blue-500 shrink-0" />
             <span>{req.contact_value}</span>
           </p>
@@ -156,7 +169,7 @@ function ProviderRequestCard({
         <div className="flex flex-col items-end gap-1.5">
           {reqStatus === 'MATCHED' && (
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-700 border border-amber-200">
-              Onayınızı Bekliyor
+              {isReorder ? 'Tekrar Talebi Geldi' : 'Onayınızı Bekliyor'}
             </span>
           )}
           {reqStatus === 'ACCEPTED' && (
@@ -205,7 +218,7 @@ function ProviderRequestCard({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div>
               <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
-                Teklif Edilen Tutar (TRY) *
+                Tutar (TRY) *
               </label>
               <input
                 type="number"
@@ -283,22 +296,32 @@ function ProviderRequestCard({
         <div className="flex items-center gap-2 ml-auto">
           {reqStatus === 'MATCHED' && (
             <>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleSkip}
-                className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
-              >
-                Pas Geç
-              </button>
+              {!isReorder && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleSkip}
+                  className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  Pas Geç
+                </button>
+              )}
               <button
                 type="button"
                 disabled={loading}
                 onClick={handleAccept}
-                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 transition"
+                className={`px-5 py-2 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition ${
+                  isReorder ? 'bg-neutral-950 hover:bg-neutral-800' : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
               >
-                {loading ? <Loader2 size={12} className="animate-spin" /> : <Check size={14} />}
-                <span>Şartları Onayla & İşi Kabul Et</span>
+                {loading ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : isReorder ? (
+                  <ArrowRight size={14} />
+                ) : (
+                  <Check size={14} />
+                )}
+                <span>{isReorder ? 'Devam' : 'Şartları Onayla & İşi Kabul Et'}</span>
               </button>
             </>
           )}
@@ -323,7 +346,6 @@ function ProviderRequestCard({
 export default function ProviderDashboard() {
   const { session, API_BASE } = useAuth();
 
-  // Sağlayıcı Bilgilerini Çekme (Hem session ID hem de Phone fallback)
   const { data: providerInfoData, mutate: mutateProviderInfo } = useSWR(
     session?.phone ? `${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}` : null,
     fetcher
@@ -338,25 +360,21 @@ export default function ProviderDashboard() {
   const [activeTab, setActiveTab] = useState('ASSIGNED'); 
   const [filterStatus, setFilterStatus] = useState('ALL');
 
-  // Sistem Ayarları
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
-  // Sağlayıcıya Atanan İşler (providerId güvenli çağrı)
   const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(
     providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
 
-  // Açık Havuzdaki Talepler
   const { data: poolData, mutate: mutatePool } = useSWR(
     providerId && activeTab === 'POOL' ? `${API_BASE}/requests/pool?providerId=${providerId}` : null,
     fetcher,
     { refreshInterval: 10000 }
   );
 
-  // Sağlayıcı Listeleri
   const [userLists, setUserLists] = useState([]);
   const fetchLists = async () => {
     if (!session?.phone) return;
@@ -401,7 +419,7 @@ export default function ProviderDashboard() {
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6 px-4 py-8">
       
-      {/* 🌟 1. PROFİL KARTI (GERİ GETİRİLDİ) */}
+      {/* PROFİL KARTI */}
       <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center space-x-3.5">
           <div className="w-12 h-12 rounded-2xl bg-neutral-950 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
@@ -418,7 +436,6 @@ export default function ProviderDashboard() {
           </div>
         </div>
 
-        {/* Skor & İstatistik Rozetleri */}
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0">
           <div className="flex flex-col items-center bg-amber-50/70 border border-amber-200/80 px-3.5 py-1.5 rounded-xl">
             <span className="text-[9px] font-mono text-amber-700 uppercase font-bold flex items-center gap-1">
@@ -440,7 +457,7 @@ export default function ProviderDashboard() {
         </div>
       </div>
 
-      {/* 2. SEKMELER */}
+      {/* SEKMELER */}
       <div className="flex items-center justify-between border-b pb-3">
         <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button
@@ -492,7 +509,7 @@ export default function ProviderDashboard() {
         </button>
       </div>
 
-      {/* 3. GÖREVLERİM */}
+      {/* GÖREVLERİM */}
       {activeTab === 'ASSIGNED' && (
         <div className="space-y-4">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
@@ -539,7 +556,7 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* 4. AÇIK HAVUZ */}
+      {/* AÇIK HAVUZ */}
       {activeTab === 'POOL' && (
         <div className="space-y-4">
           <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900">
@@ -589,7 +606,7 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* 5. LİSTELERİM */}
+      {/* LİSTELERİM */}
       {activeTab === 'LISTS' && (
         <CustomListsManager
           ownerType="PROVIDER"
