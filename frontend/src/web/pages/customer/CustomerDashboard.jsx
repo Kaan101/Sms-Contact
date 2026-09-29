@@ -9,7 +9,7 @@ import {
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
   ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
-  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus
+  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus, Copy
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -111,13 +111,11 @@ function CustomerDashboardContent() {
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
-  // Aksiyon ve Geri Bildirim State'leri
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [actionFeedbackMap, setActionFeedbackMap] = useState({});
 
-  // ⭐ YENİ: Değerlendirme geçiş durumu: { [reqId]: 'QUESTION' | 'RATING' }
   const [reviewFlowMap, setReviewFlowMap] = useState({});
 
   const showActionFeedback = (key, type, text) => {
@@ -150,6 +148,54 @@ function CustomerDashboardContent() {
   );
   
   const myCustomerRequests = useMemo(() => safeArray(customerRequestsRes?.requests), [customerRequestsRes]);
+
+  const populateFormWithPastRequest = (pastReq) => {
+    if (!pastReq) return;
+    const actionKey = `copy_${pastReq.id}`;
+    setActionLoadingKey(actionKey);
+
+    setQueryText(pastReq.raw_text || '');
+
+    if (pastReq.location) {
+      const extractedAddr = extractAddress(pastReq.location);
+      if (extractedAddr) setLocationValue(extractedAddr);
+
+      const coords = extractGPS(pastReq.location);
+      if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+        setMapPosition({ lat: coords[0], lng: coords[1] });
+        setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
+      }
+
+      const code = extractCode(pastReq.location);
+      if (code) {
+        setCompanyCode(code);
+        setIsCodeHidden(isCodeHiddenReq(pastReq.location));
+      }
+    }
+
+    setIsUrgent(Boolean(pastReq.is_urgent));
+    if (pastReq.request_type) {
+      setRequestType(pastReq.request_type);
+    }
+
+    if (pastReq.preferred_channel) {
+      const channels = pastReq.preferred_channel
+        .split(',')
+        .map(c => c.trim().toUpperCase())
+        .filter(c => ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'].includes(c));
+      if (channels.length > 0) {
+        setPreferredChannels(channels);
+      }
+    }
+
+    setActiveTab('REQUESTS');
+    setStep('INPUT');
+    setIsDetailsCollapsed(false);
+    showActionFeedback(actionKey, 'success', 'Aktarıldı');
+    setActionLoadingKey(null);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const applyFallbackLocation = (pastRequests) => {
     const validReq = safeArray(pastRequests).find(r => r?.location && !r.location.includes('Bilinmiyor') && !r.location.includes('Belirtilmedi'));
@@ -271,7 +317,6 @@ function CustomerDashboardContent() {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
       showActionFeedback(actionKey, 'success', newStatus === 'ACCEPTED' ? 'Onaylandı' : 'Tamamlandı');
       
-      // ⭐ Onaylandığında doğrudan soru aşamasına alıyoruz:
       if (newStatus === 'COMPLETED') {
         setReviewFlowMap(prev => ({ ...prev, [requestId]: 'QUESTION' }));
       }
@@ -379,7 +424,7 @@ function CustomerDashboardContent() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.4.0-EASY-FLOW</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.6.0-OPTIONAL-REFILL</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -395,24 +440,7 @@ function CustomerDashboardContent() {
           ownerId={session?.phone} 
           
           onReworkRequest={(origReq) => {
-            setQueryText(origReq?.raw_text || origReq?.notes || '');
-            if(origReq?.location) {
-               setLocationValue(extractAddress(origReq.location));
-               const coords = extractGPS(origReq.location);
-               if(coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-                 setCoordinates(`${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`);
-                 setMapPosition({lat: coords[0], lng: coords[1]});
-               }
-               setCompanyCode(extractCode(origReq.location) || '');
-               setIsCodeHidden(isCodeHiddenReq(origReq.location));
-            }
-            if(origReq?.is_urgent) setIsUrgent(true);
-            if(origReq?.request_type) setRequestType(origReq.request_type);
-
-            setActiveTab('REQUESTS'); 
-            setStep('INPUT'); 
-            setIsDetailsCollapsed(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            populateFormWithPastRequest(origReq);
           }}
 
           onDirectReorder={async (origReq) => {
@@ -919,7 +947,6 @@ function CustomerDashboardContent() {
              </div>
           )}
 
-          {/* ⭐ YENİ GEÇİŞLİ DEĞERLENDİRME BÖLÜMÜ */}
           {pendingReviewCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -933,7 +960,6 @@ function CustomerDashboardContent() {
                      const isActionLoading = actionLoadingKey === `review_${req.id}`;
                      const reviewFb = actionFeedbackMap?.[`review_${req.id}`];
                      
-                     // Durum belirleme: 'QUESTION' (varsayılan) ya da 'RATING'
                      const flowState = reviewFlowMap[req.id] || 'QUESTION';
                      
                      const ratings = getRatingsForReq(req.id);
@@ -957,7 +983,6 @@ function CustomerDashboardContent() {
                           <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">TAMAMLANDI</span>
                         </div>
                         
-                        {/* 1. ADIM: ZARİF GEÇİŞ SORUSU (ONAYLA BUTONU YERİNE GELEN ALAN) */}
                         {flowState === 'QUESTION' && (
                           <div className="p-3.5 bg-white rounded-xl border border-neutral-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
                             <div className="flex items-center gap-2">
@@ -998,7 +1023,6 @@ function CustomerDashboardContent() {
                           </div>
                         )}
 
-                        {/* 2. ADIM: "DEĞERLENDİR" DENİLİNCE AÇILAN PUANLAMA FORMU */}
                         {flowState === 'RATING' && (
                           <div className="p-4 bg-white rounded-xl border border-neutral-200/90 shadow-xs space-y-4 animate-in fade-in duration-200">
                             <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
@@ -1078,6 +1102,7 @@ function CustomerDashboardContent() {
              </div>
           )}
 
+          {/* GEÇMİŞ TALEPLER - İSTEĞE BAĞLI FORMA AKTAR BUTONU */}
           {pastCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none">
@@ -1088,11 +1113,67 @@ function CustomerDashboardContent() {
                  <div className="space-y-3">
                    <div className="relative mb-3"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={searchCustomerHistoryText} onChange={(e) => setSearchCustomerHistoryText(e.target.value)} placeholder="Geçmiş taleplerde ara..." className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium shadow-sm" /></div>
                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                     {filteredPastCustomerRequests.map((req) => (
-                        <div key={req?.id} className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm space-y-2 text-xs">
-                          <div className="flex items-start justify-between"><div><p className="font-semibold text-neutral-900">"{req?.raw_text}"</p><p className="text-[10px] text-neutral-500 font-mono mt-0.5">{safeDateTime(req?.created_at)}</p></div><span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">{req?.status}</span></div>
-                        </div>
-                     ))}
+                     {filteredPastCustomerRequests.map((req) => {
+                        const copyKey = `copy_${req?.id}`;
+                        const isCopying = actionLoadingKey === copyKey;
+                        const copyFb = actionFeedbackMap?.[copyKey];
+
+                        return (
+                          <div 
+                            key={req?.id} 
+                            className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-xs space-y-2 text-xs transition-all duration-200"
+                          >
+                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                              <div className="space-y-1 flex-1 min-w-[200px]">
+                                <p className="font-semibold text-neutral-900 leading-snug">"{req?.raw_text}"</p>
+                                <div className="flex flex-wrap items-center gap-2 text-[10px] text-neutral-500 font-mono">
+                                  <span>{safeDateTime(req?.created_at)}</span>
+                                  {req?.provider_name && (
+                                    <span>
+                                      • Sağlayıcı: <strong className="text-neutral-800 font-semibold">{req.provider_name}</strong>
+                                    </span>
+                                  )}
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">
+                                    {req?.status}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* İSTEĞE BAĞLI FORMA AKTAR ALANI (BİLDİRİM VE DÜĞME) */}
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center ml-auto">
+                                {copyFb && (
+                                  <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
+                                    copyFb.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                                  }`}>
+                                    {copyFb.type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
+                                    <span>{copyFb.text}</span>
+                                  </div>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={isCopying}
+                                  onClick={() => populateFormWithPastRequest(req)}
+                                  className="px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                                  title="Bu talebin bilgilerini yukarıdaki forma doldurur"
+                                >
+                                  {isCopying ? (
+                                    <>
+                                      <Loader2 size={11} className="animate-spin text-neutral-600" />
+                                      <span>Aktarılıyor...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy size={11} className="text-neutral-600" />
+                                      <span>Forma Aktar</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                     })}
                    </div>
                  </div>
                 )}
