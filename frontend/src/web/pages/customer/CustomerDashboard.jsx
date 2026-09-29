@@ -9,7 +9,7 @@ import {
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
   ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
-  FileText, Bell, Folder, CheckCircle2 // ⭐ EKLENDİ: CheckCircle2 import edildi
+  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -19,7 +19,6 @@ import {
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
 import CustomListsManager from '../../components/common/CustomListsManager';
 
-// ⭐ Beyaz Ekranı Engelleyen Koruyucu (Error Boundary)
 class SafeDashboardBoundary extends Component {
   constructor(props) {
     super(props);
@@ -106,7 +105,6 @@ function CustomerDashboardContent() {
   useEffect(() => { localStorage.setItem('sc_company_code', companyCode); }, [companyCode]);
   useEffect(() => { localStorage.setItem('sc_is_code_hidden', isCodeHidden); }, [isCodeHidden]);
 
-  // Varsayılan koordinat
   const defaultPosition = useMemo(() => ({ lat: 41.0082, lng: 28.9784 }), []);
   const [mapPosition, setMapPosition] = useState(defaultPosition);
   const [mapSearchText, setMapSearchText] = useState('');
@@ -118,6 +116,9 @@ function CustomerDashboardContent() {
   const [errorMessage, setErrorMessage] = useState('');
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [actionFeedbackMap, setActionFeedbackMap] = useState({});
+
+  // ⭐ YENİ: Değerlendirme geçiş durumu: { [reqId]: 'QUESTION' | 'RATING' }
+  const [reviewFlowMap, setReviewFlowMap] = useState({});
 
   const showActionFeedback = (key, type, text) => {
     setActionFeedbackMap(prev => ({ ...(prev || {}), [key]: { type, text } }));
@@ -269,6 +270,12 @@ function CustomerDashboardContent() {
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
       showActionFeedback(actionKey, 'success', newStatus === 'ACCEPTED' ? 'Onaylandı' : 'Tamamlandı');
+      
+      // ⭐ Onaylandığında doğrudan soru aşamasına alıyoruz:
+      if (newStatus === 'COMPLETED') {
+        setReviewFlowMap(prev => ({ ...prev, [requestId]: 'QUESTION' }));
+      }
+      
       await mutateCustomerReqs(); 
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İşlem yapılamadı');
@@ -328,7 +335,7 @@ function CustomerDashboardContent() {
       const comment = isSkip ? null : (reviewCommentMap[requestId] || ''); 
       await axios.post(`${API_BASE}/reviews`, { requestId: Number(requestId), reviewerType, ratings: currentRatings, comment }); 
       setReviewedRequestsMap(prev => ({ ...(prev || {}), [`${requestId}_${reviewerType}`]: true })); 
-      showActionFeedback(actionKey, 'success', isSkip ? 'Atlandı' : 'Değerlendirme iletildi');
+      showActionFeedback(actionKey, 'success', isSkip ? 'Geçildi' : 'Değerlendirme iletildi');
       await mutateCustomerReqs(); 
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'Gönderilemedi');
@@ -372,7 +379,7 @@ function CustomerDashboardContent() {
       <div className="flex items-center justify-between border-b pb-4">
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
-          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.3.0-FIXED</span>
+          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">v2.4.0-EASY-FLOW</span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
           <button onClick={() => setActiveTab('REQUESTS')} className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'REQUESTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Taleplerim</button>
@@ -653,7 +660,7 @@ function CustomerDashboardContent() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
                                 {req.created_at && (<span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>)}
-                                {reqCode && (<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}><Tag size={10}/> KOD: {reqCode} {isHidden ? '(Gizli)' : ''}</span>)}
+                                {reqCode && (<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border flex items-center gap-1 ${isHidden ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>{isCodeHidden ? <Shield size={10}/> : <Tag size={10}/>} KOD: {reqCode} {isHidden ? '(Gizli)' : ''}</span>)}
                                 {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
@@ -912,10 +919,11 @@ function CustomerDashboardContent() {
              </div>
           )}
 
+          {/* ⭐ YENİ GEÇİŞLİ DEĞERLENDİRME BÖLÜMÜ */}
           {pendingReviewCustomerRequests.length > 0 && (
              <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
-                   <h3 className="text-sm font-bold text-emerald-700 flex items-center space-x-1.5"><Sparkles size={16} className="text-amber-500" /><span>Değerlendirme Bekleyenler ({pendingReviewCustomerRequests.length})</span></h3>
+                   <h3 className="text-sm font-bold text-emerald-700 flex items-center space-x-1.5"><Sparkles size={16} className="text-amber-500" /><span>Tamamlanan Hizmetler ({pendingReviewCustomerRequests.length})</span></h3>
                    <div className="text-neutral-400">{isPendingReviewsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
                 </div>
                 {isPendingReviewsOpen && (
@@ -924,6 +932,10 @@ function CustomerDashboardContent() {
                      if (!req) return null;
                      const isActionLoading = actionLoadingKey === `review_${req.id}`;
                      const reviewFb = actionFeedbackMap?.[`review_${req.id}`];
+                     
+                     // Durum belirleme: 'QUESTION' (varsayılan) ya da 'RATING'
+                     const flowState = reviewFlowMap[req.id] || 'QUESTION';
+                     
                      const ratings = getRatingsForReq(req.id);
                      const avg = ((ratings.knowledge + ratings.communication + ratings.timing + ratings.cost) / 4).toFixed(1);
                      
@@ -942,65 +954,121 @@ function CustomerDashboardContent() {
                             <p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p>
                             <p className="text-[11px] text-neutral-500 font-mono mt-0.5">Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}</p>
                           </div>
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">ONAYLANDI</span>
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">TAMAMLANDI</span>
                         </div>
                         
-                        <div className="p-4 bg-white rounded-xl border border-neutral-200/90 shadow-xs space-y-4">
-                          
-                          <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
-                              <span className="font-extrabold text-neutral-900 text-xs uppercase tracking-wide">Hizmet Deneyimini Puanla</span>
-                              <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
-                                <span className="text-[10px] font-bold text-emerald-800">Genel Ortalama:</span>
-                                <span className="text-xs font-black text-emerald-700">{avg}</span>
-                              </div>
-                          </div>
+                        {/* 1. ADIM: ZARİF GEÇİŞ SORUSU (ONAYLA BUTONU YERİNE GELEN ALAN) */}
+                        {flowState === 'QUESTION' && (
+                          <div className="p-3.5 bg-white rounded-xl border border-neutral-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                            <div className="flex items-center gap-2">
+                              <MessageSquarePlus size={16} className="text-emerald-600 shrink-0" />
+                              <span className="text-xs font-semibold text-neutral-800">
+                                Bu hizmet tamamlandı! Deneyiminizi şimdi değerlendirmek ister misiniz?
+                              </span>
+                            </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                            {ratingCriteria.map(criteria => (
-                              <div key={criteria.id} className="flex flex-col space-y-1 bg-neutral-50 p-2 rounded-lg border border-neutral-100">
-                                <span className="text-[10px] font-bold text-neutral-600 uppercase">{criteria.label}</span>
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center space-x-1">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                      <button 
-                                        key={star} 
-                                        type="button" 
-                                        onClick={() => updateSpecificRating(req.id, criteria.id, star)} 
-                                        className={`p-1 transition cursor-pointer hover:scale-110 ${star <= ratings[criteria.id] ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
-                                      >
-                                        <Star size={16} fill={star <= ratings[criteria.id] ? '#f59e0b' : 'none'} />
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <span className="text-[10px] font-mono font-bold text-neutral-400">{ratings[criteria.id]}/5</span>
+                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                              {reviewFb && (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
+                                  reviewFb.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                                }`}>
+                                  {reviewFb.text}
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={isActionLoading}
+                                onClick={() => handleSendReview(req.id, 'CUSTOMER', true)}
+                                className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border border-neutral-200 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition"
+                              >
+                                Değerlendirmeden Geç
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isActionLoading}
+                                onClick={() => setReviewFlowMap(prev => ({ ...prev, [req.id]: 'RATING' }))}
+                                className="px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 transition flex items-center gap-1"
+                              >
+                                <Star size={12} fill="#f59e0b" className="text-amber-500" />
+                                <span>Değerlendir</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. ADIM: "DEĞERLENDİR" DENİLİNCE AÇILAN PUANLAMA FORMU */}
+                        {flowState === 'RATING' && (
+                          <div className="p-4 bg-white rounded-xl border border-neutral-200/90 shadow-xs space-y-4 animate-in fade-in duration-200">
+                            <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
+                                <span className="font-extrabold text-neutral-900 text-xs uppercase tracking-wide">Hizmet Deneyimini Puanla</span>
+                                <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
+                                  <span className="text-[10px] font-bold text-emerald-800">Ortalama:</span>
+                                  <span className="text-xs font-black text-emerald-700">{avg}</span>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+                            </div>
 
-                          <div className="pt-2">
-                             <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Bu deneyiminizle ilgili eklemek istediğiniz yorumunuz (opsiyonel)..." className="w-full p-3 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition" />
-                          </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                              {ratingCriteria.map(criteria => (
+                                <div key={criteria.id} className="flex flex-col space-y-1 bg-neutral-50 p-2 rounded-lg border border-neutral-100">
+                                  <span className="text-[10px] font-bold text-neutral-600 uppercase">{criteria.label}</span>
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center space-x-1">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <button 
+                                          key={star} 
+                                          type="button" 
+                                          onClick={() => updateSpecificRating(req.id, criteria.id, star)} 
+                                          className={`p-1 transition cursor-pointer hover:scale-110 ${star <= ratings[criteria.id] ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
+                                        >
+                                          <Star size={16} fill={star <= ratings[criteria.id] ? '#f59e0b' : 'none'} />
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <span className="text-[10px] font-mono font-bold text-neutral-400">{ratings[criteria.id]}/5</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
 
-                          <div className="flex items-center justify-end space-x-3 pt-2">
-                            {reviewFb && (
-                              <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
-                                reviewFb.type === 'success'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : 'bg-rose-50 text-rose-800 border-rose-200'
-                              }`}>
-                                {reviewFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
-                                <span>{reviewFb.text}</span>
-                              </div>
-                            )}
+                            <div className="pt-2">
+                               <input type="text" value={reviewCommentMap[req.id] || ''} onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} placeholder="Deneyiminiz hakkında kısa bir yorum ekleyin (opsiyonel)..." className="w-full p-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition" />
+                            </div>
 
-                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} className="px-3 py-2 text-neutral-500 hover:bg-neutral-100 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition">Yorum Yapmadan Geç</button>
-                            <button disabled={isActionLoading} type="button" onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} className="px-5 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-60 flex items-center space-x-1.5 transition">
-                              {isActionLoading && <Loader2 size={13} className="animate-spin" />}
-                              <span>Değerlendirmeyi Gönder</span>
-                            </button>
+                            <div className="flex items-center justify-end space-x-2 pt-2">
+                              {reviewFb && (
+                                <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
+                                  reviewFb.type === 'success'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                                }`}>
+                                  {reviewFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
+                                  <span>{reviewFb.text}</span>
+                                </div>
+                              )}
+
+                              <button 
+                                disabled={isActionLoading} 
+                                type="button" 
+                                onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} 
+                                className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition"
+                              >
+                                Değerlendirmeden Geç
+                              </button>
+
+                              <button 
+                                disabled={isActionLoading} 
+                                type="button" 
+                                onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} 
+                                className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer disabled:opacity-60 flex items-center space-x-1.5 transition"
+                              >
+                                {isActionLoading && <Loader2 size={13} className="animate-spin" />}
+                                <span>Gönder</span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                       </div>
                      );
@@ -1036,7 +1104,6 @@ function CustomerDashboardContent() {
   );
 }
 
-// Güvenlik Kalkanı Sarmalıyla Dışa Aktar
 export default function CustomerDashboard() {
   return (
     <SafeDashboardBoundary>
