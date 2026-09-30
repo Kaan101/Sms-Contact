@@ -98,4 +98,6 @@ router.post('/tests', createTest);
 router.put('/tests/:id', updateTest);
 router.delete('/tests/:id', deleteTest);
 
+router.post('/requests/:id/providers/:providerId/details', requestController.saveProviderDetails);
+
 module.exports = router;

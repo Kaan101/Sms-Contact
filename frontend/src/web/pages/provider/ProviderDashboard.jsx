@@ -53,6 +53,10 @@ function ProviderRequestCard({
   const [btnLoading, setBtnLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
+  // ⭐ YENİ: Listeye Ekleme Seçimi İçin React State
+  const [selectedListId, setSelectedListId] = useState('');
+  const [listFeedback, setListFeedback] = useState(null);
+
   const showFeedback = (type, text) => {
     setFeedback({ type, text });
     setTimeout(() => setFeedback(null), 3500);
@@ -123,17 +127,17 @@ function ProviderRequestCard({
     }
   };
 
-  const [listFeedback, setListFeedback] = useState(null);
+  // ⭐ DÜZELTİLDİ: DOM yerine State kullanan liste ekleme fonksiyonu
   const handleAddToList = async () => {
-    const selectEl = document.getElementById(`prov-list-${req.id}`);
-    if (!selectEl?.value) {
+    if (!selectedListId) {
       setListFeedback({ type: 'error', text: 'Liste seçin' });
       setTimeout(() => setListFeedback(null), 2500);
       return;
     }
     try {
-      await axios.post(`${API_BASE}/lists/${selectEl.value}/requests`, { requestId: req.id });
+      await axios.post(`${API_BASE}/lists/${selectedListId}/requests`, { requestId: req.id });
       setListFeedback({ type: 'success', text: 'Kaydedildi' });
+      setSelectedListId(''); // Seçimi sıfırla
     } catch (e) {
       setListFeedback({ type: 'error', text: 'Eklenemedi' });
     } finally {
@@ -268,7 +272,6 @@ function ProviderRequestCard({
               </div>
             </div>
 
-            {/* ⭐ Açıklama Alanı */}
             <div>
               <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
                 <AlignLeft size={11} className="text-neutral-500" />
@@ -315,8 +318,10 @@ function ProviderRequestCard({
         <div className="flex items-center gap-1.5">
           {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
             <div className="flex items-center gap-1.5">
+              {/* ⭐ DÜZELTİLDİ: DOM yerine State kullanıyoruz */}
               <select
-                id={`prov-list-${req.id}`}
+                value={selectedListId}
+                onChange={(e) => setSelectedListId(e.target.value)}
                 className="p-1.5 text-xs rounded-lg border border-neutral-200 bg-white outline-none text-neutral-800"
               >
                 <option value="">Listeye Kaydet...</option>
