@@ -21,12 +21,21 @@ const {
   getOutboundNotifications,
   deleteRequest,
   upsertProviderRequestDetails,
-  createDirectReorder // ⭐ YENİ: Reorder buraya eklendi
+  createDirectReorder // Doğrudan Tekrarla
 } = require('../controllers/requestController');
 const { getFeatures, createFeature, updateFeature, deleteFeature } = require('../controllers/featureController');
 const { submitReview, getReviewsByRequest } = require('../controllers/reviewController');
 const { getTests, createTest, updateTest, deleteTest } = require('../controllers/testController');
-const { getListsByOwner, createList, addListItem, addRequestToList, removeListItem } = require('../controllers/listController');
+
+// ⭐ YENİ: Listeler için eksiksiz Controller aktarımı
+const { 
+  getListsByOwner, 
+  createList, 
+  deleteList, 
+  addRequestToList, 
+  removeRequestFromList, 
+  getListRequests 
+} = require('../controllers/listController');
 
 
 // 1. Auth / OTP
@@ -40,12 +49,15 @@ router.put('/settings', updateSetting);
 // 3. Disambiguation (Anlam Karmaşası Çözücü)
 router.post('/disambiguate', checkDisambiguation);
 
-// 4. Özel Listeler
+// ==========================================
+// 4. ÖZEL LİSTELER (CUSTOM LISTS)
+// ==========================================
 router.get('/lists/:ownerType/:ownerId', getListsByOwner);
 router.post('/lists', createList);
-router.post('/lists/:listId/items', addListItem);
-router.post('/lists/:listId/requests', addRequestToList);
-router.delete('/lists/items/:itemId', removeListItem);
+router.delete('/lists/:listId', deleteList); // Tüm listeyi sil
+router.post('/lists/:listId/requests', addRequestToList); // Listeye talep ekle
+router.get('/lists/:listId/requests', getListRequests); // ⭐ Listenin içindeki talepleri getir
+router.delete('/lists/:listId/requests/:requestId', removeRequestFromList); // Listeden tekil talep çıkar
 
 // 5. Servis Sağlayıcılar
 router.post('/providers', registerProvider);
@@ -59,7 +71,7 @@ router.delete('/providers/:id', deleteProvider);
 // ==========================================
 
 // ⭐ A) SABİT ROTALAR (PARAMETRESİZ OLANLAR ÜSTTE OLMALIDIR)
-router.post('/requests/direct-reorder', createDirectReorder); // 🌟 DÜZELTİLDİ: /requests eklendi!
+router.post('/requests/direct-reorder', createDirectReorder);
 router.post('/requests/assign', assignProviderManually);
 router.post('/requests', createRequest);
 
@@ -98,5 +110,4 @@ router.post('/tests', createTest);
 router.put('/tests/:id', updateTest);
 router.delete('/tests/:id', deleteTest);
 
- 
 module.exports = router;
