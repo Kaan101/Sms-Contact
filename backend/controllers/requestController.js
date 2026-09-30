@@ -309,8 +309,6 @@ const getProviderAssignedRequests = async (req, res) => {
       [providerId]
     );
 
-    // GİZLİLİK KALKANI KONTROLÜ:
-    // Eğer iş zaten kabul edildiyse VEYA tekrarlanan bir siparişse (Reorder) telefon doğrudan görünür!
     const secureRows = rows.map(r => {
       const isReorder = r.provider_description && r.provider_description.includes('Tekrar');
       const isAcceptedOrDone = ['ACCEPTED', 'PROVIDER_COMPLETED', 'COMPLETED'].includes(r.status);
@@ -373,7 +371,7 @@ const deleteRequest = async (req, res) => {
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
-// TEK TANIM: Sağlayıcı detaylarını (tutar, para birimi, tarih, açıklama) güncelleme/ekleme
+// Sağlayıcı detaylarını (tutar, para birimi, tarih, açıklama) güncelleme/ekleme
 const upsertProviderRequestDetails = async (req, res) => {
   try {
     const { requestId, providerId } = req.params;
@@ -406,7 +404,6 @@ const upsertProviderRequestDetails = async (req, res) => {
   }
 };
 
- 
 // ⭐ AKILLI ZAMAN FARKI VE TÜR KORUMALI REORDER
 const createDirectReorder = async (req, res) => {
   try {
@@ -420,7 +417,6 @@ const createDirectReorder = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Sağlayıcı kimliği eksik.' });
     }
 
-    // 1. ESKİ TALEP BİLGİLERİNİ ÇEK
     let finalRequestType = requestType || 'TALEP';
     let newDeadlineDatetime = null;
     let budget = suggestedBudget !== undefined && suggestedBudget !== null && suggestedBudget !== '' 
@@ -442,14 +438,12 @@ const createDirectReorder = async (req, res) => {
       if (oldRows.length > 0) {
         const old = oldRows[0];
 
-        // Kayıt türünü koru (BILDIRIM ise kesinlikle BILDIRIM kalır)
         if (old.request_type) {
           finalRequestType = old.request_type;
         }
 
         const oldCreatedMs = old.created_at ? new Date(old.created_at).getTime() : null;
 
-        // Kullanıcının belirlediği hedef tarih (deadline_datetime) farkını koru
         if (oldCreatedMs && old.deadline_datetime) {
           const oldDeadlineMs = new Date(old.deadline_datetime).getTime();
           const diffDeadline = oldDeadlineMs - oldCreatedMs;
@@ -458,7 +452,6 @@ const createDirectReorder = async (req, res) => {
           }
         }
 
-        // Sağlayıcı termin tarihi farkını koru (suggestedTargetDate önceden hesaplanmadıysa)
         if (!targetDate && oldCreatedMs && old.provider_target_date) {
           const oldTargetMs = new Date(old.provider_target_date).getTime();
           const diffTarget = oldTargetMs - oldCreatedMs;
@@ -481,7 +474,6 @@ const createDirectReorder = async (req, res) => {
       targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
     }
 
-    // 2. TALEBİ OLUŞTUR (request_type ve yeni deadline ile)
     const insertReqQuery = `
       INSERT INTO requests 
       (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, deadline_datetime)
@@ -500,13 +492,11 @@ const createDirectReorder = async (req, res) => {
     ]);
     const newReq = newReqRows[0];
 
-    // 3. SAĞLAYICIYI ACTIVE OLARAK EKLE
     await pool.query(
       `INSERT INTO request_interests (request_id, provider_id, status) VALUES ($1, $2, 'ACTIVE')`,
       [newReq.id, tProviderId]
     );
 
-    // 4. DETAYLARI AKTAR
     await pool.query(
       `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description) 
        VALUES ($1, $2, $3, 'TRY', $4, $5)`,
@@ -517,31 +507,6 @@ const createDirectReorder = async (req, res) => {
   } catch (error) {
     console.error('Direct reorder hatası:', error);
     res.status(500).json({ status: 'error', message: `Veritabanı Hatası: ${error.message}` });
-  }
-};
-
-// Sağlayıcının girdiği fiyat ve tarihi veritabanına kaydeder
-const saveProviderDetails = async (req, res) => {
-  try {
-    // Hem :id hem de :requestId uyumlu, her türlü çalışır
-    const requestId = req.params.requestId || req.params.id; 
-    const providerId = req.params.providerId;
-    const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
-    
-    await pool.query(
-      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (request_id, provider_id) DO UPDATE SET
-       provider_budget = EXCLUDED.provider_budget,
-       provider_currency = EXCLUDED.provider_currency,
-       provider_target_date = EXCLUDED.provider_target_date,
-       provider_description = EXCLUDED.provider_description`,
-      [requestId, providerId, providerBudget, providerCurrency || 'TRY', providerTargetDate, providerDescription]
-    );
-    res.status(200).json({ status: 'success' });
-  } catch (error) {
-    console.error('Provider details save error:', error);
-    res.status(500).json({ status: 'error', message: error.message });
   }
 };
 

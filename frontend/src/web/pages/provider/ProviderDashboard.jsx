@@ -49,7 +49,6 @@ function ProviderRequestCard({
   const [description, setDescription] = useState(req.provider_description || '');
   const [isEditing, setIsEditing] = useState(false);
 
-  // Buton ve Inline Bildirim Durumları
   const [btnLoading, setBtnLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -225,7 +224,6 @@ function ProviderRequestCard({
         </div>
       </div>
 
-      {/* Şartlar / Teklif Paneli (Tutar + Tarih + Açıklama) */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
@@ -313,12 +311,11 @@ function ProviderRequestCard({
         )}
       </div>
 
-      {/* Aksiyon Butonları & Düğmenin Solundaki Geri Bildirimler */}
       <div className="flex items-center justify-between pt-1 border-t border-neutral-100 flex-wrap gap-2">
         <div className="flex items-center gap-1.5">
           {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
             <div className="flex items-center gap-1.5">
-              {/* ⭐ DÜZELTİLDİ: DOM yerine State kullanıyoruz */}
+              {/* ⭐ STATE KULLANARAK HATA ÖNLENİYOR */}
               <select
                 value={selectedListId}
                 onChange={(e) => setSelectedListId(e.target.value)}
