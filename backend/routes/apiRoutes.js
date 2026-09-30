@@ -74,6 +74,7 @@ router.post('/requests/:requestId/join-pool', joinRequestPool);
 router.post('/requests/:requestId/next-provider', passToNextProvider);
 router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
 router.post('/requests/:requestId/status', updateRequestStatus);
+router.post('/requests/:requestId/providers/:providerId/details', requestController.saveProviderDetails);
 router.post('/requests/:requestId/providers/:providerId/details', upsertProviderRequestDetails);
 router.delete('/requests/:requestId', deleteRequest);
 

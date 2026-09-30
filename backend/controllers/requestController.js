@@ -286,6 +286,36 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
+const saveProviderDetails = async (req, res) => {
+  try {
+    // BURASI ÖNEMLİ: 'id' yerine 'requestId' alıyoruz
+    const { requestId, providerId } = req.params; 
+    const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
+    
+    await pool.query(
+      `INSERT INTO request_provider_details (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (request_id, provider_id) DO UPDATE SET
+       provider_budget = EXCLUDED.provider_budget,
+       provider_currency = EXCLUDED.provider_currency,
+       provider_target_date = EXCLUDED.provider_target_date,
+       provider_description = EXCLUDED.provider_description`,
+      [
+        requestId, 
+        providerId, 
+        providerBudget, 
+        providerCurrency || 'TRY', 
+        providerTargetDate, 
+        providerDescription
+      ]
+    );
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    console.error('Provider details save error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
 const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
