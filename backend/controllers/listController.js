@@ -39,7 +39,8 @@ const deleteList = async (req, res) => {
   }
 };
 
-// 4. Talep Ekle (Telefon ve Notları Doldurur)
+
+// 4. Talep Ekle (Telefon ve Notları Kesinlikle Doldurur)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -49,6 +50,7 @@ const addRequestToList = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Veri eksik.' });
     }
 
+    // 1. Zaten ekli mi kontrolü
     const check = await pool.query(
       `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
       [parseInt(listId, 10), parseInt(requestId, 10)]
@@ -58,23 +60,34 @@ const addRequestToList = async (req, res) => {
       return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
     }
 
+    // 2. Talebin asıl bilgilerini veritabanından çek (Kesin Çözüm)
     const reqData = await pool.query(
       `SELECT contact_value, raw_text FROM requests WHERE id = $1`, 
       [parseInt(requestId, 10)]
     );
 
-    let phone = 'Bilinmiyor';
-    let notes = 'Sistem Kaydı';
+    // 3. Tablo kısıtlamalarında (NOT NULL) patlamaması için güçlü varsayılan değerler
+    let phone = 'Belirtilmemiş';
+    let notes = 'Not Yok';
 
     if (reqData.rows.length > 0) {
-      phone = reqData.rows[0].contact_value || 'Bilinmiyor';
-      notes = reqData.rows[0].raw_text || 'Sistem Kaydı';
+      const row = reqData.rows[0];
+      // Eğer veritabanında değer varsa al, yoksa varsayılanı tut (NULL hatasını engeller)
+      phone = row.contact_value ? String(row.contact_value) : 'Belirtilmemiş';
+      notes = row.raw_text ? String(row.raw_text) : 'Not Yok';
     }
 
+    const contactName = `Talep #${requestId}`;
+
+    // 4. Tüm alanları eksiksiz bir şekilde tabloya yaz
     await pool.query(
-      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) VALUES ($1, $2, $3, $4, $5)`,
-      [parseInt(listId, 10), parseInt(requestId, 10), `Talep #${requestId}`, phone, notes]
+      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [parseInt(listId, 10), parseInt(requestId, 10), contactName, phone, notes]
     );
+
+    // Terminalden takip edebilmen için log bırakıyoruz
+    console.log(`[BAŞARILI] Liste: ${listId} -> Talep: ${requestId} eklendi. (Tel: ${phone})`);
 
     res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
   } catch (error) {
