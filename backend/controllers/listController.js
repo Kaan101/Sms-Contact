@@ -39,22 +39,31 @@ const deleteList = async (req, res) => {
   }
 };
 
-// Talep Ekle (Çift kayıt korumalı: ON CONFLICT DO NOTHING)
+ // Talep Ekle (Manuel Kontrol ile %100 Güvenli)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
     const { requestId } = req.body;
 
+    // 1. Önce bu talep bu listede zaten var mı diye manuel bakıyoruz
+    const check = await pool.query(
+      `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
+      [listId, requestId]
+    );
+
+    // Eğer varsa hiç hata vermeden "Zaten var" deyip işlemi mutlu sonla bitiriyoruz
+    if (check.rows.length > 0) {
+      return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
+    }
+
+    // 2. Eğer yoksa normal bir şekilde ekliyoruz (ON CONFLICT kullanmadan)
     await pool.query(
-      `INSERT INTO list_items (list_id, request_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      `INSERT INTO list_items (list_id, request_id) VALUES ($1, $2)`,
       [listId, requestId]
     );
 
     res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
   } catch (error) {
-    if (error.code === '23505') {
-       return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
-    }
     console.error('Listeye ekleme hatası:', error);
     res.status(500).json({ status: 'error', message: 'Sunucu hatası. Eklenemedi.' });
   }
