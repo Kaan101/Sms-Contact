@@ -45,27 +45,33 @@ const addRequestToList = async (req, res) => {
     const { listId } = req.params;
     const { requestId } = req.body;
 
-    // 1. Önce bu talep bu listede zaten var mı diye manuel bakıyoruz
+    // 1. Veriler frontend'den eksik mi geliyor kontrolü
+    if (!listId || !requestId) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: `Veri Eksik: liste=${listId || 'Yok'}, talep=${requestId || 'Yok'}` 
+      });
+    }
+
     const check = await pool.query(
       `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
-      [listId, requestId]
+      [parseInt(listId, 10), parseInt(requestId, 10)]
     );
 
-    // Eğer varsa hiç hata vermeden "Zaten var" deyip işlemi mutlu sonla bitiriyoruz
     if (check.rows.length > 0) {
       return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
     }
 
-    // 2. Eğer yoksa normal bir şekilde ekliyoruz (ON CONFLICT kullanmadan)
     await pool.query(
       `INSERT INTO list_items (list_id, request_id) VALUES ($1, $2)`,
-      [listId, requestId]
+      [parseInt(listId, 10), parseInt(requestId, 10)]
     );
 
     res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
   } catch (error) {
     console.error('Listeye ekleme hatası:', error);
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası. Eklenemedi.' });
+    // ⭐ DEDEKTİF MODU: Hatanın tam teknik sebebini arayüze (kırmızı kutuya) gönderiyoruz!
+    res.status(500).json({ status: 'error', message: `DB Hatası: ${error.message}` });
   }
 };
 
