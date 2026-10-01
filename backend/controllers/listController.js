@@ -40,19 +40,17 @@ const deleteList = async (req, res) => {
 };
 
  // Talep Ekle (Manuel Kontrol ile %100 Güvenli)
+// Talep Ekle (Zorunlu İsim Alanı Doldurulmuş Hali)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
     const { requestId } = req.body;
 
-    // 1. Veriler frontend'den eksik mi geliyor kontrolü
     if (!listId || !requestId) {
-      return res.status(400).json({ 
-        status: 'error', 
-        message: `Veri Eksik: liste=${listId || 'Yok'}, talep=${requestId || 'Yok'}` 
-      });
+      return res.status(400).json({ status: 'error', message: 'Veri eksik.' });
     }
 
+    // 1. Zaten ekli mi kontrolü
     const check = await pool.query(
       `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
       [parseInt(listId, 10), parseInt(requestId, 10)]
@@ -62,15 +60,23 @@ const addRequestToList = async (req, res) => {
       return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
     }
 
+    // 2. Ekleme işlemi (contact_name zorunluluğunu aşmak için otomatik isim veriyoruz)
+    // Not: Eğer contact_phone gibi başka bir zorunlu alan daha varsa, onu da ekleyebilmek için hazır tuttuk.
     await pool.query(
-      `INSERT INTO list_items (list_id, request_id) VALUES ($1, $2)`,
-      [parseInt(listId, 10), parseInt(requestId, 10)]
+      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone) 
+       VALUES ($1, $2, $3, $4)`,
+      [
+        parseInt(listId, 10), 
+        parseInt(requestId, 10), 
+        `Kayıtlı Talep #${requestId}`, // Zorunlu contact_name alanını doldurduk
+        `Sistem`                       // Eğer contact_phone da zorunluysa diye doldurduk
+      ]
     );
 
     res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
   } catch (error) {
     console.error('Listeye ekleme hatası:', error);
-    // ⭐ DEDEKTİF MODU: Hatanın tam teknik sebebini arayüze (kırmızı kutuya) gönderiyoruz!
+    // Hata devam ederse başka hangi sütunun eksik olduğunu arayüzde gösterecek
     res.status(500).json({ status: 'error', message: `DB Hatası: ${error.message}` });
   }
 };
