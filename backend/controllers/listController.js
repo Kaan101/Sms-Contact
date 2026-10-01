@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-// Kullanıcı veya Sağlayıcının Listelerini Getir
+// 1. Kullanıcı veya Sağlayıcının Listelerini Getir
 const getListsByOwner = async (req, res) => {
   try {
     const { ownerType, ownerId } = req.params;
@@ -14,7 +14,7 @@ const getListsByOwner = async (req, res) => {
   }
 };
 
-// Yeni Liste Oluştur
+// 2. Yeni Liste Oluştur
 const createList = async (req, res) => {
   try {
     const { ownerType, ownerId, listName } = req.body;
@@ -28,7 +28,7 @@ const createList = async (req, res) => {
   }
 };
 
-// Listeyi Sil
+// 3. Listeyi Sil
 const deleteList = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -39,6 +39,7 @@ const deleteList = async (req, res) => {
   }
 };
 
+// 4. Talep Ekle (Telefon ve Notları Doldurur)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -48,7 +49,6 @@ const addRequestToList = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Veri eksik.' });
     }
 
-    // 1. Zaten ekli mi kontrolü
     const check = await pool.query(
       `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
       [parseInt(listId, 10), parseInt(requestId, 10)]
@@ -58,9 +58,8 @@ const addRequestToList = async (req, res) => {
       return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
     }
 
-    // 2. Talebin asıl bilgilerini veritabanından çekelim ki list_items tablosu boş kalmasın
     const reqData = await pool.query(
-      `SELECT contact_value, raw_text FROM requests WHERE id = $1`,
+      `SELECT contact_value, raw_text FROM requests WHERE id = $1`, 
       [parseInt(requestId, 10)]
     );
 
@@ -68,22 +67,13 @@ const addRequestToList = async (req, res) => {
     let notes = 'Sistem Kaydı';
 
     if (reqData.rows.length > 0) {
-      // Müşteri gizli moddaysa numara "555..|HIDDEN" gibi olabilir, veriyi temiz alıyoruz
       phone = reqData.rows[0].contact_value || 'Bilinmiyor';
       notes = reqData.rows[0].raw_text || 'Sistem Kaydı';
     }
 
-    // 3. Tabloya telefon ve not alanlarıyla birlikte eksiksiz yazıyoruz
     await pool.query(
-      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        parseInt(listId, 10), 
-        parseInt(requestId, 10), 
-        `Talep #${requestId}`, 
-        phone, 
-        notes
-      ]
+      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) VALUES ($1, $2, $3, $4, $5)`,
+      [parseInt(listId, 10), parseInt(requestId, 10), `Talep #${requestId}`, phone, notes]
     );
 
     res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
@@ -93,15 +83,7 @@ const addRequestToList = async (req, res) => {
   }
 };
 
-    res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
-  } catch (error) {
-    console.error('Listeye ekleme hatası:', error);
-    // Hata devam ederse başka hangi sütunun eksik olduğunu arayüzde gösterecek
-    res.status(500).json({ status: 'error', message: `DB Hatası: ${error.message}` });
-  }
-};
-
-// Listeden Öğe Çıkar
+// 5. Listeden Talep Çıkar
 const removeRequestFromList = async (req, res) => {
   try {
     const { listId, requestId } = req.params;
@@ -115,12 +97,11 @@ const removeRequestFromList = async (req, res) => {
   }
 };
 
+// 6. Listenin İçindeki Talepleri Getir
 const getListRequests = async (req, res) => {
   try {
     const { listId } = req.params;
     
-    // Hem list_items tablosundaki kendi sütunlarını (notes, phone) hem de request detaylarını çekiyoruz.
-    // Sıralamayı da patlamaması için garanti olan list_items ID'sine göre yapıyoruz.
     const { rows } = await pool.query(
       `SELECT li.id as item_id, li.contact_name, li.contact_phone, li.notes, 
         r.*, sp.name as provider_name, sp.phone as provider_phone,
@@ -134,20 +115,46 @@ const getListRequests = async (req, res) => {
       [parseInt(listId, 10)]
     );
     
-    // Frontend `CustomListsManager` bileşeni 'items' dizisi de bekliyor olabilir, 
-    // garantilemek için ikisini de döndürüyoruz!
     res.status(200).json({ status: 'success', requests: rows, items: rows });
   } catch (error) {
-    console.error('Listeyi getirme hatası:', error);
     res.status(500).json({ status: 'error', message: `DB Getirme Hatası: ${error.message}` });
   }
 };
 
+// 7. Manuel Öğe Ekleme 
+const addListItem = async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const { contactName, contactPhone, notes } = req.body;
+    const { rows } = await pool.query(
+      `INSERT INTO list_items (list_id, contact_name, contact_phone, notes) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [listId, contactName, contactPhone, notes]
+    );
+    res.status(201).json({ status: 'success', item: rows[0] });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// 8. Manuel Öğe Çıkarma
+const removeListItem = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    await pool.query(`DELETE FROM list_items WHERE id = $1`, [itemId]);
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// TÜM FONKSİYONLARI EKSİKSİZ DIŞA AKTAR
 module.exports = {
   getListsByOwner,
   createList,
   deleteList,
   addRequestToList,
   removeRequestFromList,
-  getListRequests
+  getListRequests,
+  addListItem,
+  removeListItem
 };
