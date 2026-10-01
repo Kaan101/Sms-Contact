@@ -95,10 +95,12 @@ const removeRequestFromList = async (req, res) => {
   }
 };
 
-// ⭐ LİSTENİN İÇİNDEKİ TALEPLERİ GETİR
+// ⭐ LİSTENİN İÇİNDEKİ TALEPLERİ GETİR (Hata Korumalı)
 const getListRequests = async (req, res) => {
   try {
     const { listId } = req.params;
+    
+    // li.created_at yerine r.created_at kullanarak list_items tablosunda tarih sütunu olmasa bile çökmesini engelliyoruz!
     const { rows } = await pool.query(
       `SELECT r.*, sp.name as provider_name, sp.phone as provider_phone,
         rpd.provider_budget as matched_budget, rpd.provider_currency as matched_currency, rpd.provider_target_date as matched_target_date
@@ -106,12 +108,16 @@ const getListRequests = async (req, res) => {
        JOIN requests r ON li.request_id = r.id
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
        LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = sp.id)
-       WHERE li.list_id = $1 ORDER BY li.created_at DESC`,
-      [listId]
+       WHERE li.list_id = $1 
+       ORDER BY r.created_at DESC`, 
+      [parseInt(listId, 10)]
     );
+    
     res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('Listeyi getirme hatası:', error);
+    // Ekranda (veya tarayıcı konsolunda) net hatayı göstermesi için:
+    res.status(500).json({ status: 'error', message: `DB Getirme Hatası: ${error.message}` });
   }
 };
 
