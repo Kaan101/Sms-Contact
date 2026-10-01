@@ -39,8 +39,6 @@ const deleteList = async (req, res) => {
   }
 };
 
- // Talep Ekle (Manuel Kontrol ile %100 Güvenli)
-// Talep Ekle (Zorunlu İsim Alanı Doldurulmuş Hali)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -60,18 +58,40 @@ const addRequestToList = async (req, res) => {
       return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
     }
 
-    // 2. Ekleme işlemi (contact_name zorunluluğunu aşmak için otomatik isim veriyoruz)
-    // Not: Eğer contact_phone gibi başka bir zorunlu alan daha varsa, onu da ekleyebilmek için hazır tuttuk.
+    // 2. Talebin asıl bilgilerini veritabanından çekelim ki list_items tablosu boş kalmasın
+    const reqData = await pool.query(
+      `SELECT contact_value, raw_text FROM requests WHERE id = $1`,
+      [parseInt(requestId, 10)]
+    );
+
+    let phone = 'Bilinmiyor';
+    let notes = 'Sistem Kaydı';
+
+    if (reqData.rows.length > 0) {
+      // Müşteri gizli moddaysa numara "555..|HIDDEN" gibi olabilir, veriyi temiz alıyoruz
+      phone = reqData.rows[0].contact_value || 'Bilinmiyor';
+      notes = reqData.rows[0].raw_text || 'Sistem Kaydı';
+    }
+
+    // 3. Tabloya telefon ve not alanlarıyla birlikte eksiksiz yazıyoruz
     await pool.query(
-      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone) 
-       VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
+       VALUES ($1, $2, $3, $4, $5)`,
       [
         parseInt(listId, 10), 
         parseInt(requestId, 10), 
-        `Kayıtlı Talep #${requestId}`, // Zorunlu contact_name alanını doldurduk
-        `Sistem`                       // Eğer contact_phone da zorunluysa diye doldurduk
+        `Talep #${requestId}`, 
+        phone, 
+        notes
       ]
     );
+
+    res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
+  } catch (error) {
+    console.error('Listeye ekleme hatası:', error);
+    res.status(500).json({ status: 'error', message: `DB Hatası: ${error.message}` });
+  }
+};
 
     res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
   } catch (error) {
@@ -95,28 +115,30 @@ const removeRequestFromList = async (req, res) => {
   }
 };
 
-// ⭐ LİSTENİN İÇİNDEKİ TALEPLERİ GETİR (Hata Korumalı)
 const getListRequests = async (req, res) => {
   try {
     const { listId } = req.params;
     
-    // li.created_at yerine r.created_at kullanarak list_items tablosunda tarih sütunu olmasa bile çökmesini engelliyoruz!
+    // Hem list_items tablosundaki kendi sütunlarını (notes, phone) hem de request detaylarını çekiyoruz.
+    // Sıralamayı da patlamaması için garanti olan list_items ID'sine göre yapıyoruz.
     const { rows } = await pool.query(
-      `SELECT r.*, sp.name as provider_name, sp.phone as provider_phone,
+      `SELECT li.id as item_id, li.contact_name, li.contact_phone, li.notes, 
+        r.*, sp.name as provider_name, sp.phone as provider_phone,
         rpd.provider_budget as matched_budget, rpd.provider_currency as matched_currency, rpd.provider_target_date as matched_target_date
        FROM list_items li
-       JOIN requests r ON li.request_id = r.id
+       LEFT JOIN requests r ON li.request_id = r.id
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
        LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = sp.id)
        WHERE li.list_id = $1 
-       ORDER BY r.created_at DESC`, 
+       ORDER BY li.id DESC`, 
       [parseInt(listId, 10)]
     );
     
-    res.status(200).json({ status: 'success', requests: rows });
+    // Frontend `CustomListsManager` bileşeni 'items' dizisi de bekliyor olabilir, 
+    // garantilemek için ikisini de döndürüyoruz!
+    res.status(200).json({ status: 'success', requests: rows, items: rows });
   } catch (error) {
     console.error('Listeyi getirme hatası:', error);
-    // Ekranda (veya tarayıcı konsolunda) net hatayı göstermesi için:
     res.status(500).json({ status: 'error', message: `DB Getirme Hatası: ${error.message}` });
   }
 };
