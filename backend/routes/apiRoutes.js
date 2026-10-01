@@ -88,6 +88,7 @@ router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
 router.post('/requests/:requestId/status', updateRequestStatus);
 router.post('/requests/:requestId/providers/:providerId/details', upsertProviderRequestDetails);
 router.delete('/requests/:requestId', deleteRequest);
+router.get('/lists/:listId/items', getListRequests); // Frontend bu adresi arıyor olabilir!
 
 // ==========================================
 

@@ -102,10 +102,21 @@ const getListRequests = async (req, res) => {
   try {
     const { listId } = req.params;
     
+    // NOT: r.* komutunu öne aldık ki, li.id (Liste Öğesi ID'si) talebin ID'sini ezip frontend'in silme/gösterme işlemlerini bozmasın!
     const { rows } = await pool.query(
-      `SELECT li.id as item_id, li.contact_name, li.contact_phone, li.notes, 
-        r.*, sp.name as provider_name, sp.phone as provider_phone,
-        rpd.provider_budget as matched_budget, rpd.provider_currency as matched_currency, rpd.provider_target_date as matched_target_date
+      `SELECT 
+        r.*, 
+        li.id as id, 
+        li.id as item_id, 
+        li.request_id, 
+        li.contact_name, 
+        li.contact_phone, 
+        li.notes,
+        sp.name as provider_name, 
+        sp.phone as provider_phone,
+        rpd.provider_budget as matched_budget, 
+        rpd.provider_currency as matched_currency, 
+        rpd.provider_target_date as matched_target_date
        FROM list_items li
        LEFT JOIN requests r ON li.request_id = r.id
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
@@ -115,6 +126,7 @@ const getListRequests = async (req, res) => {
       [parseInt(listId, 10)]
     );
     
+    // Frontend hem requests hem de items array'i bekliyor olabilir
     res.status(200).json({ status: 'success', requests: rows, items: rows });
   } catch (error) {
     res.status(500).json({ status: 'error', message: `DB Getirme Hatası: ${error.message}` });
