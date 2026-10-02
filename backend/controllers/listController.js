@@ -39,8 +39,7 @@ const deleteList = async (req, res) => {
   }
 };
 
-
-// 4. Talep Ekle (Telefon ve Notları Kesinlikle Doldurur)
+ // 4. Talep Ekle (Telefon ve Notları Kesinlikle Doldurur)
 const addRequestToList = async (req, res) => {
   try {
     const { listId } = req.params;
