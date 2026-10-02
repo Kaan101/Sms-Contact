@@ -286,17 +286,31 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// Sağlayıcının Üzerindeki / Takip Ettiği Talepleri Getir
+// Sağlayıcının Görevlerini Getir (Hata Korumalı & Performanslı)
 const getProviderAssignedRequests = async (req, res) => {
   try {
-    const { providerId } = req.query;
-    if (!providerId) {
-      return res.status(400).json({ status: 'error', message: 'providerId gerekli' });
+    const { providerId, phone } = req.query;
+
+    let targetProviderId = null;
+
+    if (providerId && !isNaN(parseInt(providerId, 10))) {
+      targetProviderId = parseInt(providerId, 10);
+    } else if (phone) {
+      // providerId gelmediyse veya tanımsızsa telefon numarasından id bul
+      const provRes = await pool.query(
+        `SELECT id FROM service_providers WHERE phone = $1 LIMIT 1`,
+        [phone]
+      );
+      if (provRes.rows.length > 0) {
+        targetProviderId = provRes.rows[0].id;
+      }
     }
 
-    const pId = parseInt(providerId, 10);
+    if (!targetProviderId) {
+      return res.status(200).json({ status: 'success', requests: [] });
+    }
 
-    // ⭐ rpd (request_provider_details) TABLOSU BAĞLANDI: Fiyat, Tarih ve Açıklama artık geliyor!
+    // Tablo sütunları ve tipleri hataya yer bırakmayacak şekilde seçildi:
     const query = `
       SELECT 
         r.*,
@@ -304,27 +318,27 @@ const getProviderAssignedRequests = async (req, res) => {
         rpd.provider_currency,
         rpd.provider_target_date,
         rpd.provider_description,
-        sp.name as provider_name,
-        sp.phone as provider_phone
+        sp.name AS provider_name,
+        sp.phone AS provider_phone
       FROM requests r
-      LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = $1)
       LEFT JOIN service_providers sp ON sp.id = r.matched_provider_id
+      LEFT JOIN request_provider_details rpd 
+        ON (rpd.request_id = r.id AND rpd.provider_id = $1)
       WHERE r.matched_provider_id = $1
-         OR EXISTS (
-            SELECT 1 FROM request_candidates rc 
-            WHERE rc.request_id = r.id AND rc.provider_id = $1
-         )
       ORDER BY r.created_at DESC
-      LIMIT 50
+      LIMIT 100;
     `;
 
-    const { rows } = await pool.query(query, [pId]);
-    res.status(200).json({ status: 'success', requests: rows });
+    const { rows } = await pool.query(query, [targetProviderId]);
+    return res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
-    console.error('getProviderAssignedRequests hatası:', error);
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('getProviderAssignedRequests 500 Hatası:', error.message);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: `DB Hatası: ${error.message}` 
+    });
   }
-};
+}; 
 
 const getMatchedRequests = async (req, res) => {
   try {
