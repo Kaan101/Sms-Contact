@@ -47,11 +47,6 @@ function ProviderRequestCard({
   const [budget, setBudget] = useState(initialBudget);
   const [targetDate, setTargetDate] = useState(initialDate);
   const [description, setDescription] = useState(req.provider_description || '');
-  
-  // ⭐ Eğer teklif verisi yoksa veya boşsa formu direkt AÇIK (Düzenleme Modu) getir
-  const [isEditing, setIsEditing] = useState(() => {
-    return !(initialBudget || initialDate || req.provider_description);
-  });
 
   const [btnLoading, setBtnLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -81,32 +76,29 @@ function ProviderRequestCard({
     setBtnLoading(true);
     setFeedback(null);
     try {
-      // ⭐ YENİ: AŞIRI YAVAŞLIĞI ÖNLEMEK İÇİN İSTEKLERİ PARALEL FIRLATIYORUZ (PROMISE.ALL)
+      // ⭐ AŞIRI YAVAŞLIĞI ÖNLEYEN PARALEL İSTEK (PROMISE.ALL) ⭐
       const requests = [
         axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' })
       ];
       
-      // Eğer düzenleme yapıldıysa veya yeni şart girildiyse detayları da güncelle
-      if (isEditing || budget || targetDate || description) {
-        requests.push(
-          axios.post(`${API_BASE}/requests/${req.id}/providers/${providerId}/details`, {
-            providerBudget: budget ? parseFloat(budget) : null,
-            providerCurrency: 'TRY',
-            providerTargetDate: targetDate ? new Date(targetDate).toISOString() : null,
-            providerDescription: description || (isReorder ? 'Tekrarlanan Sipariş Onayı' : '')
-          })
-        );
-      }
+      // Teklif şartlarını her halükarda güncelle
+      requests.push(
+        axios.post(`${API_BASE}/requests/${req.id}/providers/${providerId}/details`, {
+          providerBudget: budget ? parseFloat(budget) : null,
+          providerCurrency: 'TRY',
+          providerTargetDate: targetDate ? new Date(targetDate).toISOString() : null,
+          providerDescription: description || (isReorder ? 'Tekrarlanan Sipariş Onayı' : '')
+        })
+      );
 
-      await Promise.all(requests); // Aynı anda gider ve saniyesinde biter
+      await Promise.all(requests); // Ağ gecikmesi yarı yarıya düştü
       
       showFeedback('success', isReorder ? 'Sipariş devam ettirildi' : 'Kabul edildi');
-      setIsEditing(false);
-      onRefresh();
+      onRefresh(); // SWR arka planda yenilesin, ekranı dondurmasın
     } catch (err) {
       showFeedback('error', err.response?.data?.message || 'İşlem başarısız');
     } finally {
-      setBtnLoading(false);
+      setBtnLoading(false); // Buton yüklemesi saniyesinde kalkar
     }
   };
 
@@ -239,21 +231,12 @@ function ProviderRequestCard({
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
             <DollarSign size={14} className="text-emerald-600" />
-            <span>Sipariş Şartları (Fiyat, Tarih & Açıklama)</span>
+            <span>{reqStatus === 'MATCHED' ? 'Sipariş Şartlarınızı Belirleyin / Onaylayın' : 'Sipariş Şartları (Fiyat, Tarih & Açıklama)'}</span>
           </span>
-          {reqStatus === 'MATCHED' && (
-            <button
-              type="button"
-              onClick={() => setIsEditing(!isEditing)}
-              className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-bold cursor-pointer transition"
-            >
-              {isEditing ? 'Şartları Gizle' : 'Şartları Düzenle'}
-            </button>
-          )}
         </div>
 
-        {/* ⭐ ALANLARIN KABAK GİBİ GÖRÜNMESİNİ SAĞLAYAN MANTIK */}
-        {reqStatus === 'MATCHED' && isEditing ? (
+        {/* ⭐ ALANLAR HER ZAMAN AÇIK (KABUL ETME AŞAMASI) ⭐ */}
+        {reqStatus === 'MATCHED' ? (
           <div className="space-y-3 pt-1 animate-in fade-in duration-200">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -266,7 +249,7 @@ function ProviderRequestCard({
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
                   placeholder="Örn: 250"
-                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs"
+                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs transition"
                 />
               </div>
               <div>
@@ -277,7 +260,7 @@ function ProviderRequestCard({
                   type="datetime-local"
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs"
+                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs transition"
                 />
               </div>
             </div>
@@ -291,8 +274,8 @@ function ProviderRequestCard({
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Örn: Malzeme dahil fiyat teklifidir, parçalar temin edildikten sonra montaj yapılacaktır..."
-                className="w-full p-2 text-xs rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800 placeholder:text-neutral-400 shadow-xs"
+                placeholder="Müşteriyle anlaştığınız özel bir şart varsa buraya yazın..."
+                className="w-full p-2 text-xs rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800 placeholder:text-neutral-400 shadow-xs transition"
               />
             </div>
           </div>
@@ -317,12 +300,6 @@ function ProviderRequestCard({
               <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60 shadow-xs">
                 <span className="font-bold text-neutral-500 block text-[10px] uppercase font-mono mb-0.5">Sağlayıcı Notu:</span>
                 <p className="italic text-neutral-800 leading-relaxed">"{description}"</p>
-              </div>
-            )}
-
-            {!budget && !targetDate && !description && (
-              <div className="text-neutral-400 italic text-[10px]">
-                Herhangi bir teklif şartı veya not girilmemiş.
               </div>
             )}
           </div>
@@ -463,6 +440,7 @@ export default function ProviderDashboard() {
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
+  // ⭐ SWR 3 Saniyede Bir Arka Planda Günceller (Hızlı) ⭐
   const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(
     providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}` : null,
     fetcher,
@@ -521,7 +499,7 @@ export default function ProviderDashboard() {
     setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null }));
     
     try {
-      // ⭐ YENİ: AŞIRI YAVAŞLIĞI ÖNLEMEK İÇİN İSTEKLERİ PARALEL FIRLATIYORUZ (PROMISE.ALL)
+      // ⭐ AŞIRI YAVAŞLIĞI ÖNLEYEN PARALEL İSTEK (PROMISE.ALL) ⭐
       const requests = [
         axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId })
       ];
@@ -537,12 +515,12 @@ export default function ProviderDashboard() {
         );
       }
 
-      await Promise.all(requests); // Ağ gecikmesi yarı yarıya azaldı
+      await Promise.all(requests); // Ağ gecikmesi yarı yarıya düştü
 
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Teklif iletildi!' } }));
       setExpandedPoolReqId(null);
       
-      mutatePool();
+      mutatePool(); // Await yok, anında yenileme
       mutateAssigned();
     } catch (err) {
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: err.response?.data?.message || 'Hata oluştu' } }));
