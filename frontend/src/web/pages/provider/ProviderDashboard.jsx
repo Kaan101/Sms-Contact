@@ -52,7 +52,6 @@ function ProviderRequestCard({
   const [btnLoading, setBtnLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  // ⭐ YENİ: Listeye Ekleme Seçimi İçin React State
   const [selectedListId, setSelectedListId] = useState('');
   const [listFeedback, setListFeedback] = useState(null);
 
@@ -126,7 +125,6 @@ function ProviderRequestCard({
     }
   };
 
-  // ⭐ DÜZELTİLDİ: DOM yerine State kullanan liste ekleme fonksiyonu
   const handleAddToList = async () => {
     if (!selectedListId) {
       setListFeedback({ type: 'error', text: 'Liste seçin' });
@@ -136,7 +134,7 @@ function ProviderRequestCard({
     try {
       await axios.post(`${API_BASE}/lists/${selectedListId}/requests`, { requestId: req.id });
       setListFeedback({ type: 'success', text: 'Kaydedildi' });
-      setSelectedListId(''); // Seçimi sıfırla
+      setSelectedListId(''); 
     } catch (e) {
       setListFeedback({ type: 'error', text: 'Eklenemedi' });
     } finally {
@@ -315,7 +313,6 @@ function ProviderRequestCard({
         <div className="flex items-center gap-1.5">
           {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
             <div className="flex items-center gap-1.5">
-              {/* ⭐ STATE KULLANARAK HATA ÖNLENİYOR */}
               <select
                 value={selectedListId}
                 onChange={(e) => setSelectedListId(e.target.value)}
@@ -446,16 +443,17 @@ export default function ProviderDashboard() {
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
+  // ⭐ YENİ: Veri gelme hızları 3 saniyeye düşürüldü (Çok Daha Seri)
   const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(
     providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}` : null,
     fetcher,
-    { refreshInterval: 5000 }
+    { refreshInterval: 3000 }
   );
 
   const { data: poolData, mutate: mutatePool } = useSWR(
     providerId && activeTab === 'POOL' ? `${API_BASE}/requests/pool?providerId=${providerId}` : null,
     fetcher,
-    { refreshInterval: 10000 }
+    { refreshInterval: 3000 }
   );
 
   const [userLists, setUserLists] = useState([]);
@@ -490,7 +488,12 @@ export default function ProviderDashboard() {
   const [poolActionId, setPoolActionId] = useState(null);
   const [poolFeedbackMap, setPoolFeedbackMap] = useState({});
 
-  const handleJoinPool = async (requestId) => {
+  // ⭐ YENİ: Hangi teklifin formu açık tutuluyor
+  const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
+  const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
+
+  // ⭐ YENİ: Teklifli Sıraya Girme (Bidding) Sistemi
+  const handleJoinPoolWithBid = async (requestId) => {
     if (!providerId) {
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
       setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3000);
@@ -499,9 +502,25 @@ export default function ProviderDashboard() {
 
     setPoolActionId(requestId);
     setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null }));
+    
     try {
+      // 1. Önce sıraya gir
       await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId });
-      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Sıraya girildi' } }));
+      
+      // 2. Eğer form doldurulduysa şartları (Teklif/Bid) detay tablosuna kaydet
+      if (poolBidData.budget || poolBidData.targetDate || poolBidData.description) {
+        await axios.post(`${API_BASE}/requests/${requestId}/providers/${providerId}/details`, {
+          providerBudget: poolBidData.budget ? parseFloat(poolBidData.budget) : null,
+          providerCurrency: 'TRY',
+          providerTargetDate: poolBidData.targetDate ? new Date(poolBidData.targetDate).toISOString() : null,
+          providerDescription: poolBidData.description || ''
+        });
+      }
+
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Teklif iletildi!' } }));
+      setExpandedPoolReqId(null);
+      
+      // SWR verilerini beklemeden anında güncelle
       mutatePool();
       mutateAssigned();
     } catch (err) {
@@ -597,7 +616,7 @@ export default function ProviderDashboard() {
 
         <button
           type="button"
-          onClick={() => { mutateAssigned(); mutateProviderInfo(); }}
+          onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }}
           className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs"
           title="Yenile"
         >
@@ -652,12 +671,12 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* AÇIK HAVUZ */}
+      {/* ⭐ AÇIK HAVUZ VE YENİ TEKLİF FORMU */}
       {activeTab === 'POOL' && (
         <div className="space-y-4">
           <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900">
             Aşağıdaki talepler uzmanlık alanlarınızla eşleşen açık havuz talepleridir. 
-            <strong> "Talip Ol"</strong> diyerek sıraya girebilirsiniz. Müşteri sizi seçtiğinde iş görevlerinize düşecektir.
+            <strong> "Talip Ol"</strong> diyerek müşteriye özel fiyat, tarih ve notunuzu iletip sıraya girebilirsiniz.
           </div>
 
           {poolRequests.length === 0 ? (
@@ -669,59 +688,130 @@ export default function ProviderDashboard() {
               {poolRequests.map(req => {
                 const isJoining = poolActionId === req.id;
                 const poolFb = poolFeedbackMap[req.id];
+                const isExpanded = expandedPoolReqId === req.id;
 
                 return (
-                  <div key={req.id} className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
-                        <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
-                          {safeDateTime(req.created_at)}
-                        </span>
-                        {req.is_urgent && (
-                          <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                            ACİL
+                  <div key={req.id} className="bg-white rounded-xl border border-neutral-200 shadow-xs flex flex-col transition-all overflow-hidden">
+                    <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
+                          <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
+                            {safeDateTime(req.created_at)}
                           </span>
-                        )}
-                      </div>
-                      <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
-                      <p className="text-xs text-neutral-500 flex items-center gap-1">
-                        <MapPin size={12} className="text-neutral-400 shrink-0" />
-                        <span>{extractAddress(req.location)}</span>
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
-                      {poolFb && (
-                        <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in duration-200 flex items-center gap-1 ${
-                          poolFb.type === 'success'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                            : 'bg-rose-50 text-rose-800 border-rose-200'
-                        }`}>
-                          {poolFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
-                          <span>{poolFb.text}</span>
+                          {req.is_urgent && (
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                              ACİL
+                            </span>
+                          )}
                         </div>
-                      )}
+                        <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
+                        <p className="text-xs text-neutral-500 flex items-center gap-1">
+                          <MapPin size={12} className="text-neutral-400 shrink-0" />
+                          <span>{extractAddress(req.location)}</span>
+                        </p>
+                      </div>
 
-                      <button
-                        type="button"
-                        disabled={isJoining}
-                        onClick={() => handleJoinPool(req.id)}
-                        className="px-4 py-2 bg-transparent hover:bg-neutral-100 text-neutral-800 border border-neutral-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-                      >
-                        {isJoining ? (
-                          <>
-                            <Loader2 size={13} className="animate-spin text-neutral-600" />
-                            <span>İletiliyor...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send size={13} className="text-neutral-600" />
-                            <span>Talip Ol</span>
-                          </>
+                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                        {poolFb && (
+                          <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in duration-200 flex items-center gap-1 ${
+                            poolFb.type === 'success'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-rose-50 text-rose-800 border-rose-200'
+                          }`}>
+                            {poolFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
+                            <span>{poolFb.text}</span>
+                          </div>
                         )}
-                      </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isExpanded) {
+                              setExpandedPoolReqId(null);
+                            } else {
+                              setExpandedPoolReqId(req.id);
+                              setPoolBidData({ budget: '', targetDate: '', description: '' });
+                            }
+                          }}
+                          className={`px-4 py-2 border rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                            isExpanded 
+                              ? 'bg-neutral-100 text-neutral-600 border-neutral-300 hover:bg-neutral-200' 
+                              : 'bg-transparent text-neutral-800 border-neutral-300 hover:bg-neutral-50'
+                          }`}
+                        >
+                          {isExpanded ? (
+                            <>
+                              <X size={13} />
+                              <span>Vazgeç</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send size={13} className="text-emerald-600" />
+                              <span>Talip Ol & Teklif Ver</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
+
+                    {/* AÇILIR TEKLİF FORMU */}
+                    {isExpanded && (
+                      <div className="border-t border-neutral-100 bg-neutral-50 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center gap-1.5 mb-2 text-emerald-700 font-bold text-xs">
+                          <DollarSign size={14} /> Şartlarınızı Belirleyin (Opsiyonel)
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
+                              Tutar (TRY)
+                            </label>
+                            <input
+                              type="number"
+                              value={poolBidData.budget}
+                              onChange={(e) => setPoolBidData(prev => ({ ...prev, budget: e.target.value }))}
+                              placeholder="Örn: 500"
+                              className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
+                              Hedef Teslimat
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={poolBidData.targetDate}
+                              onChange={(e) => setPoolBidData(prev => ({ ...prev, targetDate: e.target.value }))}
+                              className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
+                            <AlignLeft size={11} className="text-neutral-500" />
+                            <span>Teklif Açıklaması</span>
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={poolBidData.description}
+                            onChange={(e) => setPoolBidData(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Müşteriye iletmek istediğiniz özel not veya şart..."
+                            className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800"
+                          />
+                        </div>
+                        
+                        <div className="flex justify-end pt-2">
+                          <button
+                            disabled={isJoining}
+                            onClick={() => handleJoinPoolWithBid(req.id)}
+                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-60"
+                          >
+                            {isJoining ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}
+                            <span>Teklifi İlet & Sıraya Gir</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
