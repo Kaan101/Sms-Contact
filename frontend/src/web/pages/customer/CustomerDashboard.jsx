@@ -101,7 +101,7 @@ function CustomerDashboardContent() {
   
   useEffect(() => {
     if (session?.phone) {
-      axios.get(`${API_BASE}/lists/CUSTOMER/${session.phone}`)
+      axios.get(`${API_BASE}/lists/CUSTOMER/${encodeURIComponent(session.phone)}`)
         .then(res => { if(res?.data?.lists) setUserLists(res.data.lists); })
         .catch(() => {});
     }
@@ -122,7 +122,6 @@ function CustomerDashboardContent() {
   const [actionFeedbackMap, setActionFeedbackMap] = useState({});
   const [reviewFlowMap, setReviewFlowMap] = useState({});
 
-  // ⭐ Listeye ekleme state'i (Tüm sekmeler için ID bazlı çalışır)
   const [selectedListIds, setSelectedListIds] = useState({});
 
   const showActionFeedback = (key, type, text) => {
@@ -489,7 +488,6 @@ function CustomerDashboardContent() {
     }
   };
 
-  // ⭐ Listeye ekleme fonksiyonu (State ile Tıkır Tıkır Çalışır)
   const handleAddRequestToList = async (requestId) => {
     const listId = selectedListIds[requestId];
     const actionKey = `list_add_${requestId}`;
@@ -534,6 +532,38 @@ function CustomerDashboardContent() {
     return false;
   }), [myCustomerRequests, reviewedRequestsMap]);
   const filteredPastCustomerRequests = useMemo(() => safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req?.raw_text).includes(q) || safeLower(req?.provider_name).includes(q) || safeLower(req?.status).includes(q); }), [pastCustomerRequests, searchCustomerHistoryText]);
+
+  // ⭐ 3 SANİYE OTOMATİK GEÇİŞ SİSTEMİ ⭐
+  const autoSkipTimersRef = useRef({});
+
+  useEffect(() => {
+    pendingReviewCustomerRequests.forEach((req) => {
+      const flowState = reviewFlowMap[req.id] || 'QUESTION';
+      
+      // 1. Eğer soru aşamasındaysa ve daha önce bu talep için sayaç başlatılmadıysa:
+      if (flowState === 'QUESTION' && !autoSkipTimersRef.current[req.id]) {
+        autoSkipTimersRef.current[req.id] = setTimeout(() => {
+          handleSendReview(req.id, 'CUSTOMER', true);
+          delete autoSkipTimersRef.current[req.id];
+        }, 3000);
+      }
+      
+      // 2. Eğer kullanıcı 3 saniye dolmadan "Değerlendir"e (RATING) bastıysa sayacı iptal et:
+      if (flowState !== 'QUESTION' && autoSkipTimersRef.current[req.id]) {
+        clearTimeout(autoSkipTimersRef.current[req.id]);
+        delete autoSkipTimersRef.current[req.id];
+      }
+    });
+
+    // 3. Hafıza Temizliği: Listeden kaybolan taleplerin sayaçlarını temizle
+    Object.keys(autoSkipTimersRef.current).forEach(reqId => {
+      const stillPending = pendingReviewCustomerRequests.find(r => r.id === Number(reqId));
+      if (!stillPending) {
+        clearTimeout(autoSkipTimersRef.current[reqId]);
+        delete autoSkipTimersRef.current[reqId];
+      }
+    });
+  }, [pendingReviewCustomerRequests, reviewFlowMap]);
 
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 px-6 py-8">
@@ -900,32 +930,32 @@ function CustomerDashboardContent() {
                              isTimerCritical = remaining === "Süresi Doldu" || (parseInt(remaining) < 15 && remaining.includes("dk") && !remaining.includes("saat"));
                            }
                       } else if (reqStatus === 'ACCEPTED') {
-                            if (req.matched_target_date) {
-                                const targetMs = new Date(req.matched_target_date).getTime();
-                                const nowMs = new Date().getTime();
-                                const diffMs = targetMs - nowMs;
-                                
-                                if (diffMs <= 0) {
-                                    timerDisplay = "Süresi Doldu";
-                                    isTimerCritical = true;
-                                } else {
-                                    const totalMins = Math.floor(diffMs / 60000);
-                                    const h = Math.floor(totalMins / 60);
-                                    const m = totalMins % 60;
-                                    const d = Math.floor(h / 24);
-                                    
-                                    if (d > 0) timerDisplay = `Teslimata: ${d}g ${h%24}sa`;
-                                    else if (h > 0) timerDisplay = `Teslimata: ${h}sa ${m}dk`;
-                                    else { timerDisplay = `Teslimata: ${m}dk`; isTimerCritical = m < 15; }
-                                }
-                            } else {
-                                const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
-                                const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
-                                if (remaining) {
-                                    timerDisplay = `Teslimat: ${remaining}`;
-                                    isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
-                                }
-                            }
+                             if (req.matched_target_date) {
+                                 const targetMs = new Date(req.matched_target_date).getTime();
+                                 const nowMs = new Date().getTime();
+                                 const diffMs = targetMs - nowMs;
+                                 
+                                 if (diffMs <= 0) {
+                                     timerDisplay = "Süresi Doldu";
+                                     isTimerCritical = true;
+                                 } else {
+                                     const totalMins = Math.floor(diffMs / 60000);
+                                     const h = Math.floor(totalMins / 60);
+                                     const m = totalMins % 60;
+                                     const d = Math.floor(h / 24);
+                                     
+                                     if (d > 0) timerDisplay = `Teslimata: ${d}g ${h%24}sa`;
+                                     else if (h > 0) timerDisplay = `Teslimata: ${h}sa ${m}dk`;
+                                     else { timerDisplay = `Teslimata: ${m}dk`; isTimerCritical = m < 15; }
+                                 }
+                             } else {
+                                 const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
+                                 const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
+                                 if (remaining) {
+                                     timerDisplay = `Teslimat: ${remaining}`;
+                                     isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                                 }
+                             }
                       } else if (reqStatus === 'PROVIDER_COMPLETED') {
                            const approvalLimit = Number(systemSettings?.customer_approval_timeout_hours) || 24;
                            const remaining = calculateRemainingTime(refDate, approvalLimit, 'hours');
@@ -985,7 +1015,6 @@ function CustomerDashboardContent() {
                             </div>
                           </div>
 
-                        {/* ⭐ YER 1: KABUL EDİLEN VE TAMAMLANAN TALEPLER İÇİN LİSTEYE EKLEME */}
                         {['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus) && userLists.length > 0 && (
                           <div className="mt-2.5 p-3 bg-neutral-100 border border-neutral-200 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
                             <span className="text-[11px] font-bold text-neutral-700 flex items-center gap-1">
@@ -1255,7 +1284,6 @@ function CustomerDashboardContent() {
                             </p>
                           </div>
                           
-                          {/* ⭐ YER 2: DEĞERLENDİRME AŞAMASINDAKİ İŞLER İÇİN İKONLU LİSTE EKLEME */}
                           <div className="flex flex-col items-end gap-1.5">
                             <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">TAMAMLANDI</span>
                             {userLists.length > 0 && (
@@ -1480,7 +1508,6 @@ function CustomerDashboardContent() {
                                   </div>
                                 )}
 
-                                {/* ⭐ YER 3: GEÇMİŞ TALEPLER İÇİN İKONLU LİSTEYE EKLEME */}
                                 {userLists.length > 0 && (
                                   <div className="flex items-center gap-1 bg-neutral-50 p-1 rounded-lg border border-neutral-200">
                                      <select
