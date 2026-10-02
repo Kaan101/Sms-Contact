@@ -39,56 +39,52 @@ const deleteList = async (req, res) => {
   }
 };
 
- // 4. Talep Ekle (Telefon ve Notları Kesinlikle Doldurur)
 const addRequestToList = async (req, res) => {
   try {
-    const { listId } = req.params;
-    const { requestId } = req.body;
+    const listId = parseInt(req.params.listId, 10);
+    const requestId = parseInt(req.body.requestId, 10);
 
-    if (!listId || !requestId) {
-      return res.status(400).json({ status: 'error', message: 'Veri eksik.' });
+    console.log(`--> [GELEN İSTEK] Liste ID: ${listId}, Talep ID: ${requestId}`);
+
+    if (isNaN(listId) || isNaN(requestId)) {
+      return res.status(400).json({ status: 'error', message: 'Geçersiz Liste veya Talep ID' });
     }
 
-    // 1. Zaten ekli mi kontrolü
-    const check = await pool.query(
-      `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
-      [parseInt(listId, 10), parseInt(requestId, 10)]
-    );
-
-    if (check.rows.length > 0) {
-      return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
-    }
-
-    // 2. Talebin asıl bilgilerini veritabanından çek (Kesin Çözüm)
-    const reqData = await pool.query(
+    // 1. Talebin gerçek verilerini çek
+    const reqRes = await pool.query(
       `SELECT contact_value, raw_text FROM requests WHERE id = $1`, 
-      [parseInt(requestId, 10)]
+      [requestId]
     );
 
-    // 3. Tablo kısıtlamalarında (NOT NULL) patlamaması için güçlü varsayılan değerler
     let phone = 'Belirtilmemiş';
-    let notes = 'Not Yok';
+    let notes = 'Sistem Kaydı';
 
-    if (reqData.rows.length > 0) {
-      const row = reqData.rows[0];
-      // Eğer veritabanında değer varsa al, yoksa varsayılanı tut (NULL hatasını engeller)
-      phone = row.contact_value ? String(row.contact_value) : 'Belirtilmemiş';
-      notes = row.raw_text ? String(row.raw_text) : 'Not Yok';
+    if (reqRes.rows.length > 0) {
+      phone = reqRes.rows[0].contact_value || 'Belirtilmemiş';
+      notes = reqRes.rows[0].raw_text || 'Sistem Kaydı';
     }
 
-    const contactName = `Talep #${requestId}`;
-
-    // 4. Tüm alanları eksiksiz bir şekilde tabloya yaz
+    // 2. Varsa eski kaydı temizleyip tazesini ekleyelim (Çakışma / takılma olmasın)
     await pool.query(
-      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
-       VALUES ($1, $2, $3, $4, $5)`,
-      [parseInt(listId, 10), parseInt(requestId, 10), contactName, phone, notes]
+      `DELETE FROM list_items WHERE list_id = $1 AND request_id = $2`,
+      [listId, requestId]
     );
 
-    // Terminalden takip edebilmen için log bırakıyoruz
-    console.log(`[BAŞARILI] Liste: ${listId} -> Talep: ${requestId} eklendi. (Tel: ${phone})`);
+    // 3. Tabloya net şekilde yaz
+    const insertRes = await pool.query(
+      `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING *`,
+      [listId, requestId, `Talep #${requestId}`, phone, notes]
+    );
 
-    res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
+    console.log(`--> [DB YAZILDI] Yeni Satır ID: ${insertRes.rows[0]?.id}`);
+
+    res.status(201).json({ 
+      status: 'success', 
+      message: 'Talebiniz listeye eklendi.', 
+      item: insertRes.rows[0] 
+    });
   } catch (error) {
     console.error('Listeye ekleme hatası:', error);
     res.status(500).json({ status: 'error', message: `DB Hatası: ${error.message}` });
