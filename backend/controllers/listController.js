@@ -39,52 +39,48 @@ const deleteList = async (req, res) => {
   }
 };
 
+// 4. Talep Ekle (Telefon ve Notları Kesinlikle Doldurur)
 const addRequestToList = async (req, res) => {
   try {
-    const listId = parseInt(req.params.listId, 10);
-    const requestId = parseInt(req.body.requestId, 10);
+    const { listId } = req.params;
+    const { requestId } = req.body;
 
-    console.log(`--> [GELEN İSTEK] Liste ID: ${listId}, Talep ID: ${requestId}`);
-
-    if (isNaN(listId) || isNaN(requestId)) {
-      return res.status(400).json({ status: 'error', message: 'Geçersiz Liste veya Talep ID' });
+    if (!listId || !requestId) {
+      return res.status(400).json({ status: 'error', message: 'Veri eksik.' });
     }
 
-    // 1. Talebin gerçek verilerini çek
-    const reqRes = await pool.query(
+    const check = await pool.query(
+      `SELECT 1 FROM list_items WHERE list_id = $1 AND request_id = $2`,
+      [parseInt(listId, 10), parseInt(requestId, 10)]
+    );
+
+    if (check.rows.length > 0) {
+      return res.status(200).json({ status: 'success', message: 'Zaten listede mevcut' });
+    }
+
+    const reqData = await pool.query(
       `SELECT contact_value, raw_text FROM requests WHERE id = $1`, 
-      [requestId]
+      [parseInt(requestId, 10)]
     );
 
     let phone = 'Belirtilmemiş';
-    let notes = 'Sistem Kaydı';
+    let notes = 'Not Yok';
 
-    if (reqRes.rows.length > 0) {
-      phone = reqRes.rows[0].contact_value || 'Belirtilmemiş';
-      notes = reqRes.rows[0].raw_text || 'Sistem Kaydı';
+    if (reqData.rows.length > 0) {
+      const row = reqData.rows[0];
+      phone = row.contact_value ? String(row.contact_value) : 'Belirtilmemiş';
+      notes = row.raw_text ? String(row.raw_text) : 'Not Yok';
     }
 
-    // 2. Varsa eski kaydı temizleyip tazesini ekleyelim (Çakışma / takılma olmasın)
+    const contactName = `Talep #${requestId}`;
+
     await pool.query(
-      `DELETE FROM list_items WHERE list_id = $1 AND request_id = $2`,
-      [listId, requestId]
-    );
-
-    // 3. Tabloya net şekilde yaz
-    const insertRes = await pool.query(
       `INSERT INTO list_items (list_id, request_id, contact_name, contact_phone, notes) 
-       VALUES ($1, $2, $3, $4, $5) 
-       RETURNING *`,
-      [listId, requestId, `Talep #${requestId}`, phone, notes]
+       VALUES ($1, $2, $3, $4, $5)`,
+      [parseInt(listId, 10), parseInt(requestId, 10), contactName, phone, notes]
     );
 
-    console.log(`--> [DB YAZILDI] Yeni Satır ID: ${insertRes.rows[0]?.id}`);
-
-    res.status(201).json({ 
-      status: 'success', 
-      message: 'Talebiniz listeye eklendi.', 
-      item: insertRes.rows[0] 
-    });
+    res.status(201).json({ status: 'success', message: 'Talebiniz listeye eklendi.' });
   } catch (error) {
     console.error('Listeye ekleme hatası:', error);
     res.status(500).json({ status: 'error', message: `DB Hatası: ${error.message}` });
@@ -105,18 +101,16 @@ const removeRequestFromList = async (req, res) => {
   }
 };
 
-// 6. Listenin İçindeki Talepleri Getir
+// ⭐ 6. Listenin İçindeki Talepleri Getir (Kimlik ezilmesi düzeltildi)
 const getListRequests = async (req, res) => {
   try {
     const { listId } = req.params;
     
-    // NOT: r.* komutunu öne aldık ki, li.id (Liste Öğesi ID'si) talebin ID'sini ezip frontend'in silme/gösterme işlemlerini bozmasın!
+    // r.* öne alındı ve li.id isimlendirildi. Böylece asıl req.id bozulmaz ve frontend butonları kusursuz çalışır!
     const { rows } = await pool.query(
       `SELECT 
         r.*, 
-        li.id as id, 
-        li.id as item_id, 
-        li.request_id, 
+        li.id as list_item_id, 
         li.contact_name, 
         li.contact_phone, 
         li.notes,
@@ -126,7 +120,7 @@ const getListRequests = async (req, res) => {
         rpd.provider_currency as matched_currency, 
         rpd.provider_target_date as matched_target_date
        FROM list_items li
-       LEFT JOIN requests r ON li.request_id = r.id
+       JOIN requests r ON li.request_id = r.id
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
        LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = sp.id)
        WHERE li.list_id = $1 
@@ -134,14 +128,14 @@ const getListRequests = async (req, res) => {
       [parseInt(listId, 10)]
     );
     
-    // Frontend hem requests hem de items array'i bekliyor olabilir
-    res.status(200).json({ status: 'success', requests: rows, items: rows });
+    res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
+    console.error('Listeyi getirme hatası:', error);
     res.status(500).json({ status: 'error', message: `DB Getirme Hatası: ${error.message}` });
   }
 };
 
-// 7. Manuel Öğe Ekleme 
+// 7. Manuel Öğe Ekleme (Frontend tarafından kullanılmıyor ancak uyumluluk için korundu)
 const addListItem = async (req, res) => {
   try {
     const { listId } = req.params;
@@ -167,7 +161,6 @@ const removeListItem = async (req, res) => {
   }
 };
 
-// TÜM FONKSİYONLARI EKSİKSİZ DIŞA AKTAR
 module.exports = {
   getListsByOwner,
   createList,

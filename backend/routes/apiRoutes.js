@@ -21,13 +21,11 @@ const {
   getOutboundNotifications,
   deleteRequest,
   upsertProviderRequestDetails,
-  createDirectReorder // Doğrudan Tekrarla
+  createDirectReorder 
 } = require('../controllers/requestController');
 const { getFeatures, createFeature, updateFeature, deleteFeature } = require('../controllers/featureController');
 const { submitReview, getReviewsByRequest } = require('../controllers/reviewController');
 const { getTests, createTest, updateTest, deleteTest } = require('../controllers/testController');
-
-// ⭐ YENİ: Listeler için eksiksiz Controller aktarımı
 const { 
   getListsByOwner, 
   createList, 
@@ -36,7 +34,6 @@ const {
   removeRequestFromList, 
   getListRequests 
 } = require('../controllers/listController');
-
 
 // 1. Auth / OTP
 router.post('/auth/send-otp', sendOtp);
@@ -52,12 +49,16 @@ router.post('/disambiguate', checkDisambiguation);
 // ==========================================
 // 4. ÖZEL LİSTELER (CUSTOM LISTS)
 // ==========================================
-router.get('/lists/:ownerType/:ownerId', getListsByOwner);
 router.post('/lists', createList);
-router.delete('/lists/:listId', deleteList); // Tüm listeyi sil
 router.post('/lists/:listId/requests', addRequestToList); // Listeye talep ekle
-router.get('/lists/:listId/requests', getListRequests); // ⭐ Listenin içindeki talepleri getir
+router.get('/lists/:listId/requests', getListRequests); // Listenin içindeki talepleri getir
 router.delete('/lists/:listId/requests/:requestId', removeRequestFromList); // Listeden tekil talep çıkar
+router.delete('/lists/:listId', deleteList); // Tüm listeyi sil
+
+// ⭐ DİKKAT: İçinde dinamik parametre (:ownerType/:ownerId) olan bu rota EN ALTTA olmalı!
+// Yoksa üstteki /requests kelimesini ownerId zannedip boş döndürür.
+router.get('/lists/:ownerType/:ownerId', getListsByOwner);
+
 
 // 5. Servis Sağlayıcılar
 router.post('/providers', registerProvider);
@@ -69,8 +70,6 @@ router.delete('/providers/:id', deleteProvider);
 // ==========================================
 // 6. TALEPLER VE HAVUZ (MARKETPLACE QUEUE)
 // ==========================================
-
-// ⭐ A) SABİT ROTALAR (PARAMETRESİZ OLANLAR ÜSTTE OLMALIDIR)
 router.post('/requests/direct-reorder', createDirectReorder);
 router.post('/requests/assign', assignProviderManually);
 router.post('/requests', createRequest);
@@ -81,14 +80,12 @@ router.get('/requests/provider-requests', getProviderAssignedRequests);
 router.get('/requests/pending', getPendingRequests);
 router.get('/requests/matched', getMatchedRequests);
 
-// ⭐ B) PARAMETRELİ ROTALAR (ALTTA OLMALIDIR)
 router.post('/requests/:requestId/join-pool', joinRequestPool);
 router.post('/requests/:requestId/next-provider', passToNextProvider);
 router.post('/requests/:requestId/select-candidate', selectCandidateProvider);
 router.post('/requests/:requestId/status', updateRequestStatus);
 router.post('/requests/:requestId/providers/:providerId/details', upsertProviderRequestDetails);
 router.delete('/requests/:requestId', deleteRequest);
-router.get('/lists/:listId/items', getListRequests); // Frontend bu adresi arıyor olabilir!
 
 // ==========================================
 
