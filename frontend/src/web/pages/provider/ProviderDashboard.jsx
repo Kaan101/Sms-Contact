@@ -47,7 +47,11 @@ function ProviderRequestCard({
   const [budget, setBudget] = useState(initialBudget);
   const [targetDate, setTargetDate] = useState(initialDate);
   const [description, setDescription] = useState(req.provider_description || '');
-  const [isEditing, setIsEditing] = useState(false);
+  
+  // ⭐ Eğer teklif verisi yoksa veya boşsa formu direkt AÇIK (Düzenleme Modu) getir
+  const [isEditing, setIsEditing] = useState(() => {
+    return !(initialBudget || initialDate || req.provider_description);
+  });
 
   const [btnLoading, setBtnLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -73,22 +77,31 @@ function ProviderRequestCard({
     }
   }, [req]);
 
-  const saveDetails = async () => {
-    await axios.post(`${API_BASE}/requests/${req.id}/providers/${providerId}/details`, {
-      providerBudget: budget ? parseFloat(budget) : null,
-      providerCurrency: 'TRY',
-      providerTargetDate: targetDate ? new Date(targetDate).toISOString() : null,
-      providerDescription: description || (isReorder ? 'Tekrarlanan Sipariş Onayı' : '')
-    });
-  };
-
   const handleAccept = async () => {
     setBtnLoading(true);
     setFeedback(null);
     try {
-      await saveDetails();
-      await axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' });
+      // ⭐ YENİ: AŞIRI YAVAŞLIĞI ÖNLEMEK İÇİN İSTEKLERİ PARALEL FIRLATIYORUZ (PROMISE.ALL)
+      const requests = [
+        axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' })
+      ];
+      
+      // Eğer düzenleme yapıldıysa veya yeni şart girildiyse detayları da güncelle
+      if (isEditing || budget || targetDate || description) {
+        requests.push(
+          axios.post(`${API_BASE}/requests/${req.id}/providers/${providerId}/details`, {
+            providerBudget: budget ? parseFloat(budget) : null,
+            providerCurrency: 'TRY',
+            providerTargetDate: targetDate ? new Date(targetDate).toISOString() : null,
+            providerDescription: description || (isReorder ? 'Tekrarlanan Sipariş Onayı' : '')
+          })
+        );
+      }
+
+      await Promise.all(requests); // Aynı anda gider ve saniyesinde biter
+      
       showFeedback('success', isReorder ? 'Sipariş devam ettirildi' : 'Kabul edildi');
+      setIsEditing(false);
       onRefresh();
     } catch (err) {
       showFeedback('error', err.response?.data?.message || 'İşlem başarısız');
@@ -232,19 +245,20 @@ function ProviderRequestCard({
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
-              className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+              className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-bold cursor-pointer transition"
             >
-              {isEditing ? 'Kapat' : 'Şartları Düzenle'}
+              {isEditing ? 'Şartları Gizle' : 'Şartları Düzenle'}
             </button>
           )}
         </div>
 
-        {reqStatus === 'MATCHED' ? (
-          <div className="space-y-3 pt-1">
+        {/* ⭐ ALANLARIN KABAK GİBİ GÖRÜNMESİNİ SAĞLAYAN MANTIK */}
+        {reqStatus === 'MATCHED' && isEditing ? (
+          <div className="space-y-3 pt-1 animate-in fade-in duration-200">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
-                  Tutar (TRY) *
+                  Son Tutar (TRY) *
                 </label>
                 <input
                   type="number"
@@ -252,18 +266,18 @@ function ProviderRequestCard({
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
                   placeholder="Örn: 250"
-                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
-                  Hedef Teslimat Tarihi / Saati *
+                  Son Teslimat Tarihi / Saati *
                 </label>
                 <input
                   type="datetime-local"
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
+                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs"
                 />
               </div>
             </div>
@@ -278,16 +292,16 @@ function ProviderRequestCard({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Örn: Malzeme dahil fiyat teklifidir, parçalar temin edildikten sonra montaj yapılacaktır..."
-                className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800 placeholder:text-neutral-400"
+                className="w-full p-2 text-xs rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800 placeholder:text-neutral-400 shadow-xs"
               />
             </div>
           </div>
         ) : (
-          <div className="space-y-2 text-xs font-mono">
+          <div className="space-y-2 text-xs font-mono animate-in fade-in duration-200">
             <div className="flex flex-wrap gap-4">
               <div>
                 <span className="text-neutral-500">Maliyet / Tutar: </span>
-                <strong className="text-emerald-700 font-bold">
+                <strong className="text-emerald-700 font-bold text-sm">
                   {budget ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
                 </strong>
               </div>
@@ -300,9 +314,15 @@ function ProviderRequestCard({
             </div>
 
             {description && (
-              <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60">
+              <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60 shadow-xs">
                 <span className="font-bold text-neutral-500 block text-[10px] uppercase font-mono mb-0.5">Sağlayıcı Notu:</span>
                 <p className="italic text-neutral-800 leading-relaxed">"{description}"</p>
+              </div>
+            )}
+
+            {!budget && !targetDate && !description && (
+              <div className="text-neutral-400 italic text-[10px]">
+                Herhangi bir teklif şartı veya not girilmemiş.
               </div>
             )}
           </div>
@@ -443,7 +463,6 @@ export default function ProviderDashboard() {
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
-  // ⭐ YENİ: Veri gelme hızları 3 saniyeye düşürüldü (Çok Daha Seri)
   const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(
     providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}` : null,
     fetcher,
@@ -460,7 +479,7 @@ export default function ProviderDashboard() {
   const fetchLists = async () => {
     if (!session?.phone) return;
     try {
-      const res = await axios.get(`${API_BASE}/lists/PROVIDER/${session.phone}`);
+      const res = await axios.get(`${API_BASE}/lists/PROVIDER/${encodeURIComponent(session.phone)}`);
       if (res.data?.lists) setUserLists(res.data.lists);
     } catch {}
   };
@@ -488,11 +507,9 @@ export default function ProviderDashboard() {
   const [poolActionId, setPoolActionId] = useState(null);
   const [poolFeedbackMap, setPoolFeedbackMap] = useState({});
 
-  // ⭐ YENİ: Hangi teklifin formu açık tutuluyor
   const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
   const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
 
-  // ⭐ YENİ: Teklifli Sıraya Girme (Bidding) Sistemi
   const handleJoinPoolWithBid = async (requestId) => {
     if (!providerId) {
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
@@ -504,23 +521,27 @@ export default function ProviderDashboard() {
     setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null }));
     
     try {
-      // 1. Önce sıraya gir
-      await axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId });
+      // ⭐ YENİ: AŞIRI YAVAŞLIĞI ÖNLEMEK İÇİN İSTEKLERİ PARALEL FIRLATIYORUZ (PROMISE.ALL)
+      const requests = [
+        axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId })
+      ];
       
-      // 2. Eğer form doldurulduysa şartları (Teklif/Bid) detay tablosuna kaydet
       if (poolBidData.budget || poolBidData.targetDate || poolBidData.description) {
-        await axios.post(`${API_BASE}/requests/${requestId}/providers/${providerId}/details`, {
-          providerBudget: poolBidData.budget ? parseFloat(poolBidData.budget) : null,
-          providerCurrency: 'TRY',
-          providerTargetDate: poolBidData.targetDate ? new Date(poolBidData.targetDate).toISOString() : null,
-          providerDescription: poolBidData.description || ''
-        });
+        requests.push(
+          axios.post(`${API_BASE}/requests/${requestId}/providers/${providerId}/details`, {
+            providerBudget: poolBidData.budget ? parseFloat(poolBidData.budget) : null,
+            providerCurrency: 'TRY',
+            providerTargetDate: poolBidData.targetDate ? new Date(poolBidData.targetDate).toISOString() : null,
+            providerDescription: poolBidData.description || ''
+          })
+        );
       }
+
+      await Promise.all(requests); // Ağ gecikmesi yarı yarıya azaldı
 
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Teklif iletildi!' } }));
       setExpandedPoolReqId(null);
       
-      // SWR verilerini beklemeden anında güncelle
       mutatePool();
       mutateAssigned();
     } catch (err) {
@@ -671,7 +692,7 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* ⭐ AÇIK HAVUZ VE YENİ TEKLİF FORMU */}
+      {/* AÇIK HAVUZ VE YENİ TEKLİF FORMU */}
       {activeTab === 'POOL' && (
         <div className="space-y-4">
           <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900">
