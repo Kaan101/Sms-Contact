@@ -9,7 +9,8 @@ import {
   Flame, ChevronDown, ChevronUp, Search, Navigation, Building2, AlertTriangle, 
   ShieldCheck, PhoneCall, SkipForward, Ban, Sparkles, Star, History, Radio, 
   ArrowRight, X, Check, Calendar, Loader2, Timer, AlertCircle,
-  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus, Copy, RefreshCw, FolderPlus
+  FileText, Bell, Folder, CheckCircle2, MessageSquarePlus, Copy, RefreshCw, FolderPlus,
+  DollarSign, AlignLeft
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -150,10 +151,12 @@ function CustomerDashboardContent() {
   const mapSearchInputRef = useRef(null);
 
   const customerPhoneQuery = session?.phone ? `phone=${encodeURIComponent(session.phone)}` : null;
+  
+  // ⭐ YENİ: Veri gelme hızları 3 saniyeye düşürüldü (Çok Daha Seri)
   const { data: customerRequestsRes, mutate: mutateCustomerReqs } = useSWR(
      customerPhoneQuery ? `${API_BASE}/requests/my-requests?${customerPhoneQuery}` : null, 
      fetcher, 
-     { refreshInterval: 5000 }
+     { refreshInterval: 3000 }
   );
   
   const myCustomerRequests = useMemo(() => safeArray(customerRequestsRes?.requests), [customerRequestsRes]);
@@ -268,7 +271,7 @@ function CustomerDashboardContent() {
       };
 
       await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
-      await mutateCustomerReqs();
+      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
       showActionFeedback(actionKey, 'success', 'Tekrarlandı');
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'Hata oluştu');
@@ -384,7 +387,7 @@ function CustomerDashboardContent() {
       });
       
       setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(defaultPosition); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
-      await mutateCustomerReqs();
+      mutateCustomerReqs();
     } catch (err) { setErrorMessage(err?.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
   };
 
@@ -410,7 +413,7 @@ function CustomerDashboardContent() {
         setReviewFlowMap(prev => ({ ...prev, [requestId]: 'QUESTION' }));
       }
       
-      await mutateCustomerReqs(); 
+      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İşlem yapılamadı');
     } finally {
@@ -424,7 +427,7 @@ function CustomerDashboardContent() {
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); 
       showActionFeedback(actionKey, 'success', 'Sıradakine geçildi');
-      await mutateCustomerReqs(); 
+      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'Hata oluştu');
     } finally {
@@ -439,7 +442,7 @@ function CustomerDashboardContent() {
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); 
       setExpandedCustomerQueueReqId(null); 
       showActionFeedback(actionKey, 'success', 'Sağlayıcı seçildi');
-      await mutateCustomerReqs(); 
+      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'Seçim yapılamadı');
     } finally {
@@ -453,7 +456,7 @@ function CustomerDashboardContent() {
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'CANCELLED' }); 
       showActionFeedback(actionKey, 'success', 'Talep iptal edildi');
-      await mutateCustomerReqs(); 
+      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İptal edilemedi');
     } finally {
@@ -480,7 +483,7 @@ function CustomerDashboardContent() {
       try { localStorage.setItem('sc_reviewed_requests', JSON.stringify(nextReviewed)); } catch (e) {}
 
       showActionFeedback(actionKey, 'success', isSkip ? 'Geçildi' : 'Değerlendirme iletildi');
-      await mutateCustomerReqs(); 
+      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İşlem kaydedilemedi');
     } finally {
@@ -539,23 +542,18 @@ function CustomerDashboardContent() {
   useEffect(() => {
     pendingReviewCustomerRequests.forEach((req) => {
       const flowState = reviewFlowMap[req.id] || 'QUESTION';
-      
-      // 1. Eğer soru aşamasındaysa ve daha önce bu talep için sayaç başlatılmadıysa:
       if (flowState === 'QUESTION' && !autoSkipTimersRef.current[req.id]) {
         autoSkipTimersRef.current[req.id] = setTimeout(() => {
           handleSendReview(req.id, 'CUSTOMER', true);
           delete autoSkipTimersRef.current[req.id];
         }, 3000);
       }
-      
-      // 2. Eğer kullanıcı 3 saniye dolmadan "Değerlendir"e (RATING) bastıysa sayacı iptal et:
       if (flowState !== 'QUESTION' && autoSkipTimersRef.current[req.id]) {
         clearTimeout(autoSkipTimersRef.current[req.id]);
         delete autoSkipTimersRef.current[req.id];
       }
     });
 
-    // 3. Hafıza Temizliği: Listeden kaybolan taleplerin sayaçlarını temizle
     Object.keys(autoSkipTimersRef.current).forEach(reqId => {
       const stillPending = pendingReviewCustomerRequests.find(r => r.id === Number(reqId));
       if (!stillPending) {
@@ -572,7 +570,7 @@ function CustomerDashboardContent() {
         <h2 className="text-xl font-extrabold text-neutral-950 flex items-center gap-2">
           <span>Müşteri Paneli</span>
           <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-            v2.9.1-GLOBAL-LISTS
+            v2.9.2-GLOBAL-BIDDING
           </span>
         </h2>
         <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
@@ -987,7 +985,8 @@ function CustomerDashboardContent() {
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
                               
-                              {req.matched_budget !== null && req.matched_budget !== undefined && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED', 'MATCHED'].includes(reqStatus) && (
+                              {/* MEVCUT İŞİN BÜTÇESİ (KABUL EDİLMİŞSE) */}
+                              {req.matched_budget !== null && req.matched_budget !== undefined && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus) && (
                                 <div className="mt-2.5 flex flex-wrap gap-2">
                                   <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold text-[10px] flex items-center shadow-sm">
                                       💰 Maliyet: {new Intl.NumberFormat('tr-TR').format(Number(req.matched_budget))} {req.matched_currency || 'TRY'}
@@ -1001,7 +1000,7 @@ function CustomerDashboardContent() {
                             
                             <div className="flex flex-col items-end gap-1.5">
                               {reqStatus === 'POOL' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">Açık Havuzda</span>}
-                              {reqStatus === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Sağlayıcı Bulundu</span>}
+                              {reqStatus === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-700 border border-amber-200">Teklif / Sağlayıcı Seçimi Bekliyor</span>}
                               {reqStatus === 'PROVIDER_SKIPPED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">Pas Geçti</span>}
                               {reqStatus === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">Kabul Edildi</span>}
                               {reqStatus === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Teslim Etti</span>}
@@ -1055,11 +1054,12 @@ function CustomerDashboardContent() {
                           </div>
                         )}
 
+                        {/* ⭐⭐⭐ BURASI: SAĞLAYICININ VERDİĞİ TEKLİFLER VE ŞARTLAR KABAK GİBİ GÖRÜNÜR ⭐⭐⭐ */}
                         {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
-                            <div className="p-3 flex items-center justify-between border-b border-emerald-100/50">
-                              <div className="text-[10px] font-mono font-bold text-emerald-700">
-                                {reqStatus === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'SİRAYA GİREN SAĞLAYICILAR')}
+                            <div className="p-3 flex items-center justify-between border-b border-emerald-100/50 bg-emerald-50/30">
+                              <div className="text-[10px] font-mono font-bold text-emerald-800">
+                                {reqStatus === 'PROVIDER_SKIPPED' ? <span className="text-rose-600">PAS GEÇEN SAĞLAYICI</span> : (req.provider_name ? 'ŞU ANKİ AKTİF SAĞLAYICI' : 'SİRAYA GİREN VE TEKLİF VERENLER')}
                               </div>
                             </div>
 
@@ -1077,44 +1077,55 @@ function CustomerDashboardContent() {
                                     
                                     <div 
                                       onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
-                                      className="p-3 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50"
+                                      className="p-3 flex flex-col sm:flex-row sm:items-start justify-between cursor-pointer hover:bg-neutral-50/50 gap-3"
                                     >
-                                      <div>
+                                      <div className="flex-1 w-full">
                                         <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
                                           <span>#{idx + 1} {qProv.name}</span>
                                           {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
                                           {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
                                           {qProv.interest_status === 'SKIPPED' && !isCurrent && <span className="text-[9px] bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded font-mono">PAS GEÇİLDİ</span>}
                                         </p>
-                                        <div className="flex flex-col mt-1.5 space-y-1.5">
-                                          <div className="flex items-center space-x-2">
-                                            <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
-                                            {qProv.avg_rating && (
-                                              <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                                                <Star size={8} fill="#f59e0b" /> {Number(parseFloat(qProv.avg_rating).toFixed(2))} ({qProv.review_count} Yorum)
-                                              </span>
-                                            )}
-                                            {qProv.avg_score && (
-                                              <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
-                                                Sistem Skoru: {Number(parseFloat(qProv.avg_score).toFixed(2))}/100
-                                              </span>
-                                            )}
-                                          </div>
-                                          
-                                          {qProv.provider_budget !== null && qProv.provider_budget !== undefined && qProv.provider_target_date && (
-                                            <div className="flex flex-wrap items-center gap-2">
-                                              <span className="bg-emerald-50/70 border border-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                                💰 Bütçe: {new Intl.NumberFormat('tr-TR').format(Number(qProv.provider_budget))} {qProv.provider_currency || 'TRY'}
-                                              </span>
-                                              <span className="bg-indigo-50/70 border border-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                                🎯 Tarih: {safeDateTime(qProv.provider_target_date)}
-                                              </span>
-                                            </div>
+                                        <div className="flex items-center space-x-2 mt-1.5">
+                                          <span className="text-[10px] font-mono text-neutral-500">📞 {qProv.phone}</span>
+                                          {qProv.avg_rating && (
+                                            <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                              <Star size={8} fill="#f59e0b" /> {Number(parseFloat(qProv.avg_rating).toFixed(2))} ({qProv.review_count} Yorum)
+                                            </span>
                                           )}
                                         </div>
+                                        
+                                        {/* ⭐ TEKLİF DETAYLARI: MÜŞTERİ BİZZAT GÖRSÜN */}
+                                        {(qProv.provider_budget != null || qProv.provider_target_date || qProv.provider_description) && (
+                                          <div className="mt-2.5 p-2.5 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col gap-1.5 max-w-lg">
+                                            <span className="text-[9px] font-bold text-blue-800 uppercase tracking-wide flex items-center gap-1">
+                                              <DollarSign size={10} /> Sağlayıcı Teklifi ve Şartları
+                                            </span>
+                                            
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              {qProv.provider_budget != null && (
+                                                <span className="bg-white border border-blue-200 text-blue-900 px-1.5 py-1 rounded text-[10px] font-bold shadow-xs">
+                                                  💰 Fiyat: {new Intl.NumberFormat('tr-TR').format(Number(qProv.provider_budget))} TRY
+                                                </span>
+                                              )}
+                                              {qProv.provider_target_date && (
+                                                <span className="bg-white border border-blue-200 text-blue-900 px-1.5 py-1 rounded text-[10px] font-bold shadow-xs">
+                                                  🎯 Teslimat: {safeDateTime(qProv.provider_target_date)}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            {qProv.provider_description && (
+                                              <div className="text-[11px] text-blue-900 font-medium bg-white p-2 rounded border border-blue-100 mt-0.5 flex gap-1.5 leading-snug">
+                                                <AlignLeft size={12} className="text-blue-500 shrink-0 mt-0.5" />
+                                                <span>"{qProv.provider_description}"</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                       
-                                      <div className="flex items-center space-x-2 shrink-0 ml-2">
+                                      <div className="flex items-center space-x-2 shrink-0 ml-2 mt-2 sm:mt-0">
                                           {actionFeedbackMap?.[isCurrent ? acceptKey : selectKey] && (
                                             <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
                                               actionFeedbackMap[isCurrent ? acceptKey : selectKey].type === 'success'
@@ -1126,16 +1137,17 @@ function CustomerDashboardContent() {
                                             </div>
                                           )}
 
+                                          {/* "ONAYLA" VE "BUNU SEÇ" BUTONLARI */}
                                           {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
-                                              <button disabled={actionLoadingKey === acceptKey} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED', acceptKey); }} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
-                                                {actionLoadingKey === acceptKey ? <Loader2 size={10} className="animate-spin mr-1" /> : <ShieldCheck size={10} className="mr-1"/>}
-                                                <span>Onayla</span>
+                                              <button disabled={actionLoadingKey === acceptKey} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED', acceptKey); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
+                                                {actionLoadingKey === acceptKey ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <ShieldCheck size={12} className="mr-1.5"/>}
+                                                <span>Onayla & İşe Başla</span>
                                               </button>
                                           )}
                                           {!isCurrent && (
-                                              <button disabled={actionLoadingKey === selectKey} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
-                                                {actionLoadingKey === selectKey ? <Loader2 size={10} className="animate-spin mr-1" /> : <Check size={10} className="mr-1"/>}
-                                                <span>Bunu Seç</span>
+                                              <button disabled={actionLoadingKey === selectKey} onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
+                                                {actionLoadingKey === selectKey ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Check size={12} className="mr-1.5"/>}
+                                                <span>Bu Teklifi Seç</span>
                                               </button>
                                           )}
                                           <div className="text-neutral-400 p-1 bg-white border border-neutral-200 rounded ml-1 transition hover:bg-neutral-50 shadow-xs">
@@ -1144,6 +1156,7 @@ function CustomerDashboardContent() {
                                       </div>
                                     </div>
 
+                                    {/* GEÇMİŞ YORUMLAR */}
                                     {isProvExpanded && (
                                       <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
                                         {safeArray(qProv.reviews).length > 0 ? (
