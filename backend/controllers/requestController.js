@@ -237,16 +237,68 @@ const passToNextProvider = async (req, res) => {
 
 const selectCandidateProvider = async (req, res) => {
   try {
-    const { requestId } = req.params; 
-    const { providerId } = req.body;
-    
-    await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
-    await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
-    await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, providerId]);
+    const requestId = parseInt(req.params.requestId, 10);
+    const providerId = parseInt(req.body.providerId, 10);
 
-    res.status(200).json({ status: 'success' });
+    if (isNaN(requestId) || isNaN(providerId)) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'Geçersiz requestId veya providerId' 
+      });
+    }
+
+    // 1. Sağlayıcının teklif detaylarını oku (tabloda kayıt olmasa bile çökmez)
+    let bid = {};
+    try {
+      const detailRes = await pool.query(
+        `SELECT provider_budget, provider_currency, provider_target_date, provider_description 
+         FROM request_provider_details 
+         WHERE request_id = $1 AND provider_id = $2 
+         ORDER BY id DESC LIMIT 1`,
+        [requestId, providerId]
+      );
+      if (detailRes.rows.length > 0) {
+        bid = detailRes.rows[0];
+      }
+    } catch (dbErr) {
+      console.warn('request_provider_details okunamadı (varsayılan değerler kullanılacak):', dbErr.message);
+    }
+
+    // 2. Talebi güncelle ve seçilen sağlayıcıyı bağla
+    const updateQuery = `
+      UPDATE requests 
+      SET 
+        matched_provider_id = $1,
+        status = 'MATCHED',
+        matched_budget = COALESCE($2, matched_budget),
+        matched_currency = COALESCE($3, matched_currency, 'TRY'),
+        matched_target_date = COALESCE($4, matched_target_date),
+        provider_description = COALESCE($5, provider_description),
+        updated_at = NOW()
+      WHERE id = $6
+      RETURNING *;
+    `;
+
+    const { rows } = await pool.query(updateQuery, [
+      providerId,
+      bid.provider_budget || null,
+      bid.provider_currency || 'TRY',
+      bid.provider_target_date || null,
+      bid.provider_description || null,
+      requestId
+    ]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı' });
+    }
+
+    return res.status(200).json({ status: 'success', request: rows[0] });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('selectCandidateProvider hatası:', error);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: `Seçim kaydedilemedi: ${error.message}` 
+    });
   }
 };
 

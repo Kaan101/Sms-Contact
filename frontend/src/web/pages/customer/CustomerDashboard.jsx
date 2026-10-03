@@ -435,16 +435,27 @@ function CustomerDashboardContent() {
     }
   };
 
-  const handleCustomerSelectCandidate = async (requestId, providerId) => { 
-    const actionKey = `select_${requestId}_${providerId}`;
+ const handleCustomerSelectCandidate = async (requestId, providerId) => { 
+    const rId = Number(requestId);
+    const pId = Number(providerId);
+
+    if (!rId || !pId) {
+      showActionFeedback(`select_${requestId}_${providerId}`, 'error', 'Eksik ID bilgisi');
+      return;
+    }
+
+    const actionKey = `select_${rId}_${pId}`;
     setActionLoadingKey(actionKey);
+
     try { 
-      await axios.post(`${API_BASE}/requests/${Number(requestId)}/select-candidate`, { providerId: Number(providerId) }); 
+      await axios.post(`${API_BASE}/requests/${rId}/select-candidate`, { providerId: pId }); 
       setExpandedCustomerQueueReqId(null); 
       showActionFeedback(actionKey, 'success', 'Sağlayıcı seçildi');
-      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
+      mutateCustomerReqs(); 
     } catch (err) {
-      showActionFeedback(actionKey, 'error', 'Seçim yapılamadı');
+      const serverMsg = err.response?.data?.message || 'Seçim yapılamadı';
+      showActionFeedback(actionKey, 'error', serverMsg);
+      console.error('Seçim hatası:', err.response?.data || err.message);
     } finally {
       setActionLoadingKey(null);
     }
