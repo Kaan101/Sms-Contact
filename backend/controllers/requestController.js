@@ -310,7 +310,8 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
- const getProviderAssignedRequests = async (req, res) => {
+ // Sağlayıcının Görevlerini Getir (İletişim Bilgisi Filtreli & Hızlı)
+const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId, phone } = req.query;
     let targetProviderId = null;
@@ -329,10 +330,24 @@ const updateRequestStatus = async (req, res) => {
       return res.status(200).json({ status: 'success', requests: [] });
     }
 
-    // Bütçe, tarih ve notlar doğrudan rpd tablosundan okunur
+    // ⭐ Müşteri iletişimi: Eğer sağlayıcı seçilmişse (matched_provider_id = $1)
+    // ve talep kabul/eşleşme aşamasındaysa müşterinin telefonunu temiz haliyle açıyoruz!
     const query = `
       SELECT 
-        r.*,
+        r.id,
+        r.raw_text,
+        r.status,
+        r.location,
+        r.is_urgent,
+        r.created_at,
+        r.updated_at,
+        r.matched_provider_id,
+        -- İletişim bayrağını (|HIDDEN vb.) ayıkla, seçilen sağlayıcıya doğrudan numarayı teslim et:
+        CASE 
+          WHEN r.matched_provider_id = $1 THEN SPLIT_PART(r.contact_value, '|', 1)
+          ELSE 'Seçim yapıldıktan sonra açılacak'
+        END AS contact_value,
+        r.preferred_channel,
         rpd.provider_budget,
         rpd.provider_currency,
         rpd.provider_target_date,
