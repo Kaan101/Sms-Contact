@@ -5,12 +5,12 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
   safeArray, safeUpper, extractAddress, extractGPS, 
-  safeDateTime, calculateRemainingTime 
+  safeDateTime, calculateRemainingTime, safeString, extractPhoneForWa 
 } from '../../../core/utils/helpers';
 import CustomListsManager from '../../components/common/CustomListsManager';
 
@@ -165,6 +165,13 @@ function ProviderRequestCard({
     }
   }
 
+  // ⭐ İLETİŞİM BİLGİSİ PARÇALAMA
+  const forceRevealContact = ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
+  const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
+  const displayContact = forceRevealContact ? rawContact : 'Gizli (Müşteri Seçince Açılacak)';
+  const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
+  const showPhone = forceRevealContact && safeString(req.preferred_channel).includes('PHONE');
+
   return (
     <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -189,10 +196,6 @@ function ProviderRequestCard({
           <p className="text-xs text-neutral-600 mt-1 flex items-center gap-1">
             <MapPin size={12} className="text-neutral-400 shrink-0" />
             <span>{extractAddress(req.location)}</span>
-          </p>
-          <p className="text-xs font-mono text-blue-700 font-semibold mt-1 flex items-center gap-1">
-            <Phone size={12} className="text-blue-500 shrink-0" />
-            <span>{req.contact_value}</span>
           </p>
         </div>
 
@@ -226,12 +229,39 @@ function ProviderRequestCard({
         </div>
       </div>
 
+      {/* ⭐ MÜŞTERİ İLETİŞİM KUTUSU (ARA VE YAZ BUTONLARI) ⭐ */}
+      <div className={`p-2.5 rounded-lg border flex items-center justify-between ${forceRevealContact ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-mono uppercase font-semibold text-neutral-500">
+            {forceRevealContact ? '✅ Müşteri İletişim (Açık)' : 'Müşteri İletişim'}
+          </span>
+          <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-neutral-900 font-mono text-sm' : 'text-neutral-400'}`}>{displayContact}</span>
+        </div>
+        
+        {forceRevealContact && (
+          <div className="flex items-center gap-2">
+            {(showPhone || true) && ( // Her halükarda telefon arama opsiyonu açılsın
+              <a href={`tel:${rawContact}`} onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+                <PhoneCall size={12} />
+                <span>Ara</span>
+              </a>
+            )}
+            {showWhatsApp && (
+              <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+                <MessageCircle size={12} />
+                <span>Yaz</span>
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ŞARTLAR PANELİ: MATCHED İSE DÜZENLENEBİLİR VE DOĞRUDAN AÇIK */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
             <DollarSign size={14} className="text-emerald-600" />
-            <span>{reqStatus === 'MATCHED' ? 'Sipariş Şartları (Fiyat, Teslimat Tarihi ve Not)' : 'Onaylanan Şartlar'}</span>
+            <span>{reqStatus === 'MATCHED' ? 'Sipariş Şartları (Fiyat, Tarih ve Açıklama)' : 'Onaylanan Şartlar'}</span>
           </span>
         </div>
 
@@ -240,7 +270,7 @@ function ProviderRequestCard({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1 font-bold">
-                  Tutar (TRY) *
+                  Son Tutar (TRY) *
                 </label>
                 <input
                   type="number"
@@ -253,7 +283,7 @@ function ProviderRequestCard({
               </div>
               <div>
                 <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1 font-bold">
-                  Hedef Teslimat Tarihi & Saati *
+                  Son Teslimat Tarihi / Saati *
                 </label>
                 <input
                   type="datetime-local"
@@ -265,7 +295,7 @@ function ProviderRequestCard({
             </div>
 
             <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1 font-bold flex items-center gap-1">
+              <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
                 <AlignLeft size={11} className="text-neutral-500" />
                 <span>Teklif Notu / Açıklama (Opsiyonel)</span>
               </label>
@@ -439,7 +469,6 @@ export default function ProviderDashboard() {
   const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
   const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
-  // 2 saniyelik hafif yenileme döngüsü ve sekme odağında anında çekme
   const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(
     providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}&phone=${encodeURIComponent(session?.phone || '')}` : null,
     fetcher,
@@ -487,7 +516,6 @@ export default function ProviderDashboard() {
   const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
   const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
 
-  // Havuzdan Sıraya Gir & Teklif Ver (Paralel İstek)
   const handleJoinPoolWithBid = async (requestId) => {
     if (!providerId) {
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
@@ -761,7 +789,7 @@ export default function ProviderDashboard() {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1 font-bold">
+                            <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
                               Tutar (TRY)
                             </label>
                             <input
@@ -769,23 +797,23 @@ export default function ProviderDashboard() {
                               value={poolBidData.budget}
                               onChange={(e) => setPoolBidData(prev => ({ ...prev, budget: e.target.value }))}
                               placeholder="Örn: 500"
-                              className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900"
+                              className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1 font-bold">
+                            <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">
                               Hedef Teslimat
                             </label>
                             <input
                               type="datetime-local"
                               value={poolBidData.targetDate}
                               onChange={(e) => setPoolBidData(prev => ({ ...prev, targetDate: e.target.value }))}
-                              className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900"
+                              className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1 font-bold flex items-center gap-1">
+                          <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
                             <AlignLeft size={11} className="text-neutral-500" />
                             <span>Teklif Açıklaması</span>
                           </label>
@@ -794,7 +822,7 @@ export default function ProviderDashboard() {
                             value={poolBidData.description}
                             onChange={(e) => setPoolBidData(prev => ({ ...prev, description: e.target.value }))}
                             placeholder="Müşteriye iletmek istediğiniz özel not veya şart..."
-                            className="w-full p-2 text-xs rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800"
+                            className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800"
                           />
                         </div>
                         
