@@ -235,17 +235,51 @@ const passToNextProvider = async (req, res) => {
   }
 };
 
-const selectCandidateProvider = async (req, res) => {
+ const selectCandidateProvider = async (req, res) => {
   try {
-    const { requestId } = req.params; 
+    const { requestId } = req.params;
     const { providerId } = req.body;
-    
-    await pool.query(`UPDATE request_interests SET status = 'SKIPPED' WHERE request_id = $1 AND status = 'ACTIVE'`, [requestId]);
-    await pool.query(`UPDATE requests SET matched_provider_id = $1, status = 'MATCHED' WHERE id = $2`, [providerId, requestId]);
-    await pool.query(`UPDATE request_interests SET status = 'ACTIVE' WHERE request_id = $1 AND provider_id = $2`, [requestId, providerId]);
 
-    res.status(200).json({ status: 'success' });
+    const rId = parseInt(requestId, 10);
+    const pId = parseInt(providerId, 10);
+
+    // 1. Sağlayıcının verdiği teklif detaylarını al
+    const detailRes = await pool.query(
+      `SELECT provider_budget, provider_currency, provider_target_date, provider_description 
+       FROM request_provider_details 
+       WHERE request_id = $1 AND provider_id = $2 LIMIT 1`,
+      [rId, pId]
+    );
+
+    const bid = detailRes.rows[0] || {};
+
+    // 2. Talebi MATCHED yaparken teklif değerlerini doğrudan ana tabloya işle
+    const updateQuery = `
+      UPDATE requests 
+      SET 
+        matched_provider_id = $1,
+        status = 'MATCHED',
+        matched_budget = COALESCE($2, matched_budget),
+        matched_currency = COALESCE($3, matched_currency, 'TRY'),
+        matched_target_date = COALESCE($4, matched_target_date),
+        provider_description = COALESCE($5, provider_description),
+        updated_at = NOW()
+      WHERE id = $6
+      RETURNING *;
+    `;
+
+    const { rows } = await pool.query(updateQuery, [
+      pId,
+      bid.provider_budget || null,
+      bid.provider_currency || 'TRY',
+      bid.provider_target_date || null,
+      bid.provider_description || null,
+      rId
+    ]);
+
+    res.status(200).json({ status: 'success', request: rows[0] });
   } catch (error) {
+    console.error('selectCandidateProvider hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
