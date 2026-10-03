@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leafl
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import useSWR from 'swr';
-import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, MessageCircle, Loader2, Timer, AlertCircle, FileText, Bell, DollarSign, AlignLeft } from 'lucide-react';
+import { Search, MapPin, Layers, Plus, Filter, X, Briefcase, Inbox, Clock, ShieldCheck, Check, MessageCircle, Loader2, Timer, AlertCircle, FileText, Bell, DollarSign } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, safeUpper, extractAddress, extractGPS, isCodeHiddenReq, extractCode, safeDateTime, extractPhoneForWa, calculateRemainingTime } from '../../../core/utils/helpers';
 import { UniversalMapController, SharedMapClickHandler } from '../../components/maps/MapComponents';
@@ -28,13 +28,13 @@ const TaskCard = React.memo(({
   const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
   const isActionLoading = actionLoadingId === req.id;
 
-  // MÜŞTERİ İLETİŞİM BİLGİSİNİN AÇILMASI
   const forceRevealContact = isMyTask && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
   const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
+  
   const displayContact = forceRevealContact ? rawContact : 'Gizli (Müşteri Seçince Açılacak)';
   const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
 
-  // TEKLİF FORMU STATE'LERİ
+  // TEKLİF ALANLARI STATE'LERİ
   const [cardBudget, setCardBudget] = useState(req.provider_budget ?? req.matched_budget ?? '');
   const [cardTargetDate, setCardTargetDate] = useState(() => {
     const rawDate = req.provider_target_date || req.matched_target_date;
@@ -48,7 +48,6 @@ const TaskCard = React.memo(({
   });
   const [cardDescription, setCardDescription] = useState(req.provider_description || req.notes || '');
 
-  // Backend verisi değiştikçe inputları güncelle
   useEffect(() => {
     setCardBudget(req.provider_budget ?? req.matched_budget ?? '');
     const rawDate = req.provider_target_date || req.matched_target_date;
@@ -163,8 +162,8 @@ const TaskCard = React.memo(({
              </div>
            )}
 
-           {/* TEKLİF & ŞART FORMU ALANI */}
-           {providerProfile && ['POOL', 'PENDING', 'MATCHED'].includes(reqStatus) && !isActionLoading && (
+           {/* TEKLİF & ŞART FORMU ALANI (SADECE HAVUZDAYKEN DÜZENLENEBİLİR) */}
+           {providerProfile && ['POOL', 'PENDING'].includes(reqStatus) && !hasJoined && !isMyTask && !isActionLoading && (
              <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2 mb-1">
                <div className="grid grid-cols-2 gap-2">
                  <div>
@@ -180,54 +179,89 @@ const TaskCard = React.memo(({
                  <label className="text-[9px] font-bold text-neutral-500 block mb-0.5">Açıklama / Şartlar</label>
                  <textarea rows={1} placeholder="Özel şart veya notunuz..." value={cardDescription} onChange={(e) => setCardDescription(e.target.value)} onClick={e=>e.stopPropagation()} className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded outline-none focus:border-neutral-900 resize-none font-medium" />
                </div>
+               
+               <div className="flex gap-2 pt-1 border-t border-neutral-200 mt-2">
+                 <button 
+                   disabled={isActionLoading} 
+                   onClick={(e) => { 
+                     e.stopPropagation(); 
+                     setExpandedTrackerReqId(null); 
+                     handleJoinPool(req.id, { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription }); 
+                   }} 
+                   className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
+                 >
+                   {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                   <span>Teklifle Sıraya Gir</span>
+                 </button>
+                 <button 
+                   disabled={isActionLoading} 
+                   onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} 
+                   className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer disabled:opacity-50"
+                 >
+                   Kaldır
+                 </button>
+               </div>
              </div>
            )}
            
-           {/* AKSİYON BUTONLARI */}
-           {providerProfile && ['POOL', 'PENDING'].includes(reqStatus) && !hasJoined && !isMyTask && (
-              <div className="flex gap-2">
-                <button 
-                  disabled={isActionLoading} 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    setExpandedTrackerReqId(null); // Tıklanır tıklanmaz kartı anında kapatır
-                    handleJoinPool(req.id, { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription }); 
-                  }} 
-                  className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
-                >
-                  {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                  <span>Teklifle Sıraya Gir</span>
-                </button>
-                <button 
-                  disabled={isActionLoading} 
-                  onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} 
-                  className="px-3 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer disabled:opacity-50"
-                >
-                  Kaldır
-                </button>
-              </div>
-           )}
-           
-           {providerProfile && isMyTask && (
-             <div className="flex flex-col gap-2">
+           {/* ⭐ YENİ: MÜŞTERİ SEÇİM YAPTIKTAN SONRA (SALT OKUNUR TEKLİF & KABUL ALANI) ⭐ */}
+           {providerProfile && isMyTask && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus) && (
+             <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
+               <span className="text-[9px] font-bold text-neutral-700 uppercase flex items-center gap-1">
+                 <DollarSign size={12} className="text-emerald-600" />
+                 <span>Teklif Şartlarınız</span>
+               </span>
+               <div className="grid grid-cols-2 gap-2">
+                 <div>
+                   <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Tutar</label>
+                   <input 
+                     type="text" 
+                     readOnly
+                     value={cardBudget ? `${new Intl.NumberFormat('tr-TR').format(Number(cardBudget))} TRY` : 'Belirtilmedi'} 
+                     className="w-full p-1.5 text-[11px] bg-neutral-100 border border-neutral-200 rounded font-bold outline-none text-neutral-600 cursor-not-allowed" 
+                   />
+                 </div>
+                 <div>
+                   <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Hedef Teslimat</label>
+                   <input 
+                     type="text" 
+                     readOnly
+                     value={cardTargetDate ? safeDateTime(cardTargetDate) : 'Belirtilmedi'} 
+                     className="w-full p-1.5 text-[10px] bg-neutral-100 border border-neutral-200 rounded font-bold outline-none text-neutral-600 cursor-not-allowed" 
+                   />
+                 </div>
+               </div>
+               {cardDescription && (
+                 <div>
+                   <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Açıklama / Not</label>
+                   <textarea 
+                     rows={1} 
+                     readOnly
+                     value={cardDescription} 
+                     className="w-full p-1.5 text-[11px] bg-neutral-100 border border-neutral-200 rounded font-medium outline-none resize-none text-neutral-600 cursor-not-allowed" 
+                   />
+                 </div>
+               )}
+
+               {/* AKSİYON BUTONLARI */}
                {reqStatus === 'MATCHED' && (
-                 <div className="flex gap-2">
+                 <div className="flex gap-2 pt-2 border-t border-neutral-200/60 mt-1">
                    <button 
                      disabled={isActionLoading} 
                      onClick={(e) => { 
                        e.stopPropagation(); 
-                       setExpandedTrackerReqId(null); // Tıklanır tıklanmaz kartı anında kapatır
-                       handleStatusChange(req.id, 'ACCEPTED', { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription }); 
+                       setExpandedTrackerReqId(null); 
+                       handleStatusChange(req.id, 'ACCEPTED'); 
                      }} 
-                     className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
+                     className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-bold hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
                    >
                      {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                     <span>Şartları Onayla & İşi Kabul Et</span>
+                     <span>İşi Kabul Et</span>
                    </button>
                    <button 
                      disabled={isActionLoading} 
                      onClick={(e) => { e.stopPropagation(); setExpandedTrackerReqId(null); handleProviderSkip(req.id); }} 
-                     className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition cursor-pointer disabled:opacity-50"
+                     className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer disabled:opacity-50"
                    >
                      Pas Geç
                    </button>
@@ -235,11 +269,15 @@ const TaskCard = React.memo(({
                )}
                
                {reqStatus === 'ACCEPTED' && (
-                 <div className="flex gap-2">
+                 <div className="flex gap-2 pt-2 border-t border-neutral-200/60 mt-1">
                    <button 
                      disabled={isActionLoading} 
-                     onClick={(e) => { e.stopPropagation(); setExpandedTrackerReqId(null); handleStatusChange(req.id, 'PROVIDER_COMPLETED'); }} 
-                     className="flex-1 py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5 shadow-sm"
+                     onClick={(e) => { 
+                       e.stopPropagation(); 
+                       setExpandedTrackerReqId(null); 
+                       handleStatusChange(req.id, 'PROVIDER_COMPLETED'); 
+                     }} 
+                     className="flex-1 py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-bold hover:bg-neutral-800 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5 shadow-sm"
                    >
                      {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                      <span>{isActionLoading ? 'İşleniyor...' : 'İşi Teslim Et'}</span>
@@ -247,7 +285,7 @@ const TaskCard = React.memo(({
                    <button 
                      disabled={isActionLoading} 
                      onClick={(e) => { e.stopPropagation(); setExpandedTrackerReqId(null); handleProviderSkip(req.id); }} 
-                     className="px-3 py-2 border text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
+                     className="px-3 py-2 border text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-bold transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
                    >
                      {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                      <span>Pas Geç</span>
@@ -283,7 +321,7 @@ const TaskCard = React.memo(({
                                 {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
                               </p>
                               <p className="text-[10px] font-mono text-neutral-500 mt-1">
-                                📞 { (isCurrent && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus)) ? qProv.phone : '*** ** ** (Gizli)' }
+                                📞 { (isCurrent && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus)) ? qProv.phone : '*** ** ** (Gizli)' }
                               </p>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -351,16 +389,17 @@ export default function TrackerDashboard() {
   const [isTrackerListOpen, setIsTrackerListOpen] = useState(true);
   const [isTrackerAddModalOpen, setIsTrackerAddModalOpen] = useState(false);
   const [trackerMapSelectedPos, setTrackerMapSelectedPos] = useState(null);
-  const [trackerMapSelectedAddress, setTrackerMapSelectedAddress] = useState('');
   const [trackerMapSearchText, setTrackerMapSearchText] = useState('');
   const [isTrackerMapSearching, setIsTrackerMapSearching] = useState(false);
   const [trackerMapSuggestions, setTrackerMapSuggestions] = useState([]);
   const [isTrackerSuggestionsVisible, setIsTrackerSuggestionsVisible] = useState(false);
   const [isTrackerFilterOpen, setIsTrackerFilterOpen] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState({ city: '', district: '', zip: '', code: '' });
+  
   const [isTrackerPoolFilterActive, setIsTrackerPoolFilterActive] = useState(false);
   const [showMyTrackerTasks, setShowMyTrackerTasks] = useState(false);
   const [expandedTrackerReqId, setExpandedTrackerReqId] = useState(null);
+
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const [queryText, setQueryText] = useState('');
@@ -391,32 +430,16 @@ export default function TrackerDashboard() {
   }, [trackerMapSearchText]);
 
 
-  // ⭐ TEKLİF DETAYLARI İLE DURUM DEĞİŞİKLİĞİ (PARALEL)
-  const handleStatusChange = useCallback(async (requestId, newStatus, bidDetails = null) => { 
+  const handleStatusChange = useCallback(async (requestId, newStatus) => { 
     setActionLoadingId(requestId);
     try { 
-      const requests = [
-        axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus })
-      ];
-      
-      if (bidDetails && providerProfile?.id) {
-        requests.push(
-          axios.post(`${API_BASE}/requests/${Number(requestId)}/providers/${providerProfile.id}/details`, {
-            providerBudget: bidDetails.budget !== '' ? parseFloat(bidDetails.budget) : null,
-            providerCurrency: 'TRY',
-            providerTargetDate: bidDetails.targetDate ? new Date(bidDetails.targetDate).toISOString() : null,
-            providerDescription: bidDetails.description || ''
-          })
-        );
-      }
-
-      await Promise.all(requests);
+      await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus }); 
       await mutatePending(); await mutateMatched(); await mutateActiveReq(); await mutatePoolReq();
     } catch (err) {
     } finally {
       setActionLoadingId(null);
     }
-  }, [API_BASE, providerProfile, mutatePending, mutateMatched, mutateActiveReq, mutatePoolReq]);
+  }, [API_BASE, mutatePending, mutateMatched, mutateActiveReq, mutatePoolReq]);
 
   const handleProviderSkip = useCallback(async (requestId) => {
     setActionLoadingId(requestId);
@@ -429,7 +452,6 @@ export default function TrackerDashboard() {
     }
   }, [API_BASE, mutatePending, mutateMatched, mutateActiveReq, mutatePoolReq]);
 
-  // ⭐ TEKLİF DETAYLARI İLE SIRAYA GİRME (PARALEL)
   const handleJoinPool = useCallback(async (requestId, bidDetails = null) => { 
     if (!providerProfile) return;
     setActionLoadingId(requestId);
@@ -438,6 +460,7 @@ export default function TrackerDashboard() {
           axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId: providerProfile.id })
         ];
 
+        // Teklif Veritabanına Yazılıyor (Paralel İstek)
         if (bidDetails && (bidDetails.budget || bidDetails.targetDate || bidDetails.description)) {
           requests.push(
             axios.post(`${API_BASE}/requests/${requestId}/providers/${providerProfile.id}/details`, {
@@ -599,7 +622,7 @@ export default function TrackerDashboard() {
         </div>
 
         {isTrackerListOpen && (
-          <div className="absolute top-16 right-0 w-[70vw] sm:w-[240px] md:w-[260px] min-w-[200px] max-w-[290px] h-[calc(100vh-64px)] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
+          <div className="absolute top-16 right-0 w-[85vw] sm:w-[320px] md:w-[360px] min-w-[280px] max-w-[400px] h-[calc(100vh-64px)] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-[400] flex flex-col border-l border-neutral-200 animate-in slide-in-from-right duration-300">
              <div className="p-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col space-y-3">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-xs text-neutral-900 truncate pr-1">Operasyon Listesi ({filteredTrackerRequests.length})</h3><button onClick={() => setIsTrackerListOpen(false)} className="text-neutral-400 hover:text-neutral-800 p-1 cursor-pointer"><X size={14}/></button></div>
                 
