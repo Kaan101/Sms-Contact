@@ -247,46 +247,18 @@ const selectCandidateProvider = async (req, res) => {
       });
     }
 
-    // 1. Sağlayıcının teklif detaylarını oku (tabloda kayıt olmasa bile çökmez)
-    let bid = {};
-    try {
-      const detailRes = await pool.query(
-        `SELECT provider_budget, provider_currency, provider_target_date, provider_description 
-         FROM request_provider_details 
-         WHERE request_id = $1 AND provider_id = $2 
-         ORDER BY id DESC LIMIT 1`,
-        [requestId, providerId]
-      );
-      if (detailRes.rows.length > 0) {
-        bid = detailRes.rows[0];
-      }
-    } catch (dbErr) {
-      console.warn('request_provider_details okunamadı (varsayılan değerler kullanılacak):', dbErr.message);
-    }
-
-    // 2. Talebi güncelle ve seçilen sağlayıcıyı bağla
+    // requests tablosunda yalnızca mevcut sütunlar güncellenir
     const updateQuery = `
       UPDATE requests 
       SET 
         matched_provider_id = $1,
         status = 'MATCHED',
-        matched_budget = COALESCE($2, matched_budget),
-        matched_currency = COALESCE($3, matched_currency, 'TRY'),
-        matched_target_date = COALESCE($4, matched_target_date),
-        provider_description = COALESCE($5, provider_description),
         updated_at = NOW()
-      WHERE id = $6
+      WHERE id = $2
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(updateQuery, [
-      providerId,
-      bid.provider_budget || null,
-      bid.provider_currency || 'TRY',
-      bid.provider_target_date || null,
-      bid.provider_description || null,
-      requestId
-    ]);
+    const { rows } = await pool.query(updateQuery, [providerId, requestId]);
 
     if (rows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'Talep bulunamadı' });
@@ -338,31 +310,26 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// Sağlayıcının Görevlerini Getir (Hata Korumalı & Performanslı)
-const getProviderAssignedRequests = async (req, res) => {
+ const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId, phone } = req.query;
-
     let targetProviderId = null;
 
     if (providerId && !isNaN(parseInt(providerId, 10))) {
       targetProviderId = parseInt(providerId, 10);
     } else if (phone) {
-      // providerId gelmediyse veya tanımsızsa telefon numarasından id bul
       const provRes = await pool.query(
         `SELECT id FROM service_providers WHERE phone = $1 LIMIT 1`,
         [phone]
       );
-      if (provRes.rows.length > 0) {
-        targetProviderId = provRes.rows[0].id;
-      }
+      if (provRes.rows.length > 0) targetProviderId = provRes.rows[0].id;
     }
 
     if (!targetProviderId) {
       return res.status(200).json({ status: 'success', requests: [] });
     }
 
-    // Tablo sütunları ve tipleri hataya yer bırakmayacak şekilde seçildi:
+    // Bütçe, tarih ve notlar doğrudan rpd tablosundan okunur
     const query = `
       SELECT 
         r.*,
@@ -384,13 +351,10 @@ const getProviderAssignedRequests = async (req, res) => {
     const { rows } = await pool.query(query, [targetProviderId]);
     return res.status(200).json({ status: 'success', requests: rows });
   } catch (error) {
-    console.error('getProviderAssignedRequests 500 Hatası:', error.message);
-    return res.status(500).json({ 
-      status: 'error', 
-      message: `DB Hatası: ${error.message}` 
-    });
+    console.error('getProviderAssignedRequests hatası:', error);
+    return res.status(500).json({ status: 'error', message: error.message });
   }
-}; 
+};
 
 const getMatchedRequests = async (req, res) => {
   try {
@@ -434,37 +398,58 @@ const deleteRequest = async (req, res) => {
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
-// Teklif Detaylarını Ekle / Güncelle (Hızlı Upsert)
-const upsertProviderRequestDetails = async (req, res) => {
+ const upsertProviderRequestDetails = async (req, res) => {
   try {
     const requestId = parseInt(req.params.requestId, 10);
     const providerId = parseInt(req.params.providerId, 10);
     const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
 
-    const query = `
-      INSERT INTO request_provider_details 
-        (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      ON CONFLICT (request_id, provider_id) 
-      DO UPDATE SET
-        provider_budget = EXCLUDED.provider_budget,
-        provider_currency = EXCLUDED.provider_currency,
-        provider_target_date = EXCLUDED.provider_target_date,
-        provider_description = EXCLUDED.provider_description,
-        updated_at = NOW()
-      RETURNING *;
-    `;
+    // Önce mevcut kayıt var mı kontrol et
+    const check = await pool.query(
+      `SELECT id FROM request_provider_details WHERE request_id = $1 AND provider_id = $2 LIMIT 1`,
+      [requestId, providerId]
+    );
 
-    const { rows } = await pool.query(query, [
-      requestId,
-      providerId,
-      providerBudget || null,
-      providerCurrency || 'TRY',
-      providerTargetDate || null,
-      providerDescription || null
-    ]);
+    let resultRow;
+    if (check.rows.length > 0) {
+      const updateRes = await pool.query(
+        `UPDATE request_provider_details 
+         SET 
+           provider_budget = $1,
+           provider_currency = $2,
+           provider_target_date = $3,
+           provider_description = $4,
+           updated_at = NOW()
+         WHERE id = $5
+         RETURNING *`,
+        [
+          providerBudget !== undefined && providerBudget !== '' ? parseFloat(providerBudget) : null,
+          providerCurrency || 'TRY',
+          providerTargetDate || null,
+          providerDescription || null,
+          check.rows[0].id
+        ]
+      );
+      resultRow = updateRes.rows[0];
+    } else {
+      const insertRes = await pool.query(
+        `INSERT INTO request_provider_details 
+           (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+         RETURNING *`,
+        [
+          requestId,
+          providerId,
+          providerBudget !== undefined && providerBudget !== '' ? parseFloat(providerBudget) : null,
+          providerCurrency || 'TRY',
+          providerTargetDate || null,
+          providerDescription || null
+        ]
+      );
+      resultRow = insertRes.rows[0];
+    }
 
-    res.status(200).json({ status: 'success', details: rows[0] });
+    res.status(200).json({ status: 'success', details: resultRow });
   } catch (error) {
     console.error('upsertProviderRequestDetails hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
