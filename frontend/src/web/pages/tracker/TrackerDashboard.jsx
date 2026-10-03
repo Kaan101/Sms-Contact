@@ -28,28 +28,30 @@ const TaskCard = React.memo(({
 }) => {
   const coords = extractGPS(req.location);
   const isExpanded = expandedTrackerReqId === req.id;
-  const isMyTask = providerProfile ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
+  
+  // Eşleşme ve Görev Kontrolleri
+  const isMyTask = providerProfile 
+    ? activeProviderRequests.some(pr => Number(pr?.id) === Number(req.id)) 
+    : false;
+    
   const hasJoined = providerProfile && (
     safeArray(req.queuedProviders).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || 
     safeArray(req.queueList).some(qp => Number(qp?.id) === Number(providerProfile?.id)) || 
     isMyTask
   );
-  const isMatch = providerProfile ? poolRequests.some(pr => Number(pr?.id) === Number(req.id)) : false;
-  
+
   const reqStatus = safeUpper(req.status);
-  const canExpand = !providerProfile || isMatch || hasJoined || isMyTask;
   const isActionLoading = actionLoadingId === req.id;
 
-  // ⭐ MÜŞTERİ SEÇTİĞİ ANDA (MATCHED, ACCEPTED, PROVIDER_COMPLETED) İLETİŞİM DOĞRUDAN AÇILIR
+  // ⭐ Müşteri seçtiğinde telefon doğrudan açılır
   const forceRevealContact = isMyTask && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
   const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
-  
-  const displayContact = forceRevealContact ? rawContact : 'Gizli (Seçilince Açılacak)';
+  const displayContact = forceRevealContact ? rawContact : 'Gizli (Müşteri Seçince Açılacak)';
   const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
 
-  // ⭐ TEKLİF ALANLARI STATE'LERİ (TUTAR, HEDEF TARİH, AÇIKLAMA)
-  const initialBudget = req.provider_budget ?? req.matched_budget ?? '';
-  const initialDate = useMemo(() => {
+  // ⭐ Teklif Alanları State'i
+  const [cardBudget, setCardBudget] = useState(req.provider_budget ?? req.matched_budget ?? '');
+  const [cardTargetDate, setCardTargetDate] = useState(() => {
     const rawDate = req.provider_target_date || req.matched_target_date;
     if (!rawDate) return '';
     try {
@@ -58,10 +60,7 @@ const TaskCard = React.memo(({
     } catch {
       return '';
     }
-  }, [req.provider_target_date, req.matched_target_date]);
-
-  const [cardBudget, setCardBudget] = useState(initialBudget);
-  const [cardTargetDate, setCardTargetDate] = useState(initialDate);
+  });
   const [cardDescription, setCardDescription] = useState(req.provider_description || req.notes || '');
 
   useEffect(() => {
@@ -76,7 +75,7 @@ const TaskCard = React.memo(({
     setCardDescription(req.provider_description || req.notes || '');
   }, [req]);
 
-  // --- SAYAÇ (TIMER) MANTIĞI ---
+  // Sayaç Mantığı
   let timerDisplay = null;
   let isTimerCritical = false;
   const currentStatus = reqStatus || 'POOL';
@@ -103,49 +102,64 @@ const TaskCard = React.memo(({
        timerDisplay = `Teslimat: ${remaining}`;
        isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
      }
-  } else if (currentStatus === 'PROVIDER_COMPLETED') {
-     const approvalLimit = Number(systemSettings?.customer_approval_timeout_hours) || 24;
-     const remaining = calculateRemainingTime(refDate, approvalLimit, 'hours');
-     if (remaining) {
-       timerDisplay = `Onay: ${remaining}`;
-     }
   }
 
   return (
-    <div onClick={() => { 
-        if(coords) { 
-            setTrackerMapCenter(coords); 
-            setTrackerMapSelectedPos(null); 
-            setCoordinates(''); 
-            if (window.innerWidth < 640) setIsTrackerListOpen(false); 
+    <div 
+      onClick={() => { 
+        if (coords) { 
+          setTrackerMapCenter(coords); 
+          setTrackerMapSelectedPos(null); 
+          setCoordinates(''); 
+          if (window.innerWidth < 640) setIsTrackerListOpen(false); 
         } 
-        if (canExpand) {
-            setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); 
-        }
-    }} className={`p-3 rounded-xl border bg-white shadow-sm transition group cursor-pointer hover:border-blue-400 ${isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''}`}>
+        // Kart engelsiz olarak her tıklandığında açılır / kapanır
+        setExpandedTrackerReqId(prev => prev === req.id ? null : req.id); 
+      }} 
+      className={`p-3 rounded-xl border bg-white shadow-sm transition cursor-pointer hover:border-blue-400 ${
+        isExpanded ? 'border-blue-400 shadow-md ring-1 ring-blue-100' : ''
+      }`}
+    >
       <div className="flex items-start justify-between mb-1.5 flex-wrap gap-y-1">
         <div className="flex flex-wrap items-center gap-1.5">
            <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-           
            {req.request_type === 'BILDIRIM' ? (
-             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 border border-amber-200 text-amber-700"><Bell size={10} /> BİLDİRİM</span>
+             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 border border-amber-200 text-amber-700">
+               <Bell size={10} /> BİLDİRİM
+             </span>
            ) : (
-             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-50 border border-blue-200 text-blue-700"><FileText size={10} /> TALEP</span>
+             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-50 border border-blue-200 text-blue-700">
+               <FileText size={10} /> TALEP
+             </span>
            )}
-
-           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>{reqStatus || 'POOL'}</span>
+           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+             reqStatus === 'POOL' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+           }`}>
+             {reqStatus || 'POOL'}
+           </span>
         </div>
         
         {timerDisplay && (
-           <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+           <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+             isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'
+           }`}>
               {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
               <span>{timerDisplay}</span>
            </div>
         )}
 
-        {providerProfile && hasJoined && !isMyTask && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Sıradayınız</span>}
-        {providerProfile && isMyTask && <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">Benim İşim</span>}
+        {providerProfile && hasJoined && !isMyTask && (
+          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+            Sıradayınız
+          </span>
+        )}
+        {providerProfile && isMyTask && (
+          <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-sm">
+            Benim İşim
+          </span>
+        )}
       </div>
+
       <h4 className="text-xs font-bold text-neutral-900 leading-snug line-clamp-2">"{req.raw_text}"</h4>
       
       <div className="flex flex-col gap-1 mt-2 mb-1 text-[10px] text-neutral-500 font-mono">
@@ -163,238 +177,138 @@ const TaskCard = React.memo(({
           )}
       </div>
       
+      {/* ⭐ AÇILAN PANEL: TEKLİF FORMU VE İŞLEM BUTONLARI ⭐ */}
       {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2.5 cursor-default" onClick={(e) => e.stopPropagation()}>
-           
-           {/* ⭐ 1. HAVUZDAKİ İŞLER İÇİN TEKLİF VE SIRAYA GİR FORMU */}
-           {providerProfile && ['POOL', 'PENDING', 'MATCHED', 'ACCEPTED', 'PROVIDER_SKIPPED', 'PROVIDER_COMPLETED'].includes(reqStatus) && !hasJoined && !isMyTask && (
-              <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
-                <span className="text-[9px] font-bold text-neutral-700 uppercase block">Teklif Şartlarınız</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Tutar (TRY)</label>
-                    <input 
-                      type="number" 
-                      placeholder="Örn: 500" 
-                      value={cardBudget} 
-                      onChange={(e) => setCardBudget(e.target.value)} 
-                      className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded font-bold outline-none" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Hedef Teslimat</label>
-                    <input 
-                      type="datetime-local" 
-                      value={cardTargetDate} 
-                      onChange={(e) => setCardTargetDate(e.target.value)} 
-                      className="w-full p-1.5 text-[10px] bg-white border border-neutral-300 rounded outline-none" 
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Açıklama / Not</label>
-                  <textarea 
-                    rows={1} 
-                    placeholder="Müşteriye notunuz..." 
-                    value={cardDescription} 
-                    onChange={(e) => setCardDescription(e.target.value)} 
-                    className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded outline-none resize-none" 
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button 
-                    disabled={isActionLoading} 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      handleJoinPoolWithBid(req.id, { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription }); 
-                      setExpandedTrackerReqId(null); 
-                    }} 
-                    className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
-                  >
-                    {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                    <span>Teklifle Sıraya Gir</span>
-                  </button>
-                  <button 
-                    disabled={isActionLoading} 
-                    onClick={(e) => { e.stopPropagation(); setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} 
-                    className="px-2.5 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer disabled:opacity-50"
-                  >
-                    Kaldır
-                  </button>
-                </div>
-              </div>
-           )}
-           
-           {/* ⭐ 2. SAĞLAYICIYA DÜŞEN GÖREVLER (MÜŞTERİ İLETİŞİMİ & ONAY) */}
-           {providerProfile && isMyTask && (
-             <div className="flex flex-col gap-2">
-               {/* Müşteri İletişim Kutusu */}
-               <div className={`p-2.5 rounded-lg border flex items-center justify-between mb-1 ${forceRevealContact ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
-                 <div className="flex flex-col">
-                   <span className="text-[10px] font-mono uppercase font-semibold text-neutral-500">
-                     {forceRevealContact ? '✅ Müşteri İletişim (Seçildiniz)' : 'Müşteri İletişim'}
-                   </span>
-                   <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-emerald-950 font-mono text-sm' : 'text-neutral-400'}`}>
-                     {displayContact}
-                   </span>
-                 </div>
-                 {showWhatsApp && (
-                    <a 
-                      href={`https://wa.me/${extractPhoneForWa(rawContact)}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      onClick={(e) => e.stopPropagation()} 
-                      className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer"
-                    >
-                      <MessageCircle size={12} />
-                      <span>Yaz</span>
-                    </a>
-                 )}
-               </div>
+        <div 
+          className="mt-3 pt-3 border-t border-neutral-100 flex flex-col gap-2.5 cursor-default" 
+          onClick={(e) => e.stopPropagation()}
+        >
+           {/* Müşteri İletişim Bilgisi */}
+           <div className={`p-2.5 rounded-lg border flex items-center justify-between ${
+             forceRevealContact ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'
+           }`}>
+             <div className="flex flex-col">
+               <span className="text-[10px] font-mono uppercase font-semibold text-neutral-500">
+                 {forceRevealContact ? '✅ Müşteri İletişim (Açık)' : 'Müşteri İletişim'}
+               </span>
+               <span className={`text-xs font-bold mt-0.5 ${
+                 forceRevealContact ? 'text-emerald-950 font-mono text-sm' : 'text-neutral-400'
+               }`}>
+                 {displayContact}
+               </span>
+             </div>
+             {showWhatsApp && (
+                <a 
+                  href={`https://wa.me/${extractPhoneForWa(rawContact)}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0"
+                >
+                  <MessageCircle size={12} />
+                  <span>Yaz</span>
+                </a>
+             )}
+           </div>
 
-               {/* MATCHED Durumunda Şartları Doğrudan Düzenleyip Kabul Etme */}
-               {reqStatus === 'MATCHED' && (
-                 <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
-                   <span className="text-[9px] font-bold text-neutral-700 uppercase block">Kabul Öncesi Şartları Onayla</span>
-                   <div className="grid grid-cols-2 gap-2">
-                     <div>
-                       <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Tutar (TRY)</label>
-                       <input 
-                         type="number" 
-                         value={cardBudget} 
-                         onChange={(e) => setCardBudget(e.target.value)} 
-                         placeholder="Örn: 500" 
-                         className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded font-bold outline-none" 
-                       />
-                     </div>
-                     <div>
-                       <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Hedef Teslimat</label>
-                       <input 
-                         type="datetime-local" 
-                         value={cardTargetDate} 
-                         onChange={(e) => setCardTargetDate(e.target.value)} 
-                         className="w-full p-1.5 text-[10px] bg-white border border-neutral-300 rounded outline-none" 
-                       />
-                     </div>
-                   </div>
-                   <div>
-                     <label className="text-[8px] font-bold text-neutral-500 block mb-0.5">Açıklama / Not</label>
-                     <textarea 
-                       rows={1} 
-                       value={cardDescription} 
-                       onChange={(e) => setCardDescription(e.target.value)} 
-                       placeholder="Şartlarınız..." 
-                       className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded outline-none resize-none" 
-                     />
-                   </div>
-                   <div className="flex gap-2 pt-1">
-                     <button 
-                       disabled={isActionLoading} 
-                       onClick={(e) => { 
-                         e.stopPropagation(); 
-                         handleStatusChangeWithBid(req.id, 'ACCEPTED', { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription }); 
-                       }} 
-                       className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-bold hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
-                     >
-                       {isActionLoading && <Loader2 size={12} className="animate-spin" />}
-                       <span>Şartları Onayla & İşi Kabul Et</span>
-                     </button>
-                     <button 
-                       disabled={isActionLoading} 
-                       onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} 
-                       className="px-3 py-1.5 border text-rose-600 rounded-lg text-[11px] hover:bg-rose-50 transition cursor-pointer disabled:opacity-50"
-                     >
-                       Pas Geç
-                     </button>
-                   </div>
-                 </div>
-               )}
-               
-               {/* ACCEPTED Durumunda İşi Teslim Et */}
-               {reqStatus === 'ACCEPTED' && (
+           {/* TEKLİF FORMU: Tutar, Tarih, Açıklama */}
+           <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
+             <div className="flex items-center justify-between">
+               <span className="text-[10px] font-bold text-neutral-700 uppercase flex items-center gap-1">
+                 <DollarSign size={12} className="text-emerald-600" />
+                 <span>Teklif Şartları (Fiyat, Tarih & Not)</span>
+               </span>
+             </div>
+
+             <div className="grid grid-cols-2 gap-2">
+               <div>
+                 <label className="text-[9px] font-bold text-neutral-500 block mb-0.5">Tutar (TRY) *</label>
+                 <input 
+                   type="number" 
+                   placeholder="Örn: 500" 
+                   value={cardBudget} 
+                   onChange={(e) => setCardBudget(e.target.value)} 
+                   className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded font-bold outline-none focus:border-neutral-900" 
+                 />
+               </div>
+               <div>
+                 <label className="text-[9px] font-bold text-neutral-500 block mb-0.5">Hedef Teslimat *</label>
+                 <input 
+                   type="datetime-local" 
+                   value={cardTargetDate} 
+                   onChange={(e) => setCardTargetDate(e.target.value)} 
+                   className="w-full p-1.5 text-[10px] bg-white border border-neutral-300 rounded outline-none focus:border-neutral-900" 
+                 />
+               </div>
+             </div>
+
+             <div>
+               <label className="text-[9px] font-bold text-neutral-500 block mb-0.5">Açıklama / Şartlar</label>
+               <textarea 
+                 rows={2} 
+                 placeholder="Müşteriye iletilecek teklif notunuz..." 
+                 value={cardDescription} 
+                 onChange={(e) => setCardDescription(e.target.value)} 
+                 className="w-full p-1.5 text-xs bg-white border border-neutral-300 rounded outline-none focus:border-neutral-900 resize-none font-medium" 
+               />
+             </div>
+
+             {/* AKSİYON BUTONLARI */}
+             <div className="pt-1">
+               {/* Durum 1: Henüz sıraya girilmemişse -> Sıraya Gir */}
+               {!hasJoined && !isMyTask && (
                  <div className="flex gap-2">
                    <button 
                      disabled={isActionLoading} 
-                     onClick={(e) => { e.stopPropagation(); handleStatusChangeWithBid(req.id, 'PROVIDER_COMPLETED'); }} 
-                     className="flex-1 py-2 bg-neutral-950 text-white rounded-lg text-[11px] font-semibold hover:bg-neutral-800 transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5 shadow-sm"
+                     onClick={() => handleJoinPoolWithBid(req.id, { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription })} 
+                     className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
                    >
-                     {isActionLoading && <Loader2 size={13} className="animate-spin" />}
-                     <span>{isActionLoading ? 'İşleniyor...' : 'İşi Teslim Et'}</span>
+                     {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                     <span>Teklifle Sıraya Gir</span>
                    </button>
                    <button 
                      disabled={isActionLoading} 
-                     onClick={(e) => { e.stopPropagation(); handleProviderSkip(req.id); }} 
-                     className="px-3 py-2 border text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
+                     onClick={() => { setHiddenPoolRequests(prev => [...prev, req.id]); setExpandedTrackerReqId(null); }} 
+                     className="px-2.5 py-1.5 border text-neutral-500 rounded-lg text-xs hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
                    >
-                     {isActionLoading && <Loader2 size={13} className="animate-spin" />}
-                     <span>Pas Geç</span>
+                     Kaldır
                    </button>
                  </div>
                )}
+
+               {/* Durum 2: Müşteri seçti (MATCHED) -> Şartları Onayla & İşi Kabul Et */}
+               {isMyTask && reqStatus === 'MATCHED' && (
+                 <div className="flex gap-2">
+                   <button 
+                     disabled={isActionLoading} 
+                     onClick={() => handleStatusChangeWithBid(req.id, 'ACCEPTED', { budget: cardBudget, targetDate: cardTargetDate, description: cardDescription })} 
+                     className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                   >
+                     {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                     <span>Şartları Onayla & İşi Kabul Et</span>
+                   </button>
+                   <button 
+                     disabled={isActionLoading} 
+                     onClick={() => handleProviderSkip(req.id)} 
+                     className="px-3 py-1.5 border text-rose-600 rounded-lg text-xs hover:bg-rose-50 transition cursor-pointer"
+                   >
+                     Pas Geç
+                   </button>
+                 </div>
+               )}
+
+               {/* Durum 3: İşlemde (ACCEPTED) -> İşi Teslim Et */}
+               {isMyTask && reqStatus === 'ACCEPTED' && (
+                 <button 
+                   disabled={isActionLoading} 
+                   onClick={() => handleStatusChangeWithBid(req.id, 'PROVIDER_COMPLETED')} 
+                   className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                 >
+                   {isActionLoading && <Loader2 size={12} className="animate-spin" />}
+                   <span>İşi Teslim Et</span>
+                 </button>
+               )}
              </div>
-           )}
-
-           {/* KUYRUK LİSTESİ */}
-           {expandedTrackerReqId === req.id && (
-              <div className="p-3 pt-1 border-t border-emerald-100 bg-neutral-50/50 mt-1">
-                <div className="space-y-2">
-                  {(() => {
-                     const queueData = req.queuedProviders || req.queueList || [];
-                     const safeQueue = safeArray(queueData);
-                     
-                     if (safeQueue.length === 0) {
-                       return <div className="text-center text-[10px] text-neutral-500 py-2">Henüz sıraya giren sağlayıcı yok.</div>;
-                     }
-
-                     return safeQueue.map((qProv, idx) => {
-                        if (!qProv || !qProv.id) return null;
-                        const isCurrent = String(req.matched_provider_id) === String(qProv.id);
-                        const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
-                        
-                        return (
-                          <div key={`qprov-${qProv.id}-${idx}`} className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition ${isCurrent ? (isSkippedByThis ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm') : 'bg-white border-neutral-200'}`}>
-                            <div>
-                              <p className="font-bold text-neutral-900 flex items-center space-x-1.5">
-                                <span>#{idx + 1} {qProv.name || 'İsimsiz Sağlayıcı'}</span>
-                                {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono">PAS GEÇTİ</span>}
-                                {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">ŞU AN AKTİF</span>}
-                              </p>
-                              <p className="text-[10px] font-mono text-neutral-500 mt-1">
-                                📞 { (isCurrent && ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus)) ? qProv.phone : '*** ** ** (Gizli)' }
-                              </p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
-                                  <button 
-                                    disabled={isActionLoading} 
-                                    onClick={(e) => { e.stopPropagation(); handleStatusChangeWithBid(req.id, 'ACCEPTED'); }} 
-                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                                  >
-                                    <ShieldCheck size={10} />
-                                    <span>Onayla</span>
-                                  </button>
-                                )}
-                                {!isCurrent && (
-                                    <div className="flex items-center">
-                                        {qProv.interest_status === 'SKIPPED' && <span className="text-[11px] font-extrabold text-rose-400/70 mr-2 uppercase tracking-wider">Pas</span>}
-                                        <button 
-                                          disabled={isActionLoading} 
-                                          onClick={(e) => { e.stopPropagation(); handleCustomerSelectCandidate(req.id, qProv.id); }} 
-                                          className="px-3 py-1.5 bg-neutral-950 text-white rounded text-[10px] font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"
-                                        >
-                                          <Check size={10} />
-                                          <span>Bunu Seç</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                          </div>
-                        );
-                     });
-                  })()}
-                </div>
-              </div>
-           )}
+           </div>
         </div>
       )}
     </div>
@@ -487,7 +401,7 @@ export default function TrackerDashboard() {
     return () => clearTimeout(delayDebounceFn);
   }, [trackerMapSearchText]);
 
-  // --- PARALEL İSTEKLE TEKLİF & STATÜ DEĞİŞİKLİĞİ (HIZLANDIRILDI) ---
+  // --- PARALEL İSTEKLE TEKLİF & STATÜ DEĞİŞİKLİĞİ ---
   const handleStatusChangeWithBid = useCallback(async (requestId, newStatus, bidDetails = null) => { 
     setActionLoadingId(requestId);
     try { 
