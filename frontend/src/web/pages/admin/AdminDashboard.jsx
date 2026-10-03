@@ -283,7 +283,7 @@ export default function AdminDashboard() {
   
   const handleCreateFeature = async (e) => { e.preventDefault(); if (!newFeature.title.trim()) return; try { await axios.post(`${API_BASE}/features`, newFeature); setNewFeature({ title: '', description: '', targetDate: new Date().toISOString().split('T')[0], status: 'BEKLİYOR', priority: 'ORTA' }); await mutateFeatures(); } catch (err) {} };
   const handleUpdateFeature = async (id, updatedFields) => { try { await axios.put(`${API_BASE}/features/${id}`, updatedFields); await mutateFeatures(); } catch (err) {} };
-  const handleDeleteFeature = async (id) => { if (!window.confirm('Emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await mutateFeatures(); } catch {} };
+  const handleDeleteFeature = async (id) => { if (!window.confirm('Bu projeyi/özelliği silmek istediğinize emin misiniz?')) return; try { await axios.delete(`${API_BASE}/features/${id}`); await mutateFeatures(); } catch (err) { alert("Silme işlemi başarısız oldu."); } };
 
   const handleAdminAssign = async (requestId, providerId) => { if (!providerId) return; try { await axios.post(`${API_BASE}/requests/assign`, { requestId: parseInt(requestId, 10), providerId: parseInt(providerId, 10) }); setWozAssignModalReq(null); await mutatePending(); await mutateMatched(); } catch {} };
   

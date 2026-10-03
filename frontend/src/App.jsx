@@ -2,6 +2,8 @@ import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuth } from './core/context/AuthContext';
 import MainPage from './web/pages/home/MainPage';
+import ProviderDashboardAkanTalep from './web/pages/admin/ProviderDashboard_AkanTalep';
+import TrackerDashboardAkanTalep from './web/pages/admin/TrackerDashboard_AkanTalep';
 
 // SADECE GEREKTİĞİNDE YÜKLENECEK BİLEŞENLER (LAZY LOADING)
 const Login = lazy(() => import('./web/pages/auth/Login'));
@@ -24,6 +26,9 @@ export default function App() {
   
   // viewMode: 'MAIN' (Ana Tanıtım Sayfası) | 'LOGIN' (Giriş Formu) | 'DASHBOARD' (Aktif Panel)
   const [viewMode, setViewMode] = useState(() => (session ? 'DASHBOARD' : 'MAIN'));
+  
+  // Admin alt sayfalarını yakalayabilmek için mevcut URL'i tutan state
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   useEffect(() => {
     if (session) {
@@ -35,6 +40,7 @@ export default function App() {
     window.history.replaceState({ view: 'main' }, '', window.location.pathname);
 
     const handlePopState = () => {
+      setCurrentPath(window.location.pathname); // Geri/İleri butonlarında URL'i güncelle
       if (!window.location.hash.includes('#login')) {
         if (!session) setViewMode('MAIN');
       } else {
@@ -61,11 +67,22 @@ export default function App() {
   };
 
   const renderDashboard = () => {
+    // ⭐ ADMIN ROLÜ İÇİN ÖZEL ALT SAYFA YÖNLENDİRMESİ
+    if (session?.role === 'ADMIN') {
+      if (currentPath.includes('/admin/live-tracker')) {
+        return <TrackerDashboardAkanTalep />;
+      }
+      if (currentPath.includes('/admin/provider-simulation')) {
+        return <ProviderDashboardAkanTalep />;
+      }
+      // Varsayılan Admin Paneli
+      return <AdminDashboard />;
+    }
+
     switch (session?.role) {
       case 'CUSTOMER': return <CustomerDashboard />;
       case 'PROVIDER': return <ProviderDashboard />;
       case 'TRACKER': return <TrackerDashboard />;
-      case 'ADMIN': return <AdminDashboard />;
       default: return <Login />;
     }
   };
@@ -85,7 +102,8 @@ export default function App() {
             className="flex items-center space-x-3 cursor-pointer group" 
             onClick={() => { 
               setViewMode('MAIN'); 
-              window.history.pushState({ view: 'main' }, '', window.location.pathname);
+              window.history.pushState({ view: 'main' }, '', '/');
+              setCurrentPath('/');
             }}
             title="Ana Sayfaya Dön"
           >
@@ -115,7 +133,8 @@ export default function App() {
                 onClick={() => { 
                   handleLogout(); 
                   setViewMode('MAIN');
-                  window.history.pushState({ view: 'main' }, '', window.location.pathname); 
+                  window.history.pushState({ view: 'main' }, '', '/'); 
+                  setCurrentPath('/');
                 }} 
                 title="Güvenli Çıkış Yap" 
                 className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
