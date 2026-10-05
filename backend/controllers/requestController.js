@@ -1,5 +1,60 @@
 const { pool } = require('../config/db');
 
+// --- MASTER TAKSONOMİ VE OTOMATİK ETİKETLEME MOTORU ---
+let MASTER_TAXONOMY = {};
+let isTaxonomyLoaded = false;
+
+const loadTaxonomyFromDB = async () => {
+  try {
+    if (!pool || typeof pool.query !== 'function') return;
+    const { rows } = await pool.query('SELECT tag_name, keywords FROM lookup_tags WHERE is_active = TRUE');
+    const newTaxonomy = {};
+
+    rows.forEach((row) => {
+      const cleanTag = (row.tag_name || '').replace('#', '').trim();
+      if (cleanTag) {
+        newTaxonomy[cleanTag] = Array.isArray(row.keywords) ? row.keywords : [];
+      }
+    });
+
+    MASTER_TAXONOMY = newTaxonomy;
+    isTaxonomyLoaded = true;
+    console.log(`✅ Master Taksonomi DB'den yüklendi: ${Object.keys(MASTER_TAXONOMY).length} etiket aktif.`);
+  } catch (error) {
+    console.error('❌ Taksonomi yüklenirken hata oluştu:', error.message);
+  }
+};
+
+loadTaxonomyFromDB();
+
+const autoTagRequest = async (rawText) => {
+  if (!rawText) return ['GENEL_BILDIRIM'];
+
+  if (!isTaxonomyLoaded || Object.keys(MASTER_TAXONOMY).length === 0) {
+    await loadTaxonomyFromDB();
+  }
+
+  const tags = new Set();
+  const lowerText = rawText.toLowerCase();
+
+  for (const [tag, keywords] of Object.entries(MASTER_TAXONOMY)) {
+    for (const keyword of keywords) {
+      if (keyword && lowerText.includes(keyword.toLowerCase().trim())) {
+        tags.add(tag);
+        break;
+      }
+    }
+  }
+
+  if (tags.size === 0) {
+    tags.add('GENEL_BILDIRIM');
+  }
+
+  return Array.from(tags);
+};
+
+// --- CONTROLLER İŞLEMLERİ ---
+
 const logSms = async (requestId, type, phone, body) => {
   try {
     await pool.query(
@@ -14,21 +69,29 @@ const logSms = async (requestId, type, phone, body) => {
 
 const createRequest = async (req, res) => {
   try {
-    const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime } = req.body;
+    const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime, requestType } = req.body;
     
+    // Dinamik etiketleri tespit et
+    const detectedTags = await autoTagRequest(rawText);
+
     const { rows: requestRows } = await pool.query(
-      `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'POOL') 
+      `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, request_type, status, tags) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'POOL', $9) 
        RETURNING *;`,
-      [rawText, disambiguationChoice, contactValue, preferredChannel || 'PHONE', location, isUrgent || false, deadlineDatetime || null]
+      [rawText, disambiguationChoice, contactValue, preferredChannel || 'PHONE', location, isUrgent || false, deadlineDatetime || null, requestType || 'TALEP', detectedTags]
     );
 
     const newRequest = requestRows[0];
     await logSms(newRequest.id, 'USER', contactValue, `Talebiniz alınmış ve servis havuzuna eklenmiştir. Hizmet sağlayıcılar sıraya girdiğinde size bilgi vereceğiz.`);
 
-    res.status(201).json({ status: 'success', request: newRequest });
+    res.status(201).json({ 
+      status: 'success', 
+      request: newRequest,
+      detectedTags: detectedTags 
+    });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: 'Sunucu hatası' });
+    console.error('createRequest hatası:', error);
+    res.status(500).json({ status: 'error', message: 'Sunucu hatası: ' + error.message });
   }
 };
 
@@ -62,30 +125,39 @@ const getOpenPoolRequests = async (req, res) => {
   try {
     const { providerId } = req.query;
 
-    const provRes = await pool.query(`SELECT service_keywords FROM service_providers WHERE id = $1`, [providerId]);
-    const providerKeywords = provRes.rows.length > 0 ? (provRes.rows[0].service_keywords || []) : [];
+    let providerKeywords = [];
+    if (providerId) {
+      const provRes = await pool.query(`SELECT service_keywords FROM service_providers WHERE id = $1`, [providerId]);
+      if (provRes.rows.length > 0) {
+        providerKeywords = provRes.rows[0].service_keywords || [];
+      }
+    }
 
     const { rows } = await pool.query(
       `SELECT r.* FROM requests r
        WHERE r.status NOT IN ('COMPLETED', 'CANCELLED') 
-       AND NOT EXISTS (
-         SELECT 1 FROM request_interests ri 
-         WHERE ri.request_id = r.id AND ri.provider_id = $1
+       AND (
+         $1::int IS NULL OR NOT EXISTS (
+           SELECT 1 FROM request_interests ri 
+           WHERE ri.request_id = r.id AND ri.provider_id = $1
+         )
        )
        ORDER BY r.created_at DESC;`,
-      [providerId]
+      [providerId || null]
     );
 
-    let filteredPool = [];
+    let filteredPool = rows;
     if (providerKeywords && providerKeywords.length > 0) {
-      filteredPool = rows.filter(req => {
-        const textToSearch = `${req.raw_text || ''} ${req.disambiguation_choice || ''}`;
+      filteredPool = rows.filter(reqItem => {
+        const textToSearch = `${reqItem.raw_text || ''} ${reqItem.disambiguation_choice || ''}`;
         return isSmartMatch(textToSearch, providerKeywords);
-      }).map(req => ({
-        ...req,
-        contact_value: '*** ** ** (Eşleşince Görünür)' 
-      }));
+      });
     }
+
+    filteredPool = filteredPool.map(reqItem => ({
+      ...reqItem,
+      contact_value: '*** ** ** (Eşleşince Görünür)' 
+    }));
 
     res.status(200).json({ status: 'success', poolRequests: filteredPool });
   } catch (error) {
@@ -126,6 +198,8 @@ const getUserRequests = async (req, res) => {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ status: 'error', message: 'Telefon numarası zorunludur.' });
 
+    const cleanPhone = phone.trim();
+
     const { rows: requests } = await pool.query(
       `SELECT r.*, 
         sp.name as provider_name, sp.phone as provider_phone, sp.email as provider_email,
@@ -135,9 +209,9 @@ const getUserRequests = async (req, res) => {
        FROM requests r
        LEFT JOIN service_providers sp ON r.matched_provider_id = sp.id
        LEFT JOIN request_provider_details rpd ON (rpd.request_id = r.id AND rpd.provider_id = r.matched_provider_id)
-       WHERE r.contact_value LIKE $1
+       WHERE r.contact_value LIKE $1 OR SPLIT_PART(r.contact_value, '|', 1) = $2
        ORDER BY r.created_at DESC;`,
-      [`%${phone}%`]
+      [`%${cleanPhone}%`, cleanPhone]
     );
     
     if (requests.length === 0) {
@@ -247,7 +321,6 @@ const selectCandidateProvider = async (req, res) => {
       });
     }
 
-    // requests tablosunda yalnızca mevcut sütunlar güncellenir
     const updateQuery = `
       UPDATE requests 
       SET 
@@ -310,7 +383,6 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
- // Sağlayıcının Görevlerini Getir (İletişim Bilgisi Filtreli & Hızlı)
 const getProviderAssignedRequests = async (req, res) => {
   try {
     const { providerId, phone } = req.query;
@@ -330,8 +402,6 @@ const getProviderAssignedRequests = async (req, res) => {
       return res.status(200).json({ status: 'success', requests: [] });
     }
 
-    // ⭐ Müşteri iletişimi: Eğer sağlayıcı seçilmişse (matched_provider_id = $1)
-    // ve talep kabul/eşleşme aşamasındaysa müşterinin telefonunu temiz haliyle açıyoruz!
     const query = `
       SELECT 
         r.id,
@@ -339,10 +409,10 @@ const getProviderAssignedRequests = async (req, res) => {
         r.status,
         r.location,
         r.is_urgent,
+        r.tags,
         r.created_at,
         r.updated_at,
         r.matched_provider_id,
-        -- İletişim bayrağını (|HIDDEN vb.) ayıkla, seçilen sağlayıcıya doğrudan numarayı teslim et:
         CASE 
           WHEN r.matched_provider_id = $1 THEN SPLIT_PART(r.contact_value, '|', 1)
           ELSE 'Seçim yapıldıktan sonra açılacak'
@@ -413,13 +483,12 @@ const deleteRequest = async (req, res) => {
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };
 
- const upsertProviderRequestDetails = async (req, res) => {
+const upsertProviderRequestDetails = async (req, res) => {
   try {
     const requestId = parseInt(req.params.requestId, 10);
     const providerId = parseInt(req.params.providerId, 10);
     const { providerBudget, providerCurrency, providerTargetDate, providerDescription } = req.body;
 
-    // Önce mevcut kayıt var mı kontrol et
     const check = await pool.query(
       `SELECT id FROM request_provider_details WHERE request_id = $1 AND provider_id = $2 LIMIT 1`,
       [requestId, providerId]
@@ -471,7 +540,6 @@ const deleteRequest = async (req, res) => {
   }
 };
 
-// ⭐ AKILLI ZAMAN FARKI VE TÜR KORUMALI REORDER
 const createDirectReorder = async (req, res) => {
   try {
     const { 
@@ -541,10 +609,13 @@ const createDirectReorder = async (req, res) => {
       targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
     }
 
+    // Reorder edilen metin için de etiketleri tespit et
+    const detectedTags = await autoTagRequest(rawText);
+
     const insertReqQuery = `
       INSERT INTO requests 
-      (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, deadline_datetime)
-      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7, $8)
+      (raw_text, contact_value, preferred_channel, location, is_urgent, request_type, status, matched_provider_id, deadline_datetime, tags)
+      VALUES ($1, $2, $3, $4, $5, $6, 'MATCHED', $7, $8, $9)
       RETURNING *;
     `;
     const { rows: newReqRows } = await pool.query(insertReqQuery, [
@@ -555,7 +626,8 @@ const createDirectReorder = async (req, res) => {
       isUrgent || false, 
       finalRequestType, 
       tProviderId,
-      newDeadlineDatetime
+      newDeadlineDatetime,
+      detectedTags
     ]);
     const newReq = newReqRows[0];
 
@@ -570,7 +642,7 @@ const createDirectReorder = async (req, res) => {
       [newReq.id, tProviderId, budget, targetDate, description]
     );
 
-    res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq });
+    res.status(201).json({ status: 'success', message: 'Doğrudan sipariş oluşturuldu', request: newReq, detectedTags });
   } catch (error) {
     console.error('Direct reorder hatası:', error);
     res.status(500).json({ status: 'error', message: `Veritabanı Hatası: ${error.message}` });

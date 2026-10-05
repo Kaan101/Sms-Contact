@@ -100,6 +100,10 @@ function CustomerDashboardContent() {
 
   const [userLists, setUserLists] = useState([]);
   
+  // ⭐ YENİ: Başarılı talep ve tespit edilen etiketler state'i
+  const [successMessage, setSuccessMessage] = useState('');
+  const [successTags, setSuccessTags] = useState([]);
+
   useEffect(() => {
     if (session?.phone) {
       axios.get(`${API_BASE}/lists/CUSTOMER/${encodeURIComponent(session.phone)}`)
@@ -152,7 +156,6 @@ function CustomerDashboardContent() {
 
   const customerPhoneQuery = session?.phone ? `phone=${encodeURIComponent(session.phone)}` : null;
   
-  // ⭐ YENİ: Veri gelme hızları 3 saniyeye düşürüldü (Çok Daha Seri)
   const { data: customerRequestsRes, mutate: mutateCustomerReqs } = useSWR(
      customerPhoneQuery ? `${API_BASE}/requests/my-requests?${customerPhoneQuery}` : null, 
      fetcher, 
@@ -271,7 +274,7 @@ function CustomerDashboardContent() {
       };
 
       await axios.post(`${API_BASE}/requests/direct-reorder`, payload);
-      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
+      mutateCustomerReqs(); 
       showActionFeedback(actionKey, 'success', 'Tekrarlandı');
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'Hata oluştu');
@@ -352,6 +355,9 @@ function CustomerDashboardContent() {
 
   const submitFinalRequest = async (disambiguationChoice) => {
     setLoading(true);
+    setSuccessMessage('');
+    setSuccessTags([]);
+
     const deadlineDatetimeISO = deadlineDate ? `${deadlineDate}T${deadlineTime || '23:59'}:00` : null;
     const finalContactValue = preferredChannels.includes('EMAIL') ? `${contactEmail.trim()} (Tel: ${session?.phone || ''})` : (session?.phone || '');
     const flaggedContactValue = `${finalContactValue}|${isContactShared ? 'SHARED' : 'HIDDEN'}`;
@@ -375,7 +381,7 @@ function CustomerDashboardContent() {
     if (companyCode.trim()) backendLocation += isCodeHidden ? ` [HIDDENCODE: ${companyCode.trim()}]` : ` [CODE: ${companyCode.trim()}]`;
 
     try {
-      await axios.post(`${API_BASE}/requests`, { 
+      const response = await axios.post(`${API_BASE}/requests`, { 
         rawText: queryText, 
         disambiguationChoice, 
         contactValue: flaggedContactValue, 
@@ -386,9 +392,40 @@ function CustomerDashboardContent() {
         requestType 
       });
       
-      setQueryText(''); setDeadlineDate(''); setDeadlineTime('23:59'); setContactEmail(''); setLocationValue(''); setCoordinates(''); setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); setStep('INPUT'); setIsDetailsCollapsed(true); setMapPosition(defaultPosition); setMapSearchText(''); setIsUrgent(false); setErrorMessage(''); setIsContactShared(false); setRequestType('TALEP');
-      mutateCustomerReqs();
-    } catch (err) { setErrorMessage(err?.response?.data?.message || 'Talep oluşturulamadı.'); } finally { setLoading(false); }
+      // ⭐ YENİ: Başarı mesajı ve etiketleri yakala
+      if (response.data && response.data.status === 'success') {
+        setSuccessMessage('Talebiniz başarıyla alındı! Eşleştirme başlıyor...');
+        setSuccessTags(response.data.detectedTags || []);
+        setIsActiveCustomerRequestsOpen(true);
+
+        setQueryText(''); 
+        setDeadlineDate(''); 
+        setDeadlineTime('23:59'); 
+        setContactEmail(''); 
+        setLocationValue(''); 
+        setCoordinates(''); 
+        setPreferredChannels(['PHONE', 'SMS', 'WHATSAPP']); 
+        setStep('INPUT'); 
+        setIsDetailsCollapsed(true); 
+        setMapPosition(defaultPosition); 
+        setMapSearchText(''); 
+        setIsUrgent(false); 
+        setErrorMessage(''); 
+        setIsContactShared(false); 
+        setRequestType('TALEP');
+        
+        mutateCustomerReqs();
+
+        setTimeout(() => {
+          setSuccessMessage('');
+          setSuccessTags([]);
+        }, 7000);
+      }
+    } catch (err) { 
+      setErrorMessage(err?.response?.data?.message || 'Talep oluşturulamadı.'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleCustomerCombinedSubmit = async (e) => {
@@ -413,7 +450,7 @@ function CustomerDashboardContent() {
         setReviewFlowMap(prev => ({ ...prev, [requestId]: 'QUESTION' }));
       }
       
-      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
+      mutateCustomerReqs(); 
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İşlem yapılamadı');
     } finally {
@@ -427,7 +464,7 @@ function CustomerDashboardContent() {
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/next-provider`); 
       showActionFeedback(actionKey, 'success', 'Sıradakine geçildi');
-      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
+      mutateCustomerReqs(); 
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'Hata oluştu');
     } finally {
@@ -435,7 +472,7 @@ function CustomerDashboardContent() {
     }
   };
 
- const handleCustomerSelectCandidate = async (requestId, providerId) => { 
+  const handleCustomerSelectCandidate = async (requestId, providerId) => { 
     const rId = Number(requestId);
     const pId = Number(providerId);
 
@@ -467,7 +504,7 @@ function CustomerDashboardContent() {
     try { 
       await axios.post(`${API_BASE}/requests/${Number(requestId)}/status`, { newStatus: 'CANCELLED' }); 
       showActionFeedback(actionKey, 'success', 'Talep iptal edildi');
-      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
+      mutateCustomerReqs(); 
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İptal edilemedi');
     } finally {
@@ -494,7 +531,7 @@ function CustomerDashboardContent() {
       try { localStorage.setItem('sc_reviewed_requests', JSON.stringify(nextReviewed)); } catch (e) {}
 
       showActionFeedback(actionKey, 'success', isSkip ? 'Geçildi' : 'Değerlendirme iletildi');
-      mutateCustomerReqs(); // HIZLI TEPKİ (AWAIT KALDIRILDI)
+      mutateCustomerReqs(); 
     } catch (err) {
       showActionFeedback(actionKey, 'error', 'İşlem kaydedilemedi');
     } finally {
@@ -547,7 +584,6 @@ function CustomerDashboardContent() {
   }), [myCustomerRequests, reviewedRequestsMap]);
   const filteredPastCustomerRequests = useMemo(() => safeArray(pastCustomerRequests).filter(req => { const q = safeLower(searchCustomerHistoryText).trim(); if (!q) return true; return safeLower(req?.raw_text).includes(q) || safeLower(req?.provider_name).includes(q) || safeLower(req?.status).includes(q); }), [pastCustomerRequests, searchCustomerHistoryText]);
 
-  // ⭐ 3 SANİYE OTOMATİK GEÇİŞ SİSTEMİ ⭐
   const autoSkipTimersRef = useRef({});
 
   useEffect(() => {
@@ -591,6 +627,35 @@ function CustomerDashboardContent() {
       </div>
 
       {errorMessage && <div className="w-full p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between"><span>{errorMessage}</span><button onClick={() => setErrorMessage('')} className="cursor-pointer"><X size={14} /></button></div>}
+
+      {/* ⭐ YENİ: TALEP OLUŞTURULDUKTAN SONRA ÇIKAN ETİKET BİLGİ ALANI ⭐ */}
+      {successMessage && (
+        <div className="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-2 text-emerald-800">
+            <CheckCircle2 size={18} />
+            <p className="text-sm font-bold">{successMessage}</p>
+          </div>
+          
+          {successTags && successTags.length > 0 && (
+            <div className="pt-3 border-t border-emerald-100">
+              <span className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-wider mb-2 block">
+                Sistemin Yakaladığı Etiketler:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {successTags.map((t, idx) => (
+                  <span 
+                    key={idx} 
+                    className="flex items-center gap-1 px-2.5 py-1 bg-white text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-mono font-bold shadow-xs"
+                  >
+                    <Tag size={12} className="text-emerald-500" />
+                    #{String(t).replace('#', '')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'LISTS' ? (
         <CustomListsManager 
@@ -996,6 +1061,21 @@ function CustomerDashboardContent() {
                               </div>
                               <h4 className="text-sm font-bold text-neutral-950 leading-snug mt-1.5">"{req.raw_text}"</h4>
                               
+                              {/* ⭐ YENİ: KART ÜZERİNDE ETİKET ROZETLERİ ⭐ */}
+                              {Array.isArray(req.tags) && req.tags.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                  {req.tags.map((tagItem, tIdx) => (
+                                    <span 
+                                      key={tIdx} 
+                                      className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <Tag size={9} className="text-blue-500" />
+                                      #{String(tagItem).replace('#', '')}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
                               {/* MEVCUT İŞİN BÜTÇESİ (KABUL EDİLMİŞSE) */}
                               {req.matched_budget !== null && req.matched_budget !== undefined && req.matched_target_date && ['ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus) && (
                                 <div className="mt-2.5 flex flex-wrap gap-2">
@@ -1065,7 +1145,7 @@ function CustomerDashboardContent() {
                           </div>
                         )}
 
-                        {/* ⭐⭐⭐ BURASI: SAĞLAYICININ VERDİĞİ TEKLİFLER VE ŞARTLAR KABAK GİBİ GÖRÜNÜR ⭐⭐⭐ */}
+                        {/* SAĞLAYICININ VERDİĞİ TEKLİFLER VE ŞARTLAR */}
                         {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
                           <div className="mt-2 bg-white border border-emerald-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300">
                             <div className="p-3 flex items-center justify-between border-b border-emerald-100/50 bg-emerald-50/30">
@@ -1106,7 +1186,6 @@ function CustomerDashboardContent() {
                                           )}
                                         </div>
                                         
-                                        {/* ⭐ TEKLİF DETAYLARI: MÜŞTERİ BİZZAT GÖRSÜN */}
                                         {(qProv.provider_budget != null || qProv.provider_target_date || qProv.provider_description) && (
                                           <div className="mt-2.5 p-2.5 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col gap-1.5 max-w-lg">
                                             <span className="text-[9px] font-bold text-blue-800 uppercase tracking-wide flex items-center gap-1">
@@ -1148,7 +1227,6 @@ function CustomerDashboardContent() {
                                             </div>
                                           )}
 
-                                          {/* "ONAYLA" VE "BUNU SEÇ" BUTONLARI */}
                                           {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' && (
                                               <button disabled={actionLoadingKey === acceptKey} onClick={(e) => { e.stopPropagation(); handleStatusChange(req.id, 'ACCEPTED', acceptKey); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-60 transition shadow-sm flex items-center">
                                                 {actionLoadingKey === acceptKey ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <ShieldCheck size={12} className="mr-1.5"/>}
@@ -1167,7 +1245,6 @@ function CustomerDashboardContent() {
                                       </div>
                                     </div>
 
-                                    {/* GEÇMİŞ YORUMLAR */}
                                     {isProvExpanded && (
                                       <div className="border-t border-neutral-100 bg-neutral-50/50 p-3 max-h-56 overflow-y-auto cursor-default">
                                         {safeArray(qProv.reviews).length > 0 ? (
@@ -1261,206 +1338,6 @@ function CustomerDashboardContent() {
                         </div>
                       </div>
                     );
-                   })}
-                 </div>
-                )}
-             </div>
-          )}
-
-          {/* DEĞERLENDİRME BÖLÜMÜ (TAMAMLANANLAR) */}
-          {pendingReviewCustomerRequests.length > 0 && (
-             <div className="mt-8 space-y-3 transition-all duration-300">
-                <div onClick={() => setIsPendingReviewsOpen(!isPendingReviewsOpen)} className="flex items-center justify-between cursor-pointer select-none">
-                   <h3 className="text-sm font-bold text-emerald-700 flex items-center space-x-1.5">
-                     <Sparkles size={16} className="text-amber-500" />
-                     <span>Tamamlanan Hizmetler ({pendingReviewCustomerRequests.length})</span>
-                   </h3>
-                   <div className="text-neutral-400">{isPendingReviewsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
-                </div>
-                {isPendingReviewsOpen && (
-                 <div className="space-y-4">
-                   {pendingReviewCustomerRequests.map((req) => {
-                     if (!req) return null;
-                     const isActionLoading = actionLoadingKey === `review_${req.id}`;
-                     const reviewFb = actionFeedbackMap?.[`review_${req.id}`];
-                     
-                     const flowState = reviewFlowMap[req.id] || 'QUESTION';
-                     
-                     const ratings = getRatingsForReq(req.id);
-                     const avg = ((ratings.knowledge + ratings.communication + ratings.timing + ratings.cost) / 4).toFixed(1);
-                     
-                     const ratingCriteria = [
-                       { id: 'knowledge', label: 'Uzmanlık ve Bilgi' },
-                       { id: 'communication', label: 'İletişim ve Nezaket' },
-                       { id: 'timing', label: 'Hız ve Zamanlama' },
-                       { id: 'cost', label: 'Fiyat / Performans' }
-                     ];
-
-                     return (
-                      <div key={req.id} className="bg-emerald-50/40 rounded-xl border border-emerald-200 p-4 shadow-sm space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="text-[10px] font-mono text-neutral-400">#REQ-{req.id}</span>
-                            <p className="text-sm font-bold text-neutral-900">"{req.raw_text}"</p>
-                            <p className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                              Sağlayıcı: <strong className="text-neutral-800">{req.provider_name || 'Bilinmiyor'}</strong> 
-                              {req.provider_phone && <span className="ml-1 text-neutral-600 font-mono">({req.provider_phone})</span>}
-                            </p>
-                          </div>
-                          
-                          <div className="flex flex-col items-end gap-1.5">
-                            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800">TAMAMLANDI</span>
-                            {userLists.length > 0 && (
-                               <div className="flex items-center gap-1">
-                                  {actionFeedbackMap?.[`list_add_${req.id}`] && (
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition-all ${
-                                      actionFeedbackMap[`list_add_${req.id}`].type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                                    }`}>
-                                      {actionFeedbackMap[`list_add_${req.id}`].text}
-                                    </span>
-                                  )}
-                                  <select
-                                    value={selectedListIds[req.id] || ''}
-                                    onChange={(e) => setSelectedListIds(prev => ({ ...prev, [req.id]: e.target.value }))}
-                                    className="max-w-[80px] p-1 text-[9px] rounded border border-emerald-200 bg-white outline-none text-emerald-800 font-bold"
-                                  >
-                                    <option value="">Liste...</option>
-                                    {userLists.map(lst => (
-                                      <option key={lst?.id} value={lst?.id}>{lst?.list_name}</option>
-                                    ))}
-                                  </select>
-                                  <button
-                                    onClick={() => handleAddRequestToList(req.id)}
-                                    disabled={actionLoadingKey === `list_add_${req.id}`}
-                                    className="p-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded transition cursor-pointer disabled:opacity-50"
-                                    title="Listeye Ekle"
-                                  >
-                                    {actionLoadingKey === `list_add_${req.id}` ? <Loader2 size={12} className="animate-spin" /> : <FolderPlus size={12} />}
-                                  </button>
-                               </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {flowState === 'QUESTION' && (
-                          <div className="p-3.5 bg-white rounded-xl border border-neutral-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-                            <div className="flex items-center gap-2">
-                              <MessageSquarePlus size={16} className="text-emerald-600 shrink-0" />
-                              <span className="text-xs font-semibold text-neutral-800">
-                                Bu hizmet tamamlandı! Deneyiminizi şimdi değerlendirmek ister misiniz?
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                              {reviewFb && (
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
-                                  reviewFb.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-                                }`}>
-                                  {reviewFb.text}
-                                </span>
-                              )}
-
-                              <button
-                                type="button"
-                                disabled={isActionLoading}
-                                onClick={() => handleSendReview(req.id, 'CUSTOMER', true)}
-                                className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border border-neutral-200 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition"
-                              >
-                                Değerlendirmeden Geç
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={isActionLoading}
-                                onClick={() => setReviewFlowMap(prev => ({ ...prev, [req.id]: 'RATING' }))}
-                                className="px-3.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 transition flex items-center gap-1"
-                              >
-                                <Star size={12} fill="#f59e0b" className="text-amber-500" />
-                                <span>Değerlendir</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {flowState === 'RATING' && (
-                          <div className="p-4 bg-white rounded-xl border border-neutral-200/90 shadow-xs space-y-4 animate-in fade-in duration-200">
-                            <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
-                                <span className="font-extrabold text-neutral-900 text-xs uppercase tracking-wide">Hizmet Deneyimini Puanla</span>
-                                <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
-                                  <span className="text-[10px] font-bold text-emerald-800">Ortalama:</span>
-                                  <span className="text-xs font-black text-emerald-700">{avg}</span>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                              {ratingCriteria.map(criteria => (
-                                <div key={criteria.id} className="flex flex-col space-y-1 bg-neutral-50 p-2 rounded-lg border border-neutral-100">
-                                  <span className="text-[10px] font-bold text-neutral-600 uppercase">{criteria.label}</span>
-                                  <div className="flex items-center justify-between w-full">
-                                    <div className="flex items-center space-x-1">
-                                      {[1, 2, 3, 4, 5].map((star) => (
-                                        <button 
-                                          key={star} 
-                                          type="button" 
-                                          onClick={() => updateSpecificRating(req.id, criteria.id, star)} 
-                                          className={`p-1 transition cursor-pointer hover:scale-110 ${star <= ratings[criteria.id] ? 'text-amber-500 fill-amber-500' : 'text-neutral-300'}`}
-                                        >
-                                          <Star size={16} fill={star <= ratings[criteria.id] ? '#f59e0b' : 'none'} />
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <span className="text-[10px] font-mono font-bold text-neutral-400">{ratings[criteria.id]}/5</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="pt-2">
-                               <input 
-                                 type="text" 
-                                 value={reviewCommentMap[req.id] || ''} 
-                                 onChange={(e) => setReviewCommentMap({ ...reviewCommentMap, [req.id]: e.target.value })} 
-                                 placeholder="Deneyiminiz hakkında kısa bir yorum ekleyin (opsiyonel)..." 
-                                 className="w-full p-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-neutral-50 focus:bg-white focus:border-neutral-950 transition" 
-                               />
-                            </div>
-
-                            <div className="flex items-center justify-end space-x-2 pt-2">
-                              {reviewFb && (
-                                <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
-                                  reviewFb.type === 'success'
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-rose-50 text-rose-800 border-rose-200'
-                                }`}>
-                                  {reviewFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
-                                  <span>{reviewFb.text}</span>
-                                </div>
-                              )}
-
-                              <button 
-                                disabled={isActionLoading} 
-                                type="button" 
-                                onClick={() => handleSendReview(req.id, 'CUSTOMER', true)} 
-                                className="px-3 py-1.5 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition"
-                              >
-                                Değerlendirmeden Geç
-                              </button>
-
-                              <button 
-                                disabled={isActionLoading} 
-                                type="button" 
-                                onClick={() => handleSendReview(req.id, 'CUSTOMER', false)} 
-                                className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer disabled:opacity-60 flex items-center space-x-1.5 transition"
-                              >
-                                {isActionLoading && <Loader2 size={13} className="animate-spin" />}
-                                <span>Gönder</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                      </div>
-                     );
                    })}
                  </div>
                 )}
