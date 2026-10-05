@@ -172,7 +172,23 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
             )}
           </div>
           <h4 className="text-sm font-bold text-neutral-950 mt-1">"{req.raw_text}"</h4>
-          <p className="text-xs text-neutral-600 mt-1 flex items-center gap-1">
+
+          {/* ⭐ YENİ: ATANAN TALEP ÜZERİNDE ETİKETLER ⭐ */}
+          {Array.isArray(req.tags) && req.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {req.tags.map((tagItem, tIdx) => (
+                <span 
+                  key={tIdx} 
+                  className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                >
+                  <Tag size={9} className="text-blue-500" />
+                  #{String(tagItem).replace('#', '')}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-neutral-600 mt-1.5 flex items-center gap-1">
             <MapPin size={12} className="text-neutral-400 shrink-0" />
             <span>{extractAddress(req.location)}</span>
           </p>
@@ -476,7 +492,23 @@ export default function ProviderDashboard() {
                           {req.is_urgent && <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">ACİL</span>}
                         </div>
                         <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
-                        <p className="text-xs text-neutral-500 flex items-center gap-1"><MapPin size={12} className="text-neutral-400 shrink-0" /><span>{extractAddress(req.location)}</span></p>
+
+                        {/* ⭐ YENİ: HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
+                        {Array.isArray(req.tags) && req.tags.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {req.tags.map((tagItem, tIdx) => (
+                              <span 
+                                key={tIdx} 
+                                className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                              >
+                                <Tag size={9} className="text-blue-500" />
+                                #{String(tagItem).replace('#', '')}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <p className="text-xs text-neutral-500 flex items-center gap-1 pt-0.5"><MapPin size={12} className="text-neutral-400 shrink-0" /><span>{extractAddress(req.location)}</span></p>
                       </div>
 
                       <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
