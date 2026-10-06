@@ -12,6 +12,9 @@ import {
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
 
+import ProviderDashboardAkanTalep from './ProviderDashboard_AkanTalep';
+import TrackerDashboardAkanTalep from './TrackerDashboard_AkanTalep';
+
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
@@ -141,22 +144,6 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
     </tr>
   );
 });
-
-const ProviderCard = React.memo(({ prov, onEdit, onDelete, onConnect }) => (
-  <div className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
-    <h3 className="font-bold text-neutral-900">{prov.name}</h3>
-    <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
-    <div className="mt-2 pt-2 border-t flex items-center justify-between">
-      <div className="flex space-x-2">
-        <button onClick={() => onEdit(prov)} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
-        <button onClick={() => onDelete(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button>
-      </div>
-      <button onClick={() => onConnect(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap">
-        <ExternalLink size={12} /><span>Bağlan</span>
-      </button>
-    </div>
-  </div>
-));
 
 const WozCard = React.memo(({ req, onAssign }) => (
   <div className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
@@ -343,7 +330,7 @@ export default function AdminDashboard() {
     const q = safeLower(searchProjectText).trim();
     const statusMatch = projectStatusFilter === 'ALL' || feat.status === projectStatusFilter;
     if (!statusMatch) return false;
-    if (!q) return true;
+    if (!q) return true; 
     return safeLower(feat.title).includes(q) || safeLower(feat.description).includes(q);
   }), [features, searchProjectText, projectStatusFilter]);
 
@@ -366,7 +353,7 @@ export default function AdminDashboard() {
     return sortableItems; 
   }, [filteredMatchedRequests, sortConfig]);
 
-  const sortedWozRequests = useMemo(() => {
+  const sortedWozRequests = useMemo(() => { 
     return [...safeArray(pendingRequests)].sort((a, b) => {
       const dateA = new Date(a?.created_at || 0).getTime();
       const dateB = new Date(b?.created_at || 0).getTime();
@@ -449,17 +436,17 @@ export default function AdminDashboard() {
           <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Proje ({features.length})</span></button>
           <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Settings size={14} /><span>Ayarlar</span></button>
 
-          {/* ⭐ CANLI TAKİP & SAĞLAYICI SİMÜLASYONU BUTONLARI ⭐ */}
           <div className="h-4 w-px bg-neutral-300 mx-0.5"></div>
           
+          {/* ⭐ CANLI TAKİP VE SAĞLAYICI SİMÜLASYONU DOĞRUDAN SEKME OLARAK AÇILIYOR ⭐ */}
           <button 
             type="button"
-            onClick={() => {
-              window.history.pushState({}, '', '/admin/live-tracker');
-              window.dispatchEvent(new Event('popstate'));
-            }} 
-            className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs"
-            title="Canlı Takip Ekranını Aç"
+            onClick={() => setAdminTab('LIVE_TRACKER')} 
+            className={`px-3 py-1.5 rounded-lg border transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs ${
+              adminTab === 'LIVE_TRACKER' 
+                ? 'bg-indigo-600 text-white border-indigo-700' 
+                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+            }`}
           >
             <Activity size={14} />
             <span>Canlı Takip</span>
@@ -467,12 +454,12 @@ export default function AdminDashboard() {
 
           <button 
             type="button"
-            onClick={() => {
-              window.history.pushState({}, '', '/admin/provider-simulation');
-              window.dispatchEvent(new Event('popstate'));
-            }} 
-            className="px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs"
-            title="Sağlayıcı Simülasyon Ekranını Aç"
+            onClick={() => setAdminTab('PROVIDER_SIMULATION')} 
+            className={`px-3 py-1.5 rounded-lg border transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs ${
+              adminTab === 'PROVIDER_SIMULATION' 
+                ? 'bg-purple-600 text-white border-purple-700' 
+                : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+            }`}
           >
             <Briefcase size={14} />
             <span>Sağlayıcı Simülasyon</span>
@@ -480,23 +467,40 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
-        <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
-          <span>Şu anki görünüm:</span>
-          <span className="font-bold text-neutral-900 bg-white px-2 py-1 rounded border shadow-xs">{adminTab}</span>
+      {/* SİMÜLASYONLAR HARİÇ GENEL ARAÇ ÇUBUĞU */}
+      {adminTab !== 'LIVE_TRACKER' && adminTab !== 'PROVIDER_SIMULATION' && (
+        <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
+          <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
+            <span>Şu anki görünüm:</span>
+            <span className="font-bold text-neutral-900 bg-white px-2 py-1 rounded border shadow-xs">{adminTab}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={handleExportExcel} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
+              <Download size={18} />
+              <span>Seçili Sekmeyi İndir</span>
+            </button>
+            <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
+              <Upload size={18} />
+              <span>Excel'den Yükle</span>
+              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} onClick={(e) => { e.target.value = null; }} />
+            </label>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={handleExportExcel} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
-            <Download size={18} />
-            <span>Seçili Sekmeyi İndir</span>
-          </button>
-          <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
-            <Upload size={18} />
-            <span>Excel'den Yükle</span>
-            <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} onClick={(e) => { e.target.value = null; }} />
-          </label>
+      )}
+
+      {/* ⭐ 1. SAĞLAYICI SİMÜLASYONU */}
+      {adminTab === 'PROVIDER_SIMULATION' && (
+        <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
+          <ProviderDashboardAkanTalep />
         </div>
-      </div>
+      )}
+
+      {/* ⭐ 2. CANLI TAKİP */}
+      {adminTab === 'LIVE_TRACKER' && (
+        <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm min-h-[650px] relative">
+          <TrackerDashboardAkanTalep />
+        </div>
+      )}
 
       {adminTab === 'WOZ' && (
         <div className="space-y-3">
@@ -522,19 +526,100 @@ export default function AdminDashboard() {
         <TimeoutTracker />
       )}
 
+      {/* ⭐ PROVIDERS (SAĞLAYICILAR LİSTESİ) DÜZENLENDİ: TABLO GÖRÜNÜMÜ ⭐ */}
       {adminTab === 'PROVIDERS' && (
-        <div className="space-y-3">
-          <div className="bg-white rounded-xl border p-3 flex justify-between">
-             <div className="relative w-full sm:w-96"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={searchProviderText} onChange={(e) => setSearchProviderText(e.target.value)} onDoubleClick={() => setSearchProviderText('')} placeholder="Firma ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none bg-neutral-50" /></div>
-             <button type="button" onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5"><Plus size={13} /><span>Yeni Ekle</span></button>
+        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm flex flex-col">
+          <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-t-2xl">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input 
+                type="text" 
+                value={searchProviderText} 
+                onChange={(e) => setSearchProviderText(e.target.value)} 
+                onDoubleClick={() => setSearchProviderText('')} 
+                placeholder="Firma adı, telefon veya anahtar kelime ara..." 
+                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-neutral-200 focus:border-neutral-900 outline-none transition" 
+              />
+            </div>
+            <button 
+              type="button" 
+              onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} 
+              className="px-4 py-2 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shadow-sm hover:bg-neutral-800 transition"
+            >
+              <Plus size={14} /><span>Yeni Sağlayıcı Ekle</span>
+            </button>
           </div>
-          <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto pr-1">
-              {!rawProviders && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {filteredProviders.map((prov) => (
-                  <ProviderCard key={prov.id} prov={prov} onEdit={handleEditProviderClick} onDelete={handleAdminDeleteProvider} onConnect={handleOpenProviderDirectSession} />
-                ))}
-              </div>
+          
+          <div className="max-h-[550px] overflow-y-auto">
+            {!rawProviders && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            <table className="w-full text-left text-xs table-auto">
+              <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Firma Adı</th>
+                  <th className="px-4 py-3 font-semibold">İletişim</th>
+                  <th className="px-4 py-3 font-semibold text-center">Puan / Skor</th>
+                  <th className="px-4 py-3 font-semibold">Anahtar Kelimeler</th>
+                  <th className="px-4 py-3 font-semibold text-right">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {filteredProviders.length === 0 && rawProviders ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-neutral-400 text-xs">Aradığınız kriterde sağlayıcı bulunamadı.</td>
+                  </tr>
+                ) : (
+                  filteredProviders.map((prov) => (
+                    <tr key={prov.id} className="hover:bg-neutral-50 transition group">
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-neutral-900">{prov.name}</div>
+                        <div className="text-[9px] text-neutral-400 font-mono mt-0.5">ID: {prov.id}</div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-neutral-600">
+                        <div>📞 {prov.phone}</div>
+                        {prov.email && <div className="text-[10px] mt-0.5 font-sans">✉️ {prov.email}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            <Star size={10} fill="#f59e0b" className="text-amber-500" /> {prov.avg_rating ? Number(parseFloat(prov.avg_rating).toFixed(1)) : '5.0'}
+                          </span>
+                          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                            Skor: {prov.priority_score || 100}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {safeArray(prov.service_keywords).slice(0, 3).map((kw, idx) => (
+                            <span key={idx} className="px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 rounded text-[9px] text-neutral-600 font-medium">
+                              {kw}
+                            </span>
+                          ))}
+                          {safeArray(prov.service_keywords).length > 3 && (
+                            <span className="px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 rounded text-[9px] text-neutral-500 font-medium cursor-help" title={safeArray(prov.service_keywords).slice(3).join(', ')}>
+                              +{safeArray(prov.service_keywords).length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="p-1.5 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded transition" title="Bağlan">
+                            <ExternalLink size={14} />
+                          </button>
+                          <button onClick={() => handleEditProviderClick(prov)} className="p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 border border-transparent hover:border-neutral-200 rounded transition" title="Düzenle">
+                            <Settings size={14} />
+                          </button>
+                          <button onClick={() => handleAdminDeleteProvider(prov.id)} className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded transition" title="Sil">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -875,7 +960,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9000]">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 border shadow-xl flex flex-col justify-between">
             <div className="flex items-start justify-between pb-3 border-b border-neutral-100"><div><h3 className="font-bold text-sm text-neutral-950">Sağlayıcı Ata & Eşleştir</h3><p className="text-xs text-neutral-600 font-medium mt-1">"{wozAssignModalReq.raw_text}"</p></div><button onClick={() => setWozAssignModalReq(null)} className="p-1 text-neutral-400 hover:text-neutral-700 transition"><X size={18} /></button></div>
-            <div className="mt-4 flex items-center gap-2"><div className="relative flex-1"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={wozProviderSearch} onChange={(e) => setWozProviderSearch(e.target.value)} placeholder="Sağlayıcı ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none focus:border-neutral-950 bg-neutral-50" /></div><button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1"><Plus size={13} /><span>Yeni Ekle</span></button></div>
+            <div className="mt-4 flex items-center gap-2"><div className="relative flex-1"><Search size={14} className="absolute left-3 top-2.5 text-neutral-400" /><input type="text" value={wozProviderSearch} onChange={(e) => setWozProviderSearch(e.target.value)} placeholder="Sağlayıcı ara..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none focus:border-neutral-950 bg-neutral-50" /></div><button onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} className="px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1"><Plus size={13} /><span>Yeni Ekle</span></button></div>
             <div className="overflow-y-auto space-y-2 max-h-[350px] mt-3 pt-1 flex-1">
               {filteredWozProviders.length === 0 && <div className="text-center text-xs text-neutral-400 py-6">Eşleşen sağlayıcı bulunamadı.</div>}
               {filteredWozProviders.map((prov) => (
