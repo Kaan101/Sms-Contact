@@ -1,12 +1,11 @@
-// controllers/tagController.js
-const { pool } = require('../config/db'); // KENDİ PROJENE GÖRE BU YOLU DÜZELT (örn: require('../db'))
+const pool = require('../config/db'); // Veritabanı bağlantı dosyanızın yolu (sistemine göre ayarla)
 
 const getTags = async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM tags ORDER BY id DESC');
         res.json({ tags: result.rows });
     } catch (error) {
-        // Tablo henüz yoksa veya boşsa çökmesin, boş dizi dönsün
+        // Eğer tablo yoksa hata vermesin, boş dizi dönsün (ilk kurulum için hayat kurtarır)
         if (error.code === '42P01') { 
             return res.json({ tags: [] }); 
         }
@@ -19,12 +18,11 @@ const createTag = async (req, res) => {
     
     try {
         const result = await pool.query(
-            'INSERT INTO tags (tag_name, keywords, is_active) VALUES ($1, $2, $3) ON CONFLICT (tag_name) DO UPDATE SET keywords = $2, is_active = $3 RETURNING *',
+            'INSERT INTO tags (tag_name, keywords, is_active) VALUES ($1, $2, $3) ON CONFLICT (tag_name) DO NOTHING RETURNING *',
             [tag_name, keywords || [], is_active ?? true]
         );
         res.status(201).json({ message: 'Etiket oluşturuldu', tag: result.rows[0] });
     } catch (error) {
-        console.error("DB Tag Ekleme Hatası:", error.message);
         res.status(500).json({ message: 'Etiket oluşturulamadı', error: error.message });
     }
 };
