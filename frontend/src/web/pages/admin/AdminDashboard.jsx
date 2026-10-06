@@ -18,7 +18,17 @@ import TrackerDashboardAkanTalep from './TrackerDashboard_AkanTalep';
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
 
-const fetcher = (url) => axios.get(url).then(res => res.data);
+// Hataları sessizce yutarak uygulamanın çökmesini veya sonsuz dönmesini engelleyen fetcher
+const fetcher = async (url) => {
+  try {
+    const res = await axios.get(url);
+    return res.data;
+  } catch (err) {
+    // API adresi henüz hazır değilse bileşenleri bozmamak için boş veri dönüyoruz.
+    console.warn(`[SWR Fetcher Hatası]: ${url} adresinden veri çekilemedi.`, err);
+    return {}; 
+  }
+};
 
 const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig, handleRequestSort }) => {
   if (!sortConfig) return null;
@@ -38,6 +48,7 @@ const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig,
   );
 });
 
+// ZAMAN AŞIMI (TIMEOUT) CANLI SAYACI EKLENMİŞ SATIR BİLEŞENİ
 const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTimeout, setIsTimeout] = useState(req.status === 'TIMEOUT');
@@ -145,6 +156,7 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   );
 });
 
+
 // ⭐ ÇOKLU SEÇMELİ VE "ANINDA GÜNCELLENEN" TAG DROPDOWN İÇEREN WOZ KARTI ⭐
 const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTags }) => {
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -168,7 +180,7 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
         await onAddTag(req.id, tagStr, false);
       }
     } catch (err) {
-      console.warn("Tag güncellenirken hata oluştu", err);
+      console.warn("Tag güncellenirken hata", err);
     } finally {
       setLoadingId(null);
     }
@@ -185,7 +197,7 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
       }
       setNewTagText('');
     } catch (err) {
-      console.warn("Yeni tag eklenirken hata oluştu", err);
+      console.warn("Yeni tag eklenirken hata", err);
     } finally {
       setLoadingId(null);
     }
@@ -206,6 +218,7 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
         </div>
         <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
         
+        {/* Talepteki Çerçeveli Etiketleri Göster */}
         {localTags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             {localTags.map((t, idx) => (
@@ -314,16 +327,18 @@ export default function AdminDashboard() {
   const { API_BASE } = useAuth();
   const [adminTab, setAdminTab] = useState('WOZ'); 
   
-  // ⭐ TÜM SWR ÇAĞRILARINA "error" YAKALAYICILARI EKLENDİ (Sonsuz dönme engellendi) ⭐
-  const { data: rawPendingRequests, error: pendingError, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
-  const { data: rawProviders, error: providersError, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
-  const { data: rawMatchedRequests, error: matchedError, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: adminTab === 'ALL_MATCHED' ? 5000 : 0 });
-  const { data: rawSmsLogs, error: smsError, mutate: mutateSms } = useSWR(`${API_BASE}/notifications`, fetcher, { refreshInterval: adminTab === 'SMS_LOGS' ? 5000 : 0 });
-  const { data: rawSettings, error: settingsError, mutate: mutateSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: adminTab === 'SETTINGS' ? 60000 : 0 });
-  const { data: rawFeatures, error: featuresError, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
-  const { data: rawTests, error: testsError, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
-  const { data: rawTags, error: tagsError, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
+  const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
+  const { data: rawProviders, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
+  const { data: rawMatchedRequests, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: adminTab === 'ALL_MATCHED' ? 5000 : 0 });
+  const { data: rawSmsLogs, mutate: mutateSms } = useSWR(`${API_BASE}/notifications`, fetcher, { refreshInterval: adminTab === 'SMS_LOGS' ? 5000 : 0 });
+  const { data: rawSettings, mutate: mutateSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: adminTab === 'SETTINGS' ? 60000 : 0 });
+  const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
+  const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
+  
+  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN
+  const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
 
+  // Güvenli okumalar. Eğer veri çekilememişse boş dizi olarak yansıt.
   const pendingRequests = safeArray(rawPendingRequests?.requests || rawPendingRequests);
   const providers = safeArray(rawProviders?.providers || rawProviders);
   const matchedRequests = safeArray(rawMatchedRequests?.requests || rawMatchedRequests);
@@ -432,6 +447,7 @@ export default function AdminDashboard() {
     return safeLower(t.tag_name).includes(q) || safeArray(t.keywords).some(k => safeLower(k).includes(q));
   }), [tags, searchTagText]);
 
+
   const handleDeleteRequest = useCallback(async (requestId) => { 
     if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; 
     try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); await mutateMatched(); } catch {} 
@@ -465,6 +481,7 @@ export default function AdminDashboard() {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
 
+  // Tag Ekle (Woz) - Hata alsa da devam et (Backend hazır olana kadar)
   const handleAddTagToWozRequest = useCallback(async (requestId, newTag, addToGlobalList = false) => {
     try {
       if (addToGlobalList) {
@@ -472,22 +489,23 @@ export default function AdminDashboard() {
           tag_name: newTag, 
           keywords: [newTag.toLowerCase()], 
           is_active: true 
-        }).catch(() => {}); // Zaten varsa hatayı yut
+        }).catch(() => {});
         mutateTags();
       }
       await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag }).catch(() => {});
       mutatePending();
     } catch (err) {
-      console.warn("API hazır olmayabilir (Tag Ekle):", err);
+      console.warn("API hazır değil (Tag Ekle):", err);
     }
   }, [API_BASE, mutatePending, mutateTags]);
 
+  // Tag Çıkar (Woz) - Hata alsa da devam et (Backend hazır olana kadar)
   const handleRemoveTagFromWozRequest = useCallback(async (requestId, tagToRemove) => {
     try {
       await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`).catch(() => {});
       mutatePending();
     } catch (err) {
-      console.warn("API hazır olmayabilir (Tag Çıkar):", err);
+      console.warn("API hazır değil (Tag Çıkar):", err);
     }
   }, [API_BASE, mutatePending]);
 
@@ -752,7 +770,9 @@ export default function AdminDashboard() {
           </div>
           
           <div className="max-h-[550px] overflow-y-auto">
-            {(!rawTags && !tagsError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {/* Eğer etiket yoksa ve yeni sekme açılmışsa spinner dönsün */}
+            {(!rawTags && tags.length === 0) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
@@ -764,11 +784,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {(!rawTags && tagsError) ? (
-                  <tr>
-                    <td colSpan="5" className="px-4 py-8 text-center text-rose-500 font-bold text-xs">Bağlantı hatası: Backend tarafında /tags ucu henüz hazır değil veya erişilemiyor.</td>
-                  </tr>
-                ) : filteredTags.length === 0 && rawTags ? (
+                {filteredTags.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-4 py-8 text-center text-neutral-400 text-xs">Aradığınız kriterde etiket bulunamadı.</td>
                   </tr>
@@ -825,7 +841,7 @@ export default function AdminDashboard() {
             </button>
           </div>
           <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3 relative">
-            {(!rawPendingRequests && !pendingError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {(!rawPendingRequests && pendingRequests.length === 0) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             {sortedWozRequests.length === 0 && rawPendingRequests ? (
                <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
             ) : (
@@ -872,7 +888,7 @@ export default function AdminDashboard() {
           </div>
           
           <div className="max-h-[550px] overflow-y-auto">
-            {(!rawProviders && !providersError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {!rawProviders && providers.length === 0 && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
@@ -977,7 +993,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="max-h-[550px] overflow-y-auto">
-            {(!rawMatchedRequests && !matchedError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {!rawMatchedRequests && matchedRequests.length === 0 && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
@@ -1008,7 +1024,7 @@ export default function AdminDashboard() {
 
       {adminTab === 'SMS_LOGS' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
-          {(!rawSmsLogs && !smsError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+          {!rawSmsLogs && smsLogs.length === 0 && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
           {filteredSmsLogs.map((log) => (
             <SmsLogCard key={log.id} log={log} />
           ))}
@@ -1023,7 +1039,7 @@ export default function AdminDashboard() {
             <div><textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
           </form>
           <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
-            {(!rawTests && !testsError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {!rawTests && tests.length === 0 && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             {tests.length === 0 && rawTests ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir test senaryosu bulunmuyor.</div>) : (
               tests.map((testItem) => {
                 const isExpanded = expandedTestId === testItem.id;
@@ -1098,7 +1114,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="max-h-[500px] overflow-y-auto">
-              {(!rawFeatures && !featuresError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+              {!rawFeatures && features.length === 0 && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
               {filteredFeatures.length === 0 && rawFeatures ? (
                 <div className="p-8 text-center text-xs text-neutral-400">Aradığınız kriterde proje/özellik bulunamadı.</div>
               ) : (
@@ -1300,6 +1316,40 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950" /></div><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950" /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950" /></div><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950" /></div></div>
               <div><div className="flex items-center justify-between mb-1.5"><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label><span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span></div><textarea rows={3} maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="virgülle ayırarak yazın..." className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
+              
+              <div className="pt-2 border-t border-neutral-100">
+                <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1.5 font-bold block">
+                  Uzmanlık Etiketleri (Tags)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {safeArray(tags).map(t => {
+                    const tagStr = String(t.tag_name).replace('#', '');
+                    const isSelected = safeArray(modalFormData.tags).includes(tagStr);
+                    return (
+                      <label 
+                        key={t.id} 
+                        className={`px-2 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition flex items-center gap-1 ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs' : 'bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-50'}`}
+                      >
+                        <input 
+                          type="checkbox" 
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newTags = e.target.checked 
+                              ? [...safeArray(modalFormData.tags), tagStr] 
+                              : safeArray(modalFormData.tags).filter(val => val !== tagStr);
+                            setModalFormData({ ...modalFormData, tags: newTags });
+                          }} 
+                        />
+                        {isSelected && <Tag size={10} className="text-blue-500" />}
+                        {tagStr}
+                      </label>
+                    );
+                  })}
+                  {safeArray(tags).length === 0 && <span className="text-[10px] text-neutral-400">Sistemde kayıtlı etiket yok.</span>}
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-3 border-t border-neutral-100"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Vazgeç</button><button type="button" onClick={handleAdminSaveProvider} disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-bold shadow-sm">Kaydet</button></div>
             </div>
           </div>
