@@ -1,5 +1,5 @@
 import TimeoutTracker from './TimeoutTracker';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import useSWR from 'swr'; 
@@ -11,6 +11,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
+
+// Kayan Simülasyon Ekranları
+import ProviderDashboardAkanTalep from './ProviderDashboard_AkanTalep';
+import TrackerDashboardAkanTalep from './TrackerDashboard_AkanTalep';
 
 const MAX_KEYWORD_CHARS = 1000;
 const MAX_KEYWORD_COUNT = 50;
@@ -35,7 +39,6 @@ const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig,
   );
 });
 
-// ZAMAN AŞIMI (TIMEOUT) CANLI SAYACI EKLENMİŞ SATIR BİLEŞENİ
 const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTimeout, setIsTimeout] = useState(req.status === 'TIMEOUT');
@@ -343,7 +346,7 @@ export default function AdminDashboard() {
     const q = safeLower(searchProjectText).trim();
     const statusMatch = projectStatusFilter === 'ALL' || feat.status === projectStatusFilter;
     if (!statusMatch) return false;
-    if (!q) return true;
+    if (!q) return true; 
     return safeLower(feat.title).includes(q) || safeLower(feat.description).includes(q);
   }), [features, searchProjectText, projectStatusFilter]);
 
@@ -449,16 +452,17 @@ export default function AdminDashboard() {
           <button onClick={() => setAdminTab('PROJECT')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'PROJECT' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><FolderKanban size={14} /><span>Proje ({features.length})</span></button>
           <button onClick={() => setAdminTab('SETTINGS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'SETTINGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}><Settings size={14} /><span>Ayarlar</span></button>
 
-          {/* ⭐ CANLI TAKİP & SAĞLAYICI SİMÜLASYONU BUTONLARI ⭐ */}
+          {/* ⭐ DOĞRUDAN PANEL İÇİNDE AÇILAN KESİNTİSİZ SİMÜLASYON SEKMELERİ ⭐ */}
           <div className="h-4 w-px bg-neutral-300 mx-0.5"></div>
           
           <button 
             type="button"
-            onClick={() => {
-              window.history.pushState({}, '', '/admin/live-tracker');
-              window.dispatchEvent(new Event('popstate'));
-            }} 
-            className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs"
+            onClick={() => setAdminTab('LIVE_TRACKER_FLOW')} 
+            className={`px-3 py-1.5 rounded-lg border transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs ${
+              adminTab === 'LIVE_TRACKER_FLOW' 
+                ? 'bg-indigo-600 text-white border-indigo-700' 
+                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+            }`}
             title="Canlı Takip Ekranını Aç"
           >
             <Activity size={14} />
@@ -467,11 +471,12 @@ export default function AdminDashboard() {
 
           <button 
             type="button"
-            onClick={() => {
-              window.history.pushState({}, '', '/admin/provider-simulation');
-              window.dispatchEvent(new Event('popstate'));
-            }} 
-            className="px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs"
+            onClick={() => setAdminTab('PROVIDER_SIMULATION_FLOW')} 
+            className={`px-3 py-1.5 rounded-lg border transition flex items-center space-x-1 font-bold cursor-pointer shadow-xs ${
+              adminTab === 'PROVIDER_SIMULATION_FLOW' 
+                ? 'bg-purple-600 text-white border-purple-700' 
+                : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+            }`}
             title="Sağlayıcı Simülasyon Ekranını Aç"
           >
             <Briefcase size={14} />
@@ -480,23 +485,40 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
-        <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
-          <span>Şu anki görünüm:</span>
-          <span className="font-bold text-neutral-900 bg-white px-2 py-1 rounded border shadow-xs">{adminTab}</span>
+      {/* CANLI TAKİP VE SAĞLAYICI SİMÜLASYONUNDA ÜST ÇUBUĞU GİZLE / GÖSTER */}
+      {adminTab !== 'LIVE_TRACKER_FLOW' && adminTab !== 'PROVIDER_SIMULATION_FLOW' && (
+        <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
+          <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
+            <span>Şu anki görünüm:</span>
+            <span className="font-bold text-neutral-900 bg-white px-2 py-1 rounded border shadow-xs">{adminTab}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={handleExportExcel} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
+              <Download size={18} />
+              <span>Seçili Sekmeyi İndir</span>
+            </button>
+            <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
+              <Upload size={18} />
+              <span>Excel'den Yükle</span>
+              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} onClick={(e) => { e.target.value = null; }} />
+            </label>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={handleExportExcel} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
-            <Download size={18} />
-            <span>Seçili Sekmeyi İndir</span>
-          </button>
-          <label className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center space-x-2 transition cursor-pointer">
-            <Upload size={18} />
-            <span>Excel'den Yükle</span>
-            <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} onClick={(e) => { e.target.value = null; }} />
-          </label>
+      )}
+
+      {/* 🚀 AKAN TALEP / SAĞLAYICI SİMÜLASYON EKRANI */}
+      {adminTab === 'PROVIDER_SIMULATION_FLOW' && (
+        <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
+          <ProviderDashboardAkanTalep />
         </div>
-      </div>
+      )}
+
+      {/* 🚀 CANLI TAKİP / AKAN TALEP EKRANI */}
+      {adminTab === 'LIVE_TRACKER_FLOW' && (
+        <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm min-h-[650px] relative">
+          <TrackerDashboardAkanTalep />
+        </div>
+      )}
 
       {adminTab === 'WOZ' && (
         <div className="space-y-3">
