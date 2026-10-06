@@ -128,7 +128,8 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
         {Array.isArray(req.tags) && req.tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mt-1">
             {req.tags.map((t, idx) => (
-              <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold">
+              <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                <Tag size={9} className="text-blue-500" />
                 #{String(t).replace('#', '')}
               </span>
             ))}
@@ -145,23 +146,37 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   );
 });
 
-// ⭐ YENİ: TAG EKLEME ÖZELLİKLİ WOZ KARTI ⭐
-const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag }) => {
+// ⭐ YENİ: ÇOKLU SEÇMELİ TAG DROPDOWN İÇEREN WOZ KARTI ⭐
+const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTags }) => {
   const [isAddingTag, setIsAddingTag] = useState(false);
-  const [newTag, setNewTag] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [newTagText, setNewTagText] = useState('');
+  const [loadingId, setLoadingId] = useState(null);
 
-  const handleAdd = async () => {
-    if (!newTag.trim()) return;
-    setLoading(true);
-    await onAddTag(req.id, newTag.trim());
-    setNewTag('');
-    setIsAddingTag(false);
-    setLoading(false);
+  // Gelen tag'leri temizle (başındaki # işaretlerini atalım ki kıyaslaması kolay olsun)
+  const reqTags = safeArray(req.tags).map(t => String(t).replace('#', ''));
+
+  // Tag Ekle & Çıkar (Toggle Mantığı)
+  const handleToggleTag = async (tagStr) => {
+    setLoadingId(tagStr);
+    if (reqTags.includes(tagStr)) {
+      await onRemoveTag(req.id, tagStr);
+    } else {
+      await onAddTag(req.id, tagStr);
+    }
+    setLoadingId(null);
+  };
+
+  // Yeni Tag Ekle
+  const handleAddNew = async () => {
+    if (!newTagText.trim()) return;
+    setLoadingId('NEW');
+    await onAddTag(req.id, newTagText.trim());
+    setNewTagText('');
+    setLoadingId(null);
   };
 
   return (
-    <div className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition hover:border-neutral-300">
+    <div className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row justify-between gap-4 text-xs transition hover:border-neutral-300">
       <div className="space-y-1.5 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
@@ -175,16 +190,16 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag }) => {
         </div>
         <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
         
-        {/* Talepteki Etiketleri Göster */}
-        {Array.isArray(req.tags) && req.tags.length > 0 && (
+        {/* Talepteki Çerçeveli Etiketleri Göster */}
+        {reqTags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            {req.tags.map((t, idx) => (
+            {reqTags.map((t, idx) => (
               <span key={idx} className="group px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs transition-colors hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200">
-                <Tag size={9} className="text-blue-500 group-hover:text-rose-500" />
-                #{String(t).replace('#', '')}
+                <Tag size={9} className="text-blue-500 group-hover:text-rose-500 transition-colors" />
+                #{t}
                 <button 
-                  onClick={(e) => { e.stopPropagation(); onRemoveTag(req.id, String(t).replace('#', '')); }} 
-                  className="p-0.5 ml-0.5 hover:bg-rose-200/50 rounded-full transition-colors opacity-50 group-hover:opacity-100"
+                  onClick={(e) => { e.stopPropagation(); onRemoveTag(req.id, t); }} 
+                  className="p-0.5 ml-0.5 hover:bg-rose-200/50 rounded-full transition-colors opacity-50 group-hover:opacity-100 cursor-pointer"
                   title="Etiketi Sil"
                 >
                   <X size={10} />
@@ -197,32 +212,58 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag }) => {
         <span className="text-[11px] text-neutral-500 block pt-1">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-center mt-3 sm:mt-0">
-        {/* Tag Ekleme Inputu ve Butonları */}
-        {isAddingTag ? (
-          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-300 shadow-sm animate-in fade-in zoom-in-95 duration-200">
-            <input 
-              type="text" 
-              value={newTag} 
-              onChange={(e) => setNewTag(e.target.value)} 
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              placeholder="Yeni tag..." 
-              className="w-24 p-1.5 text-[11px] outline-none font-medium bg-transparent text-neutral-800"
-              autoFocus
-            />
-            <button disabled={loading} onClick={handleAdd} className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md cursor-pointer transition disabled:opacity-50">
-              {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-            </button>
-            <button disabled={loading} onClick={() => setIsAddingTag(false)} className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-md cursor-pointer transition disabled:opacity-50">
-              <X size={13} />
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => setIsAddingTag(true)} className="px-3 py-2 bg-white border border-neutral-200 text-neutral-700 hover:text-blue-700 hover:border-blue-300 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center mt-3 sm:mt-0 relative">
+        {/* Çoklu Seçmeli Açılır Liste (Dropdown) */}
+        <div className="relative">
+          <button 
+            onClick={() => setIsAddingTag(!isAddingTag)} 
+            className="px-3 py-2 bg-white border border-neutral-200 text-neutral-700 hover:text-blue-700 hover:border-blue-300 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+          >
             <Tag size={13} />
             <span>Tag Ekle</span>
+            <ChevronDown size={13} className={`transition-transform ${isAddingTag ? 'rotate-180' : ''}`} />
           </button>
-        )}
+
+          {isAddingTag && (
+            <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
+              <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                {safeArray(availableTags).map(t => {
+                  const tagStr = String(t.tag_name).replace('#', '');
+                  const isSelected = reqTags.includes(tagStr);
+                  return (
+                    <label key={t.id} className="flex items-center gap-2 p-2 hover:bg-blue-50/50 rounded-lg cursor-pointer text-[11px] font-bold text-neutral-700 transition">
+                      <input 
+                        type="checkbox" 
+                        checked={isSelected}
+                        onChange={() => handleToggleTag(tagStr)}
+                        className="w-3.5 h-3.5 text-blue-600 rounded cursor-pointer"
+                        disabled={loadingId === tagStr}
+                      />
+                      <span className="flex-1">#{tagStr}</span>
+                      {loadingId === tagStr && <Loader2 size={10} className="animate-spin text-blue-500" />}
+                    </label>
+                  );
+                })}
+                {safeArray(availableTags).length === 0 && <div className="text-[10px] text-neutral-400 p-1">Sistemde kayıtlı etiket yok.</div>}
+              </div>
+              
+              <div className="border-t border-neutral-100 pt-2 flex items-center gap-1.5">
+                <input 
+                  type="text" 
+                  value={newTagText} 
+                  onChange={(e) => setNewTagText(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddNew()}
+                  placeholder="Yeni etiket yaz & ekle..." 
+                  className="w-full p-1.5 text-[11px] font-bold rounded border border-neutral-200 outline-none focus:border-neutral-900 bg-neutral-50"
+                />
+                <button disabled={loadingId === 'NEW' || !newTagText.trim()} onClick={handleAddNew} className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer disabled:opacity-50 transition shadow-xs">
+                  {loadingId === 'NEW' ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0 cursor-pointer">Sağlayıcı Seç & Ata</button>
       </div>
     </div>
@@ -267,7 +308,8 @@ export default function AdminDashboard() {
   const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
   const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
   
-  const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher, { refreshInterval: adminTab === 'TAGS' ? 10000 : 0 });
+  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN ⭐
+  const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
 
   const pendingRequests = safeArray(rawPendingRequests?.requests);
   const providers = safeArray(rawProviders?.providers);
@@ -411,16 +453,17 @@ export default function AdminDashboard() {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
 
+  // Tag Ekle (Woz)
   const handleAddTagToWozRequest = useCallback(async (requestId, newTag) => {
     try {
       await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag });
       await mutatePending();
     } catch (err) {
-      alert(err.response?.data?.message || 'Tag eklenirken hata oluştu. Lütfen Backend tarafında POST /requests/:id/tags rotasının tanımlı olduğundan emin olun.');
+      alert(err.response?.data?.message || 'Tag eklenirken hata oluştu.');
     }
   }, [API_BASE, mutatePending]);
 
-  // ⭐ YENİ: Havuzdaki Talepten Anlık Etiket Çıkarma ⭐
+  // Tag Çıkar (Woz)
   const handleRemoveTagFromWozRequest = useCallback(async (requestId, tagToRemove) => {
     try {
       await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`);
@@ -588,6 +631,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <h2 className="text-2xl font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
         
+        {/* Üst Sekmeler / Menü Çubuğu */}
         <div className="flex flex-wrap items-center gap-1.5 bg-neutral-100 p-1.5 rounded-xl border text-xs font-semibold">
           <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>WoZ Havuzu ({pendingRequests.length})</button>
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
@@ -764,7 +808,14 @@ export default function AdminDashboard() {
                <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
             ) : (
               sortedWozRequests.map((req) => (
-                <WozCard key={req.id} req={req} onAssign={handleWozAssignClick} onAddTag={handleAddTagToWozRequest} onRemoveTag={handleRemoveTagFromWozRequest} />
+                <WozCard 
+                  key={req.id} 
+                  req={req} 
+                  onAssign={handleWozAssignClick} 
+                  onAddTag={handleAddTagToWozRequest} 
+                  onRemoveTag={handleRemoveTagFromWozRequest} 
+                  availableTags={tags} 
+                />
               ))
             )}
           </div>
@@ -1233,11 +1284,12 @@ export default function AdminDashboard() {
                   Uzmanlık Etiketleri (Tags)
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {['Tesisat', 'Boya', 'Elektrik', 'Nakliyat', 'Temizlik', 'Marangoz', 'Kombi', 'Beyaz Eşya', 'Montaj', 'Acil', 'Yalıtım', 'Çatı', 'Cam'].map(tag => {
-                    const isSelected = safeArray(modalFormData.tags).includes(tag);
+                  {safeArray(tags).map(t => {
+                    const tagStr = String(t.tag_name).replace('#', '');
+                    const isSelected = safeArray(modalFormData.tags).includes(tagStr);
                     return (
                       <label 
-                        key={tag} 
+                        key={t.id} 
                         className={`px-2 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition flex items-center gap-1 ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs' : 'bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-50'}`}
                       >
                         <input 
@@ -1246,16 +1298,17 @@ export default function AdminDashboard() {
                           checked={isSelected}
                           onChange={(e) => {
                             const newTags = e.target.checked 
-                              ? [...safeArray(modalFormData.tags), tag] 
-                              : safeArray(modalFormData.tags).filter(t => t !== tag);
+                              ? [...safeArray(modalFormData.tags), tagStr] 
+                              : safeArray(modalFormData.tags).filter(val => val !== tagStr);
                             setModalFormData({ ...modalFormData, tags: newTags });
                           }} 
                         />
                         {isSelected && <Tag size={10} className="text-blue-500" />}
-                        {tag}
+                        {tagStr}
                       </label>
                     );
                   })}
+                  {safeArray(tags).length === 0 && <span className="text-[10px] text-neutral-400">Sistemde kayıtlı etiket yok.</span>}
                 </div>
               </div>
 
