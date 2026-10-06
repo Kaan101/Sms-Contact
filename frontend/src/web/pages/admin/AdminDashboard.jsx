@@ -146,7 +146,8 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   );
 });
 
-// ⭐ YENİ: ÇOKLU SEÇMELİ VE "ANINDA GÜNCELLENEN" TAG DROPDOWN İÇEREN WOZ KARTI ⭐
+
+// ⭐ ÇOKLU SEÇMELİ VE "ANINDA GÜNCELLENEN" TAG DROPDOWN İÇEREN WOZ KARTI ⭐
 const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTags }) => {
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagText, setNewTagText] = useState('');
@@ -324,7 +325,7 @@ export default function AdminDashboard() {
   const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
   const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
   
-  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN ⭐
+  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN
   const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
 
   const pendingRequests = safeArray(rawPendingRequests?.requests);
@@ -469,19 +470,17 @@ export default function AdminDashboard() {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
 
-  // ⭐ YENİ: Tag Ekle (Talebe Ekle & İstenirse Global Listeye Ekle)
+  // Tag Ekle (Woz)
   const handleAddTagToWozRequest = useCallback(async (requestId, newTag, addToGlobalList = false) => {
     try {
       if (addToGlobalList) {
-        // Hata alsa da (örn. zaten varsa) durma, catch ile sessizce geç
         await axios.post(`${API_BASE}/tags`, { 
           tag_name: newTag, 
           keywords: [newTag.toLowerCase()], 
           is_active: true 
-        }).catch(() => {});
+        }).catch(() => {}); // Zaten varsa hatayı yut
         mutateTags();
       }
-      
       await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag });
       mutatePending();
     } catch (err) {
@@ -489,7 +488,7 @@ export default function AdminDashboard() {
     }
   }, [API_BASE, mutatePending, mutateTags]);
 
-  // ⭐ YENİ: Tag Çıkar (Woz Kartından Anında Sil)
+  // Tag Çıkar (Woz)
   const handleRemoveTagFromWozRequest = useCallback(async (requestId, tagToRemove) => {
     try {
       await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`);
