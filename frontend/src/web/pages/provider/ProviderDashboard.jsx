@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import useSWR from 'swr';
 import { 
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle, Settings, Play
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle, Settings
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -328,55 +328,55 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
   );
 }
 
-export default function ProviderDashboardAkanTalep() {
+export default function ProviderDashboard() {
   const { session, API_BASE } = useAuth();
-  
-  // Tüm sağlayıcıları çekerek adminin istediği sağlayıcıyı simüle etmesini sağlıyoruz
-  const { data: providersRes } = useSWR(`${API_BASE}/providers`, fetcher);
-  const providersList = useMemo(() => safeArray(providersRes?.providers), [providersRes]);
+  const { data: providerInfoData, mutate: mutateProviderInfo } = useSWR(session?.phone ? `${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}` : null, fetcher);
+  const provider = useMemo(() => providerInfoData?.provider || session || {}, [providerInfoData, session]);
+  const providerId = provider?.id || session?.id;
 
-  const [selectedProviderId, setSelectedProviderId] = useState('');
-  const activeProvider = useMemo(() => {
-    if (!selectedProviderId && providersList.length > 0) return providersList[0];
-    return providersList.find(p => String(p.id) === String(selectedProviderId)) || null;
-  }, [providersList, selectedProviderId]);
+  const [activeTab, setActiveTab] = useState('ASSIGNED'); 
+  const [filterStatus, setFilterStatus] = useState('ALL');
 
-  const currentProviderId = activeProvider?.id || null;
+  const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
+  const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
 
-  // Açık Havuzdaki Talepleri Canlı Çek (Akan Talep Akışı - 2.5 saniye)
-  const { data: poolRes, mutate: mutatePool, isValidating: isPoolValidating } = useSWR(
-    `${API_BASE}/requests/pool`,
-    fetcher,
-    { refreshInterval: 2500 }
-  );
+  const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}&phone=${encodeURIComponent(session?.phone || '')}` : null, fetcher, { refreshInterval: 2000, revalidateOnFocus: true });
+  const { data: poolData, mutate: mutatePool } = useSWR(providerId && activeTab === 'POOL' ? `${API_BASE}/requests/pool?providerId=${providerId}` : null, fetcher, { refreshInterval: 2500, revalidateOnFocus: true });
 
-  // Seçili sağlayıcıya atanmış talepleri çek
-  const { data: assignedRes, mutate: mutateAssigned } = useSWR(
-    currentProviderId ? `${API_BASE}/requests/provider-requests?providerId=${currentProviderId}` : null,
-    fetcher,
-    { refreshInterval: 2500 }
-  );
+  const [userLists, setUserLists] = useState([]);
+  useEffect(() => {
+    if (!session?.phone) return;
+    axios.get(`${API_BASE}/lists/PROVIDER/${encodeURIComponent(session.phone)}`).then(res => { if (res.data?.lists) setUserLists(res.data.lists); }).catch(()=>{});
+  }, [session?.phone, API_BASE]);
 
-  const poolRequests = useMemo(() => safeArray(poolRes?.poolRequests || poolRes?.requests), [poolRes]);
-  const assignedRequests = useMemo(() => safeArray(assignedRes?.requests), [assignedRes]);
+  const assignedRequests = useMemo(() => safeArray(assignedData?.requests), [assignedData]);
+  const poolRequests = useMemo(() => safeArray(poolData?.poolRequests), [poolData]);
 
-  const [simTab, setSimTab] = useState('POOL'); // 'POOL' | 'ASSIGNED' | 'PROFILE'
-  const [actionLoadingId, setActionLoadingId] = useState(null);
-  const [feedbackMap, setFeedbackMap] = useState({});
-  const [offerMap, setOfferMap] = useState({});
+  const filteredAssigned = useMemo(() => {
+    if (filterStatus === 'ALL') return assignedRequests;
+    return assignedRequests.filter(r => safeUpper(r.status) === filterStatus);
+  }, [assignedRequests, filterStatus]);
 
-  // ⭐ PROFİL GÜNCELLEME STATE'LERİ ⭐
+  const pendingCount = useMemo(() => assignedRequests.filter(r => safeUpper(r.status) === 'MATCHED').length, [assignedRequests]);
+  const activeCount = useMemo(() => assignedRequests.filter(r => safeUpper(r.status) === 'ACCEPTED').length, [assignedRequests]);
+
+  const [poolActionId, setPoolActionId] = useState(null);
+  const [poolFeedbackMap, setPoolFeedbackMap] = useState({});
+  const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
+  const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
+
+  // ⭐ YENİ: PROFİL GÜNCELLEME STATE'LERİ ⭐
   const [profileData, setProfileData] = useState({
-    name: activeProvider?.name || '',
-    email: activeProvider?.email || '',
-    serviceKeywords: safeArray(activeProvider?.service_keywords).join(', ') || '',
-    tags: safeArray(activeProvider?.tags) || []
+    name: provider.name || '',
+    email: provider.email || '',
+    serviceKeywords: safeArray(provider.service_keywords).join(', ') || '',
+    tags: safeArray(provider.tags) || []
   });
   const [isProfileUpdating, setIsProfileUpdating] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState(null);
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
 
-  // API'den "lookup_tags" listesini al (Mock veya gerçek endpoint olabilir, eğer yoksa statik liste)
+  // Örnek etiket listesi
   const availableTags = [
     'Tesisat', 'Boya', 'Elektrik', 'Nakliyat', 'Temizlik', 'Marangoz',
     'Kombi', 'Beyaz Eşya', 'Montaj', 'Acil', 'Yalıtım', 'Çatı', 'Cam'
@@ -384,61 +384,52 @@ export default function ProviderDashboardAkanTalep() {
 
   // Profil yüklendiğinde formu doldur
   useEffect(() => {
-    if (activeProvider?.id) {
+    if (provider.id) {
       setProfileData({
-        name: activeProvider.name || '',
-        email: activeProvider.email || '',
-        serviceKeywords: safeArray(activeProvider.service_keywords).join(', ') || '',
-        tags: safeArray(activeProvider.tags) || []
+        name: provider.name || '',
+        email: provider.email || '',
+        serviceKeywords: safeArray(provider.service_keywords).join(', ') || '',
+        tags: safeArray(provider.tags) || []
       });
     }
-  }, [activeProvider]);
+  }, [provider]);
 
-  const showFeedback = (id, type, message) => {
-    setFeedbackMap(prev => ({ ...prev, [id]: { type, message } }));
-    setTimeout(() => {
-      setFeedbackMap(prev => ({ ...prev, [id]: null }));
-    }, 3500);
-  };
-
-  const handleSimulateClaim = async (reqId) => {
-    if (!currentProviderId) {
-      showFeedback(reqId, 'error', 'Lütfen önce simüle edilecek bir sağlayıcı seçin.');
+  const handleJoinPoolWithBid = async (requestId) => {
+    if (!providerId) {
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
+      setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3000);
       return;
     }
-
-    setActionLoadingId(reqId);
-    const offer = offerMap[reqId] || {};
-
+    setPoolActionId(requestId);
+    setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null }));
     try {
-      await axios.post(`${API_BASE}/requests/${reqId}/join-pool`, {
-        providerId: currentProviderId
-      });
-
-      if (offer.budget || offer.description) {
-        await axios.post(`${API_BASE}/requests/${reqId}/providers/${currentProviderId}/details`, {
-          providerBudget: offer.budget ? parseFloat(offer.budget) : null,
-          providerCurrency: 'TRY',
-          providerTargetDate: offer.targetDate ? new Date(offer.targetDate).toISOString() : null,
-          providerDescription: offer.description || 'Simülasyon Teklifi'
-        });
+      const requests = [ axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId }) ];
+      if (poolBidData.budget || poolBidData.targetDate || poolBidData.description) {
+        requests.push(
+          axios.post(`${API_BASE}/requests/${requestId}/providers/${providerId}/details`, {
+            providerBudget: poolBidData.budget !== '' ? parseFloat(poolBidData.budget) : null,
+            providerCurrency: 'TRY',
+            providerTargetDate: poolBidData.targetDate ? new Date(poolBidData.targetDate).toISOString() : null,
+            providerDescription: poolBidData.description || ''
+          })
+        );
       }
-
-      showFeedback(reqId, 'success', `${activeProvider.name} adına sıraya girildi!`);
-      mutatePool();
-      mutateAssigned();
+      await Promise.all(requests);
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Teklif iletildi!' } }));
+      setExpandedPoolReqId(null);
+      mutatePool(); mutateAssigned();
     } catch (err) {
-      console.error('Simülasyon talep hatası:', err);
-      showFeedback(reqId, 'error', err?.response?.data?.message || 'İşlem başarısız.');
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: err.response?.data?.message || 'Hata oluştu' } }));
     } finally {
-      setActionLoadingId(null);
+      setPoolActionId(null);
+      setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3500);
     }
   };
 
   // ⭐ PROFİL GÜNCELLEME İŞLEMİ ⭐
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    if (!currentProviderId) return;
+    if (!providerId) return;
     
     setIsProfileUpdating(true);
     setProfileFeedback(null);
@@ -446,19 +437,18 @@ export default function ProviderDashboardAkanTalep() {
     const keywordsArray = safeString(profileData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
     try {
-      await axios.put(`${API_BASE}/providers/${currentProviderId}`, {
+      await axios.put(`${API_BASE}/providers/${providerId}`, {
         name: profileData.name.trim(),
-        phone: activeProvider.phone, // Telefon değiştirilemez
+        phone: provider.phone, // Telefon değiştirilemez
         email: profileData.email.trim() || null,
         serviceKeywords: keywordsArray.slice(0, 50),
         tags: profileData.tags, // Etiketler güncelleniyor
         communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
-        priorityScore: activeProvider.priority_score || 100
+        priorityScore: provider.priority_score || 100
       });
       
       setProfileFeedback({ type: 'success', text: 'Profil başarıyla güncellendi!' });
-      // mutateProviderInfo(); => Simülasyon ekranında genel provider listesini güncelle
-      // (Bunu doğrudan kullanmak yerine bir üst parent tetiklenebilir, şimdilik UI güncelleniyor)
+      mutateProviderInfo();
     } catch (err) {
       setProfileFeedback({ type: 'error', text: 'Profil güncellenemedi.' });
     } finally {
@@ -467,7 +457,7 @@ export default function ProviderDashboardAkanTalep() {
     }
   };
 
-  // Tag Ekle / Çıkar
+  // ⭐ TAG SEÇME/ÇIKARMA FONKSİYONU ⭐
   const toggleTag = (tag) => {
     setProfileData(prev => {
       const currentTags = [...prev.tags];
@@ -480,112 +470,99 @@ export default function ProviderDashboardAkanTalep() {
   };
 
   return (
-    <div className="w-full space-y-5 font-sans">
-      
-      {/* SİMÜLASYON KONTROL PANELİ VE SAĞLAYICI SEÇİCİ */}
-      <div className="p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-900 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
-            <Play size={18} />
+    <div className="max-w-4xl mx-auto w-full space-y-6 px-4 py-8">
+      <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-neutral-950 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+            {provider?.name ? provider.name.charAt(0).toUpperCase() : <User size={22} />}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-neutral-950 text-sm">Sağlayıcı Simülasyonu (Canlı Akan Talep)</h3>
-              <span className="text-[10px] font-mono bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full font-bold">
-                Admin Test Modu
-              </span>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-extrabold text-neutral-900 text-base">{provider?.name || 'Hizmet Sağlayıcı'}</h3>
+              <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><ShieldCheck size={11} /> Onaylı Profil</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              Havuzdaki talepleri canlı izleyin ve seçilen sağlayıcı profiliyle anında teklif verin.
-            </p>
+            <p className="text-xs text-neutral-500 font-mono mt-0.5">{provider?.phone || session?.phone}</p>
           </div>
         </div>
-
-        {/* Sağlayıcı Değiştirici */}
-        <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-          <label className="text-[10px] font-mono uppercase font-bold text-neutral-500 whitespace-nowrap">Simüle Edilen:</label>
-          <select 
-            value={selectedProviderId}
-            onChange={(e) => setSelectedProviderId(e.target.value)}
-            className="w-full md:w-48 p-2 text-xs rounded-lg border border-purple-300 bg-white font-bold outline-none focus:border-purple-600 shadow-xs cursor-pointer"
-          >
-            {providersList.map(p => (
-              <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
-            ))}
-          </select>
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0">
+          <div className="flex flex-col items-center bg-amber-50/70 border border-amber-200/80 px-3.5 py-1.5 rounded-xl">
+            <span className="text-[9px] font-mono text-amber-700 uppercase font-bold flex items-center gap-1"><Star size={10} fill="#f59e0b" className="text-amber-500" /> Müşteri Puanı</span>
+            <span className="text-sm font-extrabold text-amber-900 mt-0.5">{provider?.avg_rating ? Number(parseFloat(provider.avg_rating).toFixed(1)) : '5.0'} / 5.0</span>
+          </div>
+          <div className="flex flex-col items-center bg-blue-50/70 border border-blue-200/80 px-3.5 py-1.5 rounded-xl">
+            <span className="text-[9px] font-mono text-blue-700 uppercase font-bold flex items-center gap-1"><Award size={10} className="text-blue-500" /> Sistem Skoru</span>
+            <span className="text-sm font-extrabold text-blue-900 mt-0.5">{provider?.priority_score || '100'} Puan</span>
+          </div>
         </div>
       </div>
 
-      {/* SİMÜLASYON SEKMELERİ */}
       <div className="flex items-center justify-between border-b pb-3">
-        <div className="flex items-center gap-1.5 bg-neutral-100 p-1.5 rounded-xl border text-xs font-semibold overflow-x-auto">
-          <button
-            onClick={() => setSimTab('POOL')}
-            className={`px-4 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap ${
-              simTab === 'POOL' ? 'bg-white text-neutral-950' : 'text-neutral-500 hover:text-neutral-700'
-            }`}
-          >
-            <Sparkles size={14} />
-            <span>Açık Havuz</span>
-            <span className="bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded font-mono text-[10px]">{poolRequests.length}</span>
+        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold overflow-x-auto">
+          <button onClick={() => setActiveTab('ASSIGNED')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'ASSIGNED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Briefcase size={14} /><span>Görevlerim ({assignedRequests.length})</span>
+            {pendingCount > 0 && <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">{pendingCount}</span>}
+          </button>
+          <button onClick={() => setActiveTab('POOL')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'POOL' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Sparkles size={14} /><span>Açık Havuz</span>
+          </button>
+          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Folder size={14} /><span>Listelerim</span>
           </button>
           
-          <button
-            onClick={() => setSimTab('ASSIGNED')}
-            className={`px-4 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap ${
-              simTab === 'ASSIGNED' ? 'bg-white text-neutral-950' : 'text-neutral-500 hover:text-neutral-700'
-            }`}
-          >
-            <Briefcase size={14} />
-            <span>Gelen Görevler</span>
-            <span className="bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded font-mono text-[10px]">{assignedRequests.length}</span>
-          </button>
-
-          {/* ⭐ PROFİL SEKMESİ ⭐ */}
-          <button
-            onClick={() => setSimTab('PROFILE')}
-            className={`px-4 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap ${
-              simTab === 'PROFILE' ? 'bg-white text-neutral-950' : 'text-neutral-500 hover:text-neutral-700'
-            }`}
-          >
-            <Settings size={14} />
-            <span>Profil Ayarları</span>
+          {/* ⭐ YENİ: PROFİL SEKMESİ ⭐ */}
+          <button onClick={() => setActiveTab('PROFILE')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'PROFILE' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Settings size={14} /><span>Profilim</span>
           </button>
         </div>
-
-        <button
-          onClick={() => { mutatePool(); mutateAssigned(); }}
-          className="p-2.5 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs shrink-0"
-          title="Yenile"
-        >
-          <RefreshCw size={15} className={isPoolValidating ? 'animate-spin' : ''} />
+        <button onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }} className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs shrink-0" title="Yenile">
+          <RefreshCw size={14} className={isValidatingAssigned ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      {/* İÇERİK: HAVUZ EKRANI */}
-      {simTab === 'POOL' && (
+      {activeTab === 'ASSIGNED' && (
         <div className="space-y-4">
-          <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2">
-            <AlertCircle size={16} className="shrink-0 mt-0.5" />
-            <p>Aşağıdaki talepler açık havuza düşen anlık taleplerdir. <strong>{activeProvider?.name || 'Seçili Sağlayıcı'}</strong> adına "Talip Ol" diyerek teklif iletebilirsiniz.</p>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {[
+              { id: 'ALL', label: `Tümü (${assignedRequests.length})` },
+              { id: 'MATCHED', label: `Onay Bekleyen (${pendingCount})` },
+              { id: 'ACCEPTED', label: `İşlemde (${activeCount})` },
+              { id: 'COMPLETED', label: 'Tamamlananlar' }
+            ].map(f => (
+              <button key={f.id} onClick={() => setFilterStatus(f.id)} className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${filterStatus === f.id ? 'bg-neutral-950 text-white shadow-xs' : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'}`}>
+                {f.label}
+              </button>
+            ))}
           </div>
-
-          {poolRequests.length === 0 ? (
-            <div className="text-center py-16 text-neutral-400 text-sm bg-white rounded-2xl border border-dashed">
-              Şu anda açık havuzda talep bulunmuyor.
-            </div>
+          {filteredAssigned.length === 0 ? (
+            <div className="text-center py-12 text-neutral-400 text-xs bg-white rounded-xl border border-dashed">Bu filtreye uygun herhangi bir görev bulunmuyor.</div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              {filteredAssigned.map(req => (
+                <ProviderRequestCard key={req.id} req={req} providerId={providerId} API_BASE={API_BASE} onRefresh={mutateAssigned} systemSettings={systemSettings} userLists={userLists} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'POOL' && (
+        <div className="space-y-4">
+          <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900">
+            Aşağıdaki talepler uzmanlık alanlarınızla eşleşen açık havuz talepleridir. <strong>"Talip Ol & Teklif Ver"</strong> diyerek sıraya girebilirsiniz.
+          </div>
+          {poolRequests.length === 0 ? (
+            <div className="text-center py-12 text-neutral-400 text-xs bg-white rounded-xl border border-dashed">Açık havuz talebi bulunmuyor.</div>
+          ) : (
+            <div className="space-y-3">
               {poolRequests.map(req => {
-                const isLoading = actionLoadingId === req.id;
-                const fb = feedbackMap[req.id];
-                const currentOffer = offerMap[req.id] || { budget: '', targetDate: '', description: '' };
+                const isJoining = poolActionId === req.id;
+                const poolFb = poolFeedbackMap[req.id];
+                const isExpanded = expandedPoolReqId === req.id;
 
                 return (
-                  <div key={req.id} className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm hover:border-blue-300 transition-all space-y-4">
-                    
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1.5">
+                  <div key={req.id} className="bg-white rounded-xl border border-neutral-200 shadow-xs flex flex-col transition-all overflow-hidden">
+                    <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
                           <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">{safeDateTime(req.created_at)}</span>
@@ -595,7 +572,7 @@ export default function ProviderDashboardAkanTalep() {
 
                         {/* ⭐ HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
                         {Array.isArray(req.tags) && req.tags.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {req.tags.map((tagItem, tIdx) => (
                               <span 
                                 key={tIdx} 
@@ -608,57 +585,32 @@ export default function ProviderDashboardAkanTalep() {
                           </div>
                         )}
 
-                        <p className="text-[11px] text-neutral-500 flex items-center gap-1 pt-1">
-                          <MapPin size={12} className="text-neutral-400 shrink-0" />
-                          <span>{extractAddress(req.location)}</span>
-                        </p>
+                        <p className="text-xs text-neutral-500 flex items-center gap-1 pt-0.5"><MapPin size={12} className="text-neutral-400 shrink-0" /><span>{extractAddress(req.location)}</span></p>
                       </div>
-                    </div>
 
-                    <div className="p-3 bg-neutral-50/80 rounded-xl border border-neutral-200 space-y-3">
-                      <div className="text-[10px] font-bold text-emerald-700 flex items-center gap-1"><DollarSign size={12} /> Teklif Belirle</div>
-                      
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <input 
-                          type="number" 
-                          placeholder="Tutar (TRY)" 
-                          value={currentOffer.budget} 
-                          onChange={(e) => setOfferMap({ ...offerMap, [req.id]: { ...currentOffer, budget: e.target.value } })}
-                          className="p-2 border rounded-lg outline-none focus:border-neutral-900 bg-white" 
-                        />
-                        <input 
-                          type="datetime-local" 
-                          value={currentOffer.targetDate} 
-                          onChange={(e) => setOfferMap({ ...offerMap, [req.id]: { ...currentOffer, targetDate: e.target.value } })}
-                          className="p-2 border rounded-lg outline-none focus:border-neutral-900 bg-white" 
-                        />
-                      </div>
-                      <input 
-                        type="text" 
-                        placeholder="Özel Not (Opsiyonel)" 
-                        value={currentOffer.description} 
-                        onChange={(e) => setOfferMap({ ...offerMap, [req.id]: { ...currentOffer, description: e.target.value } })}
-                        className="w-full p-2 text-xs border rounded-lg outline-none focus:border-neutral-900 bg-white" 
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
-                      <div>
-                        {fb && (
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded border animate-in fade-in ${fb.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                            {fb.message}
-                          </span>
+                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                        {poolFb && (
+                          <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${poolFb.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                            {poolFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}<span>{poolFb.text}</span>
+                          </div>
                         )}
+                        <button onClick={() => { if (isExpanded) { setExpandedPoolReqId(null); } else { setExpandedPoolReqId(req.id); setPoolBidData({ budget: '', targetDate: '', description: '' }); } }} className={`px-4 py-2 border rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${isExpanded ? 'bg-neutral-100 text-neutral-600 border-neutral-300 hover:bg-neutral-200' : 'bg-transparent text-neutral-800 border-neutral-300 hover:bg-neutral-50'}`}>
+                          {isExpanded ? <><X size={13} /><span>Vazgeç</span></> : <><Send size={13} className="text-emerald-600" /><span>Talip Ol & Teklif Ver</span></>}
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => handleSimulateClaim(req.id)}
-                        disabled={isLoading}
-                        className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                      >
-                        {isLoading ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                        <span>Simüle Et & Talip Ol</span>
-                      </button>
                     </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-neutral-100 bg-neutral-50 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center gap-1.5 mb-2 text-emerald-700 font-bold text-xs"><DollarSign size={14} /> Şartlarınızı Belirleyin (Opsiyonel)</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div><label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Tutar (TRY)</label><input type="number" value={poolBidData.budget} onChange={(e) => setPoolBidData(prev => ({ ...prev, budget: e.target.value }))} placeholder="Örn: 500" className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" /></div>
+                          <div><label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Hedef Teslimat</label><input type="datetime-local" value={poolBidData.targetDate} onChange={(e) => setPoolBidData(prev => ({ ...prev, targetDate: e.target.value }))} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" /></div>
+                        </div>
+                        <div><label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1"><AlignLeft size={11} className="text-neutral-500" /><span>Teklif Açıklaması</span></label><textarea rows={2} value={poolBidData.description} onChange={(e) => setPoolBidData(prev => ({ ...prev, description: e.target.value }))} placeholder="Müşteriye iletmek istediğiniz özel not veya şart..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800" /></div>
+                        <div className="flex justify-end pt-2"><button disabled={isJoining} onClick={() => handleJoinPoolWithBid(req.id)} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-60">{isJoining ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}<span>Teklifi İlet & Sıraya Gir</span></button></div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -667,37 +619,10 @@ export default function ProviderDashboardAkanTalep() {
         </div>
       )}
 
-      {/* İÇERİK: GELEN GÖREVLER */}
-      {simTab === 'ASSIGNED' && (
-        <div className="space-y-4">
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900">
-            <strong>{activeProvider?.name || 'Seçili Sağlayıcı'}</strong> üzerine atanmış veya onayı beklenen görevler.
-          </div>
+      {activeTab === 'LISTS' && <CustomListsManager ownerType="PROVIDER" ownerId={session?.phone} onReworkRequest={() => {}} onDirectReorder={() => {}} />}
 
-          {assignedRequests.length === 0 ? (
-            <div className="text-center py-16 text-neutral-400 text-sm bg-white rounded-2xl border border-dashed">
-              Bu sağlayıcıya atanmış bir görev bulunmuyor.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {assignedRequests.map(req => (
-                <ProviderRequestCard
-                  key={req.id}
-                  req={req}
-                  providerId={currentProviderId}
-                  API_BASE={API_BASE}
-                  onRefresh={mutateAssigned}
-                  systemSettings={{}}
-                  userLists={[]}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ⭐ YENİ: PROFİL BİLGİLERİ SEKMESİ (TAG SEÇİCİ İLE) ⭐ */}
-      {simTab === 'PROFILE' && (
+      {/* ⭐ YENİ: PROFİL BİLGİLERİ SEKMESİ ⭐ */}
+      {activeTab === 'PROFILE' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
           <div className="text-center space-y-1">
             <h2 className="text-lg font-extrabold text-neutral-900">Profil Ayarları</h2>
@@ -732,7 +657,7 @@ export default function ProviderDashboardAkanTalep() {
             <div>
               <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">Kayıtlı Telefon Numarası</label>
               <div className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-neutral-100 text-neutral-500 font-mono font-semibold flex items-center justify-between">
-                <span>{activeProvider?.phone}</span>
+                <span>{provider.phone || session?.phone}</span>
                 <span className="text-[10px] text-neutral-400 font-sans">Değiştirilemez</span>
               </div>
             </div>
@@ -762,7 +687,7 @@ export default function ProviderDashboardAkanTalep() {
                 <button 
                   type="button"
                   onClick={() => setIsTagDropdownOpen(!isTagDropdownOpen)}
-                  className="w-full p-3 text-sm rounded-xl border border-neutral-200 bg-white outline-none font-medium flex items-center justify-between shadow-xs transition hover:bg-neutral-50"
+                  className="w-full p-3 text-sm rounded-xl border border-neutral-200 bg-white outline-none font-medium flex items-center justify-between shadow-xs transition hover:bg-neutral-50 cursor-pointer"
                 >
                   <span className="text-neutral-500">Etiket Listesinden Seçin...</span>
                   <ChevronDown size={16} className={`text-neutral-400 transition-transform ${isTagDropdownOpen ? 'rotate-180' : ''}`} />
@@ -779,7 +704,7 @@ export default function ProviderDashboardAkanTalep() {
                           type="checkbox" 
                           checked={profileData.tags.includes(tag)}
                           onChange={() => toggleTag(tag)}
-                          className="w-4 h-4 text-blue-600 border-neutral-300 rounded focus:ring-blue-500"
+                          className="w-4 h-4 text-blue-600 border-neutral-300 rounded focus:ring-blue-500 cursor-pointer"
                         />
                         <span>{tag}</span>
                       </label>
@@ -794,14 +719,14 @@ export default function ProviderDashboardAkanTalep() {
                   {profileData.tags.map(tag => (
                     <div 
                       key={tag} 
-                      className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5"
+                      className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 shadow-2xs"
                     >
                       <Tag size={12} className="text-blue-500" />
                       <span>#{tag}</span>
                       <button 
                         type="button" 
                         onClick={() => toggleTag(tag)} 
-                        className="p-0.5 hover:bg-blue-200 rounded-full transition ml-1"
+                        className="p-0.5 hover:bg-blue-200 rounded-full transition ml-1 cursor-pointer"
                       >
                         <X size={12} />
                       </button>
