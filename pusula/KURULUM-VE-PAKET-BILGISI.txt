@@ -1,0 +1,32 @@
+PUSULA — UYGULAMA KAYNAK PAKETİ
+
+Bu paket, yayımlanmış ilk çalışan sürümün kaynak kodlarını içerir.
+Canlı sistemdeki kullanıcılar ve sonradan girilmiş kayıtlar bu ZIP içinde değildir.
+Örnek Hasar Yönetimi verileri kaynak koduna dahildir.
+
+İçerik: uygulama ekranları, sunucu işlemleri, veritabanı şeması ve geçiş dosyaları,
+bağımlılık listesi, kilit dosyası ve örnek ortam ayarları.
+
+Geliştirici için başlangıç:
+1. Node.js 22.13 veya daha yeni sürümünü kurun.
+2. Terminalde pusula klasörünü açın.
+3. npm ci komutuyla bağımlılıkları kurun.
+4. .env.example dosyasını .env olarak kopyalayın ve yönetici e-postasını girin.
+5. npm run build komutunu çalıştırın.
+6. Yerel veritabanı için:
+   npx wrangler d1 execute site-creator-d1 --local --persist-to .wrangler/state --config dist/server/wrangler.json --file drizzle/0000_futuristic_black_tom.sql
+7. npm run dev ile geliştirme sunucusunu başlatın.
+
+Yerel Sites giriş yardımcısı seedy@sites.test adlı geliştirme hesabını kullanır.
+Yerel yönetici denemesi için sadece yerel .env dosyasında OWNER_EMAIL değerini
+seedy@sites.test yapabilirsiniz. Canlı ortamda gerçek yönetici hesabı kullanılmalıdır.
+
+Bu uygulama Sites/Cloudflare Workers ve D1 altyapısına dayanır; ZIP içinden
+HTML dosyasına çift tıklanarak çalıştırılan bağımsız bir masaüstü programı değildir.
+.openai/hosting.json mevcut Sites proje bağlantısını korur. Başka bir ortama
+kurulum, kimlik doğrulama ve veritabanı bağlantılarının o ortama göre yapılmasını gerektirir.
+Gizli .env dosyası, erişim anahtarları ve yerel veritabanı pakete dahil edilmemiştir.
+
+Durum: Daha önce talep edilen sade, düğüm üzerinden hızlı ekleme değişikliği
+henüz uygulanmamıştır; paket mevcut yayımlanmış sürümü içerir.
+Diğer kapsam ve sınırlar için README.md dosyasına bakın.

@@ -5,7 +5,7 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle, Settings
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -173,7 +173,7 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
           </div>
           <h4 className="text-sm font-bold text-neutral-950 mt-1">"{req.raw_text}"</h4>
 
-          {/* ⭐ YENİ: ATANAN TALEP ÜZERİNDE ETİKETLER ⭐ */}
+          {/* ⭐ ATANAN TALEP ÜZERİNDE ETİKETLER ⭐ */}
           {Array.isArray(req.tags) && req.tags.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               {req.tags.map((tagItem, tIdx) => (
@@ -365,6 +365,26 @@ export default function ProviderDashboard() {
   const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
   const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
 
+  // ⭐ PROFİL GÜNCELLEME STATE'LERİ ⭐
+  const [profileData, setProfileData] = useState({
+    name: provider.name || '',
+    email: provider.email || '',
+    serviceKeywords: safeArray(provider.service_keywords).join(', ') || ''
+  });
+  const [isProfileUpdating, setIsProfileUpdating] = useState(false);
+  const [profileFeedback, setProfileFeedback] = useState(null);
+
+  // Profil yüklendiğinde formu doldur
+  useEffect(() => {
+    if (provider.id) {
+      setProfileData({
+        name: provider.name || '',
+        email: provider.email || '',
+        serviceKeywords: safeArray(provider.service_keywords).join(', ') || ''
+      });
+    }
+  }, [provider]);
+
   const handleJoinPoolWithBid = async (requestId) => {
     if (!providerId) {
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
@@ -397,6 +417,36 @@ export default function ProviderDashboard() {
     }
   };
 
+  // ⭐ PROFİL GÜNCELLEME İŞLEMİ ⭐
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!providerId) return;
+    
+    setIsProfileUpdating(true);
+    setProfileFeedback(null);
+    
+    const keywordsArray = safeString(profileData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+
+    try {
+      await axios.put(`${API_BASE}/providers/${providerId}`, {
+        name: profileData.name.trim(),
+        phone: provider.phone, // Telefon değiştirilemez (Auth için kullanılıyor)
+        email: profileData.email.trim() || null,
+        serviceKeywords: keywordsArray.slice(0, 50),
+        communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
+        priorityScore: provider.priority_score || 100
+      });
+      
+      setProfileFeedback({ type: 'success', text: 'Profil başarıyla güncellendi!' });
+      mutateProviderInfo();
+    } catch (err) {
+      setProfileFeedback({ type: 'error', text: 'Profil güncellenemedi.' });
+    } finally {
+      setIsProfileUpdating(false);
+      setTimeout(() => setProfileFeedback(null), 4000);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6 px-4 py-8">
       <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -425,19 +475,23 @@ export default function ProviderDashboard() {
       </div>
 
       <div className="flex items-center justify-between border-b pb-3">
-        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
-          <button onClick={() => setActiveTab('ASSIGNED')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'ASSIGNED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold overflow-x-auto">
+          <button onClick={() => setActiveTab('ASSIGNED')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'ASSIGNED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Briefcase size={14} /><span>Görevlerim ({assignedRequests.length})</span>
             {pendingCount > 0 && <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">{pendingCount}</span>}
           </button>
-          <button onClick={() => setActiveTab('POOL')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'POOL' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+          <button onClick={() => setActiveTab('POOL')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'POOL' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Sparkles size={14} /><span>Açık Havuz</span>
           </button>
-          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Folder size={14} /><span>Listelerim</span>
           </button>
+          {/* ⭐ YENİ: PROFİL SEKMESİ ⭐ */}
+          <button onClick={() => setActiveTab('PROFILE')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'PROFILE' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Settings size={14} /><span>Profilim</span>
+          </button>
         </div>
-        <button onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }} className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs" title="Yenile">
+        <button onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }} className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs shrink-0" title="Yenile">
           <RefreshCw size={14} className={isValidatingAssigned ? 'animate-spin' : ''} />
         </button>
       </div>
@@ -493,7 +547,7 @@ export default function ProviderDashboard() {
                         </div>
                         <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
 
-                        {/* ⭐ YENİ: HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
+                        {/* ⭐ HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
                         {Array.isArray(req.tags) && req.tags.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {req.tags.map((tagItem, tIdx) => (
@@ -543,6 +597,9 @@ export default function ProviderDashboard() {
       )}
 
       {activeTab === 'LISTS' && <CustomListsManager ownerType="PROVIDER" ownerId={session?.phone} onReworkRequest={() => {}} onDirectReorder={() => {}} />}
-    </div>
-  );
-}
+
+      {/* ⭐ YENİ: PROFİL BİLGİLERİ SEKMESİ ⭐ */}
+      {activeTab === 'PROFILE' && (
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
+          <div className="text-center space-y-1">
+            <h2 className="text-lg font-extrabold text-neutral-90
