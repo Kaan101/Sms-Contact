@@ -602,4 +602,96 @@ export default function ProviderDashboard() {
       {activeTab === 'PROFILE' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
           <div className="text-center space-y-1">
-            <h2 className="text-lg font-extrabold text-neutral-90
+            <h2 className="text-lg font-extrabold text-neutral-900">Profil Ayarları</h2>
+            <p className="text-xs text-neutral-500">Müşterilerin sizi bulabilmesi için iletişim ve hizmet bilgilerinizi güncel tutun.</p>
+          </div>
+
+          <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">Firma / Sağlayıcı Adı *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={profileData.name} 
+                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                  placeholder="Örn: Ali Usta Tesisat"
+                  className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium transition"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">E-Posta Adresi</label>
+                <input 
+                  type="email" 
+                  value={profileData.email} 
+                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                  placeholder="iletisim@aliusta.com"
+                  className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">Kayıtlı Telefon Numarası</label>
+              <div className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-neutral-100 text-neutral-500 font-mono font-semibold flex items-center justify-between">
+                <span>{provider.phone || session?.phone}</span>
+                <span className="text-[10px] text-neutral-400 font-sans">Değiştirilemez</span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1.5 font-bold flex justify-between items-center">
+                <span>Hizmet Alanları / Anahtar Kelimeler *</span>
+                <span className="text-[9px] text-neutral-400 font-medium normal-case">Virgülle ayırarak yazın (Maks 50)</span>
+              </label>
+              <textarea 
+                rows={3} 
+                required
+                value={profileData.serviceKeywords} 
+                onChange={(e) => setProfileData({ ...profileData, serviceKeywords: e.target.value })}
+                placeholder="Örn: tesisat, kombi, su kaçağı, petek temizleme..."
+                className="w-full p-3 text-sm rounded-xl border border-neutral-200 bg-neutral-50 focus:bg-white outline-none focus:border-neutral-900 font-medium transition resize-none leading-relaxed"
+              />
+              <p className="text-[10px] text-neutral-500 mt-1.5 flex items-start gap-1">
+                <AlertCircle size={12} className="text-amber-500 shrink-0" />
+                <span>Bu kelimeler, müşterilerin talepleriyle otomatik eşleşmenizi ve açık havuza düşen uygun işleri anında görebilmenizi sağlar.</span>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
+              <div>
+                {profileFeedback && (
+                  <span className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border animate-in fade-in duration-200 flex items-center gap-1.5 ${
+                    profileFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}>
+                    {profileFeedback.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                    {profileFeedback.text}
+                  </span>
+                )}
+              </div>
+              
+              <button 
+                type="submit" 
+                disabled={isProfileUpdating || !profileData.name.trim() || !profileData.serviceKeywords.trim()}
+                className="px-6 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-sm font-bold shadow-sm transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isProfileUpdating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={16} />
+                    <span>Profili Güncelle</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+    </div>
+  );
+}
