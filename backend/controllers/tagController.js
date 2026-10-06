@@ -1,12 +1,12 @@
-// DİKKAT: En üstteki süslü parantez eklendi!
-const { pool } = require('../config/db'); 
+// controllers/tagController.js
+const { pool } = require('../config/db'); // KENDİ PROJENE GÖRE BU YOLU DÜZELT (örn: require('../db'))
 
 const getTags = async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM tags ORDER BY id DESC');
         res.json({ tags: result.rows });
     } catch (error) {
-        // Eğer tablo yoksa hata vermesin, boş dizi dönsün
+        // Tablo henüz yoksa veya boşsa çökmesin, boş dizi dönsün
         if (error.code === '42P01') { 
             return res.json({ tags: [] }); 
         }
