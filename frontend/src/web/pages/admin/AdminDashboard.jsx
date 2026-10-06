@@ -513,6 +513,7 @@ export default function AdminDashboard() {
 
           <div className="h-4 w-px bg-neutral-300 mx-0.5"></div>
           
+          {/* ⭐ CANLI TAKİP VE SAĞLAYICI SİMÜLASYONU DOĞRUDAN SEKME OLARAK AÇILIYOR ⭐ */}
           <button 
             type="button"
             onClick={() => setAdminTab('LIVE_TRACKER')} 
@@ -541,6 +542,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* SİMÜLASYONLAR HARİÇ GENEL ARAÇ ÇUBUĞU */}
       {adminTab !== 'LIVE_TRACKER' && adminTab !== 'PROVIDER_SIMULATION' && (
         <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
           <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
@@ -561,12 +563,14 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ⭐ 1. SAĞLAYICI SİMÜLASYONU */}
       {adminTab === 'PROVIDER_SIMULATION' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
           <ProviderDashboardAkanTalep />
         </div>
       )}
 
+      {/* ⭐ 2. CANLI TAKİP */}
       {adminTab === 'LIVE_TRACKER' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm min-h-[650px] relative">
           <TrackerDashboardAkanTalep />
@@ -597,6 +601,7 @@ export default function AdminDashboard() {
         <TimeoutTracker />
       )}
 
+      {/* ⭐ PROVIDERS (SAĞLAYICILAR LİSTESİ) TABLO GÖRÜNÜMÜ ⭐ */}
       {adminTab === 'PROVIDERS' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm flex flex-col">
           <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-t-2xl">
@@ -1049,6 +1054,38 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950" /></div><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950" /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950" /></div><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950" /></div></div>
               <div><div className="flex items-center justify-between mb-1.5"><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label><span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span></div><textarea rows={3} maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="virgülle ayırarak yazın..." className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
+              
+              <div className="pt-2 border-t border-neutral-100">
+                <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1.5 font-bold block">
+                  Uzmanlık Etiketleri (Tags)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {['Tesisat', 'Boya', 'Elektrik', 'Nakliyat', 'Temizlik', 'Marangoz', 'Kombi', 'Beyaz Eşya', 'Montaj', 'Acil', 'Yalıtım', 'Çatı', 'Cam'].map(tag => {
+                    const isSelected = safeArray(modalFormData.tags).includes(tag);
+                    return (
+                      <label 
+                        key={tag} 
+                        className={`px-2 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition flex items-center gap-1 ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs' : 'bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-50'}`}
+                      >
+                        <input 
+                          type="checkbox" 
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newTags = e.target.checked 
+                              ? [...safeArray(modalFormData.tags), tag] 
+                              : safeArray(modalFormData.tags).filter(t => t !== tag);
+                            setModalFormData({ ...modalFormData, tags: newTags });
+                          }} 
+                        />
+                        {isSelected && <Tag size={10} className="text-blue-500" />}
+                        {tag}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-3 border-t border-neutral-100"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Vazgeç</button><button type="button" onClick={handleAdminSaveProvider} disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-bold shadow-sm">Kaydet</button></div>
             </div>
           </div>
