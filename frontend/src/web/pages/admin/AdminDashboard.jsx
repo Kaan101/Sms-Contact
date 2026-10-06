@@ -1,88 +1,548 @@
-import TimeoutTracker from './TimeoutTracker';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import * as XLSX from 'xlsx';
-import useSWR from 'swr'; 
+import useSWR from 'swr';
 import { 
-  Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
-  Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
-  ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer,
-  FileText, Bell, Filter, Activity, Briefcase, Tag
+  Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
+  Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
+  Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
-import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
-
-const MAX_KEYWORD_CHARS = 1000;
-const MAX_KEYWORD_COUNT = 50;
+import { 
+  safeArray, safeUpper, extractAddress, extractGPS, 
+  safeDateTime, calculateRemainingTime, safeString, extractPhoneForWa 
+} from '../../../core/utils/helpers';
+import CustomListsManager from '../../components/common/CustomListsManager';
 
 const fetcher = (url) => axios.get(url).then(res => res.data);
 
-const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig, handleRequestSort }) => {
-  if (!sortConfig) return null;
-  const isActive = sortConfig.key === sortKey;
-  const alignClass = align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
-  const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSettings, userLists }) {
+  const reqStatus = safeUpper(req.status) || 'MATCHED';
   
-  return (
-    <th className={`px-4 py-3 font-semibold border-b border-neutral-200 cursor-pointer hover:bg-neutral-100 transition group select-none whitespace-nowrap ${alignClass}`} onClick={() => handleRequestSort(sortKey)}>
-      <div className={`flex items-center space-x-1 ${justifyClass}`}>
-        <span>{label}</span>
-        <span className={`${isActive ? 'text-neutral-900' : 'text-neutral-300 group-hover:text-neutral-500'} transition`}>
-          {isActive ? (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : (<ArrowUpDown size={12} />)}
-        </span>
-      </div>
-    </th>
+  const isReorder = Boolean(
+    (req.provider_description && req.provider_description.includes('Tekrar')) ||
+    (req.matched_budget && req.matched_target_date)
   );
-});
 
-// ZAMAN AŞIMI (TIMEOUT) CANLI SAYACI EKLENMİŞ SATIR BİLEŞENİ
-const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isTimeout, setIsTimeout] = useState(req.status === 'TIMEOUT');
+  const initialBudget = req.provider_budget ?? req.matched_budget ?? '';
+  const initialDate = useMemo(() => {
+    const rawDate = req.provider_target_date || req.matched_target_date;
+    if (!rawDate) return '';
+    try {
+      const d = new Date(rawDate);
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    } catch {
+      return '';
+    }
+  }, [req.provider_target_date, req.matched_target_date]);
+
+  const [budget, setBudget] = useState(initialBudget);
+  const [targetDate, setTargetDate] = useState(initialDate);
+  const [description, setDescription] = useState(req.provider_description || req.notes || '');
+
+  const [btnLoading, setBtnLoading] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [selectedListId, setSelectedListId] = useState('');
+  const [listFeedback, setListFeedback] = useState(null);
+
+  const showFeedback = (type, text) => {
+    setFeedback({ type, text });
+    setTimeout(() => setFeedback(null), 3500);
+  };
 
   useEffect(() => {
-    if (req.status === 'TIMEOUT' || req.status === 'TAMAMLANDI' || req.status === 'İPTAL') {
-      setIsTimeout(req.status === 'TIMEOUT');
+    setBudget(req.provider_budget ?? req.matched_budget ?? '');
+    const rawDate = req.provider_target_date || req.matched_target_date;
+    if (rawDate) {
+      try {
+        const d = new Date(rawDate);
+        setTargetDate(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+      } catch {}
+    } else {
+      setTargetDate('');
+    }
+    setDescription(req.provider_description || req.notes || '');
+  }, [req]);
+
+  const handleAccept = async () => {
+    setBtnLoading(true);
+    setFeedback(null);
+    try {
+      const requests = [
+        axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'ACCEPTED' }),
+        axios.post(`${API_BASE}/requests/${req.id}/providers/${providerId}/details`, {
+          providerBudget: budget !== '' ? parseFloat(budget) : null,
+          providerCurrency: 'TRY',
+          providerTargetDate: targetDate ? new Date(targetDate).toISOString() : null,
+          providerDescription: description || (isReorder ? 'Tekrarlanan Sipariş Onayı' : '')
+        })
+      ];
+      await Promise.all(requests);
+      showFeedback('success', isReorder ? 'Sipariş devam ettirildi' : 'Kabul edildi');
+      onRefresh();
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'İşlem başarısız');
+    } finally {
+      setBtnLoading(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setBtnLoading(true);
+    setFeedback(null);
+    try {
+      await axios.post(`${API_BASE}/requests/${req.id}/status`, { newStatus: 'PROVIDER_COMPLETED' });
+      showFeedback('success', 'Teslimat bildirildi');
+      onRefresh();
+    } catch (err) {
+      showFeedback('error', 'Tamamlama başarısız');
+    } finally {
+      setBtnLoading(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setBtnLoading(true);
+    setFeedback(null);
+    try {
+      await axios.post(`${API_BASE}/requests/${req.id}/next-provider`);
+      showFeedback('success', 'Pas geçildi');
+      onRefresh();
+    } catch (err) {
+      showFeedback('error', 'Hata oluştu');
+    } finally {
+      setBtnLoading(false);
+    }
+  };
+
+  const handleAddToList = async () => {
+    if (!selectedListId) {
+      setListFeedback({ type: 'error', text: 'Liste seçin' });
+      setTimeout(() => setListFeedback(null), 2500);
       return;
     }
+    try {
+      await axios.post(`${API_BASE}/lists/${selectedListId}/requests`, { requestId: req.id });
+      setListFeedback({ type: 'success', text: 'Kaydedildi' });
+      setSelectedListId(''); 
+    } catch (e) {
+      setListFeedback({ type: 'error', text: 'Eklenemedi' });
+    } finally {
+      setTimeout(() => setListFeedback(null), 2500);
+    }
+  };
 
-    let timeoutMins = 15; 
-    if (localSettings) {
-      if (req.status === 'WAITING') {
-        timeoutMins = localSettings.pool_lifespan_hours * 60; 
-      } else if (req.status === 'MATCHED') {
-        timeoutMins = localSettings.customer_selection_timeout_mins; 
+  let timerDisplay = null;
+  const refDate = req.updated_at || req.created_at || new Date().toISOString();
+  if (reqStatus === 'MATCHED') {
+    const remaining = calculateRemainingTime(refDate, systemSettings?.customer_selection_timeout_mins || 60, 'mins');
+    if (remaining) timerDisplay = `Kabul Süresi: ${remaining}`;
+  } else if (reqStatus === 'ACCEPTED') {
+    if (targetDate) {
+      const diffMs = new Date(targetDate).getTime() - Date.now();
+      if (diffMs > 0) {
+        const totalMins = Math.floor(diffMs / 60000);
+        const h = Math.floor(totalMins / 60);
+        const m = totalMins % 60;
+        timerDisplay = `Teslimata: ${h}sa ${m}dk`;
+      } else {
+        timerDisplay = 'Teslimat Süresi Doldu';
       }
     }
+  }
 
-    const startTime = req.created_at ? new Date(req.created_at).getTime() : Date.now();
-    const expireTimeMs = startTime + (timeoutMins * 60 * 1000);
+  const forceRevealContact = ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
+  const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
+  const displayContact = forceRevealContact ? rawContact : 'Gizli (Müşteri Seçince Açılacak)';
+  const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
 
-    const calculateTime = () => {
-      const now = Date.now();
-      const diff = expireTimeMs - now;
-      if (diff <= 0) {
-        setTimeLeft(0);
-        setIsTimeout(true);
-        return false; 
-      } else {
-        setTimeLeft(diff);
-        return true; 
+  return (
+    <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
+            <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
+              {safeDateTime(req.created_at)}
+            </span>
+            {req.is_urgent && (
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                ACİL
+              </span>
+            )}
+          </div>
+          <h4 className="text-sm font-bold text-neutral-950 mt-1">"{req.raw_text}"</h4>
+
+          {/* ⭐ YENİ: ATANAN TALEP ÜZERİNDE ETİKETLER ⭐ */}
+          {Array.isArray(req.tags) && req.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {req.tags.map((tagItem, tIdx) => (
+                <span 
+                  key={tIdx} 
+                  className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                >
+                  <Tag size={9} className="text-blue-500" />
+                  #{String(tagItem).replace('#', '')}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-neutral-600 mt-1.5 flex items-center gap-1">
+            <MapPin size={12} className="text-neutral-400 shrink-0" />
+            <span>{extractAddress(req.location)}</span>
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-1.5">
+          {reqStatus === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-700 border border-amber-200">Onayınızı Bekliyor</span>}
+          {reqStatus === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Üzerinizde (İşlemde)</span>}
+          {reqStatus === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Teslim Edildi</span>}
+          {reqStatus === 'COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-neutral-100 text-neutral-700 border">Tamamlandı</span>}
+          {timerDisplay && <span className="text-[10px] font-mono font-bold bg-neutral-50 border px-1.5 py-0.5 rounded text-neutral-600 flex items-center gap-1"><Timer size={11} /> {timerDisplay}</span>}
+        </div>
+      </div>
+
+      {/* MÜŞTERİ İLETİŞİM KUTUSU */}
+      <div className={`p-2.5 rounded-lg border flex items-center justify-between ${forceRevealContact ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-mono uppercase font-semibold text-neutral-500">
+            {forceRevealContact ? '✅ Müşteri İletişim (Açık)' : 'Müşteri İletişim'}
+          </span>
+          <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-neutral-900 font-mono text-sm' : 'text-neutral-400'}`}>{displayContact}</span>
+        </div>
+        {forceRevealContact && (
+          <div className="flex items-center gap-2">
+            <a href={`tel:${rawContact}`} onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+              <PhoneCall size={12} />
+              <span>Ara</span>
+            </a>
+            {showWhatsApp && (
+              <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+                <MessageCircle size={12} />
+                <span>Yaz</span>
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ŞARTLAR PANELİ: MATCHED AŞAMASINDA SALT OKUNUR (KİLİTLİ) */}
+      <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+            <DollarSign size={14} className="text-emerald-600" />
+            <span>{reqStatus === 'MATCHED' ? 'Kabul Edilen Teklif Şartlarınız' : 'Onaylanan Şartlar'}</span>
+          </span>
+        </div>
+
+        {reqStatus === 'MATCHED' ? (
+          <div className="space-y-3 pt-1 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Son Tutar (TRY)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={budget ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
+                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Son Teslimat Tarihi</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}
+                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none cursor-not-allowed"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
+                <AlignLeft size={11} /> <span>Teklif Notu / Açıklama</span>
+              </label>
+              <textarea
+                rows={2}
+                readOnly
+                value={description || 'Açıklama girilmemiş.'}
+                className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none resize-none font-medium cursor-not-allowed"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 text-xs font-mono animate-in fade-in duration-200">
+            <div className="flex flex-wrap gap-4">
+              <div><span className="text-neutral-500">Maliyet / Tutar: </span><strong className="text-emerald-700 font-bold text-sm">{budget !== '' ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}</strong></div>
+              <div><span className="text-neutral-500">Hedef Teslimat: </span><strong className="text-neutral-900 font-bold">{targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}</strong></div>
+            </div>
+            {description && (
+              <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60 shadow-xs">
+                <span className="font-bold text-neutral-500 block text-[10px] uppercase font-mono mb-0.5">Sağlayıcı Notu:</span>
+                <p className="italic text-neutral-800 leading-relaxed">"{description}"</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between pt-1 border-t border-neutral-100 flex-wrap gap-2">
+        <div className="flex items-center gap-1.5">
+          {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <select value={selectedListId} onChange={(e) => setSelectedListId(e.target.value)} className="p-1.5 text-xs rounded-lg border border-neutral-200 bg-white outline-none text-neutral-800">
+                <option value="">Listeye Kaydet...</option>
+                {userLists.map(l => <option key={l.id} value={l.id}>{l.list_name}</option>)}
+              </select>
+              {listFeedback && <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${listFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>{listFeedback.text}</span>}
+              <button type="button" onClick={handleAddToList} className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-bold cursor-pointer">Ekle</button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2.5 ml-auto">
+          {feedback && (
+            <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${feedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+              {feedback.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
+              <span>{feedback.text}</span>
+            </div>
+          )}
+
+          {reqStatus === 'MATCHED' && (
+            <>
+              <button type="button" disabled={btnLoading} onClick={handleSkip} className="px-3 py-2 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50">Pas Geç</button>
+              <button type="button" disabled={btnLoading} onClick={handleAccept} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition">
+                {btnLoading ? <><Loader2 size={13} className="animate-spin" /><span>İşleniyor...</span></> : <><Check size={14} /><span>Şartları Onayla & İşi Kabul Et</span></>}
+              </button>
+            </>
+          )}
+
+          {reqStatus === 'ACCEPTED' && (
+            <button type="button" disabled={btnLoading} onClick={handleComplete} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition">
+              {btnLoading ? <><Loader2 size={13} className="animate-spin" /><span>Tamamlanıyor...</span></> : <><CheckCircle2 size={14} /><span>İşi Teslim Et</span></>}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ProviderDashboard() {
+  const { session, API_BASE } = useAuth();
+  const { data: providerInfoData, mutate: mutateProviderInfo } = useSWR(session?.phone ? `${API_BASE}/providers/by-phone?phone=${encodeURIComponent(session.phone)}` : null, fetcher);
+  const provider = useMemo(() => providerInfoData?.provider || session || {}, [providerInfoData, session]);
+  const providerId = provider?.id || session?.id;
+
+  const [activeTab, setActiveTab] = useState('ASSIGNED'); 
+  const [filterStatus, setFilterStatus] = useState('ALL');
+
+  const { data: rawSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: 60000 });
+  const systemSettings = rawSettings?.settings || { customer_selection_timeout_mins: 60, provider_completion_timeout_hours: 48 };
+
+  const { data: assignedData, mutate: mutateAssigned, isValidating: isValidatingAssigned } = useSWR(providerId ? `${API_BASE}/requests/provider-requests?providerId=${providerId}&phone=${encodeURIComponent(session?.phone || '')}` : null, fetcher, { refreshInterval: 2000, revalidateOnFocus: true });
+  const { data: poolData, mutate: mutatePool } = useSWR(providerId && activeTab === 'POOL' ? `${API_BASE}/requests/pool?providerId=${providerId}` : null, fetcher, { refreshInterval: 2500, revalidateOnFocus: true });
+
+  const [userLists, setUserLists] = useState([]);
+  useEffect(() => {
+    if (!session?.phone) return;
+    axios.get(`${API_BASE}/lists/PROVIDER/${encodeURIComponent(session.phone)}`).then(res => { if (res.data?.lists) setUserLists(res.data.lists); }).catch(()=>{});
+  }, [session?.phone, API_BASE]);
+
+  const assignedRequests = useMemo(() => safeArray(assignedData?.requests), [assignedData]);
+  const poolRequests = useMemo(() => safeArray(poolData?.poolRequests), [poolData]);
+
+  const filteredAssigned = useMemo(() => {
+    if (filterStatus === 'ALL') return assignedRequests;
+    return assignedRequests.filter(r => safeUpper(r.status) === filterStatus);
+  }, [assignedRequests, filterStatus]);
+
+  const pendingCount = useMemo(() => assignedRequests.filter(r => safeUpper(r.status) === 'MATCHED').length, [assignedRequests]);
+  const activeCount = useMemo(() => assignedRequests.filter(r => safeUpper(r.status) === 'ACCEPTED').length, [assignedRequests]);
+
+  const [poolActionId, setPoolActionId] = useState(null);
+  const [poolFeedbackMap, setPoolFeedbackMap] = useState({});
+  const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
+  const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
+
+  const handleJoinPoolWithBid = async (requestId) => {
+    if (!providerId) {
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
+      setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3000);
+      return;
+    }
+    setPoolActionId(requestId);
+    setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null }));
+    try {
+      const requests = [ axios.post(`${API_BASE}/requests/${requestId}/join-pool`, { providerId }) ];
+      if (poolBidData.budget || poolBidData.targetDate || poolBidData.description) {
+        requests.push(
+          axios.post(`${API_BASE}/requests/${requestId}/providers/${providerId}/details`, {
+            providerBudget: poolBidData.budget !== '' ? parseFloat(poolBidData.budget) : null,
+            providerCurrency: 'TRY',
+            providerTargetDate: poolBidData.targetDate ? new Date(poolBidData.targetDate).toISOString() : null,
+            providerDescription: poolBidData.description || ''
+          })
+        );
       }
-    };
+      await Promise.all(requests);
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'success', text: 'Teklif iletildi!' } }));
+      setExpandedPoolReqId(null);
+      mutatePool(); mutateAssigned();
+    } catch (err) {
+      setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: err.response?.data?.message || 'Hata oluştu' } }));
+    } finally {
+      setPoolActionId(null);
+      setTimeout(() => setPoolFeedbackMap(prev => ({ ...prev, [requestId]: null })), 3500);
+    }
+  };
 
-    if (!calculateTime()) return;
+  return (
+    <div className="max-w-4xl mx-auto w-full space-y-6 px-4 py-8">
+      <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-neutral-950 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+            {provider?.name ? provider.name.charAt(0).toUpperCase() : <User size={22} />}
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-extrabold text-neutral-900 text-base">{provider?.name || 'Hizmet Sağlayıcı'}</h3>
+              <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><ShieldCheck size={11} /> Onaylı Profil</span>
+            </div>
+            <p className="text-xs text-neutral-500 font-mono mt-0.5">{provider?.phone || session?.phone}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0">
+          <div className="flex flex-col items-center bg-amber-50/70 border border-amber-200/80 px-3.5 py-1.5 rounded-xl">
+            <span className="text-[9px] font-mono text-amber-700 uppercase font-bold flex items-center gap-1"><Star size={10} fill="#f59e0b" className="text-amber-500" /> Müşteri Puanı</span>
+            <span className="text-sm font-extrabold text-amber-900 mt-0.5">{provider?.avg_rating ? Number(parseFloat(provider.avg_rating).toFixed(1)) : '5.0'} / 5.0</span>
+          </div>
+          <div className="flex flex-col items-center bg-blue-50/70 border border-blue-200/80 px-3.5 py-1.5 rounded-xl">
+            <span className="text-[9px] font-mono text-blue-700 uppercase font-bold flex items-center gap-1"><Award size={10} className="text-blue-500" /> Sistem Skoru</span>
+            <span className="text-sm font-extrabold text-blue-900 mt-0.5">{provider?.priority_score || '100'} Puan</span>
+          </div>
+        </div>
+      </div>
 
-    const timer = setInterval(() => {
-      if (!calculateTime()) clearInterval(timer);
-    }, 1000);
+      <div className="flex items-center justify-between border-b pb-3">
+        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
+          <button onClick={() => setActiveTab('ASSIGNED')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'ASSIGNED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Briefcase size={14} /><span>Görevlerim ({assignedRequests.length})</span>
+            {pendingCount > 0 && <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">{pendingCount}</span>}
+          </button>
+          <button onClick={() => setActiveTab('POOL')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'POOL' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Sparkles size={14} /><span>Açık Havuz</span>
+          </button>
+          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+            <Folder size={14} /><span>Listelerim</span>
+          </button>
+        </div>
+        <button onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }} className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs" title="Yenile">
+          <RefreshCw size={14} className={isValidatingAssigned ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
-    return () => clearInterval(timer);
-  }, [req.created_at, req.status, localSettings]);
+      {activeTab === 'ASSIGNED' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {[
+              { id: 'ALL', label: `Tümü (${assignedRequests.length})` },
+              { id: 'MATCHED', label: `Onay Bekleyen (${pendingCount})` },
+              { id: 'ACCEPTED', label: `İşlemde (${activeCount})` },
+              { id: 'COMPLETED', label: 'Tamamlananlar' }
+            ].map(f => (
+              <button key={f.id} onClick={() => setFilterStatus(f.id)} className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${filterStatus === f.id ? 'bg-neutral-950 text-white shadow-xs' : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {filteredAssigned.length === 0 ? (
+            <div className="text-center py-12 text-neutral-400 text-xs bg-white rounded-xl border border-dashed">Bu filtreye uygun herhangi bir görev bulunmuyor.</div>
+          ) : (
+            <div className="space-y-3">
+              {filteredAssigned.map(req => (
+                <ProviderRequestCard key={req.id} req={req} providerId={providerId} API_BASE={API_BASE} onRefresh={mutateAssigned} systemSettings={systemSettings} userLists={userLists} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-  const formatTime = (ms) => {
-    if (ms <= 0) return "00:00";
-    const totalSeconds = Math.floor(ms / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
+      {activeTab === 'POOL' && (
+        <div className="space-y-4">
+          <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900">
+            Aşağıdaki talepler uzmanlık alanlarınızla eşleşen açık havuz talepleridir. <strong>"Talip Ol & Teklif Ver"</strong> diyerek sıraya girebilirsiniz.
+          </div>
+          {poolRequests.length === 0 ? (
+            <div className="text-center py-12 text-neutral-400 text-xs bg-white rounded-xl border border-dashed">Açık havuz talebi bulunmuyor.</div>
+          ) : (
+            <div className="space-y-3">
+              {poolRequests.map(req => {
+                const isJoining = poolActionId === req.id;
+                const poolFb = poolFeedbackMap[req.id];
+                const isExpanded = expandedPoolReqId === req.id;
+
+                return (
+                  <div key={req.id} className="bg-white rounded-xl border border-neutral-200 shadow-xs flex flex-col transition-all overflow-hidden">
+                    <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
+                          <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">{safeDateTime(req.created_at)}</span>
+                          {req.is_urgent && <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">ACİL</span>}
+                        </div>
+                        <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
+
+                        {/* ⭐ YENİ: HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
+                        {Array.isArray(req.tags) && req.tags.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {req.tags.map((tagItem, tIdx) => (
+                              <span 
+                                key={tIdx} 
+                                className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                              >
+                                <Tag size={9} className="text-blue-500" />
+                                #{String(tagItem).replace('#', '')}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <p className="text-xs text-neutral-500 flex items-center gap-1 pt-0.5"><MapPin size={12} className="text-neutral-400 shrink-0" /><span>{extractAddress(req.location)}</span></p>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                        {poolFb && (
+                          <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${poolFb.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                            {poolFb.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}<span>{poolFb.text}</span>
+                          </div>
+                        )}
+                        <button onClick={() => { if (isExpanded) { setExpandedPoolReqId(null); } else { setExpandedPoolReqId(req.id); setPoolBidData({ budget: '', targetDate: '', description: '' }); } }} className={`px-4 py-2 border rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${isExpanded ? 'bg-neutral-100 text-neutral-600 border-neutral-300 hover:bg-neutral-200' : 'bg-transparent text-neutral-800 border-neutral-300 hover:bg-neutral-50'}`}>
+                          {isExpanded ? <><X size={13} /><span>Vazgeç</span></> : <><Send size={13} className="text-emerald-600" /><span>Talip Ol & Teklif Ver</span></>}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-neutral-100 bg-neutral-50 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center gap-1.5 mb-2 text-emerald-700 font-bold text-xs"><DollarSign size={14} /> Şartlarınızı Belirleyin (Opsiyonel)</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div><label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Tutar (TRY)</label><input type="number" value={poolBidData.budget} onChange={(e) => setPoolBidData(prev => ({ ...prev, budget: e.target.value }))} placeholder="Örn: 500" className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" /></div>
+                          <div><label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Hedef Teslimat</label><input type="datetime-local" value={poolBidData.targetDate} onChange={(e) => setPoolBidData(prev => ({ ...prev, targetDate: e.target.value }))} className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900" /></div>
+                        </div>
+                        <div><label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1"><AlignLeft size={11} className="text-neutral-500" /><span>Teklif Açıklaması</span></label><textarea rows={2} value={poolBidData.description} onChange={(e) => setPoolBidData(prev => ({ ...prev, description: e.target.value }))} placeholder="Müşteriye iletmek istediğiniz özel not veya şart..." className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800" /></div>
+                        <div className="flex justify-end pt-2"><button disabled={isJoining} onClick={() => handleJoinPoolWithBid(req.id)} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-60">{isJoining ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}<span>Teklifi İlet & Sıraya Gir</span></button></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'LISTS' && <CustomListsManager ownerType="PROVIDER" ownerId={session?.phone} onReworkRequest={() => {}} onDirectReorder={() => {}} />}
+    </div>
+  );
+}
