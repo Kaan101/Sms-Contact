@@ -7,7 +7,7 @@ import {
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
   ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer,
-  FileText, Bell, Filter, Activity, Briefcase, Tag, Star // ⭐ HATA BURADAYDI: Star ikonu eklendi!
+  FileText, Bell, Filter, Activity, Briefcase, Tag, Star, Check
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
@@ -128,7 +128,8 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
         {Array.isArray(req.tags) && req.tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mt-1">
             {req.tags.map((t, idx) => (
-              <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold">
+              <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                <Tag size={9} className="text-blue-500" />
                 #{String(t).replace('#', '')}
               </span>
             ))}
@@ -145,32 +146,96 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   );
 });
 
-const WozCard = React.memo(({ req, onAssign }) => (
-  <div className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-        {req.request_type === 'BILDIRIM' ? (
-          <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
-        ) : (
-          <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
-        )}
-        {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
-        {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
-      </div>
-      <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
-      {Array.isArray(req.tags) && req.tags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 mt-1">
-          {req.tags.map((t, idx) => (
-            <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold">
-              #{String(t).replace('#', '')}
-            </span>
-          ))}
+// ⭐ YENİ: TAG EKLEME ÖZELLİKLİ WOZ KARTI ⭐
+const WozCard = React.memo(({ req, onAssign, onAddTag }) => {
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAdd = async () => {
+    if (!newTag.trim()) return;
+    setLoading(true);
+    await onAddTag(req.id, newTag.trim());
+    setNewTag('');
+    setIsAddingTag(false);
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition hover:border-neutral-300">
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+          {req.request_type === 'BILDIRIM' ? (
+            <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
+          ) : (
+            <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
+          )}
+          {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
+          {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
         </div>
-      )}
-      <span className="text-[11px] text-neutral-500 block">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
+        <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
+        
+        {/* Talepteki Etiketleri Göster */}
+        {Array.isArray(req.tags) && req.tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            {req.tags.map((t, idx) => (
+              <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                <Tag size={9} className="text-blue-500" />
+                #{String(t).replace('#', '')}
+              </span>
+            ))}
+          </div>
+        )}
+        
+        <span className="text-[11px] text-neutral-500 block">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center mt-2 sm:mt-0">
+        {/* Tag Ekleme Inputu ve Butonları */}
+        {isAddingTag ? (
+          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-300 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+            <input 
+              type="text" 
+              value={newTag} 
+              onChange={(e) => setNewTag(e.target.value)} 
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              placeholder="Yeni tag..." 
+              className="w-24 p-1.5 text-[11px] outline-none font-medium bg-transparent text-neutral-800"
+              autoFocus
+            />
+            <button disabled={loading} onClick={handleAdd} className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md cursor-pointer transition disabled:opacity-50">
+              {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+            </button>
+            <button disabled={loading} onClick={() => setIsAddingTag(false)} className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-md cursor-pointer transition disabled:opacity-50">
+              <X size={13} />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setIsAddingTag(true)} className="px-3 py-2 bg-white border border-neutral-200 text-neutral-700 hover:text-blue-700 hover:border-blue-300 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+            <Tag size={13} />
+            <span>Tag Ekle</span>
+          </button>
+        )}
+        <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0 cursor-pointer">Sağlayıcı Seç & Ata</button>
+      </div>
     </div>
-    <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0">Sağlayıcı Seç & Ata</button>
+  );
+});
+
+const ProviderCard = React.memo(({ prov, onEdit, onDelete, onConnect }) => (
+  <div className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
+    <h3 className="font-bold text-neutral-900">{prov.name}</h3>
+    <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+    <div className="mt-2 pt-2 border-t flex items-center justify-between">
+      <div className="flex space-x-2">
+        <button onClick={() => onEdit(prov)} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
+        <button onClick={() => onDelete(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button>
+      </div>
+      <button onClick={() => onConnect(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap">
+        <ExternalLink size={12} /><span>Bağlan</span>
+      </button>
+    </div>
   </div>
 ));
 
@@ -273,6 +338,16 @@ export default function AdminDashboard() {
   const handleWozAssignClick = useCallback((req) => {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
+
+  // ⭐ YENİ: Havuzdaki Talebe Anlık Etiket (Tag) Ekleme ⭐
+  const handleAddTagToWozRequest = useCallback(async (requestId, newTag) => {
+    try {
+      await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag });
+      await mutatePending();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Tag eklenirken hata oluştu. Lütfen Backend tarafında POST /requests/:id/tags rotasının tanımlı olduğundan emin olun.');
+    }
+  }, [API_BASE, mutatePending]);
 
   const handleRequestSort = useCallback((key) => { 
     setSortConfig(prevConfig => {
@@ -438,7 +513,6 @@ export default function AdminDashboard() {
 
           <div className="h-4 w-px bg-neutral-300 mx-0.5"></div>
           
-          {/* ⭐ CANLI TAKİP VE SAĞLAYICI SİMÜLASYONU DOĞRUDAN SEKME OLARAK AÇILIYOR ⭐ */}
           <button 
             type="button"
             onClick={() => setAdminTab('LIVE_TRACKER')} 
@@ -467,7 +541,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* SİMÜLASYONLAR HARİÇ GENEL ARAÇ ÇUBUĞU */}
       {adminTab !== 'LIVE_TRACKER' && adminTab !== 'PROVIDER_SIMULATION' && (
         <div className="w-full flex items-center justify-between gap-4 py-3 px-5 mb-2 bg-neutral-50 border border-neutral-200 rounded-xl shadow-sm">
           <div className="flex items-center space-x-2 text-neutral-500 text-sm font-medium">
@@ -488,14 +561,12 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ⭐ 1. SAĞLAYICI SİMÜLASYONU */}
       {adminTab === 'PROVIDER_SIMULATION' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
           <ProviderDashboardAkanTalep />
         </div>
       )}
 
-      {/* ⭐ 2. CANLI TAKİP */}
       {adminTab === 'LIVE_TRACKER' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm min-h-[650px] relative">
           <TrackerDashboardAkanTalep />
@@ -515,7 +586,7 @@ export default function AdminDashboard() {
                <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
             ) : (
               sortedWozRequests.map((req) => (
-                <WozCard key={req.id} req={req} onAssign={handleWozAssignClick} />
+                <WozCard key={req.id} req={req} onAssign={handleWozAssignClick} onAddTag={handleAddTagToWozRequest} />
               ))
             )}
           </div>
@@ -526,7 +597,6 @@ export default function AdminDashboard() {
         <TimeoutTracker />
       )}
 
-      {/* ⭐ PROVIDERS (SAĞLAYICILAR LİSTESİ) DÜZENLENDİ: TABLO GÖRÜNÜMÜ ⭐ */}
       {adminTab === 'PROVIDERS' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm flex flex-col">
           <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-t-2xl">
@@ -544,7 +614,7 @@ export default function AdminDashboard() {
             <button 
               type="button" 
               onClick={() => { setEditingProviderId(null); setModalFormData({ name: '', phone: '', email: '', serviceKeywords: '', communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'], priorityScore: 100 }); setIsModalOpen(true); }} 
-              className="px-4 py-2 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shadow-sm hover:bg-neutral-800 transition"
+              className="px-4 py-2 bg-neutral-950 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 shadow-sm hover:bg-neutral-800 transition cursor-pointer"
             >
               <Plus size={14} /><span>Yeni Sağlayıcı Ekle</span>
             </button>
@@ -604,13 +674,13 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="p-1.5 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded transition" title="Bağlan">
+                          <button onClick={() => handleOpenProviderDirectSession(prov.phone)} className="p-1.5 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded transition cursor-pointer" title="Bağlan">
                             <ExternalLink size={14} />
                           </button>
-                          <button onClick={() => handleEditProviderClick(prov)} className="p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 border border-transparent hover:border-neutral-200 rounded transition" title="Düzenle">
+                          <button onClick={() => handleEditProviderClick(prov)} className="p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 border border-transparent hover:border-neutral-200 rounded transition cursor-pointer" title="Düzenle">
                             <Settings size={14} />
                           </button>
-                          <button onClick={() => handleAdminDeleteProvider(prov.id)} className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded transition" title="Sil">
+                          <button onClick={() => handleAdminDeleteProvider(prov.id)} className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded transition cursor-pointer" title="Sil">
                             <Trash2 size={14} />
                           </button>
                         </div>
