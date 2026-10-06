@@ -38,7 +38,6 @@ const SortableHeader = React.memo(({ label, sortKey, align = "left", sortConfig,
   );
 });
 
-// ZAMAN AŞIMI (TIMEOUT) CANLI SAYACI EKLENMİŞ SATIR BİLEŞENİ
 const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTimeout, setIsTimeout] = useState(req.status === 'TIMEOUT');
@@ -146,30 +145,27 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   );
 });
 
-
 // ⭐ ÇOKLU SEÇMELİ VE "ANINDA GÜNCELLENEN" TAG DROPDOWN İÇEREN WOZ KARTI ⭐
 const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTags }) => {
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagText, setNewTagText] = useState('');
   const [loadingId, setLoadingId] = useState(null);
   
-  // Optimistic UI için yerel tag state'i (ekranın anında güncellenmesi için)
   const [localTags, setLocalTags] = useState([]);
 
   useEffect(() => {
     setLocalTags(safeArray(req.tags).map(t => String(t).replace('#', '')));
   }, [req.tags]);
 
-  // Tag Ekle & Çıkar (Toggle Mantığı)
   const handleToggleTag = async (tagStr) => {
     setLoadingId(tagStr);
     try {
       if (localTags.includes(tagStr)) {
-        setLocalTags(prev => prev.filter(t => t !== tagStr)); // Ekrandan anında sil
-        await onRemoveTag(req.id, tagStr); // Arka planda sil
+        setLocalTags(prev => prev.filter(t => t !== tagStr));
+        await onRemoveTag(req.id, tagStr);
       } else {
-        setLocalTags(prev => [...prev, tagStr]); // Ekrana anında ekle
-        await onAddTag(req.id, tagStr, false); // Arka planda ekle (global kayıt yapma)
+        setLocalTags(prev => [...prev, tagStr]);
+        await onAddTag(req.id, tagStr, false);
       }
     } catch (err) {
       console.warn("Tag güncellenirken hata oluştu", err);
@@ -178,15 +174,14 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
     }
   };
 
-  // Yeni Tag Yarat ve Hem Talebe Hem Global Listeye Ekle
   const handleAddNew = async () => {
     if (!newTagText.trim()) return;
     const tagStr = newTagText.trim().replace('#', '');
     setLoadingId('NEW');
     try {
       if (!localTags.includes(tagStr)) {
-        setLocalTags(prev => [...prev, tagStr]); // Ekrana anında ekle
-        await onAddTag(req.id, tagStr, true); // true = Global Tags listesine de POST at
+        setLocalTags(prev => [...prev, tagStr]); 
+        await onAddTag(req.id, tagStr, true); 
       }
       setNewTagText('');
     } catch (err) {
@@ -211,7 +206,6 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
         </div>
         <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
         
-        {/* Talepteki Çerçeveli Etiketleri Göster */}
         {localTags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             {localTags.map((t, idx) => (
@@ -234,7 +228,6 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
       </div>
 
       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center mt-3 sm:mt-0 relative">
-        {/* Çoklu Seçmeli Açılır Liste (Dropdown) */}
         <div className="relative">
           <button 
             onClick={(e) => { e.stopPropagation(); setIsAddingTag(!isAddingTag); }} 
@@ -321,25 +314,23 @@ export default function AdminDashboard() {
   const { API_BASE } = useAuth();
   const [adminTab, setAdminTab] = useState('WOZ'); 
   
-  const { data: rawPendingRequests, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
-  const { data: rawProviders, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
-  const { data: rawMatchedRequests, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: adminTab === 'ALL_MATCHED' ? 5000 : 0 });
-  const { data: rawSmsLogs, mutate: mutateSms } = useSWR(`${API_BASE}/notifications`, fetcher, { refreshInterval: adminTab === 'SMS_LOGS' ? 5000 : 0 });
-  const { data: rawSettings, mutate: mutateSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: adminTab === 'SETTINGS' ? 60000 : 0 });
-  const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
-  const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
-  
-  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN ⭐
-  const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
+  // ⭐ TÜM SWR ÇAĞRILARINA "error" YAKALAYICILARI EKLENDİ (Sonsuz dönme engellendi) ⭐
+  const { data: rawPendingRequests, error: pendingError, mutate: mutatePending } = useSWR(`${API_BASE}/requests/pending`, fetcher, { refreshInterval: adminTab === 'WOZ' ? 5000 : 0 });
+  const { data: rawProviders, error: providersError, mutate: mutateProviders } = useSWR(`${API_BASE}/providers`, fetcher, { refreshInterval: adminTab === 'PROVIDERS' ? 30000 : 0 });
+  const { data: rawMatchedRequests, error: matchedError, mutate: mutateMatched } = useSWR(`${API_BASE}/requests/matched`, fetcher, { refreshInterval: adminTab === 'ALL_MATCHED' ? 5000 : 0 });
+  const { data: rawSmsLogs, error: smsError, mutate: mutateSms } = useSWR(`${API_BASE}/notifications`, fetcher, { refreshInterval: adminTab === 'SMS_LOGS' ? 5000 : 0 });
+  const { data: rawSettings, error: settingsError, mutate: mutateSettings } = useSWR(`${API_BASE}/settings`, fetcher, { refreshInterval: adminTab === 'SETTINGS' ? 60000 : 0 });
+  const { data: rawFeatures, error: featuresError, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
+  const { data: rawTests, error: testsError, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
+  const { data: rawTags, error: tagsError, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
 
-  // ⭐ GÜVENLİ ARRAY DÖNÜŞÜMLERİ (Backend format hatalarını önler) ⭐
-  const pendingRequests = useMemo(() => safeArray(rawPendingRequests?.requests || rawPendingRequests), [rawPendingRequests]);
-  const providers = useMemo(() => safeArray(rawProviders?.providers || rawProviders), [rawProviders]);
-  const matchedRequests = useMemo(() => safeArray(rawMatchedRequests?.requests || rawMatchedRequests), [rawMatchedRequests]);
-  const smsLogs = useMemo(() => safeArray(rawSmsLogs?.notifications || rawSmsLogs), [rawSmsLogs]);
-  const features = useMemo(() => safeArray(rawFeatures?.features || rawFeatures), [rawFeatures]);
-  const tests = useMemo(() => safeArray(rawTests?.tests || rawTests), [rawTests]);
-  const tags = useMemo(() => safeArray(rawTags?.tags || rawTags), [rawTags]);
+  const pendingRequests = safeArray(rawPendingRequests?.requests || rawPendingRequests);
+  const providers = safeArray(rawProviders?.providers || rawProviders);
+  const matchedRequests = safeArray(rawMatchedRequests?.requests || rawMatchedRequests);
+  const smsLogs = safeArray(rawSmsLogs?.notifications || rawSmsLogs);
+  const features = safeArray(rawFeatures?.features || rawFeatures);
+  const tests = safeArray(rawTests?.tests || rawTests);
+  const tags = safeArray(rawTags?.tags || rawTags);
   
   const [localSettings, setLocalSettings] = useState({
     pool_lifespan_hours: 72,
@@ -441,7 +432,6 @@ export default function AdminDashboard() {
     return safeLower(t.tag_name).includes(q) || safeArray(t.keywords).some(k => safeLower(k).includes(q));
   }), [tags, searchTagText]);
 
-
   const handleDeleteRequest = useCallback(async (requestId) => { 
     if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; 
     try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); await mutateMatched(); } catch {} 
@@ -475,7 +465,6 @@ export default function AdminDashboard() {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
 
-  // ⭐ YENİ: Tag Ekle (Talebe Ekle & İstenirse Global Listeye Ekle)
   const handleAddTagToWozRequest = useCallback(async (requestId, newTag, addToGlobalList = false) => {
     try {
       if (addToGlobalList) {
@@ -493,7 +482,6 @@ export default function AdminDashboard() {
     }
   }, [API_BASE, mutatePending, mutateTags]);
 
-  // ⭐ YENİ: Tag Çıkar (Woz Kartından Anında Sil)
   const handleRemoveTagFromWozRequest = useCallback(async (requestId, tagToRemove) => {
     try {
       await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`).catch(() => {});
@@ -764,7 +752,7 @@ export default function AdminDashboard() {
           </div>
           
           <div className="max-h-[550px] overflow-y-auto">
-            {!rawTags && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {(!rawTags && !tagsError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
@@ -776,25 +764,29 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filteredTags.length === 0 && rawTags ? (
+                {(!rawTags && tagsError) ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-rose-500 font-bold text-xs">Bağlantı hatası: Backend tarafında /tags ucu henüz hazır değil veya erişilemiyor.</td>
+                  </tr>
+                ) : filteredTags.length === 0 && rawTags ? (
                   <tr>
                     <td colSpan="5" className="px-4 py-8 text-center text-neutral-400 text-xs">Aradığınız kriterde etiket bulunamadı.</td>
                   </tr>
                 ) : (
                   filteredTags.map((tItem) => (
-                    <tr key={tItem.id} className="hover:bg-neutral-50 transition group">
+                    <tr key={tItem.id || tItem.tag_name || Math.random()} className="hover:bg-neutral-50 transition group">
                       <td className="px-4 py-3 font-mono text-[10px] text-neutral-400 font-bold">
-                        #{tItem.id}
+                        #{tItem.id || 'YENİ'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 font-bold text-neutral-900">
                           <Tag size={12} className="text-blue-500" />
-                          <span>#{String(tItem.tag_name).replace('#', '')}</span>
+                          <span>#{String(tItem.tag_name || tItem).replace('#', '')}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${tItem.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-neutral-100 text-neutral-500 border-neutral-200'}`}>
-                          {tItem.is_active ? 'Aktif' : 'Pasif'}
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${tItem.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-neutral-100 text-neutral-500 border-neutral-200'}`}>
+                          {tItem.is_active !== false ? 'Aktif' : 'Pasif'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -833,7 +825,7 @@ export default function AdminDashboard() {
             </button>
           </div>
           <div className="bg-white rounded-2xl border p-4 max-h-[550px] overflow-y-auto space-y-3 relative">
-            {!rawPendingRequests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {(!rawPendingRequests && !pendingError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             {sortedWozRequests.length === 0 && rawPendingRequests ? (
                <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
             ) : (
@@ -880,7 +872,7 @@ export default function AdminDashboard() {
           </div>
           
           <div className="max-h-[550px] overflow-y-auto">
-            {!rawProviders && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {(!rawProviders && !providersError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
@@ -985,7 +977,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="max-h-[550px] overflow-y-auto">
-            {!rawMatchedRequests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {(!rawMatchedRequests && !matchedError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             <table className="w-full text-left text-xs table-auto">
               <thead className="bg-neutral-50 text-[10px] font-mono uppercase text-neutral-500 sticky top-0 z-10 shadow-sm border-b">
                 <tr>
@@ -1016,7 +1008,7 @@ export default function AdminDashboard() {
 
       {adminTab === 'SMS_LOGS' && (
         <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5">
-          {!rawSmsLogs && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+          {(!rawSmsLogs && !smsError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
           {filteredSmsLogs.map((log) => (
             <SmsLogCard key={log.id} log={log} />
           ))}
@@ -1031,7 +1023,7 @@ export default function AdminDashboard() {
             <div><textarea rows={2} value={newTest.description} onChange={(e) => setNewTest({ ...newTest, description: e.target.value })} placeholder="Test adımları ve beklenen sonuç açıklaması..." className="w-full p-2 text-xs rounded-lg border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
           </form>
           <div className="bg-white rounded-2xl border border-neutral-200 p-4 max-h-[550px] overflow-y-auto space-y-2.5 pr-1">
-            {!rawTests && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+            {(!rawTests && !testsError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
             {tests.length === 0 && rawTests ? (<div className="p-8 text-center text-xs text-neutral-400">Henüz kayıtlı bir test senaryosu bulunmuyor.</div>) : (
               tests.map((testItem) => {
                 const isExpanded = expandedTestId === testItem.id;
@@ -1106,7 +1098,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="max-h-[500px] overflow-y-auto">
-              {!rawFeatures && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
+              {(!rawFeatures && !featuresError) && <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400" size={20} /></div>}
               {filteredFeatures.length === 0 && rawFeatures ? (
                 <div className="p-8 text-center text-xs text-neutral-400">Aradığınız kriterde proje/özellik bulunamadı.</div>
               ) : (
