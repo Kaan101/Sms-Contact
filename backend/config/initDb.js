@@ -1,4 +1,73 @@
-const { pool } = require('./db');
+const { pool } = require('./db'); // Kendi projenizdeki pg pool bağlantı yolu
+
+// --- MASTER TAKSONOMİ VE OTOMATİK ETİKETLEME MOTORU ---
+let MASTER_TAXONOMY = {};
+let isTaxonomyLoaded = false;
+
+const loadTaxonomyFromDB = async () => {
+  try {
+    if (!pool || typeof pool.query !== 'function') return;
+    
+    // ⭐ DEĞİŞİKLİK: Eski lookup_tags yerine yeni tags tablosu kullanılıyor.
+    const { rows } = await pool.query('SELECT tag_name, keywords FROM tags WHERE is_active = TRUE');
+    const newTaxonomy = {};
+
+    rows.forEach((row) => {
+      const cleanTag = (row.tag_name || '').replace('#', '').trim();
+      if (cleanTag) {
+        newTaxonomy[cleanTag] = Array.isArray(row.keywords) ? row.keywords : [];
+      }
+    });
+
+    MASTER_TAXONOMY = newTaxonomy;
+    isTaxonomyLoaded = true;
+    console.log(`✅ Master Taksonomi DB'den yüklendi: ${Object.keys(MASTER_TAXONOMY).length} etiket aktif.`);
+  } catch (error) {
+    console.error('❌ Taksonomi yüklenirken hata oluştu:', error.message);
+  }
+};
+
+loadTaxonomyFromDB();
+
+const autoTagRequest = async (rawText) => {
+  if (!rawText) return ['GENEL_BILDIRIM'];
+
+  if (!isTaxonomyLoaded || Object.keys(MASTER_TAXONOMY).length === 0) {
+    await loadTaxonomyFromDB();
+  }
+
+  const tags = new Set();
+  const lowerText = rawText.toLowerCase();
+
+  for (const [tag, keywords] of Object.entries(MASTER_TAXONOMY)) {
+    for (const keyword of keywords) {
+      if (keyword && lowerText.includes(keyword.toLowerCase().trim())) {
+        tags.add(tag);
+        break;
+      }
+    }
+  }
+
+  if (tags.size === 0) {
+    tags.add('GENEL_BILDIRIM');
+  }
+
+  return Array.from(tags);
+};
+
+// --- CONTROLLER İŞLEMLERİ ---
+
+const logSms = async (requestId, type, phone, body) => {
+  try {
+    await pool.query(
+      `INSERT INTO outbound_notifications (request_id, recipient_type, recipient_phone, message_body) 
+       VALUES ($1, $2, $3, $4)`,
+      [requestId, type, phone, body]
+    );
+  } catch (error) {
+    console.error('SMS Loglama Hatası:', error);
+  }
+};
 
 const initial100Providers = [
   // 1. Su & Damacana Dağıtım (10 Adet)
@@ -25,7 +94,7 @@ const initial100Providers = [
   ["Beyoğlu Cihangir Tesisatçısı", "+905321020009", "cihangir@tesisatci.com", ["tesisat", "musluk", "eski bina tesisatı", "beyoğlu", "cihangir", "karaköy", "su kaçağı"], ["PHONE", "SMS"], 88],
   ["Sarıyer Boğaz Tesisat", "+905321020010", "sariyer@bogaztesisat.com", ["tesisat", "tesisatçı", "hidrofor", "su deposu", "sarıyer", "tarabya", "yeniköy", "su ustası"], ["PHONE", "SMS"], 86],
 
-  // 3. Emlak & Gayrimenkul Danışmanlığı (10 Adet) - YENİ EKLENDİ
+  // 3. Emlak & Gayrimenkul Danışmanlığı (10 Adet)
   ["Tarabya Emlak", "+905321030001", "tarabya@emlak.com", ["emlak", "kiralık", "satılık", "daire", "villa", "tarabya", "sarıyer", "gayrimenkul"], ["PHONE", "SMS", "WHATSAPP"], 110],
   ["Moda Gayrimenkul", "+905321030002", "moda@gayrimenkul.com", ["emlak", "kiralık daire", "satılık ev", "moda", "kadıköy", "işyeri kiralık"], ["PHONE", "WHATSAPP"], 104],
   ["Beşiktaş Boğaz Emlak", "+905321030003", "besiktas@bogazemlak.com", ["emlak", "yalı", "deniz manzaralı", "kiralık", "beşiktaş", "ortaköy"], ["PHONE", "SMS"], 102],
@@ -40,6 +109,17 @@ const initial100Providers = [
 
 const initDatabase = async () => {
   try {
+    // ⭐ YENİ: 0. Etiketler (Tags) Tablosu
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tags (
+        id SERIAL PRIMARY KEY,
+        tag_name VARCHAR(100) NOT NULL UNIQUE,
+        keywords TEXT[] DEFAULT '{}',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 1. service_providers tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS service_providers (
@@ -48,6 +128,7 @@ const initDatabase = async () => {
         phone VARCHAR(50) NOT NULL,
         email VARCHAR(255),
         service_keywords TEXT[] NOT NULL,
+        tags TEXT[] DEFAULT '{}', -- YENİ: Etiket dizisi eklendi
         communication_channels TEXT[] NOT NULL DEFAULT ARRAY['PHONE'],
         priority_score INTEGER DEFAULT 100,
         is_active BOOLEAN DEFAULT TRUE,
@@ -55,7 +136,7 @@ const initDatabase = async () => {
       );
     `);
 
-    // 2. requests tablosu (YENİ KOLON: request_type EKLENDİ)
+    // 2. requests tablosu
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -67,9 +148,10 @@ const initDatabase = async () => {
         is_urgent BOOLEAN DEFAULT FALSE,
         deadline_datetime TIMESTAMP WITH TIME ZONE,
         preferred_channel VARCHAR(50) NOT NULL DEFAULT 'PHONE',
-        request_type VARCHAR(50) DEFAULT 'TALEP', -- YENİ: Kayıt Türü
+        request_type VARCHAR(50) DEFAULT 'TALEP',
         status VARCHAR(50) NOT NULL DEFAULT 'POOL', 
         matched_provider_id INTEGER,
+        tags TEXT[] DEFAULT '{}', -- YENİ: Etiket dizisi eklendi
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -87,15 +169,13 @@ const initDatabase = async () => {
       );
     `);
 
-    // GÜNCELLEME GÜVENCESİ: Mevcut tabloda 'request_type' kolonu yoksa ekle (Hata almamak için PostgreSQL 'DO' bloğu kullanılır)
+    // GÜNCELLEME GÜVENCESİ: Mevcut tablolara eksik kolonları ekleme
     await pool.query(`
       DO $$ 
       BEGIN 
-          BEGIN
-              ALTER TABLE requests ADD COLUMN request_type VARCHAR(50) DEFAULT 'TALEP';
-          EXCEPTION
-              WHEN duplicate_column THEN RAISE NOTICE 'column request_type already exists in requests.';
-          END;
+          BEGIN ALTER TABLE requests ADD COLUMN request_type VARCHAR(50) DEFAULT 'TALEP'; EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE requests ADD COLUMN tags TEXT[] DEFAULT '{}'; EXCEPTION WHEN duplicate_column THEN END;
+          BEGIN ALTER TABLE service_providers ADD COLUMN tags TEXT[] DEFAULT '{}'; EXCEPTION WHEN duplicate_column THEN END;
       END $$;
     `);
 
@@ -149,9 +229,9 @@ const initDatabase = async () => {
       );
     `);
 
-// 7. Değerlendirme & Yorum Tablosu (GÜNCELLENMİŞ - ONDALIKLI SAYI DESTEKLİ)
+    // 7. Değerlendirme & Yorum Tablosu
     await pool.query(`
-      DROP TABLE IF EXISTS reviews CASCADE; -- Eski yapıyı temizler
+      DROP TABLE IF EXISTS reviews CASCADE;
       CREATE TABLE reviews (
         id SERIAL PRIMARY KEY,
         request_id INTEGER NOT NULL,
@@ -160,7 +240,7 @@ const initDatabase = async () => {
         rating_communication NUMERIC(3,2),
         rating_timing NUMERIC(3,2),
         rating_cost NUMERIC(3,2),
-        rating NUMERIC(3,2), -- Eski INTEGER yerine NUMERIC yapıldı (Örn: 4.25)
+        rating NUMERIC(3,2), 
         score NUMERIC(5,2),
         comment TEXT,
         rating_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -200,6 +280,7 @@ const initDatabase = async () => {
 
     // Sequence Eşitlemeleri
     await pool.query(`
+      SELECT setval(pg_get_serial_sequence('tags', 'id'), COALESCE((SELECT MAX(id) FROM tags), 1), true);
       SELECT setval(pg_get_serial_sequence('service_providers', 'id'), COALESCE((SELECT MAX(id) FROM service_providers), 1), true);
       SELECT setval(pg_get_serial_sequence('requests', 'id'), COALESCE((SELECT MAX(id) FROM requests), 1), true);
       SELECT setval(pg_get_serial_sequence('project_features', 'id'), COALESCE((SELECT MAX(id) FROM project_features), 1), true);
@@ -207,7 +288,7 @@ const initDatabase = async () => {
       SELECT setval(pg_get_serial_sequence('test_cases', 'id'), COALESCE((SELECT MAX(id) FROM test_cases), 1), true);
     `);
 
-    // YENİ: Detaylı Değerlendirme ve Skor Kolonları
+    // Detaylı Değerlendirme ve Skor Kolonları
     await pool.query(`
       DO $$ 
       BEGIN 
@@ -220,7 +301,8 @@ const initDatabase = async () => {
           BEGIN ALTER TABLE reviews ADD COLUMN score_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP; EXCEPTION WHEN duplicate_column THEN END;
       END $$;
     `);
-    // Yeni Tablo: Request - Provider Detayları (Teklif, Bütçe, Tarih)
+    
+    // Yeni Tablo: Request - Provider Detayları
     await pool.query(`
       CREATE TABLE IF NOT EXISTS request_provider_details (
         id SERIAL PRIMARY KEY,
@@ -242,4 +324,4 @@ const initDatabase = async () => {
   }
 };
 
-module.exports = initDatabase;
+module.exports = { initDatabase, pool };
