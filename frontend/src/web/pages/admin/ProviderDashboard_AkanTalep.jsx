@@ -5,12 +5,13 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, Play,
+  PhoneCall, MessageCircle // ⭐ BEYAZ EKRAN SEBEBİ BURADAKİ EKSİKLİKLERDİ
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
   safeArray, safeUpper, extractAddress, extractGPS, 
-  safeDateTime, calculateRemainingTime 
+  safeDateTime, calculateRemainingTime, safeString, extractPhoneForWa 
 } from '../../../core/utils/helpers';
 import CustomListsManager from '../../components/common/CustomListsManager';
 
@@ -165,6 +166,11 @@ function ProviderRequestCard({
     }
   }
 
+  const forceRevealContact = ['MATCHED', 'ACCEPTED', 'PROVIDER_COMPLETED'].includes(reqStatus); 
+  const rawContact = safeString(req.contact_value).replace(/\|HIDDEN/gi, '').replace(/\|SHARED/gi, '').trim();
+  const displayContact = forceRevealContact ? rawContact : 'Gizli (Müşteri Seçince Açılacak)';
+  const showWhatsApp = forceRevealContact && safeString(req.preferred_channel).includes('WHATSAPP');
+
   return (
     <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -186,14 +192,17 @@ function ProviderRequestCard({
             )}
           </div>
           <h4 className="text-sm font-bold text-neutral-950 mt-1">"{req.raw_text}"</h4>
-          
-          {/* ⭐ YENİ EKLENEN KISIM: KART ÜZERİNDEKİ ETİKETLER ⭐ */}
+
+          {/* ⭐ YENİ: ATANAN TALEP ÜZERİNDE ETİKETLER ⭐ */}
           {Array.isArray(req.tags) && req.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 mt-1.5">
-              {req.tags.map((t, idx) => (
-                <span key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {req.tags.map((tagItem, tIdx) => (
+                <span 
+                  key={tIdx} 
+                  className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                >
                   <Tag size={9} className="text-blue-500" />
-                  #{String(t).replace('#', '')}
+                  #{String(tagItem).replace('#', '')}
                 </span>
               ))}
             </div>
@@ -203,48 +212,47 @@ function ProviderRequestCard({
             <MapPin size={12} className="text-neutral-400 shrink-0" />
             <span>{extractAddress(req.location)}</span>
           </p>
-          <p className="text-xs font-mono text-blue-700 font-semibold mt-1 flex items-center gap-1">
-            <Phone size={12} className="text-blue-500 shrink-0" />
-            <span>{req.contact_value}</span>
-          </p>
         </div>
 
         <div className="flex flex-col items-end gap-1.5">
-          {reqStatus === 'MATCHED' && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-700 border border-amber-200">
-              {isReorder ? 'Tekrar Talebi Geldi' : 'Onayınızı Bekliyor'}
-            </span>
-          )}
-          {reqStatus === 'ACCEPTED' && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Üzerinizde (İşlemde)
-            </span>
-          )}
-          {reqStatus === 'PROVIDER_COMPLETED' && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">
-              Teslim Edildi
-            </span>
-          )}
-          {reqStatus === 'COMPLETED' && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-neutral-100 text-neutral-700 border">
-              Tamamlandı
-            </span>
-          )}
-
-          {timerDisplay && (
-            <span className="text-[10px] font-mono font-bold bg-neutral-50 border px-1.5 py-0.5 rounded text-neutral-600 flex items-center gap-1">
-              <Timer size={11} /> {timerDisplay}
-            </span>
-          )}
+          {reqStatus === 'MATCHED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-50 text-amber-700 border border-amber-200">Onayınızı Bekliyor</span>}
+          {reqStatus === 'ACCEPTED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">Üzerinizde (İşlemde)</span>}
+          {reqStatus === 'PROVIDER_COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">Teslim Edildi</span>}
+          {reqStatus === 'COMPLETED' && <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-neutral-100 text-neutral-700 border">Tamamlandı</span>}
+          {timerDisplay && <span className="text-[10px] font-mono font-bold bg-neutral-50 border px-1.5 py-0.5 rounded text-neutral-600 flex items-center gap-1"><Timer size={11} /> {timerDisplay}</span>}
         </div>
       </div>
 
-      {/* ŞARTLAR PANELİ: MATCHED İSE DÜZENLENEBİLİR VE DOĞRUDAN AÇIK */}
+      {/* MÜŞTERİ İLETİŞİM KUTUSU */}
+      <div className={`p-2.5 rounded-lg border flex items-center justify-between ${forceRevealContact ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-mono uppercase font-semibold text-neutral-500">
+            {forceRevealContact ? '✅ Müşteri İletişim (Açık)' : 'Müşteri İletişim'}
+          </span>
+          <span className={`text-xs font-bold mt-0.5 ${forceRevealContact ? 'text-neutral-900 font-mono text-sm' : 'text-neutral-400'}`}>{displayContact}</span>
+        </div>
+        {forceRevealContact && (
+          <div className="flex items-center gap-2">
+            <a href={`tel:${rawContact}`} onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+              <PhoneCall size={12} />
+              <span>Ara</span>
+            </a>
+            {showWhatsApp && (
+              <a href={`https://wa.me/${extractPhoneForWa(rawContact)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center space-x-1 shadow-sm transition shrink-0 cursor-pointer">
+                <MessageCircle size={12} />
+                <span>Yaz</span>
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ŞARTLAR PANELİ: MATCHED AŞAMASINDA SALT OKUNUR (KİLİTLİ) */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
             <DollarSign size={14} className="text-emerald-600" />
-            <span>{reqStatus === 'MATCHED' ? 'Sipariş Şartları (Fiyat, Teslimat Tarihi ve Not)' : 'Onaylanan Şartlar'}</span>
+            <span>{reqStatus === 'MATCHED' ? 'Kabul Edilen Teklif Şartlarınız' : 'Onaylanan Şartlar'}</span>
           </span>
         </div>
 
@@ -252,62 +260,42 @@ function ProviderRequestCard({
           <div className="space-y-3 pt-1 animate-in fade-in duration-200">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1 font-bold">
-                  Tutar (TRY) *
-                </label>
+                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Son Tutar (TRY)</label>
                 <input
-                  type="number"
-                  step="any"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  placeholder="Örn: 500"
-                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs transition"
+                  type="text"
+                  readOnly
+                  value={budget ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
+                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1 font-bold">
-                  Hedef Teslimat Tarihi & Saati *
-                </label>
+                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Son Teslimat Tarihi</label>
                 <input
-                  type="datetime-local"
-                  value={targetDate}
-                  onChange={(e) => setTargetDate(e.target.value)}
-                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 shadow-xs transition"
+                  type="text"
+                  readOnly
+                  value={targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}
+                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none cursor-not-allowed"
                 />
               </div>
             </div>
-
             <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1 font-bold flex items-center gap-1">
-                <AlignLeft size={11} className="text-neutral-500" />
-                <span>Teklif Notu / Açıklama (Opsiyonel)</span>
+              <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
+                <AlignLeft size={11} /> <span>Teklif Notu / Açıklama</span>
               </label>
               <textarea
                 rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Özel şartlar, malzeme bilgisi veya notunuz..."
-                className="w-full p-2 text-xs rounded-lg border border-neutral-300 bg-white outline-none focus:border-neutral-900 resize-none font-medium text-neutral-800 placeholder:text-neutral-400 shadow-xs transition"
+                readOnly
+                value={description || 'Açıklama girilmemiş.'}
+                className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none resize-none font-medium cursor-not-allowed"
               />
             </div>
           </div>
         ) : (
           <div className="space-y-2 text-xs font-mono animate-in fade-in duration-200">
             <div className="flex flex-wrap gap-4">
-              <div>
-                <span className="text-neutral-500">Maliyet / Tutar: </span>
-                <strong className="text-emerald-700 font-bold text-sm">
-                  {budget !== '' ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
-                </strong>
-              </div>
-              <div>
-                <span className="text-neutral-500">Hedef Teslimat: </span>
-                <strong className="text-neutral-900 font-bold">
-                  {targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}
-                </strong>
-              </div>
+              <div><span className="text-neutral-500">Maliyet / Tutar: </span><strong className="text-emerald-700 font-bold text-sm">{budget !== '' ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}</strong></div>
+              <div><span className="text-neutral-500">Hedef Teslimat: </span><strong className="text-neutral-900 font-bold">{targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}</strong></div>
             </div>
-
             {description && (
               <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60 shadow-xs">
                 <span className="font-bold text-neutral-500 block text-[10px] uppercase font-mono mb-0.5">Sağlayıcı Notu:</span>
@@ -322,45 +310,19 @@ function ProviderRequestCard({
         <div className="flex items-center gap-1.5">
           {reqStatus === 'ACCEPTED' && userLists?.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <select
-                value={selectedListId}
-                onChange={(e) => setSelectedListId(e.target.value)}
-                className="p-1.5 text-xs rounded-lg border border-neutral-200 bg-white outline-none text-neutral-800"
-              >
+              <select value={selectedListId} onChange={(e) => setSelectedListId(e.target.value)} className="p-1.5 text-xs rounded-lg border border-neutral-200 bg-white outline-none text-neutral-800">
                 <option value="">Listeye Kaydet...</option>
-                {userLists.map(l => (
-                  <option key={l.id} value={l.id}>{l.list_name}</option>
-                ))}
+                {userLists.map(l => <option key={l.id} value={l.id}>{l.list_name}</option>)}
               </select>
-              
-              {listFeedback && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
-                  listFeedback.type === 'success' 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                    : 'bg-rose-50 text-rose-700 border-rose-200'
-                }`}>
-                  {listFeedback.text}
-                </span>
-              )}
-
-              <button
-                type="button"
-                onClick={handleAddToList}
-                className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-bold transition cursor-pointer"
-              >
-                Ekle
-              </button>
+              {listFeedback && <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${listFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>{listFeedback.text}</span>}
+              <button type="button" onClick={handleAddToList} className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-bold cursor-pointer">Ekle</button>
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-2.5 ml-auto">
           {feedback && (
-            <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in slide-in-from-right-1 duration-200 flex items-center gap-1 ${
-              feedback.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-rose-50 text-rose-800 border-rose-200'
-            }`}>
+            <div className={`text-xs font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${feedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
               {feedback.type === 'success' ? <Check size={12} className="text-emerald-600" /> : <AlertCircle size={12} className="text-rose-600" />}
               <span>{feedback.text}</span>
             </div>
@@ -368,62 +330,16 @@ function ProviderRequestCard({
 
           {reqStatus === 'MATCHED' && (
             <>
-              {!isReorder && (
-                <button
-                  type="button"
-                  disabled={btnLoading}
-                  onClick={handleSkip}
-                  className="px-3 py-2 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
-                >
-                  Pas Geç
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={btnLoading}
-                onClick={handleAccept}
-                className={`px-5 py-2 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition ${
-                  isReorder ? 'bg-neutral-950 hover:bg-neutral-800' : 'bg-emerald-600 hover:bg-emerald-700'
-                }`}
-              >
-                {btnLoading ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    <span>İşleniyor...</span>
-                  </>
-                ) : isReorder ? (
-                  <>
-                    <span>Devam</span>
-                    <ArrowRight size={14} />
-                  </>
-                ) : (
-                  <>
-                    <Check size={14} />
-                    <span>Şartları Onayla & İşi Kabul Et</span>
-                  </>
-                )}
+              <button type="button" disabled={btnLoading} onClick={handleSkip} className="px-3 py-2 text-neutral-600 hover:bg-neutral-100 border rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50">Pas Geç</button>
+              <button type="button" disabled={btnLoading} onClick={handleAccept} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition">
+                {btnLoading ? <><Loader2 size={13} className="animate-spin" /><span>İşleniyor...</span></> : <><Check size={14} /><span>Şartları Onayla & İşi Kabul Et</span></>}
               </button>
             </>
           )}
 
           {reqStatus === 'ACCEPTED' && (
-            <button
-              type="button"
-              disabled={btnLoading}
-              onClick={handleComplete}
-              className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition"
-            >
-              {btnLoading ? (
-                <>
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Tamamlanıyor...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={14} />
-                  <span>İşi Teslim Et</span>
-                </>
-              )}
+            <button type="button" disabled={btnLoading} onClick={handleComplete} className="px-4 py-2 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition">
+              {btnLoading ? <><Loader2 size={13} className="animate-spin" /><span>Tamamlanıyor...</span></> : <><CheckCircle2 size={14} /><span>İşi Teslim Et</span></>}
             </button>
           )}
         </div>
@@ -614,13 +530,16 @@ export default function ProviderDashboardAkanTalep() {
                         </div>
                         <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
 
-                        {/* ⭐ YENİ EKLENEN KISIM: HAVUZDAKİ İŞLERİN ÜZERİNDEKİ ETİKETLER ⭐ */}
+                        {/* ⭐ YENİ: HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
                         {Array.isArray(req.tags) && req.tags.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1 mt-1">
-                            {req.tags.map((t, idx) => (
-                              <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            {req.tags.map((tagItem, tIdx) => (
+                              <span 
+                                key={tIdx} 
+                                className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs"
+                              >
                                 <Tag size={9} className="text-blue-500" />
-                                #{String(t).replace('#', '')}
+                                #{String(tagItem).replace('#', '')}
                               </span>
                             ))}
                           </div>
