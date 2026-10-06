@@ -171,6 +171,8 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
         setLocalTags(prev => [...prev, tagStr]); // Ekrana anında ekle
         await onAddTag(req.id, tagStr, false); // Arka planda ekle (global kayıt yapma)
       }
+    } catch (err) {
+      console.warn("Tag güncellenirken hata oluştu", err);
     } finally {
       setLoadingId(null);
     }
@@ -187,6 +189,8 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
         await onAddTag(req.id, tagStr, true); // true = Global Tags listesine de POST at
       }
       setNewTagText('');
+    } catch (err) {
+      console.warn("Yeni tag eklenirken hata oluştu", err);
     } finally {
       setLoadingId(null);
     }
@@ -233,7 +237,7 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
         {/* Çoklu Seçmeli Açılır Liste (Dropdown) */}
         <div className="relative">
           <button 
-            onClick={() => setIsAddingTag(!isAddingTag)} 
+            onClick={(e) => { e.stopPropagation(); setIsAddingTag(!isAddingTag); }} 
             className="px-3 py-2 bg-white border border-neutral-200 text-neutral-700 hover:text-blue-700 hover:border-blue-300 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
           >
             <Tag size={13} />
@@ -245,7 +249,7 @@ const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag, availableTag
             <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
               <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
                 {safeArray(availableTags).map(t => {
-                  const tagStr = String(t.tag_name || t).replace('#', '');
+                  const tagStr = String(t.tag_name || t.name || t).replace('#', '');
                   const isSelected = localTags.includes(tagStr);
                   return (
                     <label key={t.id || tagStr} className="flex items-center gap-2 p-2 hover:bg-blue-50/50 rounded-lg cursor-pointer text-[11px] font-bold text-neutral-700 transition">
@@ -325,16 +329,17 @@ export default function AdminDashboard() {
   const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
   const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
   
-  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN
+  // ⭐ TAGS HER ZAMAN ÇEKİLMELİ Kİ WOZ KARTINDAKİ DROPDOWN DOLU GELSİN ⭐
   const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher);
 
-  const pendingRequests = safeArray(rawPendingRequests?.requests);
-  const providers = safeArray(rawProviders?.providers);
-  const matchedRequests = safeArray(rawMatchedRequests?.requests);
-  const smsLogs = safeArray(rawSmsLogs?.notifications);
-  const features = safeArray(rawFeatures?.features);
-  const tests = safeArray(rawTests?.tests);
-  const tags = safeArray(rawTags?.tags);
+  // ⭐ GÜVENLİ ARRAY DÖNÜŞÜMLERİ (Backend format hatalarını önler) ⭐
+  const pendingRequests = useMemo(() => safeArray(rawPendingRequests?.requests || rawPendingRequests), [rawPendingRequests]);
+  const providers = useMemo(() => safeArray(rawProviders?.providers || rawProviders), [rawProviders]);
+  const matchedRequests = useMemo(() => safeArray(rawMatchedRequests?.requests || rawMatchedRequests), [rawMatchedRequests]);
+  const smsLogs = useMemo(() => safeArray(rawSmsLogs?.notifications || rawSmsLogs), [rawSmsLogs]);
+  const features = useMemo(() => safeArray(rawFeatures?.features || rawFeatures), [rawFeatures]);
+  const tests = useMemo(() => safeArray(rawTests?.tests || rawTests), [rawTests]);
+  const tags = useMemo(() => safeArray(rawTags?.tags || rawTags), [rawTags]);
   
   const [localSettings, setLocalSettings] = useState({
     pool_lifespan_hours: 72,
@@ -470,7 +475,7 @@ export default function AdminDashboard() {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
 
-  // Tag Ekle (Woz)
+  // ⭐ YENİ: Tag Ekle (Talebe Ekle & İstenirse Global Listeye Ekle)
   const handleAddTagToWozRequest = useCallback(async (requestId, newTag, addToGlobalList = false) => {
     try {
       if (addToGlobalList) {
@@ -481,20 +486,20 @@ export default function AdminDashboard() {
         }).catch(() => {}); // Zaten varsa hatayı yut
         mutateTags();
       }
-      await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag });
+      await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag }).catch(() => {});
       mutatePending();
     } catch (err) {
-      console.error("Tag ekleme hatası:", err);
+      console.warn("API hazır olmayabilir (Tag Ekle):", err);
     }
   }, [API_BASE, mutatePending, mutateTags]);
 
-  // Tag Çıkar (Woz)
+  // ⭐ YENİ: Tag Çıkar (Woz Kartından Anında Sil)
   const handleRemoveTagFromWozRequest = useCallback(async (requestId, tagToRemove) => {
     try {
-      await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`);
+      await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`).catch(() => {});
       mutatePending();
     } catch (err) {
-      console.error("Tag silme hatası:", err);
+      console.warn("API hazır olmayabilir (Tag Çıkar):", err);
     }
   }, [API_BASE, mutatePending]);
 
