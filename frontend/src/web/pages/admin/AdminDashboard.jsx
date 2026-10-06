@@ -7,7 +7,7 @@ import {
   Download, Upload, Layers, FileCheck2, FolderKanban, Settings, 
   Plus, Search, Trash2, Clock, ExternalLink, ArrowUp, ArrowDown, 
   ArrowUpDown, X, ChevronUp, ChevronDown, Loader2, Timer,
-  FileText, Bell, Filter, Activity, Briefcase, Tag, Star
+  FileText, Bell, Filter, Activity, Briefcase, Tag, Star, Check
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { safeArray, safeString, safeLower, getKeywordMetrics, extractAddress, cleanContact, safeDateTime, safeDate } from '../../../core/utils/helpers';
@@ -145,32 +145,103 @@ const MatchedRequestRow = React.memo(({ req, onDelete, localSettings }) => {
   );
 });
 
-const WozCard = React.memo(({ req, onAssign }) => (
-  <div className="p-4 bg-neutral-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
-        {req.request_type === 'BILDIRIM' ? (
-          <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
-        ) : (
-          <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
-        )}
-        {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
-        {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
-      </div>
-      <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
-      {Array.isArray(req.tags) && req.tags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 mt-1">
-          {req.tags.map((t, idx) => (
-            <span key={idx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[9px] font-mono font-bold">
-              #{String(t).replace('#', '')}
-            </span>
-          ))}
+// ⭐ YENİ: TAG EKLEME ÖZELLİKLİ WOZ KARTI ⭐
+const WozCard = React.memo(({ req, onAssign, onAddTag, onRemoveTag }) => {
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAdd = async () => {
+    if (!newTag.trim()) return;
+    setLoading(true);
+    await onAddTag(req.id, newTag.trim());
+    setNewTag('');
+    setIsAddingTag(false);
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-4 bg-neutral-50 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition hover:border-neutral-300">
+      <div className="space-y-1.5 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-mono text-neutral-400 font-bold">#REQ-{req.id}</span>
+          {req.request_type === 'BILDIRIM' ? (
+            <span className="text-[9px] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-amber-700 flex items-center gap-1"><Bell size={10} /> BİLDİRİM</span>
+          ) : (
+            <span className="text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-700 flex items-center gap-1"><FileText size={10} /> TALEP</span>
+          )}
+          {req.created_at && <span className="text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Clock size={10} /> {safeDateTime(req.created_at)}</span>}
+          {req.is_urgent && <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-bold border border-rose-200 text-[10px]">ACİL</span>}
         </div>
-      )}
-      <span className="text-[11px] text-neutral-500 block">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
+        <p className="font-semibold text-neutral-950 text-sm mt-1">"{req.raw_text}"</p>
+        
+        {/* Talepteki Etiketleri Göster */}
+        {Array.isArray(req.tags) && req.tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            {req.tags.map((t, idx) => (
+              <span key={idx} className="group px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[9px] font-mono font-bold flex items-center gap-1 shadow-2xs transition-colors hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200">
+                <Tag size={9} className="text-blue-500 group-hover:text-rose-500" />
+                #{String(t).replace('#', '')}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onRemoveTag(req.id, String(t).replace('#', '')); }} 
+                  className="p-0.5 ml-0.5 hover:bg-rose-200/50 rounded-full transition-colors opacity-50 group-hover:opacity-100"
+                  title="Etiketi Sil"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        
+        <span className="text-[11px] text-neutral-500 block pt-1">👤 {cleanContact(req.contact_value)} | 📍 {extractAddress(req.location)}</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-center mt-3 sm:mt-0">
+        {/* Tag Ekleme Inputu ve Butonları */}
+        {isAddingTag ? (
+          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-300 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+            <input 
+              type="text" 
+              value={newTag} 
+              onChange={(e) => setNewTag(e.target.value)} 
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              placeholder="Yeni tag..." 
+              className="w-24 p-1.5 text-[11px] outline-none font-medium bg-transparent text-neutral-800"
+              autoFocus
+            />
+            <button disabled={loading} onClick={handleAdd} className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md cursor-pointer transition disabled:opacity-50">
+              {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+            </button>
+            <button disabled={loading} onClick={() => setIsAddingTag(false)} className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-md cursor-pointer transition disabled:opacity-50">
+              <X size={13} />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setIsAddingTag(true)} className="px-3 py-2 bg-white border border-neutral-200 text-neutral-700 hover:text-blue-700 hover:border-blue-300 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+            <Tag size={13} />
+            <span>Tag Ekle</span>
+          </button>
+        )}
+        <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0 cursor-pointer">Sağlayıcı Seç & Ata</button>
+      </div>
     </div>
-    <button onClick={() => onAssign(req)} className="px-3.5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-semibold shadow-sm transition hover:bg-neutral-800 shrink-0">Sağlayıcı Seç & Ata</button>
+  );
+});
+
+const ProviderCard = React.memo(({ prov, onEdit, onDelete, onConnect }) => (
+  <div className="p-3.5 bg-neutral-50 rounded-xl border shadow-xs">
+    <h3 className="font-bold text-neutral-900">{prov.name}</h3>
+    <p className="text-[11px] text-blue-700 font-mono mt-0.5">📞 {prov.phone}</p>
+    <div className="mt-2 pt-2 border-t flex items-center justify-between">
+      <div className="flex space-x-2">
+        <button onClick={() => onEdit(prov)} className="text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition">Düzenle</button>
+        <button onClick={() => onDelete(prov.id)} className="text-rose-600 hover:text-rose-800 text-xs font-semibold transition">Sil</button>
+      </div>
+      <button onClick={() => onConnect(prov.phone)} className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center space-x-1 transition" title="Bu sağlayıcı olarak giriş yap">
+        <ExternalLink size={12} /><span>Bağlan</span>
+      </button>
+    </div>
   </div>
 ));
 
@@ -196,7 +267,6 @@ export default function AdminDashboard() {
   const { data: rawFeatures, mutate: mutateFeatures } = useSWR(`${API_BASE}/features`, fetcher);
   const { data: rawTests, mutate: mutateTests } = useSWR(`${API_BASE}/tests`, fetcher);
   
-  // ⭐ YENİ: TAGS SWR ⭐
   const { data: rawTags, mutate: mutateTags } = useSWR(`${API_BASE}/tags`, fetcher, { refreshInterval: adminTab === 'TAGS' ? 10000 : 0 });
 
   const pendingRequests = safeArray(rawPendingRequests?.requests);
@@ -234,7 +304,6 @@ export default function AdminDashboard() {
   const [searchSmsText, setSearchSmsText] = useState('');
   const [smsRecipientFilter, setSmsRecipientFilter] = useState('ALL');
   
-  // Tag States
   const [searchTagText, setSearchTagText] = useState('');
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [editingTagId, setEditingTagId] = useState(null);
@@ -252,7 +321,6 @@ export default function AdminDashboard() {
     await Promise.all([mutatePending(), mutateProviders(), mutateMatched(), mutateSms(), mutateFeatures(), mutateTests(), mutateSettings(), mutateTags()]);
   };
 
-  // --- ETİKET (TAG) İŞLEMLERİ ---
   const handleEditTagClick = useCallback((tagItem) => {
     setEditingTagId(tagItem.id);
     setTagFormData({
@@ -310,7 +378,6 @@ export default function AdminDashboard() {
   }), [tags, searchTagText]);
 
 
-  // --- DİĞER İŞLEMLER ---
   const handleDeleteRequest = useCallback(async (requestId) => { 
     if (!window.confirm('Bu talebi silmek istediğinize emin misiniz?')) return; 
     try { await axios.delete(`${API_BASE}/requests/${Number(requestId)}`); await mutateMatched(); } catch {} 
@@ -343,6 +410,25 @@ export default function AdminDashboard() {
   const handleWozAssignClick = useCallback((req) => {
     setWozAssignModalReq(req); setWozProviderSearch('');
   }, []);
+
+  const handleAddTagToWozRequest = useCallback(async (requestId, newTag) => {
+    try {
+      await axios.post(`${API_BASE}/requests/${requestId}/tags`, { tag: newTag });
+      await mutatePending();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Tag eklenirken hata oluştu. Lütfen Backend tarafında POST /requests/:id/tags rotasının tanımlı olduğundan emin olun.');
+    }
+  }, [API_BASE, mutatePending]);
+
+  // ⭐ YENİ: Havuzdaki Talepten Anlık Etiket Çıkarma ⭐
+  const handleRemoveTagFromWozRequest = useCallback(async (requestId, tagToRemove) => {
+    try {
+      await axios.delete(`${API_BASE}/requests/${requestId}/tags/${encodeURIComponent(tagToRemove)}`);
+      await mutatePending();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Tag silinirken hata oluştu.');
+    }
+  }, [API_BASE, mutatePending]);
 
   const handleRequestSort = useCallback((key) => { 
     setSortConfig(prevConfig => {
@@ -502,12 +588,10 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <h2 className="text-2xl font-bold text-neutral-950">Sistem Yönetim Paneli</h2>
         
-        {/* Üst Sekmeler / Menü Çubuğu */}
         <div className="flex flex-wrap items-center gap-1.5 bg-neutral-100 p-1.5 rounded-xl border text-xs font-semibold">
           <button onClick={() => setAdminTab('WOZ')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'WOZ' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>WoZ Havuzu ({pendingRequests.length})</button>
           <button onClick={() => setAdminTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg transition ${adminTab === 'PROVIDERS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>Sağlayıcılar ({filteredProviders.length}/{providers.length})</button>
           
-          {/* ⭐ YENİ: TAGS SEKMESİ */}
           <button onClick={() => setAdminTab('TAGS')} className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${adminTab === 'TAGS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Tag size={14} /><span>Etiketler</span>
           </button>
@@ -583,7 +667,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ⭐ YENİ: ETİKETLER (TAGS) SEKMESİ ⭐ */}
       {adminTab === 'TAGS' && (
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm flex flex-col">
           <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-t-2xl">
@@ -681,7 +764,7 @@ export default function AdminDashboard() {
                <div className="text-center text-xs text-neutral-400 py-6">Havuzda bekleyen talep yok.</div>
             ) : (
               sortedWozRequests.map((req) => (
-                <WozCard key={req.id} req={req} onAssign={handleWozAssignClick} />
+                <WozCard key={req.id} req={req} onAssign={handleWozAssignClick} onAddTag={handleAddTagToWozRequest} onRemoveTag={handleRemoveTagFromWozRequest} />
               ))
             )}
           </div>
@@ -1144,6 +1227,38 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Firma Adı *</label><input type="text" value={modalFormData.name} onChange={(e) => setModalFormData({ ...modalFormData, name: e.target.value })} className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950" /></div><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Telefon *</label><input type="tel" value={modalFormData.phone} onChange={(e) => setModalFormData({ ...modalFormData, phone: e.target.value })} className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950" /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">E-posta</label><input type="email" value={modalFormData.email} onChange={(e) => setModalFormData({ ...modalFormData, email: e.target.value })} className="w-full p-2.5 text-xs rounded-xl border outline-none focus:border-neutral-950" /></div><div><label className="block text-[10px] font-mono uppercase font-semibold text-neutral-500 mb-1">Öncelik Skoru</label><input type="number" value={modalFormData.priorityScore} onChange={(e) => setModalFormData({ ...modalFormData, priorityScore: e.target.value })} className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950" /></div></div>
               <div><div className="flex items-center justify-between mb-1.5"><label className="text-[10px] font-mono uppercase font-semibold text-neutral-500">Anahtar Kelimeler *</label><span className={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT ? 'text-rose-600' : 'text-neutral-500'}>{modalKwMetrics.wordCount} / {MAX_KEYWORD_COUNT} Kelime</span></div><textarea rows={3} maxLength={MAX_KEYWORD_CHARS} value={modalFormData.serviceKeywords} onChange={(e) => setModalFormData({ ...modalFormData, serviceKeywords: e.target.value })} placeholder="virgülle ayırarak yazın..." className="w-full p-2.5 text-xs font-mono rounded-xl border outline-none focus:border-neutral-950 resize-none bg-neutral-50" /></div>
+              
+              <div className="pt-2 border-t border-neutral-100">
+                <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1.5 font-bold block">
+                  Uzmanlık Etiketleri (Tags)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {['Tesisat', 'Boya', 'Elektrik', 'Nakliyat', 'Temizlik', 'Marangoz', 'Kombi', 'Beyaz Eşya', 'Montaj', 'Acil', 'Yalıtım', 'Çatı', 'Cam'].map(tag => {
+                    const isSelected = safeArray(modalFormData.tags).includes(tag);
+                    return (
+                      <label 
+                        key={tag} 
+                        className={`px-2 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition flex items-center gap-1 ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs' : 'bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-50'}`}
+                      >
+                        <input 
+                          type="checkbox" 
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newTags = e.target.checked 
+                              ? [...safeArray(modalFormData.tags), tag] 
+                              : safeArray(modalFormData.tags).filter(t => t !== tag);
+                            setModalFormData({ ...modalFormData, tags: newTags });
+                          }} 
+                        />
+                        {isSelected && <Tag size={10} className="text-blue-500" />}
+                        {tag}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-3 border-t border-neutral-100"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Vazgeç</button><button type="button" onClick={handleAdminSaveProvider} disabled={modalKwMetrics.wordCount > MAX_KEYWORD_COUNT || modalKwMetrics.charCount > MAX_KEYWORD_CHARS} className="px-5 py-2 bg-neutral-950 text-white rounded-xl text-xs font-bold shadow-sm">Kaydet</button></div>
             </div>
           </div>
