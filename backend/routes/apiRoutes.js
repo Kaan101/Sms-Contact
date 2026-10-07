@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-app.use('/api', require('./routes/apiRoutes'));
 
 // --- BÜTÜN CONTROLLER İÇE AKTARIMLARI (DÜZENLİ) ---
 const { sendOtp, verifyOtp } = require('../controllers/authController');
@@ -22,7 +21,9 @@ const {
   getOutboundNotifications,
   deleteRequest,
   upsertProviderRequestDetails,
-  createDirectReorder 
+  createDirectReorder,
+  addTagToRequest,        
+  removeTagFromRequest    
 } = require('../controllers/requestController');
 const { getFeatures, createFeature, updateFeature, deleteFeature } = require('../controllers/featureController');
 const { submitReview, getReviewsByRequest } = require('../controllers/reviewController');
@@ -35,6 +36,9 @@ const {
   removeRequestFromList, 
   getListRequests 
 } = require('../controllers/listController');
+
+// ⭐ TAGS CONTROLLER İÇE AKTARIMI (Eksiksiz)
+const { getTags, createTag, updateTag, deleteTag } = require('../controllers/tagController');
 
 // 1. Auth / OTP
 router.post('/auth/send-otp', sendOtp);
@@ -51,15 +55,11 @@ router.post('/disambiguate', checkDisambiguation);
 // 4. ÖZEL LİSTELER (CUSTOM LISTS)
 // ==========================================
 router.post('/lists', createList);
-router.post('/lists/:listId/requests', addRequestToList); // Listeye talep ekle
-router.get('/lists/:listId/requests', getListRequests); // Listenin içindeki talepleri getir
-router.delete('/lists/:listId/requests/:requestId', removeRequestFromList); // Listeden tekil talep çıkar
-router.delete('/lists/:listId', deleteList); // Tüm listeyi sil
-
-// ⭐ DİKKAT: İçinde dinamik parametre (:ownerType/:ownerId) olan bu rota EN ALTTA olmalı!
-// Yoksa üstteki /requests kelimesini ownerId zannedip boş döndürür.
+router.post('/lists/:listId/requests', addRequestToList);
+router.get('/lists/:listId/requests', getListRequests);
+router.delete('/lists/:listId/requests/:requestId', removeRequestFromList);
+router.delete('/lists/:listId', deleteList);
 router.get('/lists/:ownerType/:ownerId', getListsByOwner);
-
 
 // 5. Servis Sağlayıcılar
 router.post('/providers', registerProvider);
@@ -88,8 +88,11 @@ router.post('/requests/:requestId/status', updateRequestStatus);
 router.post('/requests/:requestId/providers/:providerId/details', upsertProviderRequestDetails);
 router.delete('/requests/:requestId', deleteRequest);
 
-// ==========================================
+// Talep Bazlı Tag Ekleme / Çıkarma Rotaları
+router.post('/requests/:requestId/tags', addTagToRequest);
+router.delete('/requests/:requestId/tags/:tagName', removeTagFromRequest);
 
+// ==========================================
 // 7. Bildirimler
 router.get('/notifications', getOutboundNotifications);
 
@@ -108,5 +111,13 @@ router.get('/tests', getTests);
 router.post('/tests', createTest);
 router.put('/tests/:id', updateTest);
 router.delete('/tests/:id', deleteTest);
+
+// ==========================================
+// 11. GLOBAL ETİKETLER (LOOKUP_TAGS) YÖNETİMİ
+// ==========================================
+router.get('/tags', getTags);
+router.post('/tags', createTag);
+router.put('/tags/:id', updateTag);
+router.delete('/tags/:id', deleteTag);
 
 module.exports = router;
