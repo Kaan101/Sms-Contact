@@ -71,7 +71,6 @@ const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime, requestType } = req.body;
     
-    // Dinamik etiketleri tespit et
     const detectedTags = await autoTagRequest(rawText);
 
     const { rows: requestRows } = await pool.query(
@@ -518,7 +517,7 @@ const upsertProviderRequestDetails = async (req, res) => {
     } else {
       const insertRes = await pool.query(
         `INSERT INTO request_provider_details 
-           (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description, created_at, updated_at)
+            (request_id, provider_id, provider_budget, provider_currency, provider_target_date, provider_description, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
          RETURNING *`,
         [
@@ -609,7 +608,6 @@ const createDirectReorder = async (req, res) => {
       targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
     }
 
-    // Reorder edilen metin için de etiketleri tespit et
     const detectedTags = await autoTagRequest(rawText);
 
     const insertReqQuery = `
@@ -649,6 +647,42 @@ const createDirectReorder = async (req, res) => {
   }
 };
 
+// --- TALEP BAZLI ETİKET (TAG) YÖNETİMİ ---
+
+const addTagToRequest = async (req, res) => {
+  const { requestId } = req.params;
+  const { tag } = req.body;
+  try {
+    const result = await pool.query(`
+      UPDATE requests 
+      SET tags = ARRAY(
+        SELECT DISTINCT UNNEST(array_append(COALESCE(tags, '{}'), $1))
+      )
+      WHERE id = $2 RETURNING *`, 
+      [tag, requestId]
+    );
+    res.json({ message: 'Tag eklendi', request: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ message: 'Tag eklenemedi', error: error.message });
+  }
+};
+
+const removeTagFromRequest = async (req, res) => {
+  const { requestId, tagName } = req.params;
+  try {
+    const result = await pool.query(`
+      UPDATE requests 
+      SET tags = array_remove(COALESCE(tags, '{}'), $1) 
+      WHERE id = $2 RETURNING *`, 
+      [tagName, requestId]
+    );
+    res.json({ message: 'Tag çıkarıldı', request: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ message: 'Tag çıkarılamadı', error: error.message });
+  }
+};
+
+// --- DIŞA AKTARIM (EXPORT) ---
 module.exports = {
   createRequest,
   getOpenPoolRequests, 
@@ -664,5 +698,7 @@ module.exports = {
   getOutboundNotifications,
   deleteRequest,
   upsertProviderRequestDetails,
-  createDirectReorder
+  createDirectReorder,
+  addTagToRequest,
+  removeTagFromRequest
 };
