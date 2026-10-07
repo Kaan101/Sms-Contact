@@ -1,38 +1,26 @@
 const { pool } = require('../config/db'); 
 
-// 🚀 SİHİRLİ DOKUNUŞ: Tablo yoksa otomatik oluşturan fonksiyon
-const ensureTagsTable = async () => {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS tags (
-            id SERIAL PRIMARY KEY,
-            tag_name VARCHAR(100) NOT NULL UNIQUE,
-            keywords TEXT[] DEFAULT '{}',
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-    `);
-};
-
+// 1. Etiketleri lookup_tags tablosundan getir
 const getTags = async (req, res) => {
     try {
-        await ensureTagsTable(); // Tablo yoksa önce oluştur
-        const result = await pool.query('SELECT * FROM tags ORDER BY id DESC');
+        const result = await pool.query('SELECT * FROM lookup_tags ORDER BY id DESC');
         res.json({ tags: result.rows });
     } catch (error) {
-        console.error("Tags Çekme Hatası:", error.message);
+        // Eğer lookup_tags tablosu yoksa boş dön
+        if (error.code === '42P01') { 
+            return res.json({ tags: [] }); 
+        }
         res.status(500).json({ message: 'Etiketler çekilemedi', error: error.message });
     }
 };
 
+// 2. lookup_tags tablosuna yeni etiket ekle veya güncelle
 const createTag = async (req, res) => {
     const { tag_name, keywords, is_active } = req.body;
     
     try {
-        await ensureTagsTable(); // Tablo yoksa önce oluştur
-        
-        // EXCLUDED keyword'ü PostgreSQL'de güncelleme (UPSERT) işlemi için en güvenli yöntemdir
         const result = await pool.query(
-            `INSERT INTO tags (tag_name, keywords, is_active) 
+            `INSERT INTO lookup_tags (tag_name, keywords, is_active) 
              VALUES ($1, $2, $3) 
              ON CONFLICT (tag_name) 
              DO UPDATE SET keywords = EXCLUDED.keywords, is_active = EXCLUDED.is_active 
@@ -46,13 +34,13 @@ const createTag = async (req, res) => {
     }
 };
 
+// 3. lookup_tags tablosundaki etiketi güncelle
 const updateTag = async (req, res) => {
     const { id } = req.params;
     const { tag_name, keywords, is_active } = req.body;
     try {
-        await ensureTagsTable();
         const result = await pool.query(
-            'UPDATE tags SET tag_name = $1, keywords = $2, is_active = $3 WHERE id = $4 RETURNING *',
+            'UPDATE lookup_tags SET tag_name = $1, keywords = $2, is_active = $3 WHERE id = $4 RETURNING *',
             [tag_name, keywords || [], is_active ?? true, id]
         );
         res.json({ message: 'Etiket güncellendi', tag: result.rows[0] });
@@ -62,13 +50,14 @@ const updateTag = async (req, res) => {
     }
 };
 
+// 4. lookup_tags tablosundan etiket sil
 const deleteTag = async (req, res) => {
     const { id } = req.params;
     try {
-        await ensureTagsTable();
-        await pool.query('DELETE FROM tags WHERE id = $1', [id]);
+        await pool.query('DELETE FROM lookup_tags WHERE id = $1', [id]);
         res.json({ message: 'Etiket silindi' });
     } catch (error) {
+        console.error("DB Tag Silme Hatası:", error.message);
         res.status(500).json({ message: 'Etiket silinemedi', error: error.message });
     }
 };
