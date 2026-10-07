@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+app.use('/api', require('./routes/apiRoutes'));
 
 // --- BÜTÜN CONTROLLER İÇE AKTARIMLARI (DÜZENLİ) ---
 const { sendOtp, verifyOtp } = require('../controllers/authController');
