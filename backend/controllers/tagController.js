@@ -3,28 +3,25 @@ const { pool } = require('../config/db');
 // 1. Etiketleri lookup_tags tablosundan getir
 const getTags = async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM lookup_tags ORDER BY id DESC');
+        const result = await pool.query('SELECT id, tag_name, keywords, is_active, created_at FROM lookup_tags ORDER BY id DESC');
         res.json({ tags: result.rows });
     } catch (error) {
-        // Eğer lookup_tags tablosu yoksa boş dön
-        if (error.code === '42P01') { 
-            return res.json({ tags: [] }); 
-        }
+        console.error("GET Tags Hatası:", error.message);
         res.status(500).json({ message: 'Etiketler çekilemedi', error: error.message });
     }
 };
 
-// 2. lookup_tags tablosuna yeni etiket ekle veya güncelle
+// 2. lookup_tags tablosuna yeni etiket ekle
 const createTag = async (req, res) => {
     const { tag_name, keywords, is_active } = req.body;
     
     try {
         const result = await pool.query(
-            `INSERT INTO lookup_tags (tag_name, keywords, is_active) 
-             VALUES ($1, $2, $3) 
+            `INSERT INTO lookup_tags (tag_name, keywords, is_active, created_at) 
+             VALUES ($1, $2, $3, NOW()) 
              ON CONFLICT (tag_name) 
              DO UPDATE SET keywords = EXCLUDED.keywords, is_active = EXCLUDED.is_active 
-             RETURNING *`,
+             RETURNING id, tag_name, keywords, is_active, created_at`,
             [tag_name, keywords || [], is_active ?? true]
         );
         res.status(201).json({ message: 'Etiket oluşturuldu', tag: result.rows[0] });
@@ -40,7 +37,7 @@ const updateTag = async (req, res) => {
     const { tag_name, keywords, is_active } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE lookup_tags SET tag_name = $1, keywords = $2, is_active = $3 WHERE id = $4 RETURNING *',
+            'UPDATE lookup_tags SET tag_name = $1, keywords = $2, is_active = $3 WHERE id = $4 RETURNING id, tag_name, keywords, is_active, created_at',
             [tag_name, keywords || [], is_active ?? true, id]
         );
         res.json({ message: 'Etiket güncellendi', tag: result.rows[0] });
