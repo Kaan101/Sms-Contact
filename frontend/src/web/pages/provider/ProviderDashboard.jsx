@@ -5,7 +5,7 @@ import {
   Briefcase, CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   Send, Sparkles, AlertCircle, Timer, Star, Check, X, RefreshCw,
   Folder, Calendar, DollarSign, FileText, ChevronDown, ChevronUp, Loader2,
-  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle, Settings
+  User, Award, ShieldCheck, Tag, ArrowRight, AlignLeft, PhoneCall, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../../../core/context/AuthContext';
 import { 
@@ -173,7 +173,6 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
           </div>
           <h4 className="text-sm font-bold text-neutral-950 mt-1">"{req.raw_text}"</h4>
 
-          {/* ⭐ ATANAN TALEP ÜZERİNDE ETİKETLER ⭐ */}
           {Array.isArray(req.tags) && req.tags.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               {req.tags.map((tagItem, tIdx) => (
@@ -227,63 +226,50 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
         )}
       </div>
 
-      {/* ŞARTLAR PANELİ: MATCHED AŞAMASINDA SALT OKUNUR (KİLİTLİ) */}
+      {/* ŞARTLAR PANELİ: DÜZENLENEBİLİR */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
             <DollarSign size={14} className="text-emerald-600" />
-            <span>{reqStatus === 'MATCHED' ? 'Kabul Edilen Teklif Şartlarınız' : 'Onaylanan Şartlar'}</span>
+            <span>Teklif ve Şartlar (Düzenlenebilir)</span>
           </span>
         </div>
 
-        {reqStatus === 'MATCHED' ? (
-          <div className="space-y-3 pt-1 animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Son Tutar (TRY)</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={budget ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}
-                  className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none cursor-not-allowed"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Son Teslimat Tarihi</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}
-                  className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none cursor-not-allowed"
-                />
-              </div>
+        <div className="space-y-3 pt-1 animate-in fade-in duration-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Tutar (TRY)</label>
+              <input
+                type="number"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                placeholder="Örn: 1500"
+                className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 bg-white text-neutral-900 outline-none focus:border-neutral-900"
+              />
             </div>
             <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
-                <AlignLeft size={11} /> <span>Teklif Notu / Açıklama</span>
-              </label>
-              <textarea
-                rows={2}
-                readOnly
-                value={description || 'Açıklama girilmemiş.'}
-                className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-neutral-100 text-neutral-600 outline-none resize-none font-medium cursor-not-allowed"
+              <label className="text-[10px] font-mono uppercase text-neutral-500 block mb-1 font-bold">Hedef Teslimat Tarihi</label>
+              <input
+                type="datetime-local"
+                value={targetDate}
+                onChange={(e) => setTargetDate(e.target.value)}
+                className="w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 bg-white text-neutral-900 outline-none focus:border-neutral-900"
               />
             </div>
           </div>
-        ) : (
-          <div className="space-y-2 text-xs font-mono animate-in fade-in duration-200">
-            <div className="flex flex-wrap gap-4">
-              <div><span className="text-neutral-500">Maliyet / Tutar: </span><strong className="text-emerald-700 font-bold text-sm">{budget !== '' ? `${new Intl.NumberFormat('tr-TR').format(Number(budget))} TRY` : 'Belirtilmedi'}</strong></div>
-              <div><span className="text-neutral-500">Hedef Teslimat: </span><strong className="text-neutral-900 font-bold">{targetDate ? safeDateTime(targetDate) : 'Belirtilmedi'}</strong></div>
-            </div>
-            {description && (
-              <div className="pt-1 text-[11px] font-sans text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200/60 shadow-xs">
-                <span className="font-bold text-neutral-500 block text-[10px] uppercase font-mono mb-0.5">Sağlayıcı Notu:</span>
-                <p className="italic text-neutral-800 leading-relaxed">"{description}"</p>
-              </div>
-            )}
+          <div>
+            <label className="text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold flex items-center gap-1">
+              <AlignLeft size={11} /> <span>Teklif Notu / Açıklama</span>
+            </label>
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Müşteriye iletmek istediğiniz özel not veya şart..."
+              className="w-full p-2 text-xs rounded-lg border border-neutral-200 bg-white text-neutral-900 outline-none resize-none font-medium focus:border-neutral-900"
+            />
           </div>
-        )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between pt-1 border-t border-neutral-100 flex-wrap gap-2">
@@ -365,35 +351,6 @@ export default function ProviderDashboard() {
   const [expandedPoolReqId, setExpandedPoolReqId] = useState(null);
   const [poolBidData, setPoolBidData] = useState({ budget: '', targetDate: '', description: '' });
 
-  // ⭐ YENİ: PROFİL GÜNCELLEME STATE'LERİ ⭐
-  const [profileData, setProfileData] = useState({
-    name: provider.name || '',
-    email: provider.email || '',
-    serviceKeywords: safeArray(provider.service_keywords).join(', ') || '',
-    tags: safeArray(provider.tags) || []
-  });
-  const [isProfileUpdating, setIsProfileUpdating] = useState(false);
-  const [profileFeedback, setProfileFeedback] = useState(null);
-  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
-
-  // Örnek etiket listesi
-  const availableTags = [
-    'Tesisat', 'Boya', 'Elektrik', 'Nakliyat', 'Temizlik', 'Marangoz',
-    'Kombi', 'Beyaz Eşya', 'Montaj', 'Acil', 'Yalıtım', 'Çatı', 'Cam'
-  ];
-
-  // Profil yüklendiğinde formu doldur
-  useEffect(() => {
-    if (provider.id) {
-      setProfileData({
-        name: provider.name || '',
-        email: provider.email || '',
-        serviceKeywords: safeArray(provider.service_keywords).join(', ') || '',
-        tags: safeArray(provider.tags) || []
-      });
-    }
-  }, [provider]);
-
   const handleJoinPoolWithBid = async (requestId) => {
     if (!providerId) {
       setPoolFeedbackMap(prev => ({ ...prev, [requestId]: { type: 'error', text: 'Kimlik doğrulanamadı' } }));
@@ -426,49 +383,6 @@ export default function ProviderDashboard() {
     }
   };
 
-  // ⭐ PROFİL GÜNCELLEME İŞLEMİ ⭐
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    if (!providerId) return;
-    
-    setIsProfileUpdating(true);
-    setProfileFeedback(null);
-    
-    const keywordsArray = safeString(profileData.serviceKeywords).split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-
-    try {
-      await axios.put(`${API_BASE}/providers/${providerId}`, {
-        name: profileData.name.trim(),
-        phone: provider.phone, // Telefon değiştirilemez
-        email: profileData.email.trim() || null,
-        serviceKeywords: keywordsArray.slice(0, 50),
-        tags: profileData.tags, // Etiketler güncelleniyor
-        communicationChannels: ['PHONE', 'SMS', 'EMAIL', 'WHATSAPP'],
-        priorityScore: provider.priority_score || 100
-      });
-      
-      setProfileFeedback({ type: 'success', text: 'Profil başarıyla güncellendi!' });
-      mutateProviderInfo();
-    } catch (err) {
-      setProfileFeedback({ type: 'error', text: 'Profil güncellenemedi.' });
-    } finally {
-      setIsProfileUpdating(false);
-      setTimeout(() => setProfileFeedback(null), 4000);
-    }
-  };
-
-  // ⭐ TAG SEÇME/ÇIKARMA FONKSİYONU ⭐
-  const toggleTag = (tag) => {
-    setProfileData(prev => {
-      const currentTags = [...prev.tags];
-      if (currentTags.includes(tag)) {
-        return { ...prev, tags: currentTags.filter(t => t !== tag) };
-      } else {
-        return { ...prev, tags: [...currentTags, tag] };
-      }
-    });
-  };
-
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6 px-4 py-8">
       <div className="bg-white rounded-2xl border border-neutral-200/90 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -497,24 +411,19 @@ export default function ProviderDashboard() {
       </div>
 
       <div className="flex items-center justify-between border-b pb-3">
-        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold overflow-x-auto">
-          <button onClick={() => setActiveTab('ASSIGNED')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'ASSIGNED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl border text-xs font-semibold">
+          <button onClick={() => setActiveTab('ASSIGNED')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'ASSIGNED' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Briefcase size={14} /><span>Görevlerim ({assignedRequests.length})</span>
             {pendingCount > 0 && <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">{pendingCount}</span>}
           </button>
-          <button onClick={() => setActiveTab('POOL')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'POOL' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+          <button onClick={() => setActiveTab('POOL')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'POOL' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Sparkles size={14} /><span>Açık Havuz</span>
           </button>
-          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
+          <button onClick={() => setActiveTab('LISTS')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'LISTS' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
             <Folder size={14} /><span>Listelerim</span>
           </button>
-          
-          {/* ⭐ YENİ: PROFİL SEKMESİ ⭐ */}
-          <button onClick={() => setActiveTab('PROFILE')} className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'PROFILE' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}>
-            <Settings size={14} /><span>Profilim</span>
-          </button>
         </div>
-        <button onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }} className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs shrink-0" title="Yenile">
+        <button onClick={() => { mutateAssigned(); mutateProviderInfo(); mutatePool(); }} className="p-2 text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200 rounded-xl transition cursor-pointer shadow-xs" title="Yenile">
           <RefreshCw size={14} className={isValidatingAssigned ? 'animate-spin' : ''} />
         </button>
       </div>
@@ -570,7 +479,6 @@ export default function ProviderDashboard() {
                         </div>
                         <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
 
-                        {/* ⭐ HAVUZDAKİ İŞİN ÜZERİNDE ETİKETLER ⭐ */}
                         {Array.isArray(req.tags) && req.tags.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {req.tags.map((tagItem, tIdx) => (
@@ -620,156 +528,6 @@ export default function ProviderDashboard() {
       )}
 
       {activeTab === 'LISTS' && <CustomListsManager ownerType="PROVIDER" ownerId={session?.phone} onReworkRequest={() => {}} onDirectReorder={() => {}} />}
-
-      {/* ⭐ YENİ: PROFİL BİLGİLERİ SEKMESİ ⭐ */}
-      {activeTab === 'PROFILE' && (
-        <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
-          <div className="text-center space-y-1">
-            <h2 className="text-lg font-extrabold text-neutral-900">Profil Ayarları</h2>
-            <p className="text-xs text-neutral-500">Müşterilerin sizi bulabilmesi için iletişim ve hizmet bilgilerinizi güncel tutun.</p>
-          </div>
-
-          <form onSubmit={handleUpdateProfile} className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">Firma / Sağlayıcı Adı *</label>
-                <input 
-                  type="text" 
-                  required
-                  value={profileData.name} 
-                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                  placeholder="Örn: Ali Usta Tesisat"
-                  className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium transition"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">E-Posta Adresi</label>
-                <input 
-                  type="email" 
-                  value={profileData.email} 
-                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                  placeholder="iletisim@aliusta.com"
-                  className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-white outline-none focus:border-neutral-900 font-medium transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-600 block mb-1.5 font-bold">Kayıtlı Telefon Numarası</label>
-              <div className="w-full p-2.5 text-sm rounded-xl border border-neutral-200 bg-neutral-100 text-neutral-500 font-mono font-semibold flex items-center justify-between">
-                <span>{provider.phone || session?.phone}</span>
-                <span className="text-[10px] text-neutral-400 font-sans">Değiştirilemez</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-mono uppercase text-neutral-600 mb-1.5 font-bold flex justify-between items-center">
-                <span>Hizmet Alanları / Serbest Anahtar Kelimeler *</span>
-                <span className="text-[9px] text-neutral-400 font-medium normal-case">Virgülle ayırarak yazın (Maks 50)</span>
-              </label>
-              <textarea 
-                rows={2} 
-                required
-                value={profileData.serviceKeywords} 
-                onChange={(e) => setProfileData({ ...profileData, serviceKeywords: e.target.value })}
-                placeholder="Örn: tesisat, kombi, su kaçağı, petek temizleme..."
-                className="w-full p-3 text-sm rounded-xl border border-neutral-200 bg-neutral-50 focus:bg-white outline-none focus:border-neutral-900 font-medium transition resize-none leading-relaxed"
-              />
-            </div>
-
-            {/* ⭐ TAG / ETİKET SEÇİCİ ALAN ⭐ */}
-            <div className="pt-2 border-t border-neutral-100">
-              <label className="text-[10px] font-mono uppercase text-neutral-600 mb-2 font-bold block">
-                Uzmanlık Etiketleri (Tags)
-              </label>
-              
-              <div className="relative">
-                <button 
-                  type="button"
-                  onClick={() => setIsTagDropdownOpen(!isTagDropdownOpen)}
-                  className="w-full p-3 text-sm rounded-xl border border-neutral-200 bg-white outline-none font-medium flex items-center justify-between shadow-xs transition hover:bg-neutral-50 cursor-pointer"
-                >
-                  <span className="text-neutral-500">Etiket Listesinden Seçin...</span>
-                  <ChevronDown size={16} className={`text-neutral-400 transition-transform ${isTagDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isTagDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto p-2">
-                    {availableTags.map(tag => (
-                      <label 
-                        key={tag} 
-                        className="flex items-center gap-2 p-2 hover:bg-blue-50 rounded-lg cursor-pointer transition text-sm text-neutral-700 font-medium"
-                      >
-                        <input 
-                          type="checkbox" 
-                          checked={profileData.tags.includes(tag)}
-                          onChange={() => toggleTag(tag)}
-                          className="w-4 h-4 text-blue-600 border-neutral-300 rounded focus:ring-blue-500 cursor-pointer"
-                        />
-                        <span>{tag}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Seçilen Etiketlerin Rozet Olarak Gösterimi */}
-              {profileData.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {profileData.tags.map(tag => (
-                    <div 
-                      key={tag} 
-                      className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <Tag size={12} className="text-blue-500" />
-                      <span>#{tag}</span>
-                      <button 
-                        type="button" 
-                        onClick={() => toggleTag(tag)} 
-                        className="p-0.5 hover:bg-blue-200 rounded-full transition ml-1 cursor-pointer"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
-              <div>
-                {profileFeedback && (
-                  <span className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border animate-in fade-in duration-200 flex items-center gap-1.5 ${
-                    profileFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-                  }`}>
-                    {profileFeedback.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                    {profileFeedback.text}
-                  </span>
-                )}
-              </div>
-              
-              <button 
-                type="submit" 
-                disabled={isProfileUpdating || !profileData.name.trim() || !profileData.serviceKeywords.trim()}
-                className="px-6 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-xl text-sm font-bold shadow-sm transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isProfileUpdating ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Kaydediliyor...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check size={16} />
-                    <span>Profili Güncelle</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
     </div>
   );
 }
