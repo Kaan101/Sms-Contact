@@ -1,4 +1,6 @@
+// backend/controllers/requestController.js
 const { pool } = require('../config/db');
+const { calculateProviderScore } = require('../services/scoringService');
 
 // --- MASTER TAKSONOMİ VE OTOMATİK ETİKETLEME MOTORU ---
 let MASTER_TAXONOMY = {};
@@ -125,10 +127,18 @@ const getOpenPoolRequests = async (req, res) => {
     const { providerId } = req.query;
 
     let providerKeywords = [];
+    let providerInfo = null;
+
     if (providerId) {
-      const provRes = await pool.query(`SELECT service_keywords FROM service_providers WHERE id = $1`, [providerId]);
+      const provRes = await pool.query(
+        `SELECT sp.*, 
+          (SELECT AVG(rv.rating) FROM reviews rv JOIN requests req ON rv.request_id = req.id WHERE req.matched_provider_id = sp.id AND rv.reviewer_type = 'CUSTOMER') as avg_rating
+         FROM service_providers sp WHERE sp.id = $1`, 
+        [providerId]
+      );
       if (provRes.rows.length > 0) {
-        providerKeywords = provRes.rows[0].service_keywords || [];
+        providerInfo = provRes.rows[0];
+        providerKeywords = providerInfo.service_keywords || [];
       }
     }
 
@@ -153,10 +163,24 @@ const getOpenPoolRequests = async (req, res) => {
       });
     }
 
-    filteredPool = filteredPool.map(reqItem => ({
-      ...reqItem,
-      contact_value: '*** ** ** (Eşleşince Görünür)' 
-    }));
+    // Skorlama Motoru Entegrasyonu
+    if (providerInfo) {
+      filteredPool = filteredPool.map(reqItem => {
+        const score = calculateProviderScore(providerInfo, reqItem);
+        return {
+          ...reqItem,
+          match_score: score,
+          contact_value: '*** ** ** (Eşleşince Görünür)'
+        };
+      });
+
+      filteredPool.sort((a, b) => b.match_score - a.match_score);
+    } else {
+      filteredPool = filteredPool.map(reqItem => ({
+        ...reqItem,
+        contact_value: '*** ** ** (Eşleşince Görünür)' 
+      }));
+    }
 
     res.status(200).json({ status: 'success', poolRequests: filteredPool });
   } catch (error) {
@@ -686,7 +710,7 @@ const removeTagFromRequest = async (req, res) => {
 module.exports = {
   createRequest,
   getOpenPoolRequests, 
-  joinRequestPool,     
+  joinRequestPool,    
   getUserRequests,
   getProviderAssignedRequests,
   passToNextProvider,

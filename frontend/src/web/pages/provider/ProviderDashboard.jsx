@@ -491,12 +491,18 @@ export default function ProviderDashboard() {
                   <div key={req.id} className="bg-white rounded-xl border border-neutral-200 shadow-xs flex flex-col transition-all overflow-hidden">
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-mono font-bold text-neutral-400">#REQ-{req.id}</span>
                           <span className="text-[10px] font-mono text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">{safeDateTime(req.created_at)}</span>
                           {req.is_urgent && <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">ACİL</span>}
+                          {req.match_score !== undefined && (
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-mono font-extrabold flex items-center gap-1 shadow-2xs">
+                              <Sparkles size={11} className="text-emerald-600" />
+                              Uyum Skoru: %{req.match_score}
+                            </span>
+                          )}
                         </div>
-                        <h4 className="text-sm font-bold text-neutral-950">"{req.raw_text}"</h4>
+                        <h4 className="text-sm font-bold text-neutral-950 mt-1">"{req.raw_text}"</h4>
 
                         {Array.isArray(req.tags) && req.tags.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
