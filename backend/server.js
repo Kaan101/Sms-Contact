@@ -1,17 +1,16 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { pool, testDbConnection } = require('./config/db');
 const initDatabase = require('./config/initDb');
 const apiRoutes = require('./routes/apiRoutes');
+const { startCronJobs } = require('./services/cronJob');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ... diğer kodlar
-const { startCronJobs } = require('./services/cronJob');
-startCronJobs(); // Sunucu kalktığında botu da çalıştır
+// Sunucu kalktığında botu/cron işlerini başlat
+startCronJobs();
 
 // Middleware
 app.use(cors());
@@ -32,8 +31,7 @@ const startServer = async () => {
     await testDbConnection();
     
     // --- GÜVENLİ MIGRATION BAŞLANGICI ---
-    // Production'da bile olsak, sadece "eksik olan" kritik tabloları 
-try {
+    try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS request_provider_details (
             id SERIAL PRIMARY KEY,
@@ -42,7 +40,7 @@ try {
             provider_budget NUMERIC(10,2),
             provider_currency VARCHAR(10) DEFAULT 'TRY',
             provider_target_date TIMESTAMP WITH TIME ZONE,
-            provider_delivered_at TIMESTAMP WITH TIME ZONE, -- YENİ EKLENEN KOLON
+            provider_delivered_at TIMESTAMP WITH TIME ZONE,
             provider_description TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -55,8 +53,7 @@ try {
     }
     // --- GÜVENLİ MIGRATION BİTİŞİ ---
 
-    // Geliştirme (development) ortamında veya manuel bir komut verildiğinde initDb çalışsın,
-    // Canlı (production/Railway) ortamında tabloları SIFIRLAMASIN!
+    // Canlı (production) ortamında tabloları SIFIRLAMASIN
     if (process.env.NODE_ENV === 'development' || process.env.INIT_DB === 'true') {
         console.log('Tablo oluşturma/güncelleme (initDb) başlatılıyor...');
         await initDatabase();
@@ -64,13 +61,7 @@ try {
         console.log('Production ortamı: initDb (Tablo sıfırlama) atlandı.');
     }
 
-// service_providers tablosuna source (kaynak) kolonunu güvenli şekilde ekle
-    await pool.query(`
-      ALTER TABLE service_providers 
-      ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'MANUAL';
-    `);
-
-    // service_providers tablosuna genişletilmiş profil kolonlarını güvenli şekilde ekle
+    // service_providers tablosuna genişletilmiş profil kolonlarını ve kaynağı güvenli şekilde ekle
     await pool.query(`
       ALTER TABLE service_providers 
       ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'MANUAL',
@@ -85,14 +76,18 @@ try {
       ADD COLUMN IF NOT EXISTS description TEXT;
     `);
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Sunucu ${PORT} portunda aktif.`);
-    });
+    // Yerel geliştirme ortamında portu dinle
+    if (process.env.NODE_ENV !== 'production' || process.env.LOCAL_LISTEN === 'true') {
+      app.listen(PORT, () => {
+        console.log(`🚀 Sunucu ${PORT} portunda aktif.`);
+      });
+    }
   } catch (error) {
     console.error('Sunucu başlatma hatası:', error);
   }
-
-  
 };
 
 startServer();
+
+// Vercel serverless fonksiyon uyumluluğu için dışa aktar
+module.exports = app;
