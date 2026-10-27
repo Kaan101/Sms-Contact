@@ -19,7 +19,7 @@ const fetcher = (url) => axios.get(url).then(res => res.data);
 function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSettings, userLists }) {
   const reqStatus = safeUpper(req.status) || 'MATCHED';
   
-  // Sadece MATCHED (ilk teklif/onay aşaması) durumunda alanlar düzenlenebilir olsun.
+  // Sadece MATCHED aşamasında düzenlenebilir olsun.
   const isEditable = reqStatus === 'MATCHED';
 
   const isReorder = Boolean(
@@ -229,7 +229,7 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
         )}
       </div>
 
-      {/* ŞARTLAR PANELİ: MÜŞTERİ SEÇİMİNDEN SONRA (MATCHED HARİCİ) KİLİTLİ */}
+      {/* ŞARTLAR PANELİ: MATCHED DIŞINDA KESİNLİKLE KİLİTLİ */}
       <div className="bg-neutral-50 rounded-xl border border-neutral-200/80 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
@@ -245,13 +245,16 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
               <input
                 type="number"
                 disabled={!isEditable}
+                readOnly={!isEditable}
                 value={budget}
-                onChange={(e) => isEditable && setBudget(e.target.value)}
+                onChange={(e) => {
+                  if (isEditable) setBudget(e.target.value);
+                }}
                 placeholder="Örn: 1500"
                 className={`w-full p-2 text-xs font-mono font-bold rounded-lg border border-neutral-200 outline-none ${
                   isEditable 
                     ? 'bg-white text-neutral-900 focus:border-neutral-900' 
-                    : 'bg-neutral-100 text-neutral-500 cursor-not-allowed select-none'
+                    : 'bg-neutral-200 text-neutral-700 cursor-not-allowed select-none opacity-90'
                 }`}
               />
             </div>
@@ -260,12 +263,15 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
               <input
                 type="datetime-local"
                 disabled={!isEditable}
+                readOnly={!isEditable}
                 value={targetDate}
-                onChange={(e) => isEditable && setTargetDate(e.target.value)}
+                onChange={(e) => {
+                  if (isEditable) setTargetDate(e.target.value);
+                }}
                 className={`w-full p-2 text-xs font-mono rounded-lg border border-neutral-200 outline-none ${
                   isEditable 
                     ? 'bg-white text-neutral-900 focus:border-neutral-900' 
-                    : 'bg-neutral-100 text-neutral-500 cursor-not-allowed select-none'
+                    : 'bg-neutral-200 text-neutral-700 cursor-not-allowed select-none opacity-90'
                 }`}
               />
             </div>
@@ -277,13 +283,16 @@ function ProviderRequestCard({ req, providerId, API_BASE, onRefresh, systemSetti
             <textarea
               rows={2}
               disabled={!isEditable}
+              readOnly={!isEditable}
               value={description}
-              onChange={(e) => isEditable && setDescription(e.target.value)}
+              onChange={(e) => {
+                if (isEditable) setDescription(e.target.value);
+              }}
               placeholder="Müşteriye iletmek istediğiniz özel not veya şart..."
               className={`w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none resize-none font-medium ${
                 isEditable 
                   ? 'bg-white text-neutral-900 focus:border-neutral-900' 
-                  : 'bg-neutral-100 text-neutral-500 cursor-not-allowed select-none'
+                  : 'bg-neutral-200 text-neutral-700 cursor-not-allowed select-none opacity-90'
               }`}
             />
           </div>
