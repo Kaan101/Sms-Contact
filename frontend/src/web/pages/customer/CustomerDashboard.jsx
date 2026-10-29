@@ -651,7 +651,7 @@ function CustomerDashboardContent() {
               </div>
             </div>
           )}
-        </div>
+      </div>
       )}
 
       {activeTab === 'LISTS' ? (
@@ -671,7 +671,7 @@ function CustomerDashboardContent() {
               </div>
               <form onSubmit={handleCustomerCombinedSubmit} className="space-y-4">
                 <div className="bg-[#FAFBFD] rounded-xl border border-neutral-200 p-3 focus-within:ring-2 focus-within:ring-neutral-950 transition-all">
-                  
+                   
                   <div className="flex gap-2">
                     <textarea 
                       rows={2} 
@@ -690,7 +690,7 @@ function CustomerDashboardContent() {
                       <ChevronDown size={16} />
                     </button>
                   </div>
-                  
+                   
                   <div className="flex flex-wrap items-start gap-4 px-2 pb-3 pt-1 text-[11px] font-mono text-neutral-500">
                     <div className="flex flex-col leading-tight">
                       <span className="flex items-center space-x-1">
@@ -702,12 +702,12 @@ function CustomerDashboardContent() {
                       {coordinates && <span className="pl-4 text-[9.5px] mt-0.5 text-neutral-400 tracking-wide">{coordinates}</span>}
                     </div>
                     <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
-                      
+                       
                       <span className="font-bold px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm text-neutral-800 border-neutral-200">
                         {requestType === 'TALEP' ? <FileText size={11} className="text-blue-600" /> : <Bell size={11} className="text-amber-500" />}
                         {requestType === 'TALEP' ? 'Talep' : 'Bildirim'}
                       </span>
-                      
+                       
                       {isUrgent && <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">ACİL</span>}
                       {deadlineDate && <span className="flex items-center space-x-1"><Clock size={12}/><span>{deadlineDate} {deadlineTime}</span></span>}
                       {companyCode && (
@@ -734,7 +734,7 @@ function CustomerDashboardContent() {
                     </div>
                   </div>
                 </div>
-                
+                 
                 <div className="flex items-center justify-end pt-1 pb-1 px-1 relative z-10">
                   <button 
                     type="submit" 
@@ -756,34 +756,34 @@ function CustomerDashboardContent() {
                 </div>
 
                 {!isDetailsCollapsed && (
-                   <div className="mt-3 pt-5 border-t border-neutral-200/70 flex flex-col md:flex-row gap-6">
-                      <div className="w-full md:w-5/12 space-y-5">
-                         
-                         <div className="space-y-2">
-                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">Kayıt Türü</label>
-                          <div className="flex bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60">
-                            {[
-                              { id: 'TALEP', label: 'Talep', icon: FileText },
-                              { id: 'BILDIRIM', label: 'Bildirim', icon: Bell }
-                            ].map(item => (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => setRequestType(item.id)}
-                                className={`flex-1 flex items-center justify-center space-x-1.5 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                                  requestType === item.id 
-                                    ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/50' 
-                                    : 'text-neutral-500 hover:text-neutral-700'
-                                }`}
-                              >
-                                <item.icon size={14} className={requestType === item.id ? (item.id === 'TALEP' ? 'text-blue-600' : 'text-amber-500') : ''} />
-                                <span>{item.label}</span>
-                              </button>
-                            ))}
+                    <div className="mt-3 pt-5 border-t border-neutral-200/70 flex flex-col md:flex-row gap-6">
+                       <div className="w-full md:w-5/12 space-y-5">
+                           
+                          <div className="space-y-2">
+                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">Kayıt Türü</label>
+                           <div className="flex bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60">
+                             {[
+                               { id: 'TALEP', label: 'Talep', icon: FileText },
+                               { id: 'BILDIRIM', label: 'Bildirim', icon: Bell }
+                             ].map(item => (
+                               <button
+                                 key={item.id}
+                                 type="button"
+                                 onClick={() => setRequestType(item.id)}
+                                 className={`flex-1 flex items-center justify-center space-x-1.5 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                   requestType === item.id 
+                                     ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/50' 
+                                     : 'text-neutral-500 hover:text-neutral-700'
+                                 }`}
+                               >
+                                 <item.icon size={14} className={requestType === item.id ? (item.id === 'TALEP' ? 'text-blue-600' : 'text-amber-500') : ''} />
+                                 <span>{item.label}</span>
+                               </button>
+                             ))}
+                           </div>
                           </div>
-                         </div>
 
-                         <div>
+                          <div>
                             <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
                               <span className="flex items-center space-x-1">
                                 <Calendar size={12} className="text-neutral-700"/>
@@ -810,94 +810,94 @@ function CustomerDashboardContent() {
                                 title="En Son Saat" 
                               />
                             </div>
-                         </div>
-
-                         <div className="space-y-2">
-                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Phone size={13} /><span>Telefon</span></button>
-                            <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageSquare size={13} /><span>SMS</span></button>
-                            <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span>E-posta</span></button>
-                            <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
                           </div>
-                          {preferredChannels.includes('EMAIL') && (
-                            <div className="animate-in fade-in duration-150 pt-1">
-                              <input 
-                                ref={emailInputRef} 
-                                type="email" 
-                                required 
-                                value={contactEmail} 
-                                onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} 
-                                placeholder="E-posta Adresiniz..." 
-                                className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" 
-                              />
-                            </div>
-                          )}
-                         </div>
 
-                         <div className="grid grid-cols-2 gap-3 pt-2">
-                          <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
-                            <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
-                            <div className="flex items-center space-x-2">
-                              <Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
-                              <div className="flex flex-col">
-                                <span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span>
-                                <span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span>
-                              </div>
-                            </div>
-                          </label>
-
-                          <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
-                            <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
-                            <div className="flex items-center space-x-2 w-full justify-center">
-                              <Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} />
-                              <div className="flex flex-col text-center">
-                                <span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span>
-                                <span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span>
-                            </div>
-                            </div>
-                          </label>
-                         </div>
-
-                         <div className="pt-1">
-                          <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
-                            <span>Grup / Kurum Kodu (Opsiyonel)</span>
-                            <label className="flex items-center space-x-1 cursor-pointer">
-                              <input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" />
-                              <span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span>
-                            </label>
-                          </label>
-                          <div className="relative">
-                            <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
-                            <input 
-                              type="text" 
-                              value={companyCode} 
-                              onChange={e => setCompanyCode(e.target.value.toUpperCase())} 
-                              placeholder="Örn: MOB-2026" 
-                              className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" 
-                            />
+                          <div className="space-y-2">
+                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 block mb-1.5">İletişim Tercihi</label>
+                           <div className="grid grid-cols-2 gap-2">
+                             <button type="button" onClick={() => togglePreferredChannel('PHONE')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('PHONE') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Phone size={13} /><span>Telefon</span></button>
+                             <button type="button" onClick={() => togglePreferredChannel('SMS')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('SMS') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageSquare size={13} /><span>SMS</span></button>
+                             <button type="button" onClick={() => togglePreferredChannel('EMAIL')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('EMAIL') ? 'border-neutral-950 bg-neutral-950 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><Mail size={13} /><span>E-posta</span></button>
+                             <button type="button" onClick={() => togglePreferredChannel('WHATSAPP')} className={`p-2 rounded-lg border text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer ${preferredChannels.includes('WHATSAPP') ? 'border-emerald-700 bg-emerald-700 text-white' : 'bg-white hover:bg-neutral-50 text-neutral-700'}`}><MessageCircle size={13} /><span>WhatsApp</span></button>
+                           </div>
+                           {preferredChannels.includes('EMAIL') && (
+                             <div className="animate-in fade-in duration-150 pt-1">
+                               <input 
+                                 ref={emailInputRef} 
+                                 type="email" 
+                                 required 
+                                 value={contactEmail} 
+                                 onChange={(e) => { setContactEmail(e.target.value); if (errorMessage) setErrorMessage(''); }} 
+                                 placeholder="E-posta Adresiniz..." 
+                                 className="w-full p-2 text-xs rounded-lg border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium" 
+                               />
+                             </div>
+                           )}
                           </div>
-                         </div>
-                      </div>
-                      
-                      <div className="w-full md:w-7/12 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
-                         <div className="flex items-center justify-between mb-2">
-                           <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
-                             <MapPin size={12} className="text-neutral-700" />
-                             <span>Haritadan Konum Seçin</span>
-                           </span>
-                           <button 
-                             type="button" 
-                             onClick={fetchCurrentLocation} 
-                             disabled={isLocating} 
-                             className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition cursor-pointer"
-                           >
-                             <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> 
-                             <span>Mevcut Konuma Git</span>
-                           </button>
-                         </div>
-                         
-                         <div className="relative w-full h-[350px] md:h-full md:min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
+
+                          <div className="grid grid-cols-2 gap-3 pt-2">
+                           <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isContactShared ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}`}>
+                             <input type="checkbox" checked={isContactShared} onChange={(e) => setIsContactShared(e.target.checked)} className="hidden" />
+                             <div className="flex items-center space-x-2">
+                               <Shield size={16} className={`shrink-0 ${isContactShared ? 'text-blue-600' : 'text-neutral-400'}`} />
+                               <div className="flex flex-col">
+                                 <span className={`text-[10px] font-bold leading-tight ${isContactShared ? 'text-blue-800' : 'text-neutral-700'}`}>Hemen Paylaş</span>
+                                 <span className="text-[8px] text-neutral-500 font-mono mt-0.5 leading-tight">Gizli Mod Kapalı</span>
+                               </div>
+                             </div>
+                           </label>
+
+                           <label className={`flex items-center p-2.5 rounded-xl border cursor-pointer select-none transition ${isUrgent ? 'bg-rose-50 border-rose-300 shadow-sm' : 'bg-white border-neutral-200 hover:bg-neutral-50'}`}>
+                             <input type="checkbox" checked={isUrgent} onChange={(e) => setIsUrgent(e.target.checked)} className="hidden" />
+                             <div className="flex items-center space-x-2 w-full justify-center">
+                               <Flame size={18} className={isUrgent ? 'text-rose-600 animate-bounce shrink-0' : 'text-neutral-400 shrink-0'} />
+                               <div className="flex flex-col text-center">
+                                 <span className={`text-[10px] font-bold leading-tight ${isUrgent ? 'text-rose-700' : 'text-neutral-700'}`}>ACİL DURUM</span>
+                                 <span className={`text-[8px] font-mono mt-0.5 leading-tight ${isUrgent ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>Kırmızı Kod</span>
+                               </div>
+                             </div>
+                           </label>
+                          </div>
+
+                          <div className="pt-1">
+                           <label className="text-[11px] font-mono uppercase font-semibold text-neutral-500 mb-1.5 flex items-center justify-between">
+                             <span>Grup / Kurum Kodu (Opsiyonel)</span>
+                             <label className="flex items-center space-x-1 cursor-pointer">
+                               <input type="checkbox" checked={isCodeHidden} onChange={e => setIsCodeHidden(e.target.checked)} className="rounded text-neutral-900" />
+                               <span className="text-[10px] font-bold text-neutral-700 normal-case">Gizli Tut</span>
+                             </label>
+                           </label>
+                           <div className="relative">
+                             <Tag size={14} className="absolute left-3 top-2.5 text-neutral-400" />
+                             <input 
+                               type="text" 
+                               value={companyCode} 
+                               onChange={e => setCompanyCode(e.target.value.toUpperCase())} 
+                               placeholder="Örn: MOB-2026" 
+                               className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 outline-none bg-white focus:border-neutral-950 font-medium transition uppercase" 
+                             />
+                           </div>
+                          </div>
+                       </div>
+                        
+                       <div className="w-full md:w-7/12 flex flex-col pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-6 min-h-[350px]">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] font-mono uppercase font-semibold text-neutral-500 flex items-center space-x-1">
+                              <MapPin size={12} className="text-neutral-700" />
+                              <span>Haritadan Konum Seçin</span>
+                            </span>
+                            <button 
+                              type="button" 
+                              onClick={fetchCurrentLocation} 
+                              disabled={isLocating} 
+                              className="text-[10px] font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1 transition cursor-pointer"
+                            >
+                              <Navigation size={10} className={isLocating ? 'animate-spin' : ''} /> 
+                              <span>Mevcut Konuma Git</span>
+                            </button>
+                          </div>
+                           
+                          <div className="relative w-full h-[350px] md:h-full md:min-h-[350px] rounded-xl overflow-hidden border border-neutral-300 z-0 bg-neutral-50 shadow-inner mt-1">
                             <div className="absolute top-2 left-2 right-2 z-[1000]">
                                <div className="relative">
                                  <Search size={14} className="absolute left-3 top-2.5 text-neutral-400" />
@@ -910,31 +910,31 @@ function CustomerDashboardContent() {
                                    onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 200)} 
                                    placeholder="Haritada mekan veya adres ara..." 
                                    className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border-none outline-none focus:ring-2 focus:ring-neutral-900 shadow-md bg-white/90 backdrop-blur-sm transition" 
-                                  />
-                              </div>
-                              {mapSuggestions.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
-                                   {mapSuggestions.map((sug, idx) => (
-                                     <div 
-                                       key={idx} 
-                                       className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
-                                       onMouseDown={(e) => { 
-                                         e.preventDefault(); 
-                                         const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; 
-                                         setMapPosition(newPos); 
-                                         setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
-                                         setLocationValue(sug.display_name); 
-                                         setMapSearchText(''); 
-                                       }}
-                                     >
-                                       <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" />
-                                       <span>{sug.display_name}</span>
-                                     </div>
-                                  ))}
-                              </div>
+                                 />
+                               </div>
+                               {mapSuggestions.length > 0 && (
+                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[9999]">
+                                    {mapSuggestions.map((sug, idx) => (
+                                      <div 
+                                        key={idx} 
+                                        className="p-2.5 text-xs text-neutral-700 hover:bg-blue-50 cursor-pointer flex items-start space-x-2 transition" 
+                                        onMouseDown={(e) => { 
+                                          e.preventDefault(); 
+                                          const newPos = { lat: parseFloat(sug.lat), lng: parseFloat(sug.lon) }; 
+                                          setMapPosition(newPos); 
+                                          setCoordinates(`${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`); 
+                                          setLocationValue(sug.display_name); 
+                                          setMapSearchText(''); 
+                                        }}
+                                      >
+                                        <MapPin size={12} className="text-neutral-400 mt-0.5 shrink-0" />
+                                        <span>{sug.display_name}</span>
+                                      </div>
+                                    ))}
+                                 </div>
                                )}
                             </div>
-                            
+                             
                             <div className="absolute inset-0 z-0">
                               <MapContainer center={[mapPosition.lat, mapPosition.lng]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                                 <ZoomControl position="bottomleft" />
@@ -943,9 +943,9 @@ function CustomerDashboardContent() {
                                 <SharedMapClickHandler position={mapPosition} setPosition={setMapPosition} setLocationValue={setLocationValue} setCoordinates={setCoordinates} icon={mapIcons?.custom} />
                               </MapContainer>
                             </div>
-                         </div>
-                      </div>
-                   </div>
+                          </div>
+                       </div>
+                    </div>
                 )}
               </form>
             </div>
@@ -964,14 +964,13 @@ function CustomerDashboardContent() {
             </div>
           )}
 
-          {/* AKTİF TALEPLER */}
           {activeCustomerRequests.length > 0 && (
               <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsActiveCustomerRequestsOpen(!isActiveCustomerRequestsOpen)} className="flex items-center justify-between cursor-pointer select-none">
                    <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5">
                      <Radio size={16} className="text-emerald-500 animate-pulse" />
                      <span>Aktif Talepleriniz ({activeCustomerRequests.length})</span>
-                  </h3>
+                   </h3>
                    <div className="text-neutral-400">{isActiveCustomerRequestsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
                 </div>
                 {isActiveCustomerRequestsOpen && (
@@ -981,7 +980,7 @@ function CustomerDashboardContent() {
                       const reqStatus = safeUpper(req.status) || 'POOL';
                       const reqCode = extractCode(req.location);
                       const isHidden = isCodeHiddenReq(req.location);
-                      
+                       
                       let timerDisplay = null;
                       let isTimerCritical = false;
                       const refDate = req.updated_at || req.created_at || new Date().toISOString();
@@ -1009,7 +1008,7 @@ function CustomerDashboardContent() {
                                if (diffMs <= 0) {
                                    timerDisplay = "Süresi Doldu";
                                    isTimerCritical = true;
-                              } else {
+                               } else {
                                    const totalMins = Math.floor(diffMs / 60000);
                                    const h = Math.floor(totalMins / 60);
                                    const m = totalMins % 60;
@@ -1018,23 +1017,23 @@ function CustomerDashboardContent() {
                                    if (d > 0) timerDisplay = `Teslimata: ${d}g ${h%24}sa`;
                                    else if (h > 0) timerDisplay = `Teslimata: ${h}sa ${m}dk`;
                                    else { timerDisplay = `Teslimata: ${m}dk`; isTimerCritical = m < 15; }
-                              }
-                            } else {
-                              const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
-                              const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
-                              if (remaining) {
-                                  timerDisplay = `Teslimat: ${remaining}`;
-                                  isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
-                              }
-                          }
+                               }
+                           } else {
+                               const completionLimit = Number(systemSettings?.provider_completion_timeout_hours) || 48;
+                               const remaining = calculateRemainingTime(refDate, completionLimit, 'hours');
+                               if (remaining) {
+                                   timerDisplay = `Teslimat: ${remaining}`;
+                                   isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                               }
+                           }
                       } else if (reqStatus === 'PROVIDER_COMPLETED') {
                            const approvalLimit = Number(systemSettings?.customer_approval_timeout_hours) || 24;
-                         const remaining = calculateRemainingTime(refDate, approvalLimit, 'hours');
-                         if (remaining) {
-                           timerDisplay = `Kalan Onay: ${remaining}`;
-                           isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
-                       }
-                    }
+                           const remaining = calculateRemainingTime(refDate, approvalLimit, 'hours');
+                           if (remaining) {
+                             timerDisplay = `Kalan Onay: ${remaining}`;
+                             isTimerCritical = remaining === "Süresi Doldu" || (remaining.includes("dk") && !remaining.includes("saat"));
+                           }
+                      }
 
                       return (
                         <div key={req.id} id={`req-card-${req.id}`} className="bg-[#FAFBFD] rounded-xl border border-neutral-200/90 p-4 shadow-sm space-y-3">
@@ -1093,8 +1092,8 @@ function CustomerDashboardContent() {
                               
                               {timerDisplay && (
                                    <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${isTimerCritical ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                      {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
-                                      <span>{timerDisplay}</span>
+                                       {isTimerCritical ? <AlertCircle size={10} /> : <Timer size={10} />}
+                                       <span>{timerDisplay}</span>
                                    </div>
                               )}
                             </div>
@@ -1132,249 +1131,230 @@ function CustomerDashboardContent() {
                                   disabled={actionLoadingKey === `list_add_${req.id}`}
                                   onClick={() => handleAddRequestToList(req.id)}
                                   className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-sm disabled:opacity-60 flex items-center gap-1"
-                  >
-                                {actionLoadingKey === `list_add_${req.id}` && <Loader2 size={11} className="animate-spin" />}
-                                <span>Ekle</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* ⭐ GÜNCELLENEN TEKLİFLER VE ŞARTLAR LİSTESİ (TABLO FORMATI + AKORDİYON) ⭐ */}
-                        {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
-                          <div className="mt-3 bg-white border border-neutral-200 rounded-xl shadow-xs overflow-hidden transition-all duration-300">
-                            <div className="p-3.5 bg-neutral-50 border-b border-neutral-100 flex items-center justify-between">
-                              <span className="text-xs font-bold font-mono uppercase text-neutral-700 tracking-wider">
-                                Gelen Sağlayıcı Teklifleri ({safeArray(req.queuedProviders).length})
-                              </span>
-                              <span className="text-[10px] text-neutral-500 font-medium">Teklifleri inceleyip uygun olanı seçebilirsiniz</span>
-                            </div>
-
-                            <div className="divide-y divide-neutral-100">
-                              {safeArray(req.queuedProviders).map((qProv, idx) => {
-                                if (!qProv) return null;
-                                const isCurrent = String(req.matched_provider_id) === String(qProv.id);
-                                const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
-                                const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
-                                const selectKey = `select_${req.id}_${qProv.id}`;
-                                const acceptKey = `status_${req.id}_ACCEPTED`;
-                                
-                                const formattedBudget = qProv.provider_budget != null 
-                                  ? `${new Intl.NumberFormat('tr-TR').format(Number(qProv.provider_budget))} TRY` 
-                                  : 'Belirtilmedi';
-                                
-                                const formattedDate = qProv.provider_target_date 
-                                  ? safeDateTime(qProv.provider_target_date) 
-                                  : 'Belirtilmedi';
-
-                                const rating = qProv.avg_rating ? Number(parseFloat(qProv.avg_rating).toFixed(1)) : '5.0';
-
-                                return (
-                                  <div key={qProv.id} className={`transition-colors ${isCurrent && !isSkippedByThis ? 'bg-emerald-50/40' : 'hover:bg-neutral-50/60'}`}>
-                                    {/* Ana Tablo / Liste Satırı */}
-                                    <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                      
-                                      {/* Sağlayıcı Bilgisi ve Puanı */}
-                                      <div className="flex items-center space-x-3.5 min-w-[220px]">
-                                        <div className="w-10 h-10 rounded-xl bg-neutral-900 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                                          {qProv.name ? qProv.name.charAt(0).toUpperCase() : <Building2 size={18} />}
-                                        </div>
-                                        <div>
-                                          <div className="flex items-center space-x-1.5">
-                                            <span className="font-bold text-neutral-900 text-xs md:text-sm">{qProv.name || 'Hizmet Sağlayıcı'}</span>
-                                            {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono font-bold">AKTİF</span>}
-                                            {isSkippedByThis && <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-mono font-bold">PAS GEÇTİ</span>}
-                                          </div>
-                                          <div className="flex items-center gap-1.5 mt-1">
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                                              <Star size={10} fill="#f59e0b" className="text-amber-500" /> {rating} / 5.0 ({qProv.review_count || 0} Yorum)
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Tutar ve Tarih Bilgileri */}
-                                      <div className="grid grid-cols-2 gap-4 md:flex md:items-center md:gap-8 flex-1">
-                                        <div>
-                                          <span className="text-[9px] font-mono uppercase text-neutral-400 block font-bold">Teklif Tutarı</span>
-                                          <span className="text-xs md:text-sm font-extrabold font-mono text-emerald-700 flex items-center gap-0.5 mt-0.5">
-                                            <DollarSign size={13} /> {formattedBudget}
-                                          </span>
-                                        </div>
-                                        <div>
-                                          <span className="text-[9px] font-mono uppercase text-neutral-400 block font-bold">Hedef Tarih</span>
-                                          <span className="text-xs font-medium text-neutral-800 flex items-center gap-1 mt-0.5 font-mono">
-                                            <Calendar size={12} className="text-neutral-400 shrink-0" /> {formattedDate}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Aksiyon Butonları (Seç & Detay Akordiyonu) */}
-                                      <div className="flex items-center gap-2 justify-end shrink-0">
-                                        {actionFeedbackMap?.[isCurrent && reqStatus === 'MATCHED' ? acceptKey : selectKey] && (
-                                          <div className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 ${
-                                            actionFeedbackMap[isCurrent && reqStatus === 'MATCHED' ? acceptKey : selectKey].type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-                                          }`}>
-                                            <span>{actionFeedbackMap[isCurrent && reqStatus === 'MATCHED' ? acceptKey : selectKey].text}</span>
-                                          </div>
-                                        )}
-
-                                        <button
-                                          type="button"
-                                          onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
-                                          className="px-3 py-2 text-neutral-600 hover:bg-neutral-100 border border-neutral-200 rounded-xl text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
-                                        >
-                                          <span>{isProvExpanded ? 'Gizle' : 'Detaylar'}</span>
-                                          {isProvExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                                        </button>
-
-                                        {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' ? (
-                                          <button
-                                            type="button"
-                                            disabled={actionLoadingKey === acceptKey}
-                                            onClick={() => handleStatusChange(req.id, 'ACCEPTED', acceptKey)}
-                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
-                                          >
-                                            {actionLoadingKey === acceptKey ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={14} />}
-                                            <span>Onayla & İşe Başla</span>
-                                          </button>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            disabled={actionLoadingKey === selectKey || (isCurrent && !isSkippedByThis)}
-                                            onClick={() => handleCustomerSelectCandidate(req.id, qProv.id)}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                                              isCurrent && !isSkippedByThis 
-                                                ? 'bg-emerald-600 text-white cursor-default' 
-                                                : 'bg-neutral-950 hover:bg-neutral-800 text-white disabled:opacity-50'
-                                            }`}
-                                          >
-                                            {actionLoadingKey === selectKey ? <Loader2 size={13} className="animate-spin" /> : (isCurrent && !isSkippedByThis ? <Check size={14} /> : null)}
-                                            <span>{isCurrent && !isSkippedByThis ? 'Seçildi' : 'Seç'}</span>
-                                          </button>
-                                        )}
-                                      </div>
-
-                                    </div>
-
-                                    {/* Akordiyon Detay Alanı (Sağlayıcı Notu ve Geçmiş Yorumlar) */}
-                                    {isProvExpanded && (
-                                      <div className="px-4 pb-4 pt-1 bg-neutral-50/80 border-t border-neutral-100 space-y-3 animate-in fade-in duration-200">
-                                        {qProv.provider_description && (
-                                          <div className="space-y-1">
-                                            <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">Sağlayıcı Açıklaması / Notu</span>
-                                            <p className="text-xs text-neutral-700 bg-white p-3 rounded-xl border border-neutral-200/60 leading-relaxed font-medium">
-                                              "{qProv.provider_description}"
-                                            </p>
-                                          </div>
-                                        )}
-
-                                        <div className="space-y-2">
-                                          <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">Geçmiş Müşteri Yorumları & Puanları</span>
-                                          {safeArray(qProv.reviews).length > 0 ? (
-                                            <div className="space-y-2">
-                                              {qProv.reviews.map((rev, revIdx) => (
-                                                <div key={revIdx} className="bg-white p-3 rounded-xl border border-neutral-200/80 shadow-2xs space-y-1.5">
-                                                  <div className="flex justify-between items-center">
-                                                    <div className="flex items-center gap-1.5 text-amber-500">
-                                                      <Star size={11} fill="#f59e0b" /> <span className="font-bold text-xs">{Number(parseFloat(rev?.rating || 0).toFixed(1))} / 5.0</span>
-                                                      {rev?.score && <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono ml-1 font-bold">Skor: {Number(parseFloat(rev.score).toFixed(1))}</span>}
-                                                    </div>
-                                                    <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev?.rating_date)}</span>
-                                                  </div>
-                                                  {rev?.comment && rev.comment.trim() !== '' && (
-                                                    <p className="text-xs text-neutral-700 italic leading-relaxed bg-neutral-50 p-2 rounded-lg">
-                                                      "{rev.comment}"
-                                                    </p>
-                                                  )}
-                                                  <div className="grid grid-cols-4 gap-1 text-[9px] text-neutral-500 font-bold uppercase text-center mt-1 border-t border-neutral-100 pt-1.5">
-                                                    <div>Uzmanlık: <span className="text-neutral-900">{parseFloat(rev?.rating_knowledge || 0)}</span></div>
-                                                    <div>İletişim: <span className="text-neutral-900">{parseFloat(rev?.rating_communication || 0)}</span></div>
-                                                    <div>Hız: <span className="text-neutral-900">{parseFloat(rev?.rating_timing || 0)}</span></div>
-                                                    <div>Fiyat: <span className="text-neutral-900">{parseFloat(rev?.rating_cost || 0)}</span></div>
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <div className="text-center text-[11px] text-neutral-400 py-3 italic bg-white border border-neutral-200/60 rounded-xl">
-                                              Bu sağlayıcı için henüz geçmiş bir müşteri değerlendirmesi bulunmuyor.
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
-                          <span>📍 {extractAddress(req.location)}</span>
-                          {req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}
-                        </div>
-                         
-                        <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
-                          <div className="flex items-center space-x-1.5">
-                            {(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (
-                              <div className="flex items-center gap-1.5">
-                                {actionFeedbackMap?.[`skip_${req.id}`] && (
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${actionFeedbackMap[`skip_${req.id}`].type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                                    {actionFeedbackMap[`skip_${req.id}`].text}
-                                  </span>
-                                )}
-                                <button disabled={actionLoadingKey === `skip_${req.id}`} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50">
-                                  {actionLoadingKey === `skip_${req.id}` ? <Loader2 size={11} className="animate-spin" /> : <SkipForward size={11} />}
-                                  <span>Sıradakine Geç</span>
+                                >
+                                  {actionLoadingKey === `list_add_${req.id}` && <Loader2 size={11} className="animate-spin" />}
+                                  <span>Ekle</span>
                                 </button>
                               </div>
-                            )}
+                            </div>
+                          )}
+
+                          {/* ⭐ GÜNCELLENEN 2 SATIRLIK TEKLİF LİSTESİ (1. SATIR: İSİM, TUTAR, TARİH, BUTON | 2. SATIR: AKORDİYON) ⭐ */}
+                          {(req.provider_name || safeArray(req.queuedProviders).length > 0) && (
+                            <div className="mt-3 bg-white border border-neutral-200 rounded-xl shadow-xs overflow-hidden transition-all duration-300">
+                              <div className="p-3 bg-neutral-50 border-b border-neutral-100 flex items-center justify-between">
+                                <span className="text-xs font-bold font-mono uppercase text-neutral-700 tracking-wider">
+                                  Gelen Sağlayıcı Teklifleri ({safeArray(req.queuedProviders).length})
+                                </span>
+                              </div>
+
+                              <div className="divide-y divide-neutral-100">
+                                {safeArray(req.queuedProviders).map((qProv) => {
+                                  if (!qProv) return null;
+                                  const isCurrent = String(req.matched_provider_id) === String(qProv.id);
+                                  const isSkippedByThis = isCurrent && reqStatus === 'PROVIDER_SKIPPED';
+                                  const isProvExpanded = expandedProviderReviewId === `${req.id}_${qProv.id}`;
+                                  const selectKey = `select_${req.id}_${qProv.id}`;
+                                  const acceptKey = `status_${req.id}_ACCEPTED`;
+                                  
+                                  const formattedBudget = qProv.provider_budget != null 
+                                    ? `${new Intl.NumberFormat('tr-TR').format(Number(qProv.provider_budget))} TRY` 
+                                    : 'Belirtilmedi';
+                                  
+                                  const formattedDate = qProv.provider_target_date 
+                                    ? safeDateTime(qProv.provider_target_date) 
+                                    : 'Belirtilmedi';
+
+                                  const rating = qProv.avg_rating ? Number(parseFloat(qProv.avg_rating).toFixed(1)) : '5.0';
+
+                                  return (
+                                    <div key={qProv.id} className={`transition-colors ${isCurrent && !isSkippedByThis ? 'bg-emerald-50/40' : 'hover:bg-neutral-50/60'}`}>
+                                      {/* 1. SATIR: Sağlayıcı Adı (boşluk bırakarak), Tutar, Tarih, Butonlar */}
+                                      <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        
+                                        <div className="flex items-center space-x-3 flex-1 min-w-[200px]">
+                                          <div className="w-8 h-8 rounded-lg bg-neutral-900 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
+                                            {qProv.name ? qProv.name.charAt(0).toUpperCase() : <Building2 size={14} />}
+                                          </div>
+                                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                            <div className="flex items-center space-x-1.5">
+                                              <span className="font-bold text-neutral-900 text-xs">{qProv.name || 'Hizmet Sağlayıcı'}</span>
+                                              {isCurrent && !isSkippedByThis && <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1 py-0.2 rounded font-mono font-bold">AKTİF</span>}
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                              <Star size={9} fill="#f59e0b" className="text-amber-500" /> {rating} ({qProv.review_count || 0})
+                                            </div>
+
+                                            <div className="flex items-center gap-4 ml-auto sm:ml-2 text-xs font-mono">
+                                              <span className="font-extrabold text-emerald-700 flex items-center gap-0.5">
+                                                <DollarSign size={12} /> {formattedBudget}
+                                              </span>
+                                              <span className="text-neutral-600 flex items-center gap-1">
+                                                <Calendar size={11} className="text-neutral-400" /> {formattedDate}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Sağ Taraf: Detay ve Seç Butonları */}
+                                        <div className="flex items-center gap-2 justify-end shrink-0">
+                                          {actionFeedbackMap?.[isCurrent && reqStatus === 'MATCHED' ? acceptKey : selectKey] && (
+                                            <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all flex items-center gap-1 ${
+                                              actionFeedbackMap[isCurrent && reqStatus === 'MATCHED' ? acceptKey : selectKey].type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                                            }`}>
+                                              <span>{actionFeedbackMap[isCurrent && reqStatus === 'MATCHED' ? acceptKey : selectKey].text}</span>
+                                            </div>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() => setExpandedProviderReviewId(isProvExpanded ? null : `${req.id}_${qProv.id}`)}
+                                            className="px-2.5 py-1.5 text-neutral-600 hover:bg-neutral-100 border border-neutral-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                                          >
+                                            <span>{isProvExpanded ? 'Gizle' : 'Detay'}</span>
+                                            {isProvExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                          </button>
+
+                                          {isCurrent && !isSkippedByThis && reqStatus === 'MATCHED' ? (
+                                            <button
+                                              type="button"
+                                              disabled={actionLoadingKey === acceptKey}
+                                              onClick={() => handleStatusChange(req.id, 'ACCEPTED', acceptKey)}
+                                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-60"
+                                            >
+                                              {actionLoadingKey === acceptKey ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                                              <span>Onayla</span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              disabled={actionLoadingKey === selectKey || (isCurrent && !isSkippedByThis)}
+                                              onClick={() => handleCustomerSelectCandidate(req.id, qProv.id)}
+                                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs ${
+                                                isCurrent && !isSkippedByThis 
+                                                  ? 'bg-emerald-600 text-white cursor-default' 
+                                                  : 'bg-neutral-950 hover:bg-neutral-800 text-white disabled:opacity-50'
+                                              }`}
+                                            >
+                                              {actionLoadingKey === selectKey ? <Loader2 size={12} className="animate-spin" /> : (isCurrent && !isSkippedByThis ? <Check size={12} /> : null)}
+                                              <span>{isCurrent && !isSkippedByThis ? 'Seçildi' : 'Seç'}</span>
+                                            </button>
+                                          )}
+                                        </div>
+
+                                      </div>
+
+                                      {/* 2. SATIR: AKORDİYON (Açıklama ve Geçmiş Yorumlar) */}
+                                      {isProvExpanded && (
+                                        <div className="px-4 pb-3 pt-1 bg-neutral-50/90 border-t border-neutral-100 space-y-2.5 animate-in fade-in duration-200">
+                                          {qProv.provider_description && (
+                                            <div className="space-y-0.5">
+                                              <span className="text-[9px] font-mono uppercase font-bold text-neutral-400 block">Sağlayıcı Açıklaması</span>
+                                              <p className="text-xs text-neutral-700 bg-white p-2.5 rounded-lg border border-neutral-200/60 leading-relaxed font-medium">
+                                                "{qProv.provider_description}"
+                                              </p>
+                                            </div>
+                                          )}
+
+                                          <div className="space-y-1.5">
+                                            <span className="text-[9px] font-mono uppercase font-bold text-neutral-400 block">Geçmiş Müşteri Değerlendirmeleri</span>
+                                            {safeArray(qProv.reviews).length > 0 ? (
+                                              <div className="space-y-2">
+                                                {qProv.reviews.map((rev, revIdx) => (
+                                                  <div key={revIdx} className="bg-white p-2.5 rounded-lg border border-neutral-200/70 shadow-2xs space-y-1">
+                                                    <div className="flex justify-between items-center">
+                                                      <div className="flex items-center gap-1 text-amber-500">
+                                                        <Star size={10} fill="#f59e0b" /> <span className="font-bold text-[11px]">{Number(parseFloat(rev?.rating || 0).toFixed(1))} / 5.0</span>
+                                                      </div>
+                                                      <span className="text-[9px] text-neutral-400 font-mono">{safeDateTime(rev?.rating_date)}</span>
+                                                    </div>
+                                                    {rev?.comment && rev.comment.trim() !== '' && (
+                                                      <p className="text-[11px] text-neutral-700 italic bg-neutral-50 p-1.5 rounded">
+                                                        "{rev.comment}"
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <div className="text-center text-[10px] text-neutral-400 py-2 italic bg-white border border-neutral-200/60 rounded-lg">
+                                                Bu sağlayıcı için henüz geçmiş değerlendirme bulunmuyor.
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-neutral-500 pt-1 border-t border-neutral-100 mt-2">
+                            <span>📍 {extractAddress(req.location)}</span>
+                            {req.deadline_datetime && <span>⏰ En Son: {safeDateTime(req.deadline_datetime)}</span>}
                           </div>
                            
-                          <div className="flex items-center space-x-2 ml-auto">
-                            {(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`]) && (
-                              <div className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
-                                (actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.type === 'success'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : 'bg-rose-50 text-rose-800 border-rose-200'
-                              }`}>
-                                {(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.type === 'success' ? <Check size={11} /> : <AlertCircle size={11} />}
-                                <span>{(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.text}</span>
-                              </div>
-                            )}
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-xs">
+                            <div className="flex items-center space-x-1.5">
+                              {(['MATCHED', 'PROVIDER_COMPLETED', 'ACCEPTED', 'PROVIDER_SKIPPED'].includes(reqStatus)) && safeArray(req.queuedProviders).length > 1 && (
+                                <div className="flex items-center gap-1.5">
+                                  {actionFeedbackMap?.[`skip_${req.id}`] && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${actionFeedbackMap[`skip_${req.id}`].type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                                      {actionFeedbackMap[`skip_${req.id}`].text}
+                                    </span>
+                                  )}
+                                  <button disabled={actionLoadingKey === `skip_${req.id}`} onClick={() => handleCustomerNextProvider(req.id)} className="px-2.5 py-1 border hover:bg-neutral-100 rounded text-[11px] font-semibold flex items-center space-x-1 text-neutral-700 cursor-pointer disabled:opacity-50">
+                                    {actionLoadingKey === `skip_${req.id}` ? <Loader2 size={11} className="animate-spin" /> : <SkipForward size={11} />}
+                                    <span>Sıradakine Geç</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                             
+                            <div className="flex items-center space-x-2 ml-auto">
+                              {(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`]) && (
+                                <div className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all animate-in fade-in flex items-center gap-1 ${
+                                  (actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.type === 'success'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                                }`}>
+                                  {(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.type === 'success' ? <Check size={11} /> : <AlertCircle size={11} />}
+                                  <span>{(actionFeedbackMap?.[`status_${req.id}_COMPLETED`] || actionFeedbackMap?.[`cancel_${req.id}`])?.text}</span>
+                                </div>
+                              )}
 
-                            {(reqStatus === 'MATCHED' || reqStatus === 'PROVIDER_COMPLETED') && (
-                              <button disabled={actionLoadingKey === `status_${req.id}_COMPLETED`} onClick={() => handleStatusChange(req.id, 'COMPLETED', `status_${req.id}_COMPLETED`)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm cursor-pointer disabled:opacity-60">
-                                {actionLoadingKey === `status_${req.id}_COMPLETED` ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                                <span>{reqStatus === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span>
+                              {(reqStatus === 'MATCHED' || reqStatus === 'PROVIDER_COMPLETED') && (
+                                <button disabled={actionLoadingKey === `status_${req.id}_COMPLETED`} onClick={() => handleStatusChange(req.id, 'COMPLETED', `status_${req.id}_COMPLETED`)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold flex items-center space-x-1 shadow-sm cursor-pointer disabled:opacity-60">
+                                  {actionLoadingKey === `status_${req.id}_COMPLETED` ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                  <span>{reqStatus === 'PROVIDER_COMPLETED' ? 'Onayla & Tamamla' : 'Hizmeti Tamamla'}</span>
+                                </button>
+                              )}
+
+                              <button disabled={actionLoadingKey === `cancel_${req.id}`} onClick={() => handleDeleteRequest(req.id)} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1" title="Talebi İptal Et">
+                                {actionLoadingKey === `cancel_${req.id}` ? <Loader2 size={11} className="animate-spin" /> : <Ban size={12} />}
+                                <span>İptal</span>
                               </button>
-                            )}
-
-                            <button disabled={actionLoadingKey === `cancel_${req.id}`} onClick={() => handleDeleteRequest(req.id)} className="px-2 py-1 border hover:bg-neutral-100 text-neutral-600 rounded text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1" title="Talebi İptal Et">
-                              {actionLoadingKey === `cancel_${req.id}` ? <Loader2 size={11} className="animate-spin" /> : <Ban size={12} />}
-                              <span>İptal</span>
-                            </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                   })}
-                  </div>
+                     );
+                    })}
+                 </div>
                 )}
-              </div>
+             </div>
           )}
 
-          {/* GEÇMİŞ TALEPLER */}
           {pastCustomerRequests.length > 0 && (
               <div className="mt-8 space-y-3 transition-all duration-300">
                 <div onClick={() => setIsCustomerHistoryOpen(!isCustomerHistoryOpen)} className="flex items-center justify-between cursor-pointer select-none">
                    <h3 className="text-sm font-bold text-neutral-700 flex items-center space-x-1.5">
                      <History size={16} className="text-neutral-500" />
                      <span>Geçmiş Talepler ({pastCustomerRequests.length})</span>
-                  </h3>
+                   </h3>
                    <div className="text-neutral-400">{isCustomerHistoryOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
                 </div>
                 {isCustomerHistoryOpen && (
@@ -1387,63 +1367,63 @@ function CustomerDashboardContent() {
                        onChange={(e) => setSearchCustomerHistoryText(e.target.value)} 
                        placeholder="Geçmiş taleplerde ara..." 
                        className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border outline-none bg-white focus:border-neutral-950 font-medium shadow-sm" 
-                   />
-                  </div>
+                     />
+                   </div>
                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                      {filteredPastCustomerRequests.map((req) => {
-                        const copyKey = `copy_${req?.id}`;
-                        const reorderKey = `reorder_${req?.id}`;
+                       const copyKey = `copy_${req?.id}`;
+                       const reorderKey = `reorder_${req?.id}`;
 
-                        const isCopying = actionLoadingKey === copyKey;
-                        const isReordering = actionLoadingKey === reorderKey;
+                       const isCopying = actionLoadingKey === copyKey;
+                       const isReordering = actionLoadingKey === reorderKey;
 
-                        const copyFb = actionFeedbackMap?.[copyKey];
-                        const reorderFb = actionFeedbackMap?.[reorderKey];
-                        const listFb = actionFeedbackMap?.[`list_add_${req.id}`];
+                       const copyFb = actionFeedbackMap?.[copyKey];
+                       const reorderFb = actionFeedbackMap?.[reorderKey];
+                       const listFb = actionFeedbackMap?.[`list_add_${req.id}`];
 
-                        return (
-                          <div 
-                            key={req?.id} 
-                            className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-2 text-xs hover:border-neutral-300 transition-all duration-200"
-                          >
-                            <div className="flex items-start justify-between gap-3 flex-wrap">
-                              <div className="space-y-1 flex-1 min-w-[200px]">
-                                <p className="font-semibold text-neutral-900 leading-snug">"{req?.raw_text}"</p>
-                                <div className="flex flex-wrap items-center gap-2 text-[10px] text-neutral-500 font-mono">
-                                  <span>{safeDateTime(req?.created_at)}</span>
-                                  {req?.provider_name && (
-                                    <span>
-                                      • Sağlayıcı: <strong className="text-neutral-800 font-semibold">{req.provider_name}</strong>
-                                    </span>
-                                  )}
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">
-                                    {req?.status}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center ml-auto">
-                              {(copyFb || reorderFb || listFb) && (
-                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
-                                  (copyFb || reorderFb || listFb)?.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-                                }`}>
-                                  {(copyFb || reorderFb || listFb)?.type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
-                                  <span>{(copyFb || reorderFb || listFb)?.text}</span>
-                                </div>
-                              )}
+                       return (
+                         <div 
+                           key={req?.id} 
+                           className="p-3.5 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-2 text-xs hover:border-neutral-300 transition-all duration-200"
+                         >
+                           <div className="flex items-start justify-between gap-3 flex-wrap">
+                             <div className="space-y-1 flex-1 min-w-[200px]">
+                               <p className="font-semibold text-neutral-900 leading-snug">"{req?.raw_text}"</p>
+                               <div className="flex flex-wrap items-center gap-2 text-[10px] text-neutral-500 font-mono">
+                                 <span>{safeDateTime(req?.created_at)}</span>
+                                 {req?.provider_name && (
+                                   <span>
+                                     • Sağlayıcı: <strong className="text-neutral-800 font-semibold">{req.provider_name}</strong>
+                                   </span>
+                                 )}
+                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-neutral-100 border text-neutral-700">
+                                   {req?.status}
+                                 </span>
+                               </div>
+                             </div>
+                              
+                             <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center ml-auto">
+                               {(copyFb || reorderFb || listFb) && (
+                                 <div className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all animate-in fade-in flex items-center gap-1 ${
+                                   (copyFb || reorderFb || listFb)?.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                                 }`}>
+                                   {(copyFb || reorderFb || listFb)?.type === 'success' ? <Check size={10} /> : <AlertCircle size={10} />}
+                                   <span>{(copyFb || reorderFb || listFb)?.text}</span>
+                                 </div>
+                               )}
 
-                              {userLists.length > 0 && (
-                                <div className="flex items-center gap-1 bg-neutral-50 p-1 rounded-lg border border-neutral-200">
+                               {userLists.length > 0 && (
+                                 <div className="flex items-center gap-1 bg-neutral-50 p-1 rounded-lg border border-neutral-200">
                                     <select
                                       value={selectedListIds[req.id] || ''}
-                                    onChange={(e) => setSelectedListIds(prev => ({ ...prev, [req.id]: e.target.value }))}
-                                    className="w-16 p-1 text-[9px] rounded border border-neutral-200 bg-white outline-none"
-                                    title="Liste Seçin"
-                                  >
-                                    <option value="">Liste</option>
-                                    {userLists.map(l => <option key={l.id} value={l.id}>{l.list_name}</option>)}
-                                  </select>
-                                  <button
+                                      onChange={(e) => setSelectedListIds(prev => ({ ...prev, [req.id]: e.target.value }))}
+                                      className="w-16 p-1 text-[9px] rounded border border-neutral-200 bg-white outline-none"
+                                      title="Liste Seçin"
+                                    >
+                                      <option value="">Liste</option>
+                                      {userLists.map(l => <option key={l.id} value={l.id}>{l.list_name}</option>)}
+                                    </select>
+                                    <button
                                       type="button"
                                       disabled={actionLoadingKey === `list_add_${req.id}`}
                                       onClick={() => handleAddRequestToList(req.id)}
@@ -1453,38 +1433,40 @@ function CustomerDashboardContent() {
                                       {actionLoadingKey === `list_add_${req.id}` ? <Loader2 size={12} className="animate-spin text-neutral-700" /> : <FolderPlus size={12} />}
                                     </button>
                                   </div>
-                              )}
+                               )}
 
-                            <button
-                              type="button"
-                              disabled={isCopying}
-                              onClick={() => populateFormWithPastRequest(req)}
-                              className="p-2 text-neutral-600 hover:text-neutral-950 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50"
-                              title="Bilgileri Talep Formuna Aktar"
-                            >
-                              {isCopying ? <Loader2 size={13} className="animate-spin text-neutral-700" /> : <Copy size={13} />}
-                            </button>
+                               <button
+                                 type="button"
+                                 disabled={isCopying}
+                                 onClick={() => populateFormWithPastRequest(req)}
+                                 className="p-2 text-neutral-600 hover:text-neutral-950 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50"
+                                 title="Bilgileri Talep Formuna Aktar"
+                               >
+                                 {isCopying ? <Loader2 size={13} className="animate-spin text-neutral-700" /> : <Copy size={13} />}
+                               </button>
 
-                            <button
-                              type="button"
-                              disabled={isReordering}
-                              onClick={() => handleDirectReorderAction(req)}
-                              className="p-2 text-neutral-700 hover:text-white bg-white hover:bg-neutral-950 border border-neutral-200 hover:border-neutral-950 rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50"
-                              title="Aynı Şartlarla Doğrudan Tekrarla"
-                            >
-                              {isReordering ? <Loader2 size={13} className="animate-spin text-neutral-700" /> : <RefreshCw size={13} />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                        );
-                    })}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-    </div>
+                               <button
+                                 type="button"
+                                 disabled={isReordering}
+                                 onClick={() => handleDirectReorderAction(req)}
+                                 className="p-2 text-neutral-700 hover:text-white bg-white hover:bg-neutral-950 border border-neutral-200 hover:border-neutral-950 rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50"
+                                 title="Aynı Şartlarla Doğrudan Tekrarla"
+                               >
+                                 {isReordering ? <Loader2 size={13} className="animate-spin text-neutral-700" /> : <RefreshCw size={13} />}
+                               </button>
+                             </div>
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 </div>
+                )}
+             </div>
+          )}
+        </>
+      )}
+  </div>
   );
 }
 
