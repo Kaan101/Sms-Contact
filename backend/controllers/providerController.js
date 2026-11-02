@@ -7,7 +7,6 @@ const getNormalizedLast10 = (p) => {
   return digits.length >= 10 ? digits.slice(-10) : digits;
 };
 
-// Yardımcı: Etiketleri güvenli bir şekilde diziye çevirir (tags veya tag destekli)
 // Gelişmiş Etiket Çözümleyici (Nesne, Dizi veya String destekli)
 const parseTags = (inputTags) => {
   if (!inputTags) return [];
@@ -16,7 +15,7 @@ const parseTags = (inputTags) => {
   if (Array.isArray(inputTags)) {
     return inputTags.map(item => {
       if (!item) return '';
-      // Eğer eleman bir nesneyse (örn: {id: 1, name: 'tesisat'} veya {tag: 'tesisat'})
+      // Eğer eleman bir nesneyse (örn: {id: 1, name: 'tesisat'} veya {tag: 'tesisat'} vb.)
       if (typeof item === 'object') {
         return String(item.name || item.tag || item.tag_name || item.label || Object.values(item)[0] || '').trim().toLowerCase();
       }
@@ -33,7 +32,7 @@ const parseTags = (inputTags) => {
   return [];
 };
 
-// 1. Yeni Servis Veren Ekleme (Tags / Tag Destekli)
+// 1. Yeni Servis Veren Ekleme (Tags / Tag / SelectedTags Destekli)
 const registerProvider = async (req, res) => {
   try {
     const { 
@@ -43,8 +42,10 @@ const registerProvider = async (req, res) => {
       postalCode, providerType, providerSubtype, description
     } = req.body;
 
-    // Frontend 'tags' veya 'tag' göndermiş olabilir, her ikisini de kontrol edelim
-    const rawTags = req.body.tags !== undefined ? req.body.tags : req.body.tag;
+    // Frontend 'tags', 'tag' veya 'selectedTags' göndermiş olabilir
+    const rawTags = req.body.tags !== undefined 
+      ? req.body.tags 
+      : (req.body.tag !== undefined ? req.body.tag : req.body.selectedTags);
 
     if (!name || !phone || !serviceKeywords || !communicationChannels) {
       return res.status(400).json({
@@ -162,14 +163,14 @@ const getProviderByPhone = async (req, res) => {
   }
 };
 
-// 4. Servis Veren Güncelleme (Gelişmiş Tags / Tag Desteği)
+// 4. Servis Veren Güncelleme (Gelişmiş Debug ve Çoklu Format Destekli)
 const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
-
-// 🔍 Gelen veriyi konsola yazdırarak kontrol edelim
+    
+    // 🔍 Gelen tüm isteği konsola basalım (Vercel'den ne geliyor görelim)
     console.log(`[DEBUG] Güncelleme İsteği ID: ${id}, Body:`, req.body);
-   
+
     const { 
       name, phone, email, serviceKeywords, communicationChannels, 
       priorityScore, isActive,
@@ -177,8 +178,12 @@ const updateProvider = async (req, res) => {
       postalCode, providerType, providerSubtype, description 
     } = req.body;
 
-    // Frontend 'tags' veya 'tag' göndermiş olabilir
-    const rawTags = req.body.tags !== undefined ? req.body.tags : req.body.tag;
+    // Frontend 'tags', 'tag' veya 'selectedTags' göndermiş olabilir
+    const rawTags = req.body.tags !== undefined 
+      ? req.body.tags 
+      : (req.body.tag !== undefined ? req.body.tag : req.body.selectedTags);
+      
+    console.log(`[DEBUG] Yakalanan Raw Tags:`, rawTags);
 
     const keywordsArray = serviceKeywords !== undefined ? (
       Array.isArray(serviceKeywords) 
@@ -187,6 +192,7 @@ const updateProvider = async (req, res) => {
     ) : null;
 
     const tagsArray = rawTags !== undefined ? parseTags(rawTags) : null;
+    console.log(`[DEBUG] İşlenen Tags Array:`, tagsArray);
 
     const channelsArray = communicationChannels !== undefined ? (
       Array.isArray(communicationChannels) 
