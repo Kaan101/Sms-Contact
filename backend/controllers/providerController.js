@@ -152,6 +152,10 @@ const getProviderByPhone = async (req, res) => {
 const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
+
+// 🔍 Gelen veriyi konsola yazdırarak kontrol edelim
+    console.log(`[DEBUG] Güncelleme İsteği ID: ${id}, Body:`, req.body);
+   
     const { 
       name, phone, email, serviceKeywords, communicationChannels, 
       priorityScore, isActive,
