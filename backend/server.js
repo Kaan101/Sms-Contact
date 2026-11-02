@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -9,9 +8,11 @@ const apiRoutes = require('./routes/apiRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ... diğer kodlar
+// Bot/Cron servisleri varsa başlat
 const { startCronJobs } = require('./services/cronJob');
-startCronJobs(); // Sunucu kalktığında botu da çalıştır
+if (typeof startCronJobs === 'function') {
+  startCronJobs(); // Sunucu kalktığında botu da çalıştır
+}
 
 // Middleware
 app.use(cors());
@@ -32,8 +33,7 @@ const startServer = async () => {
     await testDbConnection();
     
     // --- GÜVENLİ MIGRATION BAŞLANGICI ---
-    // Production'da bile olsak, sadece "eksik olan" kritik tabloları 
-try {
+    try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS request_provider_details (
             id SERIAL PRIMARY KEY,
@@ -42,7 +42,7 @@ try {
             provider_budget NUMERIC(10,2),
             provider_currency VARCHAR(10) DEFAULT 'TRY',
             provider_target_date TIMESTAMP WITH TIME ZONE,
-            provider_delivered_at TIMESTAMP WITH TIME ZONE, -- YENİ EKLENEN KOLON
+            provider_delivered_at TIMESTAMP WITH TIME ZONE,
             provider_description TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -53,22 +53,17 @@ try {
     } catch (dbError) {
       console.error('❌ Güvenli Migration hatası:', dbError.message);
     }
-    // --- GÜVENLİ MIGRATION BİTİŞİ ---
 
-    // Geliştirme (development) ortamında veya manuel bir komut verildiğinde initDb çalışsın,
-    // Canlı (production/Railway) ortamında tabloları SIFIRLAMASIN!
-    if (process.env.NODE_ENV === 'development' || process.env.INIT_DB === 'true') {
-        console.log('Tablo oluşturma/güncelleme (initDb) başlatılıyor...');
-        await initDatabase();
-    } else {
-        console.log('Production ortamı: initDb (Tablo sıfırlama) atlandı.');
+    // service_providers tablosuna 'tags' (dizi) sütununu güvenli şekilde ekle
+    try {
+      await pool.query(`
+        ALTER TABLE service_providers 
+        ADD COLUMN IF NOT EXISTS tags TEXT[];
+      `);
+      console.log('✅ Güvenli Migration: service_providers.tags sütunu kontrol edildi.');
+    } catch (dbError) {
+      console.error('❌ Tags Migration hatası:', dbError.message);
     }
-
-// service_providers tablosuna source (kaynak) kolonunu güvenli şekilde ekle
-    await pool.query(`
-      ALTER TABLE service_providers 
-      ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'MANUAL';
-    `);
 
     // service_providers tablosuna genişletilmiş profil kolonlarını güvenli şekilde ekle
     await pool.query(`
@@ -84,15 +79,22 @@ try {
       ADD COLUMN IF NOT EXISTS provider_subtype VARCHAR(100),
       ADD COLUMN IF NOT EXISTS description TEXT;
     `);
+    // --- GÜVENLİ MIGRATION BİTİŞİ ---
 
-    app.listen(PORT, () => {
+    if (process.env.NODE_ENV === 'development' || process.env.INIT_DB === 'true') {
+        console.log('Tablo oluşturma/güncelleme (initDb) başlatılıyor...');
+        await initDatabase();
+    } else {
+        console.log('Production ortamı: initDb (Tablo sıfırlama) atlandı.');
+    }
+
+    // 🚀 Railway / Docker için '0.0.0.0' eklenerek SIGTERM / Port sorunu kökten çözüldü
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Sunucu ${PORT} portunda aktif.`);
     });
   } catch (error) {
     console.error('Sunucu başlatma hatası:', error);
   }
-
-  
 };
 
 startServer();
