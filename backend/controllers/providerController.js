@@ -7,15 +7,30 @@ const getNormalizedLast10 = (p) => {
   return digits.length >= 10 ? digits.slice(-10) : digits;
 };
 
-// 1. Yeni Servis Veren Ekleme (Ayrı Tags Alanı Destekli)
+// Yardımcı: Etiketleri güvenli bir şekilde diziye çevirir (tags veya tag destekli)
+const parseTags = (inputTags) => {
+  if (!inputTags) return [];
+  if (Array.isArray(inputTags)) {
+    return inputTags.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+  }
+  if (typeof inputTags === 'string') {
+    return inputTags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+  return [];
+};
+
+// 1. Yeni Servis Veren Ekleme (Tags / Tag Destekli)
 const registerProvider = async (req, res) => {
   try {
     const { 
-      name, phone, email, serviceKeywords, tags, communicationChannels, 
+      name, phone, email, serviceKeywords, communicationChannels, 
       priorityScore, source,
       address, country, city, district, neighborhood,
       postalCode, providerType, providerSubtype, description
     } = req.body;
+
+    // Frontend 'tags' veya 'tag' göndermiş olabilir, her ikisini de kontrol edelim
+    const rawTags = req.body.tags !== undefined ? req.body.tags : req.body.tag;
 
     if (!name || !phone || !serviceKeywords || !communicationChannels) {
       return res.status(400).json({
@@ -25,14 +40,10 @@ const registerProvider = async (req, res) => {
     }
 
     const keywordsArray = Array.isArray(serviceKeywords) 
-      ? serviceKeywords 
-      : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      ? serviceKeywords.map(s => String(s).trim().toLowerCase()).filter(Boolean)
+      : String(serviceKeywords).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
-    const tagsArray = tags ? (
-      Array.isArray(tags) 
-        ? tags 
-        : tags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-    ) : [];
+    const tagsArray = parseTags(rawTags);
 
     const channelsArray = Array.isArray(communicationChannels)
       ? communicationChannels
@@ -102,7 +113,7 @@ const getProviders = async (req, res) => {
   }
 };
 
-// 3. Telefon Numarasına Göre Sağlayıcı Bilgisi Getir (Son 10 Hane Eşleşmesiyle)
+// 3. Telefon Numarasına Göre Sağlayıcı Bilgisi Getir
 const getProviderByPhone = async (req, res) => {
   try {
     const { phone } = req.query;
@@ -137,30 +148,29 @@ const getProviderByPhone = async (req, res) => {
   }
 };
 
-// 4. Servis Veren Güncelleme (Ayrı Tags Destekli)
+// 4. Servis Veren Güncelleme (Gelişmiş Tags / Tag Desteği)
 const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
     const { 
-      name, phone, email, serviceKeywords, tags, communicationChannels, 
+      name, phone, email, serviceKeywords, communicationChannels, 
       priorityScore, isActive,
       address, country, city, district, neighborhood,
       postalCode, providerType, providerSubtype, description 
     } = req.body;
 
-    const keywordsArray = serviceKeywords ? (
+    // Frontend 'tags' veya 'tag' göndermiş olabilir
+    const rawTags = req.body.tags !== undefined ? req.body.tags : req.body.tag;
+
+    const keywordsArray = serviceKeywords !== undefined ? (
       Array.isArray(serviceKeywords) 
-        ? serviceKeywords 
-        : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+        ? serviceKeywords.map(s => String(s).trim().toLowerCase()).filter(Boolean)
+        : String(serviceKeywords).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
     ) : null;
 
-    const tagsArray = tags !== undefined ? (
-      Array.isArray(tags) 
-        ? tags 
-        : tags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-    ) : null;
+    const tagsArray = rawTags !== undefined ? parseTags(rawTags) : null;
 
-    const channelsArray = communicationChannels ? (
+    const channelsArray = communicationChannels !== undefined ? (
       Array.isArray(communicationChannels) 
         ? communicationChannels 
         : ['PHONE']
