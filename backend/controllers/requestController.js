@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-// --- MASTER TAKSONOMİ VE OTOMATİK ETİKETLEME MOTORU ---
+// --- MASTER TAKSONOMİ VE AKILLI AI ROUTER MOTORU ---
 let MASTER_TAXONOMY = {};
 let isTaxonomyLoaded = false;
 
@@ -26,6 +26,23 @@ const loadTaxonomyFromDB = async () => {
 };
 
 loadTaxonomyFromDB();
+
+// Aşama 1: Akıllı Router & Bağlam (Context) Zenginleştirme
+const performAiAnalysis = (rawText) => {
+  const text = (rawText || "").toLowerCase().trim();
+  
+  // 1. Aciliyet Tespiti
+  const urgentKeywords = ["acil", "hemen", "kritik", "su basması", "kilitli kaldı", "yangın"];
+  const isUrgent = urgentKeywords.some(keyword => text.includes(keyword));
+
+  // 2. Kayıt Türü Tespiti (Talep vs Bildirim)
+  const notificationKeywords = ["bilgi", "duyuru", "şikayet", "durum"];
+  const isNotification = notificationKeywords.some(keyword => text.includes(keyword));
+  const requestType = isNotification ? "BILDIRIM" : "TALEP";
+  const intent = isNotification ? "NOTIFICATION_INTENT" : "SERVICE_REQUEST";
+
+  return { isUrgent, requestType, intent };
+};
 
 const autoTagRequest = async (rawText) => {
   if (!rawText) return ['GENEL_BILDIRIM'];
@@ -53,6 +70,36 @@ const autoTagRequest = async (rawText) => {
   return Array.from(tags);
 };
 
+// --- AŞAMA 1.3: DURUM MAKİNESİ (STATE MACHINE) VALIDATOR ---
+const VALID_TRANSITIONS = {
+  'POOL': ['MATCHED', 'CANCELLED', 'PROVIDER_SKIPPED', 'MANUAL_INTERVENTION'],
+  'MATCHED': ['ACCEPTED', 'CANCELLED', 'POOL', 'PROVIDER_SKIPPED'],
+  'ACCEPTED': ['PROVIDER_COMPLETED', 'COMPLETED', 'CANCELLED'],
+  'PROVIDER_COMPLETED': ['COMPLETED', 'CANCELLED'],
+  'PROVIDER_SKIPPED': ['POOL', 'MATCHED', 'CANCELLED'],
+  'MANUAL_INTERVENTION': ['MATCHED', 'POOL', 'CANCELLED'],
+  'CANCELLED': []
+};
+
+const validateStateTransition = (currentState, targetState) => {
+  const current = (currentState || 'POOL').toUpperCase();
+  const target = (targetState || '').toUpperCase();
+
+  const allowedNextStates = VALID_TRANSITIONS[current];
+  if (!allowedNextStates) {
+    return { isValid: false, message: `Geçersiz başlangıç durumu: ${current}` };
+  }
+
+  if (!allowedNextStates.includes(target)) {
+    return { 
+      isValid: false, 
+      message: `Durum geçişi reddedildi! "${current}" durumundan "${target}" durumuna geçilemez.` 
+    };
+  }
+
+  return { isValid: true };
+};
+
 // --- CONTROLLER İŞLEMLERİ ---
 
 const logSms = async (requestId, type, phone, body) => {
@@ -71,13 +118,18 @@ const createRequest = async (req, res) => {
   try {
     const { rawText, disambiguationChoice, contactValue, preferredChannel, location, isUrgent, deadlineDatetime, requestType } = req.body;
     
+    // 🤖 Otonom AI Router & Bağlam Zenginleştirme
+    const aiAnalysis = performAiAnalysis(rawText);
     const detectedTags = await autoTagRequest(rawText);
+
+    const finalIsUrgent = isUrgent !== undefined ? isUrgent : aiAnalysis.isUrgent;
+    const finalRequestType = requestType || aiAnalysis.requestType;
 
     const { rows: requestRows } = await pool.query(
       `INSERT INTO requests (raw_text, disambiguation_choice, contact_value, preferred_channel, location, is_urgent, deadline_datetime, request_type, status, tags) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'POOL', $9) 
        RETURNING *;`,
-      [rawText, disambiguationChoice, contactValue, preferredChannel || 'PHONE', location, isUrgent || false, deadlineDatetime || null, requestType || 'TALEP', detectedTags]
+      [rawText, disambiguationChoice, contactValue, preferredChannel || 'PHONE', location, finalIsUrgent, deadlineDatetime || null, finalRequestType, detectedTags]
     );
 
     const newRequest = requestRows[0];
@@ -351,6 +403,18 @@ const updateRequestStatus = async (req, res) => {
     const { requestId } = req.params;
     const { newStatus } = req.body;
 
+    // 🤖 Mevcut durumu DB'den çekip State Machine doğrulaması yapalım
+    const currentReqRes = await pool.query(`SELECT status FROM requests WHERE id = $1`, [requestId]);
+    if (currentReqRes.rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Talep bulunamadı.' });
+    }
+    const currentStatus = currentReqRes.rows[0].status;
+
+    const validation = validateStateTransition(currentStatus, newStatus);
+    if (!validation.isValid) {
+      return res.status(400).json({ status: 'error', message: validation.message });
+    }
+
     const { rows } = await pool.query(
       `UPDATE requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *;`,
       [newStatus, requestId]
@@ -371,6 +435,7 @@ const updateRequestStatus = async (req, res) => {
       if (newStatus === 'ACCEPTED') {
         await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Talebiniz sağlayıcı tarafından kabul edildi. İletişime geçilecektir.`);
       } else if (newStatus === 'PROVIDER_COMPLETED') {
+        await logSnsIfNeeded?.(); // Güvenli kontrol
         await logSms(updatedReq.id, 'USER', updatedReq.contact_value, `Sağlayıcı işlemi tamamladığını bildirdi. Lütfen onaylayıp değerlendirin.`);
       }
     }
