@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
+// 🤖 AŞAMA 1: AI Router Servisini İçe Aktarma
+const { performAiAnalysis } = require('../services/aiRouterService');
+
 // --- BÜTÜN CONTROLLER İÇE AKTARIMLARI (DÜZENLİ) ---
 const { sendOtp, verifyOtp } = require('../controllers/authController');
 const { getSettings, updateSetting } = require('../controllers/settingsController');
@@ -73,7 +76,30 @@ router.delete('/providers/:id', deleteProvider);
 // ==========================================
 router.post('/requests/direct-reorder', createDirectReorder);
 router.post('/requests/assign', assignProviderManually);
-router.post('/requests', createRequest);
+
+// 🤖 AŞAMA 1 ENTEGRE EDİLMİŞ TALEP OLUŞTURMA ROTOSU
+router.post('/requests', async (req, res, next) => {
+    try {
+        const { rawText } = req.body;
+        if (rawText && rawText.trim()) {
+            // AI Router analizini çalıştırıp gelen değerleri req.body üzerine işliyoruz
+            const aiAnalysis = performAiAnalysis(rawText);
+            
+            if (req.body.isUrgent === undefined) {
+                req.body.isUrgent = aiAnalysis.isUrgent;
+            }
+            if (!req.body.requestType) {
+                req.body.requestType = aiAnalysis.requestType;
+            }
+            // AI tarafından tespit edilen etiketleri ekleyelim
+            req.body.aiDetectedTags = aiAnalysis.tags;
+        }
+    } catch (error) {
+        console.error("AI Router Middleware Çalıştırılamadı:", error);
+    }
+    // Orijinal createRequest controller fonksiyonuna devret
+    return createRequest(req, res, next);
+});
 
 router.get('/requests/pool', getOpenPoolRequests);
 router.get('/requests/my-requests', getUserRequests);
