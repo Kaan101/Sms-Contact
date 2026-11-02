@@ -7,7 +7,7 @@ const getNormalizedLast10 = (p) => {
   return digits.length >= 10 ? digits.slice(-10) : digits;
 };
 
- // 1. Yeni Servis Veren Ekleme (Tam Teşekküllü)
+// 1. Yeni Servis Veren Ekleme (Tam Teşekküllü)
 const registerProvider = async (req, res) => {
   try {
     const { 
@@ -130,11 +130,16 @@ const getProviderByPhone = async (req, res) => {
   }
 };
 
-// 4. Servis Veren Güncelleme
+// 4. Servis Veren Güncelleme (Tam Teşekküllü ve Etiket Destekli)
 const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, email, serviceKeywords, communicationChannels, priorityScore, isActive } = req.body;
+    const { 
+      name, phone, email, serviceKeywords, communicationChannels, 
+      priorityScore, isActive,
+      address, country, city, district, neighborhood,
+      postalCode, providerType, providerSubtype, description 
+    } = req.body;
 
     const keywordsArray = serviceKeywords ? (
       Array.isArray(serviceKeywords) 
@@ -157,8 +162,18 @@ const updateProvider = async (req, res) => {
         service_keywords = COALESCE($4, service_keywords),
         communication_channels = COALESCE($5, communication_channels),
         priority_score = COALESCE($6, priority_score),
-        is_active = COALESCE($7, is_active)
-      WHERE id = $8
+        is_active = COALESCE($7, is_active),
+        address = COALESCE($8, address),
+        country = COALESCE($9, country),
+        city = COALESCE($10, city),
+        district = COALESCE($11, district),
+        neighborhood = COALESCE($12, neighborhood),
+        postal_code = COALESCE($13, postal_code),
+        provider_type = COALESCE($14, provider_type),
+        provider_subtype = COALESCE($15, provider_subtype),
+        description = COALESCE($16, description),
+        updated_at = NOW()
+      WHERE id = $17
       RETURNING *;
     `;
 
@@ -168,8 +183,17 @@ const updateProvider = async (req, res) => {
       email !== undefined ? (email && email.trim() !== '' ? email.trim() : null) : null,
       keywordsArray,
       channelsArray,
-      priorityScore !== undefined ? parseInt(priorityScore, 10) : null,
+      priorityScore !== undefined && priorityScore !== '' ? parseInt(priorityScore, 10) : null,
       isActive !== undefined ? isActive : null,
+      address !== undefined ? (address && address.trim() !== '' ? address.trim() : null) : null,
+      country !== undefined ? (country && country.trim() !== '' ? country.trim() : null) : null,
+      city !== undefined ? (city && city.trim() !== '' ? city.trim() : null) : null,
+      district !== undefined ? (district && district.trim() !== '' ? district.trim() : null) : null,
+      neighborhood !== undefined ? (neighborhood && neighborhood.trim() !== '' ? neighborhood.trim() : null) : null,
+      postalCode !== undefined ? (postalCode && postalCode.trim() !== '' ? postalCode.trim() : null) : null,
+      providerType !== undefined ? (providerType && providerType.trim() !== '' ? providerType.trim() : null) : null,
+      providerSubtype !== undefined ? (providerSubtype && providerSubtype.trim() !== '' ? providerSubtype.trim() : null) : null,
+      description !== undefined ? (description && description.trim() !== '' ? description.trim() : null) : null,
       id
     ];
 
@@ -204,6 +228,7 @@ const deleteProvider = async (req, res) => {
 
     res.status(200).json({ status: 'success', message: 'Servis veren silindi.' });
   } catch (error) {
+    console.error('Servis veren silme hatası:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
