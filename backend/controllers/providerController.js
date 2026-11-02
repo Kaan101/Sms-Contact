@@ -8,14 +8,28 @@ const getNormalizedLast10 = (p) => {
 };
 
 // Yardımcı: Etiketleri güvenli bir şekilde diziye çevirir (tags veya tag destekli)
+// Gelişmiş Etiket Çözümleyici (Nesne, Dizi veya String destekli)
 const parseTags = (inputTags) => {
   if (!inputTags) return [];
+  
+  // Eğer dizi olarak geldiyse (İçerisinde nesne veya string olabilir)
   if (Array.isArray(inputTags)) {
-    return inputTags.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+    return inputTags.map(item => {
+      if (!item) return '';
+      // Eğer eleman bir nesneyse (örn: {id: 1, name: 'tesisat'} veya {tag: 'tesisat'})
+      if (typeof item === 'object') {
+        return String(item.name || item.tag || item.tag_name || item.label || Object.values(item)[0] || '').trim().toLowerCase();
+      }
+      // Düz metinse
+      return String(item).trim().toLowerCase();
+    }).filter(Boolean);
   }
+  
+  // Eğer virgülle ayrılmış string olarak geldiyse
   if (typeof inputTags === 'string') {
     return inputTags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   }
+  
   return [];
 };
 
