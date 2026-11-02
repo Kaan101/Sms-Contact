@@ -7,11 +7,11 @@ const getNormalizedLast10 = (p) => {
   return digits.length >= 10 ? digits.slice(-10) : digits;
 };
 
-// 1. Yeni Servis Veren Ekleme (Tam Teşekküllü)
+// 1. Yeni Servis Veren Ekleme (Ayrı Tags Alanı Destekli)
 const registerProvider = async (req, res) => {
   try {
     const { 
-      name, phone, email, serviceKeywords, communicationChannels, 
+      name, phone, email, serviceKeywords, tags, communicationChannels, 
       priorityScore, source,
       address, country, city, district, neighborhood,
       postalCode, providerType, providerSubtype, description
@@ -28,6 +28,12 @@ const registerProvider = async (req, res) => {
       ? serviceKeywords 
       : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
+    const tagsArray = tags ? (
+      Array.isArray(tags) 
+        ? tags 
+        : tags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    ) : [];
+
     const channelsArray = Array.isArray(communicationChannels)
       ? communicationChannels
       : ['PHONE'];
@@ -37,10 +43,10 @@ const registerProvider = async (req, res) => {
 
     const insertQuery = `
       INSERT INTO service_providers 
-      (name, phone, email, service_keywords, communication_channels, priority_score, source, 
+      (name, phone, email, service_keywords, tags, communication_channels, priority_score, source, 
        address, country, city, district, neighborhood,
        postal_code, provider_type, provider_subtype, description)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *;
     `;
 
@@ -49,6 +55,7 @@ const registerProvider = async (req, res) => {
       phone.trim(),
       email && email.trim() !== '' ? email.trim() : null,
       keywordsArray,
+      tagsArray,
       channelsArray,
       parseInt(priorityScore, 10) || 100,
       providerSource,
@@ -130,12 +137,12 @@ const getProviderByPhone = async (req, res) => {
   }
 };
 
-// 4. Servis Veren Güncelleme (Tam Teşekküllü ve Etiket Destekli)
+// 4. Servis Veren Güncelleme (Ayrı Tags Destekli)
 const updateProvider = async (req, res) => {
   try {
     const { id } = req.params;
     const { 
-      name, phone, email, serviceKeywords, communicationChannels, 
+      name, phone, email, serviceKeywords, tags, communicationChannels, 
       priorityScore, isActive,
       address, country, city, district, neighborhood,
       postalCode, providerType, providerSubtype, description 
@@ -145,6 +152,12 @@ const updateProvider = async (req, res) => {
       Array.isArray(serviceKeywords) 
         ? serviceKeywords 
         : serviceKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    ) : null;
+
+    const tagsArray = tags !== undefined ? (
+      Array.isArray(tags) 
+        ? tags 
+        : tags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
     ) : null;
 
     const channelsArray = communicationChannels ? (
@@ -160,20 +173,20 @@ const updateProvider = async (req, res) => {
         phone = COALESCE($2, phone),
         email = COALESCE($3, email),
         service_keywords = COALESCE($4, service_keywords),
-        communication_channels = COALESCE($5, communication_channels),
-        priority_score = COALESCE($6, priority_score),
-        is_active = COALESCE($7, is_active),
-        address = COALESCE($8, address),
-        country = COALESCE($9, country),
-        city = COALESCE($10, city),
-        district = COALESCE($11, district),
-        neighborhood = COALESCE($12, neighborhood),
-        postal_code = COALESCE($13, postal_code),
-        provider_type = COALESCE($14, provider_type),
-        provider_subtype = COALESCE($15, provider_subtype),
-        description = COALESCE($16, description),
-        updated_at = NOW()
-      WHERE id = $17
+        tags = COALESCE($5, tags),
+        communication_channels = COALESCE($6, communication_channels),
+        priority_score = COALESCE($7, priority_score),
+        is_active = COALESCE($8, is_active),
+        address = COALESCE($9, address),
+        country = COALESCE($10, country),
+        city = COALESCE($11, city),
+        district = COALESCE($12, district),
+        neighborhood = COALESCE($13, neighborhood),
+        postal_code = COALESCE($14, postal_code),
+        provider_type = COALESCE($15, provider_type),
+        provider_subtype = COALESCE($16, provider_subtype),
+        description = COALESCE($17, description)
+      WHERE id = $18
       RETURNING *;
     `;
 
@@ -182,6 +195,7 @@ const updateProvider = async (req, res) => {
       phone ? phone.trim() : null,
       email !== undefined ? (email && email.trim() !== '' ? email.trim() : null) : null,
       keywordsArray,
+      tagsArray,
       channelsArray,
       priorityScore !== undefined && priorityScore !== '' ? parseInt(priorityScore, 10) : null,
       isActive !== undefined ? isActive : null,
